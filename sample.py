@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from docutils.nodes import legend
 from matplotlib.colors import Normalize
+import matplotlib.patheffects as pe
 
 
 def load_wd_data(path, t_limit=19.0, poe_min=None, clip_pct=99.5):
@@ -276,8 +277,13 @@ def plot_2d_polar_two(
 
     for ax in (ax1, ax2):
         ax.scatter(wd_theta, wd_dist, c=[wd_t], cmap=scR.cmap, norm=norm,
-                   s=60, edgecolor="k", linewidth=0.8, marker="o", alpha=0.95, zorder=5)
-        ax.text(0.15, 200, "WD 1856", ha="center", va="center", fontsize=10)
+                   s=30, edgecolor="w", linewidth=0.8, marker="o", alpha=0.95, zorder=5)
+        ax.text(
+            0.15, 220, "WD 1856",
+            ha="center", va="center", fontsize=10,
+            color="black",
+            path_effects=[pe.withStroke(linewidth=2, foreground="white")]
+        )
 
     # Titles
     if titles and len(titles) == 2:
@@ -372,6 +378,6 @@ if __name__ == "__main__":
         dec, d_pc, Tmag,  # Right panel
         Tmag[idx],
         rmax=800,
-        titles=("2-min TOI WD", "200s FFI WD"),
+        titles=("2-min TOI WD", "200-s FFI WD"),
         wd_bp=17.5032, wd_rp=16.2780
     )
