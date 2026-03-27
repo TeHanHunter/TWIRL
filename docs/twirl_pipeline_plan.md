@@ -22,7 +22,7 @@ The proposal already fixes the high-level sequence:
 
 ## Design Drivers From The Proposal
 
-- Primary input sample: Gaia white dwarf catalog, crossmatched to TESS/TIC metadata.
+- Primary input sample: the local external Gentile Fusillo et al. (2021) Gaia EDR3 white dwarf catalogue, recommended at `data_local/catalogs/GaiaEDR3_WD_main.fits`, then crossmatched to TESS/TIC metadata.
 - Photometry source: 200 s TESS FFIs only, which means sectors/orbits from Sector 56 onward.
 - Extraction engine: the MIT-adapted TGLC pipeline already used in the QLP environment.
 - Search target: any transiting or occulting object around a WD, with first-year emphasis on large, deep, short-duration events in the WD 1856-like regime.
@@ -62,24 +62,74 @@ notebooks/
 reports/
 ```
 
+## External Data Policy
+
+Large external inputs and staged survey products should remain local and outside normal git tracking.
+
+Recommended local layout:
+
+```text
+data_local/
+  catalogs/
+    GaiaEDR3_WD_main.fits
+  tglc-data/
+```
+
+Rules:
+
+- do not commit large raw FITS catalogs to this repo
+- do not treat local external data as part of the git-managed source tree
+- record local input path, file size, and provenance in derived metadata products
+- version-control the code, configs, schemas, and derived table definitions that act on those local files
+
 ## Step 1: Generate WD Light Curves On MIT PDO Machines
 
 This is the foundation for everything else. The MIT fork is no longer a single-target `quick_lc.py` workflow. It is an orbit/camera/CCD production pipeline with separate catalog, cutout, ePSF, and light-curve stages.
 
 ### 1.1 Build the WD target table
 
-Create a single master catalog for TWIRL with, at minimum:
+The current seed catalogue for this repo is:
+
+- `data_local/catalogs/GaiaEDR3_WD_main.fits` or another user-configured local path
+- based on Gentile Fusillo et al. (2021), "A catalogue of white dwarfs in Gaia EDR3"
+- this is the main Gaia EDR3 catalogue, not the reduced-proper-motion extension
+- this file is a local external dependency and should not be committed to git
+
+Important catalogue facts to treat as part of the survey definition:
+
+- the main catalogue contains about `1.28 million` sources that passed the authors' quality selection
+- the paper identifies `Pwd > 0.75` as the high-confidence WD threshold, yielding about `359,073` candidates
+- the paper quotes an upper-limit completeness of about `93%` for white dwarfs with `G <= 20`, `Teff > 7000 K`, and `|b| > 20 deg`
+
+TWIRL should build a single master catalog from this file with, at minimum:
 
 - Gaia DR3 designation/source ID
 - TIC ID, if available
 - RA, Dec
 - Gaia `G`, `BP`, `RP`
+- Gaia `Pwd`
 - TESS magnitude estimate
 - WD selection probability / class flag from the input WD catalog
 - sector/orbit coverage in TESS
 - camera, CCD, and cutout mapping once known
 
 This table becomes the control plane for the whole survey.
+
+The master catalog should also include provenance fields that make later survey definitions reproducible:
+
+- local seed-catalog path used at build time
+- seed-catalog file size and modification time, or a stronger file hash when practical
+- TWIRL catalog build version
+- crossmatch recipe version
+- sample-selection recipe version
+
+The parent-sample protocol should be explicit in code and metadata, but the exact TWIRL cut is intentionally deferred for now:
+
+- `seed_catalog`: all rows in the local Gentile Fusillo et al. (2021) main catalogue
+- `reference_highconf_sample`: rows with `Pwd > 0.75`, used as a default high-confidence comparison sample
+- `twirl_parent_sample`: the final locked denominator for occurrence-rate work, to be defined later
+- until `twirl_parent_sample` is frozen, any completeness or occurrence summaries must be labeled provisional
+- any exploratory search outside the final locked denominator must be labeled exploratory and excluded from occurrence-rate denominators by default
 
 ### 1.2 Decide the production sample
 
@@ -90,10 +140,22 @@ Use two nested samples:
 
 A practical starting point is:
 
+- use `Pwd > 0.75` as the default high-confidence reference sample for pilot QA and crossmatch studies
 - primary sample near `T <= 18`
 - full sample extended toward `T <= 20` where recovery remains useful
 - include WD 1856+534 as the mandatory smoke-test target
 - choose one `Sector >= 56` containing WD 1856+534 as the first end-to-end benchmark; the exact sector can be selected later
+
+This creates two linked but distinct products:
+
+- a statistical survey sample with a locked denominator and documented cuts
+- an exploratory event-search layer that can be broader, but does not feed occurrence-rate claims by default
+
+The exact TWIRL WD cut should be frozen only after:
+
+- the Gaia-to-TIC matching behavior is characterized
+- benchmark QA is complete
+- the baseline search stack is defined well enough to support end-to-end injections
 
 ### 1.3 Prepare the MIT PDO environment
 
@@ -148,6 +210,14 @@ Then create a target-centric view:
 - quality flags preserved
 - provenance recorded
 
+The consolidated index format should explicitly distinguish:
+
+- raw imported columns from the seed catalogue
+- derived TWIRL metadata
+- crossmatch outputs
+- processing-status fields
+- sample-membership flags
+
 ### 1.6 Run photometric QA before any ML work
 
 Before training or search, measure:
@@ -162,7 +232,18 @@ Before training or search, measure:
 
 This step should produce a small QA report and a list of sectors/orbits to reprocess if needed.
 
-### 1.7 Gaps to close in the current MIT fork
+### 1.7 Benchmark acceptance criteria
+
+Before scaling beyond the pilot stage, the WD 1856 benchmark should satisfy all of the following at the documentation level:
+
+- the expected transit window is visible in at least one `Sector >= 56` benchmark product
+- the event timing is consistent with the published WD 1856 ephemeris within the expected propagated uncertainty
+- the signal is present in at least one aperture product and checked across the `1x1`, `3x3`, and `5x5` apertures
+- any strong aperture disagreement is documented and investigated as a contamination or extraction issue
+- an independent extraction path has been compared on the benchmark set
+- the benchmark result is strong enough to serve as a smoke test for the first baseline search implementation
+
+### 1.8 Gaps to close in the current MIT fork
 
 The MIT fork is close to what TWIRL needs, but not identical to the survey requirements.
 
@@ -172,6 +253,7 @@ Known gaps to track early:
 - If important WD targets lack TIC IDs, the light-curve stage will need to be extended to support Gaia-selected targets directly.
 - The new output product is decontaminated aperture photometry in HDF5, not the old per-target FITS product with `cal_psf_flux` and `cal_aper_flux`.
 - The old `prior`-based single-target workflow is not exposed in the new CLI, so any need for floating-field-star priors must be added explicitly.
+- The catalogue completeness quoted by Gentile Fusillo et al. (2021) applies only in specific regimes; TWIRL must not generalize that completeness to the full search sample without its own end-to-end validation.
 
 ### Step 1 Deliverables
 
@@ -201,6 +283,18 @@ For the first version, the cleanest path is:
 2. run a separate dip-search branch for non-periodic or weakly periodic events,
 3. pass candidates into automated vetting,
 4. add a WD-specific classifier later if it materially improves triage.
+
+### 2.1b Minimum baseline search specification
+
+Before adding ML triage, the baseline search should define and document:
+
+- the detrending approach used for minute-scale events, with explicit injection checks that the detrending does not erase the target signals
+- how `1x1`, `3x3`, and `5x5` apertures are searched and compared
+- the rule for choosing a preferred aperture per candidate
+- the candidate statistics recorded by the periodic branch
+- the candidate statistics recorded by the non-periodic dip branch
+- the multi-sector merge logic for periodic candidates
+- the rule for keeping irregular or apparently aperiodic events separate from the periodic survey sample
 
 ### 2.2 Build the labeled dataset
 
@@ -278,6 +372,8 @@ Produce completeness surfaces as a function of:
 - number of sectors
 - crowding / contamination metrics
 
+Completeness products should be tagged with the exact sample definition and search-branch definition they apply to. Do not present a completeness surface as survey-wide if it only applies to a provisional cut or one search mode.
+
 ### Step 3 Deliverables
 
 - injection engine
@@ -343,6 +439,20 @@ Current planning assumption for MIT-affiliated follow-up:
 - identify which MIT-access high-speed photometric instrument is actually schedulable for WD transit windows
 - build a rapid-response workflow around short predicted windows and sub-minute cadence requirements
 
+Follow-up readiness criteria should be satisfied before requesting telescope time for a periodic candidate:
+
+- the event survives the baseline search and automated vetting
+- the signal is independently re-extracted or cross-checked in a second reduction path
+- image-level and aperture-level contamination checks are complete
+- the ephemeris is precise enough for the planned instrument and observing window
+- the expected cadence and depth are compatible with the planned facility
+- the candidate status, assumptions, and main false-positive modes are documented
+
+For apparently aperiodic or irregular events:
+
+- do not assume repeat-photometry confirmation is possible
+- define a separate follow-up path centered on classification, continued monitoring, or archival/context constraints
+
 ### 5.3 Final population analysis
 
 Regardless of the number of validated planets, TWIRL should finish with:
@@ -350,6 +460,14 @@ Regardless of the number of validated planets, TWIRL should finish with:
 - occurrence-rate posteriors or upper limits, first in the large-occulting regime where the 200 s survey is strongest
 - candidate catalog publication
 - validated discoveries, if present
+
+A publishable null result still requires:
+
+- a locked parent sample
+- a documented search definition
+- end-to-end completeness tied to that search definition
+- a final vetted candidate table or null-candidate statement
+- upper limits stated only for the declared sample and event class
 
 ### Step 5 Deliverables
 
