@@ -1,0 +1,393 @@
+# TWIRL Pipeline Plan
+
+This document turns the NHFP proposal into an executable software and survey plan for this repository.
+
+## Project Goal
+
+TWIRL will use 200 s TESS FFIs, TGLC-based light-curve extraction, transparent transit/dip searches, optional machine-learning triage, automated vetting, and injection-recovery tests to:
+
+1. search for any transiting or occulting objects around white dwarfs,
+2. measure the completeness of that search in the regimes where 200 s data are strongest,
+3. derive occurrence-rate constraints or upper limits for those regimes, and
+4. produce validated candidate lists and follow-up targets.
+
+The proposal already fixes the high-level sequence:
+
+1. generate WD light curves with the MIT-adapted TGLC on MIT PDO machines,
+2. build a baseline search for periodic and non-periodic transit-like events,
+3. train or adapt a model only if it improves triage after the baseline search is understood,
+4. run injection-recovery tests,
+5. search the WD sample,
+6. validate the resulting targets.
+
+## Design Drivers From The Proposal
+
+- Primary input sample: Gaia white dwarf catalog, crossmatched to TESS/TIC metadata.
+- Photometry source: 200 s TESS FFIs only, which means sectors/orbits from Sector 56 onward.
+- Extraction engine: the MIT-adapted TGLC pipeline already used in the QLP environment.
+- Search target: any transiting or occulting object around a WD, with first-year emphasis on large, deep, short-duration events in the WD 1856-like regime.
+- Science outputs: validated candidates, a ranked follow-up list, and occurrence-rate limits first for large occulters; Earth-size/HZ occurrence work is a longer-term goal only after completeness is demonstrated.
+
+## Recommended Repo Layout
+
+The repo should be organized around the pipeline stages rather than papers or notebooks.
+
+```text
+docs/
+  twirl_pipeline_plan.md
+  mit_tglc_usage_guide.md
+catalogs/
+  wd_master_catalog/
+  sector_orbit_maps/
+configs/
+  tglc/
+  detection/
+  injections/
+scripts/
+  step1_lcs/
+  step2_detection/
+  step3_injections/
+  step4_search/
+  step5_validation/
+src/
+  twirl/
+    catalogs/
+    io/
+    lightcurves/
+    detection/
+    injections/
+    search/
+    validation/
+notebooks/
+reports/
+```
+
+## Step 1: Generate WD Light Curves On MIT PDO Machines
+
+This is the foundation for everything else. The MIT fork is no longer a single-target `quick_lc.py` workflow. It is an orbit/camera/CCD production pipeline with separate catalog, cutout, ePSF, and light-curve stages.
+
+### 1.1 Build the WD target table
+
+Create a single master catalog for TWIRL with, at minimum:
+
+- Gaia DR3 designation/source ID
+- TIC ID, if available
+- RA, Dec
+- Gaia `G`, `BP`, `RP`
+- TESS magnitude estimate
+- WD selection probability / class flag from the input WD catalog
+- sector/orbit coverage in TESS
+- camera, CCD, and cutout mapping once known
+
+This table becomes the control plane for the whole survey.
+
+### 1.2 Decide the production sample
+
+Use two nested samples:
+
+- `search_sample_primary`: the highest-priority WD sample for the first end-to-end run
+- `search_sample_full`: the broader sample used for the final occurrence-rate analysis
+
+A practical starting point is:
+
+- primary sample near `T <= 18`
+- full sample extended toward `T <= 20` where recovery remains useful
+- include WD 1856+534 as the mandatory smoke-test target
+- choose one `Sector >= 56` containing WD 1856+534 as the first end-to-end benchmark; the exact sector can be selected later
+
+### 1.3 Prepare the MIT PDO environment
+
+The MIT-adapted TGLC expects:
+
+- local TICA FFI files already staged on disk,
+- local `pyticdb` access to `tic_82` and `gaia3`,
+- a `tglc-data` directory tree organized by orbit/camera/CCD.
+
+For TWIRL, the immediate operational tasks are:
+
+1. freeze the orbit list to process,
+2. identify which orbit/camera/CCD combinations contain WD targets,
+3. pre-stage the required 200 s FFIs,
+4. confirm the `pyticdb` databases resolve on PDO,
+5. define batch-job wrappers for one orbit-camera-CCD unit per job.
+
+### 1.4 Generate catalogs and cutouts
+
+The MIT fork runs in four logical stages:
+
+1. `catalogs`
+2. `cutouts`
+3. `epsfs`
+4. `lightcurves`
+
+For TWIRL, the key configuration change is to lift the TIC magnitude limit well beyond the default value. The MIT fork defaults to bright-star QLP use cases; WD work needs a much deeper target cut.
+
+Initial production assumptions:
+
+- run `--max-magnitude 20`
+- keep Gaia catalogs for all relevant field stars
+- run per orbit and per CCD, not per target
+
+### 1.5 Extract and consolidate WD light curves
+
+The MIT fork writes one HDF5 file per TIC target. After production, build a TWIRL light-curve index with:
+
+- TIC ID
+- Gaia DR3 ID
+- orbit
+- sector
+- camera/CCD
+- cutout ID
+- HDF5 path
+- summary quality metrics
+
+Then create a target-centric view:
+
+- all sectors for one WD grouped together
+- time stamps standardized
+- quality flags preserved
+- provenance recorded
+
+### 1.6 Run photometric QA before any ML work
+
+Before training or search, measure:
+
+- per-target RMS / MAD versus magnitude
+- sector-level failure rates
+- missing cadence statistics
+- light-curve completeness by target and by orbit
+- recovery of WD 1856+534 b in the 200 s products
+- agreement or disagreement across the 1x1, 3x3, and 5x5 apertures for benchmark targets
+- basic comparison against at least one independent extraction path on the benchmark target set
+
+This step should produce a small QA report and a list of sectors/orbits to reprocess if needed.
+
+### 1.7 Gaps to close in the current MIT fork
+
+The MIT fork is close to what TWIRL needs, but not identical to the survey requirements.
+
+Known gaps to track early:
+
+- It is target-output oriented around TIC IDs, so TWIRL must verify that the WD sample is complete enough after Gaia-to-TIC matching.
+- If important WD targets lack TIC IDs, the light-curve stage will need to be extended to support Gaia-selected targets directly.
+- The new output product is decontaminated aperture photometry in HDF5, not the old per-target FITS product with `cal_psf_flux` and `cal_aper_flux`.
+- The old `prior`-based single-target workflow is not exposed in the new CLI, so any need for floating-field-star priors must be added explicitly.
+
+### Step 1 Deliverables
+
+- WD master target catalog
+- orbit/camera/CCD job table
+- automated PDO production scripts
+- consolidated WD light-curve archive
+- QA report and reprocessing list
+
+## Step 2: Build The Search Stack And Optional WD-Specific Classifier
+
+The proposal points toward Astronet-Triage-like deep-learning search, but the first survey version should not be ML-first. TWIRL should begin with an interpretable search stack and add ML only where it clearly improves ranking or false-positive control.
+
+### 2.1 Define the detection unit
+
+Decide what the search stack scores:
+
+- sector-level candidate windows,
+- period-search peaks,
+- folded light curves,
+- local/global transit views derived from a separate search stage,
+- and non-periodic dip clusters that may represent debris or irregular occultations.
+
+For the first version, the cleanest path is:
+
+1. produce a transparent periodic candidate list with a short-duration box/trapezoid search,
+2. run a separate dip-search branch for non-periodic or weakly periodic events,
+3. pass candidates into automated vetting,
+4. add a WD-specific classifier later if it materially improves triage.
+
+### 2.2 Build the labeled dataset
+
+Positive examples:
+
+- injected WD transits in real TGLC light curves
+- WD 1856+534 b as a benchmark
+- synthetic variants covering duration, depth, cadence loss, and crowding
+- large-occulting benchmark cases spanning giant planets, brown dwarfs, and compact stellar companions
+
+Negative examples:
+
+- quiet WDs
+- eclipsing binaries and blends
+- scattered-light / systematics artifacts
+- cadence-gap and momentum-dump failures
+
+### 2.3 Train the model
+
+If a classifier is added, the training pipeline should include:
+
+- train/validation/test splits by target, not random cadence
+- class-balance control
+- calibration of classifier scores
+- explicit evaluation versus magnitude, period, depth, and number of sectors
+
+### Step 2 Deliverables
+
+- reproducible periodic-search baseline
+- reproducible dip-search baseline
+- reproducible training set definition
+- trained detector checkpoint(s), if justified
+- evaluation report
+- inference script that scores the full TWIRL archive
+
+## Step 3: Injection-Recovery Tests
+
+This is the completeness backbone of the survey and should run through the same search stack used in Step 4.
+
+### 3.1 Injection design
+
+Inject over a grid in:
+
+- orbital period
+- transit depth
+- duration / impact parameter
+- host magnitude
+- number of observed sectors
+
+The grid should be densest near:
+
+- the WD 1856-like large-occulting regime,
+- Roche-limit boundary cases,
+- deep short-duration transits that are most astrophysically plausible for WD systems,
+- and only secondarily the Earth-size/HZ regime, which should not drive the first-year completeness claims.
+
+### 3.2 Recovery protocol
+
+Each injection should pass through:
+
+1. the search stage,
+2. the classifier, if used,
+3. the vetter,
+4. candidate merging rules.
+
+Do not estimate completeness from only one stage; use the true end-to-end recovery fraction.
+
+### 3.3 Completeness products
+
+Produce completeness surfaces as a function of:
+
+- `Tmag`
+- period
+- depth
+- number of sectors
+- crowding / contamination metrics
+
+### Step 3 Deliverables
+
+- injection engine
+- recovery summaries
+- completeness grids for occurrence-rate work
+
+## Step 4: Search For WD Transiting Objects
+
+After the light curves, detector, and completeness machinery are stable, run the production search.
+
+### 4.1 Full survey inference
+
+Run the periodic and non-periodic search branches across all WD light curves and record:
+
+- candidate ephemerides
+- detection scores
+- per-sector evidence
+- merged multi-sector candidates
+- flags for apparently aperiodic or irregular events
+
+### 4.2 Candidate catalog construction
+
+For each candidate, store:
+
+- target identifiers
+- discovery sectors
+- transit parameters
+- detection statistics
+- vetter outputs
+- links to diagnostic plots and files
+
+### Step 4 Deliverables
+
+- machine-generated candidate table
+- diagnostic plot package
+- ranked follow-up target list
+
+## Step 5: Validate The Targets
+
+Validation should combine automated filtering and external follow-up.
+
+### 5.1 Automated checks
+
+- contamination and crowding review
+- centroid and aperture behavior
+- odd/even and depth consistency checks where applicable
+- ephemeris consistency across sectors
+- image-level inspection around predicted transits
+
+### 5.2 External follow-up
+
+For the strongest candidates:
+
+- high-cadence photometry at predicted transit windows
+- archival imaging and catalog checks
+- spectroscopy or RV constraints where physically meaningful
+- high-resolution imaging if blending is a concern
+
+Current planning assumption for MIT-affiliated follow-up:
+
+- treat Magellan as the primary institutional follow-up path to develop early
+- treat MMT as a collaborator-driven or backup path rather than the main plan
+- identify which MIT-access high-speed photometric instrument is actually schedulable for WD transit windows
+- build a rapid-response workflow around short predicted windows and sub-minute cadence requirements
+
+### 5.3 Final population analysis
+
+Regardless of the number of validated planets, TWIRL should finish with:
+
+- occurrence-rate posteriors or upper limits, first in the large-occulting regime where the 200 s survey is strongest
+- candidate catalog publication
+- validated discoveries, if present
+
+### Step 5 Deliverables
+
+- validated-candidate list
+- follow-up status table
+- occurrence-rate paper inputs
+
+## Suggested Milestones
+
+### Year 1
+
+- finalize WD sample
+- stand up MIT PDO light-curve production
+- select and run a first `Sector >= 56` benchmark containing WD 1856+534
+- recover WD 1856+534 b with the new 200 s workflow
+- stand up the baseline periodic and dip-search branches
+- create first injection datasets for large occulters
+- identify the concrete MIT-affiliated follow-up path and required collaborators/instruments
+
+### Year 2
+
+- run the full search stack and automated vetting
+- publish candidate catalog
+- execute first follow-up campaign
+
+### Year 3
+
+- complete validation
+- compute occurrence rates with completeness corrections, starting with the large-occulting regime
+- publish discoveries and/or upper limits
+
+## Immediate Implementation Priorities For This Repo
+
+1. Create the WD master catalog builder.
+2. Create the orbit/camera/CCD mapper for the WD sample.
+3. Wrap the MIT TGLC CLI in PDO batch scripts.
+4. Define the consolidated HDF5-to-TWIRL index format.
+5. Build a QA notebook/report around WD 1856+534 b and a small control sample.
+6. Decide whether TWIRL will rely on TIC completeness or extend the MIT fork to support Gaia-first target selection.
+7. Build the first transparent periodic and dip-search baselines before committing to an ML-heavy workflow.
+8. Lock down the MIT-affiliated follow-up path for short, high-cadence transit confirmation.
