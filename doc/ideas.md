@@ -3,7 +3,7 @@
 This file is for brainstorming, referee-style concerns, unresolved decisions, and future directions.
 
 Nothing in this file is automatically a project decision.
-Project decisions belong in `plan.md`, `AGENTS.md`, or `docs/twirl_pipeline_plan.md` once they are accepted.
+Project decisions belong in `doc/twirl_plan.md`, `AGENTS.md`, or another formal repo doc once they are accepted.
 
 ## Why This File Exists
 
@@ -98,6 +98,6 @@ The biggest likely referee objections are:
 
 When a brainstorming item becomes a decision:
 
-- move it into `plan.md` if it changes current status or priorities
+- move it into `doc/twirl_plan.md` if it changes current status or priorities
 - move it into `AGENTS.md` if it becomes operating protocol
-- move it into `docs/twirl_pipeline_plan.md` if it changes the formal pipeline or scientific plan
+- move it into `doc/twirl_plan.md` if it changes the formal pipeline or scientific plan

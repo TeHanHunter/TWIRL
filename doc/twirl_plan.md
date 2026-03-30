@@ -1,6 +1,15 @@
-# TWIRL Pipeline Plan
+# twirl_plan.md
 
 This document turns the NHFP proposal into an executable software and survey plan for this repository.
+
+## Current Status Snapshot
+
+- TWIRL is a standalone repo and remains separate from `TWIRL_proposal`.
+- The core survey is limited to `200 s` TESS FFIs, which means `Sector >= 56`.
+- `WD 1856+534` is the benchmark target, but the exact benchmark sector is intentionally not fixed yet.
+- The seed WD catalog is a local external dependency, not a git-tracked repo asset.
+- `Pwd > 0.75` is the default high-confidence reference sample for pilot work, but the final TWIRL denominator is still to be determined later.
+- The first search should be interpretable and not ML-first.
 
 ## Project Goal
 
@@ -22,7 +31,7 @@ The proposal already fixes the high-level sequence:
 
 ## Design Drivers From The Proposal
 
-- Primary input sample: the local external Gentile Fusillo et al. (2021) Gaia EDR3 white dwarf catalogue, recommended at `data_local/catalogs/GaiaEDR3_WD_main.fits`, then crossmatched to TESS/TIC metadata.
+- Primary input sample: the local external Gentile Fusillo et al. (2021) Gaia EDR3 white dwarf catalogue, recommended at `data_local/catalogs/GaiaEDR3_WD_main.fits`, with Gaia DR3 as the authoritative target identifier and TIC/TESS metadata added when available.
 - Photometry source: 200 s TESS FFIs only, which means sectors/orbits from Sector 56 onward.
 - Extraction engine: the MIT-adapted TGLC pipeline already used in the QLP environment.
 - Search target: any transiting or occulting object around a WD, with first-year emphasis on large, deep, short-duration events in the WD 1856-like regime.
@@ -33,9 +42,12 @@ The proposal already fixes the high-level sequence:
 The repo should be organized around the pipeline stages rather than papers or notebooks.
 
 ```text
-docs/
-  twirl_pipeline_plan.md
+doc/
+  twirl_plan.md
   mit_tglc_usage_guide.md
+  ideas.md
+  local_data.md
+  plotting_style.md
 catalogs/
   wd_master_catalog/
   sector_orbit_maps/
@@ -153,7 +165,7 @@ This creates two linked but distinct products:
 
 The exact TWIRL WD cut should be frozen only after:
 
-- the Gaia-to-TIC matching behavior is characterized
+- the Gaia-first target definition and any required MIT TGLC implementation changes are characterized well enough to support production
 - benchmark QA is complete
 - the baseline search stack is defined well enough to support end-to-end injections
 
@@ -249,7 +261,8 @@ The MIT fork is close to what TWIRL needs, but not identical to the survey requi
 
 Known gaps to track early:
 
-- It is target-output oriented around TIC IDs, so TWIRL must verify that the WD sample is complete enough after Gaia-to-TIC matching.
+- Gaia DR3 should remain the survey-defining target identifier even if the current MIT implementation is still partly TIC-oriented.
+- Gaia-to-TIC matching should be audited for metadata and implementation reasons, but it should not define the scientific parent sample by itself.
 - If important WD targets lack TIC IDs, the light-curve stage will need to be extended to support Gaia-selected targets directly.
 - The new output product is decontaminated aperture photometry in HDF5, not the old per-target FITS product with `cal_psf_flux` and `cal_aper_flux`.
 - The old `prior`-based single-target workflow is not exposed in the new CLI, so any need for floating-field-star priors must be added explicitly.
@@ -506,6 +519,6 @@ A publishable null result still requires:
 3. Wrap the MIT TGLC CLI in PDO batch scripts.
 4. Define the consolidated HDF5-to-TWIRL index format.
 5. Build a QA notebook/report around WD 1856+534 b and a small control sample.
-6. Decide whether TWIRL will rely on TIC completeness or extend the MIT fork to support Gaia-first target selection.
+6. Audit Gaia-first target support and decide what MIT fork changes are needed for targets without TIC IDs.
 7. Build the first transparent periodic and dip-search baselines before committing to an ML-heavy workflow.
 8. Lock down the MIT-affiliated follow-up path for short, high-cadence transit confirmation.

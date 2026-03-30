@@ -1,15 +1,16 @@
-# Local Data
+# local_data.md
 
-This directory is for large local-only inputs and staged products that should not be committed to git.
+This note describes large local-only inputs and staged products that should not be committed to git.
 
 Recommended layout:
 
 ```text
 data_local/
-  README.md
   catalogs/
     GaiaEDR3_WD_main.fits
   tglc-data/
+doc/
+  local_data.md
 ```
 
 Current policy:

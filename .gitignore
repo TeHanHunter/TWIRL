@@ -3,5 +3,5 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-data_local/*
-!data_local/README.md
+.venv/
+data_local/

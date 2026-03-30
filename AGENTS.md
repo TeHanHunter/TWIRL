@@ -6,14 +6,15 @@ This file is the operating protocol for agents working in the standalone `TWIRL`
 
 Before making substantive changes, read:
 
-- `plan.md`
-- `docs/twirl_pipeline_plan.md`
-- `docs/mit_tglc_usage_guide.md`
-- `ideas.md`
+- `doc/twirl_plan.md`
+- `doc/mit_tglc_usage_guide.md`
+- `doc/ideas.md`
+- `doc/local_data.md`
+- `doc/plotting_style.md` before making or revising publication-facing figures
 
-Use `plan.md` for the current project snapshot, `docs/twirl_pipeline_plan.md` for the detailed pipeline spec, and `ideas.md` for unresolved questions and brainstorming.
+Use `doc/twirl_plan.md` as the single project plan, `doc/ideas.md` for unresolved questions and brainstorming, `doc/local_data.md` for local-only data conventions, and `doc/plotting_style.md` for figure styling.
 
-Follow the Step 1-5 pipeline structure defined in `docs/twirl_pipeline_plan.md`.
+Follow the Step 1-5 pipeline structure defined in `doc/twirl_plan.md`.
 
 If this file and those docs disagree, treat the docs as authoritative and update `AGENTS.md`.
 
@@ -49,6 +50,7 @@ If this file and those docs disagree, treat the docs as authoritative and update
 
 - The current seed WD catalogue is the local Gentile Fusillo et al. (2021) main Gaia EDR3 catalogue, recommended at `data_local/catalogs/GaiaEDR3_WD_main.fits`.
 - It is based on Gentile Fusillo et al. (2021), the Gaia EDR3 white dwarf catalogue.
+- Treat Gaia DR3 as the authoritative TWIRL target identifier.
 - Treat `Pwd > 0.75` as the default high-confidence reference sample for pilot work and comparisons.
 - The exact TWIRL WD denominator is still to be determined later.
 - Keep two concepts separate:
@@ -83,8 +85,9 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - MIT TGLC outputs HDF5 light curves, not the old FITS products.
 - Downstream TWIRL code should expect decontaminated aperture photometry with `1x1`, `3x3`, and `5x5` apertures.
 - Do not assume old columns such as `cal_psf_flux` or `cal_aper_flux`.
-- A major early risk is TIC-based target emission:
-  - verify Gaia-to-TIC completeness
+- TIC IDs are useful metadata and may still matter for the current MIT implementation, but they do not define the scientific sample.
+- A major early engineering risk is TIC-oriented target emission:
+  - audit how Gaia-selected targets propagate through the MIT fork
   - be prepared to recommend a Gaia-first extension if scientifically important WDs are missing
 
 ## Safety And Boundaries
@@ -140,7 +143,7 @@ When choosing what to implement next, prefer this order:
 3. PDO batch wrappers around the MIT TGLC CLI
 4. consolidated HDF5-to-TWIRL index format
 5. WD 1856 QA benchmark
-6. TIC completeness decision or Gaia-first extension
+6. Gaia-first target-support decision in the MIT fork
 7. baseline periodic and dip-search pipelines
 8. follow-up coordination support
 
@@ -157,10 +160,11 @@ When choosing what to implement next, prefer this order:
 ## Code And Repo Conventions
 
 - Prefer pipeline code, scripts, and structured metadata over notebook-only workflows.
-- Follow the staged repo layout in `docs/twirl_pipeline_plan.md` as the codebase grows.
+- Follow the staged repo layout in `doc/twirl_plan.md` as the codebase grows.
 - Keep implementation decisions transparent and easy to audit.
 - Prefer small smoke tests on pilot samples before scaling to full production.
 - Avoid hidden scientific assumptions in code. Put important survey assumptions in docs or config.
+- For publication-facing plots, use the shared style module in `src/twirl/plotting/style.py` rather than script-local Seaborn theme blocks.
 
 ## When To Stop And Ask
 
