@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Iterable, List
 
 import numpy as np
 from astropy.io import fits
@@ -170,7 +170,7 @@ def fetch_dr2_to_dr3_rows(
     tic_db: ReflectedDatabase,
     table_name: str,
     dr3_ids: np.ndarray,
-) -> list[Any]:
+) -> List[Any]:
     import sqlalchemy as sa
 
     table = tic_db.table(table_name)
@@ -183,8 +183,8 @@ def fetch_dr2_to_dr3_rows(
 def fetch_tic_rows(
     tic_db: ReflectedDatabase,
     table_name: str,
-    dr2_ids: list[int],
-) -> list[Any]:
+    dr2_ids: List[int],
+) -> List[Any]:
     import sqlalchemy as sa
 
     if not dr2_ids:
@@ -199,7 +199,7 @@ def fetch_tic_rows(
     return tic_db.execute(query)
 
 
-def ensure_output_paths(paths: list[Path], overwrite: bool) -> None:
+def ensure_output_paths(paths: List[Path], overwrite: bool) -> None:
     for path in paths:
         if path.exists() and not overwrite:
             raise FileExistsError(
@@ -232,6 +232,7 @@ def export_matches(
     manifest_name: str,
     overwrite: bool,
 ) -> dict[str, Any]:
+) -> Dict[str, Any]:
     gaia_ids = load_gaia_source_ids(input_catalog, gaia_id_column, input_hdu)
 
     matches_path = output_dir / matches_name
@@ -247,10 +248,9 @@ def export_matches(
     total_no_dr2_matches = 0
     total_dr2_no_tic_matches = 0
 
-    with (
-        matches_path.open("w", newline="", encoding="utf-8") as matches_handle,
-        summary_path.open("w", newline="", encoding="utf-8") as summary_handle,
-    ):
+    with matches_path.open("w", newline="", encoding="utf-8") as matches_handle, summary_path.open(
+        "w", newline="", encoding="utf-8"
+    ) as summary_handle:
         matches_writer = csv.DictWriter(
             matches_handle,
             fieldnames=[
@@ -291,7 +291,7 @@ def export_matches(
                 dr3_ids=gaia_chunk,
             )
 
-            dr3_to_dr2: dict[int, list[int]] = {}
+            dr3_to_dr2: Dict[int, List[int]] = {}
             for dr2_source_id, dr3_source_id in dr2_rows:
                 dr3_to_dr2.setdefault(int(dr3_source_id), []).append(int(dr2_source_id))
 
@@ -300,7 +300,7 @@ def export_matches(
             )
             tic_rows = fetch_tic_rows(tic_db=tic_db, table_name=tic_table, dr2_ids=unique_dr2_ids)
 
-            dr2_to_tic_rows: dict[int, list[Any]] = {}
+            dr2_to_tic_rows: Dict[int, List[Any]] = {}
             for tic_row in tic_rows:
                 dr2_to_tic_rows.setdefault(int(tic_row.gaia_dr2_source_id), []).append(tic_row)
 

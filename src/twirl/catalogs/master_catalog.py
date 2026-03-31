@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from astropy.table import Column, Table
@@ -89,7 +89,7 @@ def build_manifest(
     build_version: str,
     highconf_pwd_threshold: float,
     include_input_sha256: bool,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     input_stat = input_path.stat()
     built_at = datetime.now(timezone.utc).isoformat()
 
@@ -143,8 +143,8 @@ def build_master_catalog(
     build_version: str = DEFAULT_BUILD_VERSION,
     highconf_pwd_threshold: float = 0.75,
     include_input_sha256: bool = False,
-    output_path: Path | None = None,
-) -> tuple[Table, dict[str, Any]]:
+    output_path: Optional[Path] = None,
+) -> Tuple[Table, Dict[str, Any]]:
     """Build the first-pass TWIRL master catalog from the local WD seed file."""
 
     table = Table.read(input_path, hdu="Joined", unit_parse_strict="silent")
@@ -288,7 +288,7 @@ def build_master_catalog(
 
 def write_master_catalog(
     table: Table,
-    manifest: dict[str, Any],
+    manifest: Dict[str, Any],
     output_path: Path,
     manifest_path: Path,
     overwrite: bool = False,
