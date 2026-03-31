@@ -299,8 +299,8 @@ def plot_sample(
         zorder=5,
     )
     ax.text(
-        wd_theta,
-        wd_dist + 200,
+        0,
+        wd_dist + 150,
         "WD 1856",
         ha="right",
         va="center",
@@ -322,8 +322,8 @@ def plot_sample(
         zorder=6,
     )
     ax_sky.text(
-        wd_x[0] + np.radians(6),
-        wd_y[0] + np.radians(2),
+        wd_x[0] + np.radians(8),
+        wd_y[0],
         "WD 1856",
         ha="left",
         va="center",
