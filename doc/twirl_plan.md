@@ -84,6 +84,7 @@ Recommended local layout:
 data_local/
   catalogs/
     GaiaEDR3_WD_main.fits
+    twirl_master_catalog/
   tglc-data/
 ```
 

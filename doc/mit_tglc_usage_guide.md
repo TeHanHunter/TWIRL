@@ -13,6 +13,23 @@ For TWIRL, this means:
 - use the MIT fork to mass-produce HDF5 light curves,
 - build TWIRL-specific indexing, QC, detection, and validation around those products.
 
+## Additional PDO Operational References
+
+Beyond the `tess-gaia-light-curve` code itself, the MIT Kavli `qlp-ops` wiki contains the current operator-facing PDO workflows around TGLC and downstream QLP processing:
+
+- Photometry roadmap:
+  `https://github.com/mit-kavli-institute/qlp-ops/wiki/Photometry-Roadmap`
+- Planet-search roadmap:
+  `https://github.com/mit-kavli-institute/qlp-ops/wiki/Planet-Search-Roadmap`
+
+For TWIRL, the photometry roadmap is the more directly relevant reference because it documents the PDO operational context around orbit setup, `tglc all`, QLP ingestion, detrending, and CCD-level quality-flag handling on `/pdo/qlp-data`. The planet-search roadmap is less directly tied to TWIRL Step 1, but it is useful background on how MIT's broader PDO pipeline continues from finished light curves into BLS, astronet triage, difference imaging, and report generation.
+
+These wiki pages should be treated as operational context rather than TWIRL requirements. TWIRL still differs from standard QLP operation in several important ways:
+
+- the scientific sample remains Gaia-first and WD-defined, not TIC-defined
+- the target regime is much fainter than the bright-star defaults used in standard QLP/TGLC operations
+- TWIRL Step 1 is about producing and indexing WD light curves, not automatically adopting the downstream QLP planet-search stack
+
 ## What Changed Relative To The Original Repo
 
 | Area | Original repo | MIT fork | Practical consequence for TWIRL |
