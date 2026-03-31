@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, List
 
 import numpy as np
 from astropy.io import fits
@@ -65,6 +67,18 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=5000,
         help="Number of Gaia DR3 IDs per database query chunk.",
+    )
+    parser.add_argument(
+        "--max-gaia-ids",
+        type=int,
+        default=None,
+        help="Optional limit on the number of Gaia DR3 IDs to export, useful for smoke tests.",
+    )
+    parser.add_argument(
+        "--progress-every-chunks",
+        type=int,
+        default=1,
+        help="Print a progress update every N chunks.",
     )
     parser.add_argument(
         "--tic-db-name",
@@ -224,6 +238,8 @@ def export_matches(
     input_hdu: str,
     gaia_id_column: str,
     chunk_size: int,
+    max_gaia_ids: int,
+    progress_every_chunks: int,
     tic_db_name: str,
     dr2_to_dr3_table: str,
     tic_table: str,
@@ -233,6 +249,8 @@ def export_matches(
     overwrite: bool,
 ) -> Dict[str, Any]:
     gaia_ids = load_gaia_source_ids(input_catalog, gaia_id_column, input_hdu)
+    if max_gaia_ids is not None:
+        gaia_ids = gaia_ids[:max_gaia_ids]
 
     matches_path = output_dir / matches_name
     summary_path = output_dir / summary_name
@@ -240,6 +258,19 @@ def export_matches(
     ensure_output_paths([matches_path, summary_path, manifest_path], overwrite=overwrite)
 
     tic_db = ReflectedDatabase(tic_db_name)
+    n_input_ids = len(gaia_ids)
+    n_chunks = int(math.ceil(n_input_ids / chunk_size))
+    start_time = time.time()
+
+    print(
+        f"[export] loaded {n_input_ids} Gaia DR3 IDs from {input_catalog}",
+        flush=True,
+    )
+    print(
+        f"[export] querying {tic_db_name}.{dr2_to_dr3_table} and {tic_db_name}.{tic_table} "
+        f"in {n_chunks} chunk(s) of up to {chunk_size} IDs",
+        flush=True,
+    )
 
     total_match_rows = 0
     total_unique_matches = 0
@@ -283,7 +314,21 @@ def export_matches(
         matches_writer.writeheader()
         summary_writer.writeheader()
 
-        for gaia_chunk in chunked(gaia_ids, chunk_size):
+        for chunk_index, gaia_chunk in enumerate(chunked(gaia_ids, chunk_size), start=1):
+            chunk_should_log = (
+                chunk_index == 1
+                or chunk_index == n_chunks
+                or progress_every_chunks <= 1
+                or chunk_index % progress_every_chunks == 0
+            )
+            if chunk_should_log:
+                elapsed_before = time.time() - start_time
+                print(
+                    f"[export] chunk {chunk_index}/{n_chunks}: starting "
+                    f"({len(gaia_chunk)} Gaia IDs, elapsed {elapsed_before:.1f}s)",
+                    flush=True,
+                )
+
             dr2_rows = fetch_dr2_to_dr3_rows(
                 tic_db=tic_db,
                 table_name=dr2_to_dr3_table,
@@ -355,6 +400,19 @@ def export_matches(
                     )
                     total_match_rows += 1
 
+            matches_handle.flush()
+            summary_handle.flush()
+
+            if chunk_should_log:
+                elapsed_after = time.time() - start_time
+                processed_ids = min(chunk_index * chunk_size, n_input_ids)
+                print(
+                    f"[export] chunk {chunk_index}/{n_chunks}: finished "
+                    f"({processed_ids}/{n_input_ids} Gaia IDs, "
+                    f"{total_match_rows} match rows written, elapsed {elapsed_after:.1f}s)",
+                    flush=True,
+                )
+
     manifest = {
         "built_at_utc": datetime.now(timezone.utc).isoformat(),
         "input_catalog_path": str(input_catalog.resolve()),
@@ -364,7 +422,9 @@ def export_matches(
         "dr2_to_dr3_table": dr2_to_dr3_table,
         "tic_table": tic_table,
         "chunk_size": chunk_size,
-        "row_count_input": int(len(gaia_ids)),
+        "max_gaia_ids": max_gaia_ids,
+        "progress_every_chunks": progress_every_chunks,
+        "row_count_input": int(n_input_ids),
         "row_count_match_rows": int(total_match_rows),
         "count_no_dr2_match": int(total_no_dr2_matches),
         "count_dr2_no_tic": int(total_dr2_no_tic_matches),
@@ -401,6 +461,8 @@ def main() -> None:
         summary_name=args.summary_name,
         manifest_name=args.manifest_name,
         overwrite=args.overwrite,
+        max_gaia_ids=args.max_gaia_ids,
+        progress_every_chunks=args.progress_every_chunks,
     )
 
     print(f"Wrote matches CSV: {manifest['matches_csv_path']}")

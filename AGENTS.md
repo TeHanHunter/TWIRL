@@ -165,6 +165,7 @@ When choosing what to implement next, prefer this order:
 - Prefer small smoke tests on pilot samples before scaling to full production.
 - Avoid hidden scientific assumptions in code. Put important survey assumptions in docs or config.
 - For publication-facing plots, use the shared style module in `src/twirl/plotting/style.py` rather than script-local Seaborn theme blocks.
+- For long-running scripts or batch jobs, add periodic progress reporting when practical so PDO runs are observable without attaching a debugger or guessing from zero-byte output files.
 
 ## When To Stop And Ask
 
