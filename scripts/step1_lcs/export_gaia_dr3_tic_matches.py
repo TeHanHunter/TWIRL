@@ -231,7 +231,6 @@ def export_matches(
     summary_name: str,
     manifest_name: str,
     overwrite: bool,
-) -> dict[str, Any]:
 ) -> Dict[str, Any]:
     gaia_ids = load_gaia_source_ids(input_catalog, gaia_id_column, input_hdu)
 
