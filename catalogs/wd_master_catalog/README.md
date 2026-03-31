@@ -57,3 +57,11 @@ It writes:
 - `gaia_dr3_to_tic_matches.csv`: one row per Gaia DR3 to TIC match
 - `gaia_dr3_to_tic_summary.csv`: one row per Gaia DR3 source ID with match counts and status
 - `gaia_dr3_to_tic_export_manifest.json`: export metadata and summary counts
+
+After export, the script
+`scripts/step1_lcs/merge_tic_summary_into_master_catalog.py`
+can merge the summary CSV back into the master catalog. The current merge policy is conservative:
+
+- fill `tic_match_status` for all Gaia rows present in the summary CSV
+- fill `tic_id` only when the summary indicates a unique TIC match
+- leave ambiguous matches at `tic_id = -1` for later review
