@@ -176,6 +176,11 @@ tglc epsfs --orbit 185 --ccd 1,1 --nprocs 4 --tglc-data-dir /path/to/tglc-data
 tglc lightcurves --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 ```
 
+In TWIRL, the first safe wrapper around this pattern is
+[`scripts/stage1_lcs/run_tglc_catalogs.py`](/Users/tehan/PycharmProjects/TWIRL/scripts/stage1_lcs/run_tglc_catalogs.py).
+It reads the orbit-aware TWIRL detector summary and, by default, prints or writes the exact
+`tglc catalogs` commands for the selected orbit/camera/CCD jobs before any execution happens.
+
 Or, once the setup is trusted:
 
 ```bash
@@ -220,6 +225,14 @@ Do not launch jobs directly from the raw WD catalog. First build a control table
 - cutout
 
 Then collapse that table to the unique orbit-camera-CCD jobs needed for production.
+
+In the current TWIRL repo, the relevant planning products are:
+
+- `data_local/catalogs/twirl_master_catalog/twirl_wd_tess_detector_summary_v0.csv`
+- `data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/`
+
+The summary table is the right input for job selection; the per-orbit/camera/CCD target tables are
+the TWIRL-side reference for what each planned job is expected to contain.
 
 ### Keep the MIT layout, add TWIRL metadata on top
 

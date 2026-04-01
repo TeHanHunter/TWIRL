@@ -176,6 +176,7 @@ When choosing what to implement next, prefer this order:
 - For publication-facing plots, do not add figure titles by default unless the user explicitly asks for them or the figure would otherwise be ambiguous.
 - For publication-facing vertically stacked comparison figures, prefer per-panel axis labels, concise panel titles when needed for disambiguation, and compact nearby shared colorbars or legends rather than oversized figure-level decorations.
 - For long-running scripts or batch jobs, add periodic progress reporting when practical so PDO runs are observable without attaching a debugger or guessing from zero-byte output files.
+- When the user says to "wrap for the day", automatically do the end-of-day hygiene when the repo state is coherent: record useful progress in `doc/twirl_plan.md`, commit the current checkpoint, push it if possible, and leave the next concrete step clear.
 
 ## When To Stop And Ask
 
