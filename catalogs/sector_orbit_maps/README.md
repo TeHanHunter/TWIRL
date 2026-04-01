@@ -37,3 +37,7 @@ The coverage mapper should write:
 The sector list should include all requested `Sector >= 56` values, including future scheduled
 sectors when they are present in the pointing table. Observed and future sectors should remain in
 the same products so later extraction code can apply an up-to-date observed-sector cutoff.
+
+The plotting helper `scripts/step1_lcs/plot_tess_observation_sky_coverage.py` consumes the
+coverage-enriched catalog and the observation table to visualize sky coverage split into currently
+observed and future-planned sectors.

@@ -10,7 +10,7 @@ This document turns the NHFP proposal into an executable software and survey pla
 - The seed WD catalog is a local external dependency, not a git-tracked repo asset.
 - `Pwd > 0.75` is the default high-confidence reference sample for pilot work, but the final TWIRL denominator is still to be determined later.
 - The first search should be interpretable and not ML-first.
-- Step 1 is now past initial catalog assembly and into TIC metadata consolidation, but orbit/camera/CCD mapping and production job-table generation are still pending.
+- Step 1 is now past initial catalog assembly and into TIC metadata consolidation; orbit/camera/CCD mapping tooling exists and the first full coverage run is in progress.
 
 ## Project Goal
 
@@ -151,6 +151,7 @@ The parent-sample protocol should be explicit in code and metadata, but the exac
 - `2026-03-31`: Built `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits` from the local Gaia EDR3 seed catalog; the manifest is `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_manifest.json`.
 - `2026-04-01`: Completed the PDO Gaia DR3 to TIC export with `scripts/step1_lcs/export_gaia_dr3_tic_matches.py`; the sidecars are `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_matches.csv` and `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv`.
 - `2026-04-01`: Added conservative merge-back tooling in `scripts/step1_lcs/merge_tic_summary_into_master_catalog.py` so ambiguous TIC matches stay unresolved.
+- `2026-04-01`: Added `scripts/step1_lcs/promote_master_catalog_version.py` so accepted intermediate products can be promoted into canonical versioned releases such as `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v1.fits`.
 
 ### 1.2 Decide the production sample (...)
 
@@ -204,6 +205,7 @@ For TWIRL, the immediate operational tasks are:
 - `2026-04-01`: Confirmed PDO exposes Python 3.9 in the visible path and created `~/TWIRL/.venv` for TWIRL helper scripts.
 - `2026-04-01`: Installed `pyticdb` into `~/TWIRL/.venv` from the MIT package index and verified `scripts/step1_lcs/export_gaia_dr3_tic_matches.py` can query `tic_82`.
 - `2026-04-01`: Added `scripts/step1_lcs/map_tess_sector_coverage.py` and `src/twirl/catalogs/tess_coverage.py` to map Sector `>= 56` detector coverage and export per-sector/camera/ccd TWIRL target tables; the output schema is documented in `catalogs/sector_orbit_maps/README.md`.
+- `2026-04-01`: Added `scripts/step1_lcs/plot_tess_observation_sky_coverage.py` to visualize the TWIRL sky coverage split between observed sectors `< 100` and future sectors `>= 100` from the promoted coverage products such as `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v1.fits`.
 
 ### 1.4 Generate catalogs and cutouts
 

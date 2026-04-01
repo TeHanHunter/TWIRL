@@ -36,6 +36,7 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Large external inputs belong under `data_local/` or another user-configured local path, not in the git-managed repo root.
 - Do not commit raw FITS catalogs or staged survey data.
 - If code depends on a local catalog or local TGLC staging area, document the path convention and record provenance in outputs.
+- Use canonical versioned master-catalog releases such as `twirl_wd_master_catalog_v1.fits` for accepted states; treat suffix-heavy stage filenames such as `*_ticmatched.fits` or `*_tesscoverage.fits` as temporary intermediates.
 
 ## Scientific Scope
 

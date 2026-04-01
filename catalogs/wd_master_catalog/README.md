@@ -55,6 +55,17 @@ fills the TESS coverage placeholder columns and writes companion sector/detector
 - detector and sector summary tables
 - optional per-sector/camera/ccd TWIRL target tables in ECSV format
 
+Once an intermediate catalog state is accepted, promote it into a canonical versioned release with
+`scripts/step1_lcs/promote_master_catalog_version.py`.
+Use versioned names such as:
+
+- `twirl_wd_master_catalog_v1.fits`
+- `twirl_wd_master_catalog_v1_manifest.json`
+- `twirl_wd_tess_observations_v1.fits`
+
+Treat suffix-heavy filenames such as `*_ticmatched.fits` or `*_tesscoverage.fits` as temporary
+intermediate products rather than the long-term canonical catalog names.
+
 ## PDO Match Export
 
 When run on PDO, the read-only script
