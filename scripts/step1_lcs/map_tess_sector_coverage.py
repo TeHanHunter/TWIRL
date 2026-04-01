@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from astropy.io import fits
 from astropy.table import Table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -145,10 +146,15 @@ def ensure_writable(paths: list[Path], overwrite: bool) -> None:
 
 
 def load_catalog(path: Path, max_targets: int | None = None) -> Table:
-    table = Table.read(path, hdu=1, unit_parse_strict="silent")
+    if max_targets is None:
+        table = Table.read(path, hdu=1, unit_parse_strict="silent")
+        table.convert_bytestring_to_unicode()
+        return table
+
+    # For smoke tests, avoid loading the full FITS table before truncating it.
+    with fits.open(path, memmap=True) as hdul:
+        table = Table(hdul[1].data[:max_targets])
     table.convert_bytestring_to_unicode()
-    if max_targets is not None:
-        table = table[:max_targets]
     return table
 
 
@@ -172,6 +178,13 @@ def main() -> None:
     ensure_writable(output_paths, overwrite=args.overwrite)
     if args.export_detector_tables:
         args.detector_table_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.max_targets is None:
+        progress(f"[coverage] loading full catalog from {args.input_catalog}")
+    else:
+        progress(
+            f"[coverage] loading up to {args.max_targets} catalog rows from {args.input_catalog}"
+        )
 
     table = load_catalog(args.input_catalog, max_targets=args.max_targets)
     progress(f"[coverage] loaded catalog rows={len(table)} from {args.input_catalog}")
