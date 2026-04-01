@@ -13,6 +13,15 @@ from astropy.table import Column, Table
 
 
 FIRST_200S_SECTOR = 56
+FIRST_TESS_SECTOR = 1
+FIRST_TESS_ORBIT = 9
+DEFAULT_ORBITS_PER_SECTOR = 2
+# Official TESS observing pages note that Sectors 97 and 98 each span four
+# consecutive orbits instead of the standard two-sector cadence.
+NONSTANDARD_ORBITS_PER_SECTOR = {
+    97: 4,
+    98: 4,
+}
 TICA_X_MIN = 44.0
 TICA_X_MAX = 2093.0
 TICA_Y_MIN = 0.0
@@ -65,6 +74,49 @@ def _compute_edge_warn(colpix: float, rowpix: float) -> bool:
         or rowpix <= EDGE_WARN_PIXELS
         or rowpix >= (TICA_Y_MAX - EDGE_WARN_PIXELS)
     )
+
+
+def build_sector_orbit_lookup(max_sector: int) -> Dict[int, np.ndarray]:
+    if max_sector < FIRST_TESS_SECTOR:
+        raise ValueError(f"max_sector must be >= {FIRST_TESS_SECTOR}")
+
+    current_orbit = FIRST_TESS_ORBIT
+    sector_orbits: Dict[int, np.ndarray] = {}
+    for sector in range(FIRST_TESS_SECTOR, max_sector + 1):
+        n_orbits = NONSTANDARD_ORBITS_PER_SECTOR.get(sector, DEFAULT_ORBITS_PER_SECTOR)
+        sector_orbits[sector] = np.arange(current_orbit, current_orbit + n_orbits, dtype=np.int16)
+        current_orbit += n_orbits
+    return sector_orbits
+
+
+def expand_sector_observation_table_to_orbits(observation_table: Table) -> Table:
+    if "orbit" in observation_table.colnames:
+        return observation_table.copy(copy_data=True)
+
+    if "sector" not in observation_table.colnames:
+        raise ValueError("observation_table must contain a 'sector' column")
+
+    ordered_names = list(observation_table.colnames)
+    insert_at = ordered_names.index("sector") + 1
+    ordered_names.insert(insert_at, "orbit")
+
+    sectors = np.asarray(observation_table["sector"], dtype=np.int16)
+    if len(sectors) == 0:
+        expanded = observation_table.copy(copy_data=True)
+        expanded["orbit"] = np.array([], dtype=np.int16)
+        return expanded[ordered_names]
+
+    sector_orbit_lookup = build_sector_orbit_lookup(int(sectors.max()))
+    orbit_lists = [sector_orbit_lookup[int(sector)] for sector in sectors]
+    repeats = np.asarray([len(orbits) for orbits in orbit_lists], dtype=np.int32)
+
+    expanded = Table()
+    for name in observation_table.colnames:
+        expanded[name] = np.repeat(np.asarray(observation_table[name]), repeats)
+
+    expanded_orbits = np.concatenate(orbit_lists).astype(np.int16)
+    expanded["orbit"] = expanded_orbits
+    return expanded[ordered_names]
 
 
 def _predict_chunk_matches_for_sector(
@@ -142,6 +194,7 @@ def compute_tess_observation_table(
     if config.max_sector is not None:
         keep &= all_sectors <= int(config.max_sector)
     sectors = all_sectors[keep]
+    sector_orbit_lookup = build_sector_orbit_lookup(int(sectors.max()))
 
     if len(sectors) == 0:
         raise ValueError(
@@ -158,6 +211,7 @@ def compute_tess_observation_table(
 
     row_chunks: list[np.ndarray] = []
     sector_chunks: list[np.ndarray] = []
+    orbit_chunks: list[np.ndarray] = []
     camera_chunks: list[np.ndarray] = []
     ccd_chunks: list[np.ndarray] = []
     col_chunks: list[np.ndarray] = []
@@ -168,6 +222,7 @@ def compute_tess_observation_table(
     for sector_idx, sector in enumerate(sectors, start=1):
         fpg_index = int(np.where(all_sectors == sector)[0][0])
         fpg = scinfo.fpgObjs[fpg_index]
+        sector_orbits = sector_orbit_lookup[int(sector)]
 
         if progress is not None:
             progress(f"[coverage] sector {sector_idx}/{len(sectors)}: sector={sector} starting")
@@ -184,16 +239,19 @@ def compute_tess_observation_table(
             if len(chunk_hits["row_index"]) == 0:
                 continue
 
-            match_count = len(chunk_hits["row_index"])
+            hit_count = len(chunk_hits["row_index"])
+            n_orbits = len(sector_orbits)
+            match_count = hit_count * n_orbits
             total_matches += match_count
 
-            row_chunks.append(chunk_hits["row_index"])
+            row_chunks.append(np.repeat(chunk_hits["row_index"], n_orbits))
             sector_chunks.append(np.full(match_count, sector, dtype=np.int16))
-            camera_chunks.append(chunk_hits["camera"])
-            ccd_chunks.append(chunk_hits["ccd"])
-            col_chunks.append(chunk_hits["colpix"])
-            rowpix_chunks.append(chunk_hits["rowpix"])
-            edge_chunks.append(chunk_hits["edge_warn"])
+            orbit_chunks.append(np.tile(sector_orbits, hit_count))
+            camera_chunks.append(np.repeat(chunk_hits["camera"], n_orbits))
+            ccd_chunks.append(np.repeat(chunk_hits["ccd"], n_orbits))
+            col_chunks.append(np.repeat(chunk_hits["colpix"], n_orbits))
+            rowpix_chunks.append(np.repeat(chunk_hits["rowpix"], n_orbits))
+            edge_chunks.append(np.repeat(chunk_hits["edge_warn"], n_orbits))
 
             if progress is not None and ((chunk_idx + 1) % 10 == 0 or chunk_idx + 1 == n_chunks):
                 progress(
@@ -210,6 +268,7 @@ def compute_tess_observation_table(
     if row_chunks:
         row_index = np.concatenate(row_chunks)
         sectors_out = np.concatenate(sector_chunks)
+        orbits_out = np.concatenate(orbit_chunks)
         cameras = np.concatenate(camera_chunks)
         ccds = np.concatenate(ccd_chunks)
         colpix = np.concatenate(col_chunks)
@@ -218,6 +277,7 @@ def compute_tess_observation_table(
     else:
         row_index = np.array([], dtype=np.int32)
         sectors_out = np.array([], dtype=np.int16)
+        orbits_out = np.array([], dtype=np.int16)
         cameras = np.array([], dtype=np.int16)
         ccds = np.array([], dtype=np.int16)
         colpix = np.array([], dtype=np.float32)
@@ -228,6 +288,7 @@ def compute_tess_observation_table(
     observation_table["catalog_row"] = row_index
     observation_table["source_id"] = source_ids[row_index] if len(row_index) else np.array([], dtype=np.int64)
     observation_table["sector"] = sectors_out
+    observation_table["orbit"] = orbits_out
     observation_table["camera"] = cameras
     observation_table["ccd"] = ccds
     observation_table["colpix"] = colpix
@@ -240,6 +301,11 @@ def compute_tess_observation_table(
         "max_sector": int(sectors.max()),
         "n_sectors": int(len(sectors)),
         "sectors": [int(sector) for sector in sectors],
+        "max_orbit": int(orbits_out.max()) if len(orbits_out) else -1,
+        "n_unique_orbits": int(len(np.unique(orbits_out))),
+        "nonstandard_orbits_per_sector": {
+            str(sector): int(n_orbits) for sector, n_orbits in sorted(NONSTANDARD_ORBITS_PER_SECTOR.items())
+        },
         "n_catalog_rows": int(len(table)),
         "n_observation_rows": int(len(observation_table)),
     }
@@ -253,8 +319,11 @@ def _build_row_json_payloads(
     has_coverage = np.zeros(n_rows, dtype=bool)
     n_observations = np.zeros(n_rows, dtype=np.int32)
     n_sectors = np.zeros(n_rows, dtype=np.int16)
+    n_orbits = np.zeros(n_rows, dtype=np.int16)
     sector_min = np.full(n_rows, -1, dtype=np.int16)
     sector_max = np.full(n_rows, -1, dtype=np.int16)
+    orbit_min = np.full(n_rows, -1, dtype=np.int16)
+    orbit_max = np.full(n_rows, -1, dtype=np.int16)
     json_payloads: list[str] = ["[]"] * n_rows
 
     if len(observation_table) == 0:
@@ -262,22 +331,27 @@ def _build_row_json_payloads(
             "has_tess_200s_coverage": has_coverage,
             "n_tess_200s_observations": n_observations,
             "n_tess_200s_sectors": n_sectors,
+            "n_tess_200s_orbits": n_orbits,
             "tess_200s_sector_min": sector_min,
             "tess_200s_sector_max": sector_max,
+            "tess_200s_orbit_min": orbit_min,
+            "tess_200s_orbit_max": orbit_max,
             "tess_observations_json": np.asarray(json_payloads, dtype=object),
         }
 
     row_index = np.asarray(observation_table["catalog_row"], dtype=np.int32)
     sector = np.asarray(observation_table["sector"], dtype=np.int16)
+    orbit = np.asarray(observation_table["orbit"], dtype=np.int16)
     camera = np.asarray(observation_table["camera"], dtype=np.int16)
     ccd = np.asarray(observation_table["ccd"], dtype=np.int16)
     colpix = np.asarray(observation_table["colpix"], dtype=float)
     rowpix = np.asarray(observation_table["rowpix"], dtype=float)
     edge_warn = np.asarray(observation_table["edge_warn"], dtype=bool)
 
-    order = np.lexsort((ccd, camera, sector, row_index))
+    order = np.lexsort((ccd, camera, orbit, sector, row_index))
     row_index = row_index[order]
     sector = sector[order]
+    orbit = orbit[order]
     camera = camera[order]
     ccd = ccd[order]
     colpix = colpix[order]
@@ -293,9 +367,12 @@ def _build_row_json_payloads(
 
         sector_slice = sector[start:stop]
         unique_sectors = np.unique(sector_slice)
+        orbit_slice = orbit[start:stop]
+        unique_orbits = np.unique(orbit_slice)
         payload = [
             {
                 "sector": int(sector[k]),
+                "orbit": int(orbit[k]),
                 "camera": int(camera[k]),
                 "ccd": int(ccd[k]),
                 "colpix": round(float(colpix[k]), 3),
@@ -308,8 +385,11 @@ def _build_row_json_payloads(
         has_coverage[row] = True
         n_observations[row] = stop - start
         n_sectors[row] = len(unique_sectors)
+        n_orbits[row] = len(unique_orbits)
         sector_min[row] = int(unique_sectors.min())
         sector_max[row] = int(unique_sectors.max())
+        orbit_min[row] = int(unique_orbits.min())
+        orbit_max[row] = int(unique_orbits.max())
         json_payloads[row] = json.dumps(payload, separators=(",", ":"))
         start = stop
 
@@ -317,8 +397,11 @@ def _build_row_json_payloads(
         "has_tess_200s_coverage": has_coverage,
         "n_tess_200s_observations": n_observations,
         "n_tess_200s_sectors": n_sectors,
+        "n_tess_200s_orbits": n_orbits,
         "tess_200s_sector_min": sector_min,
         "tess_200s_sector_max": sector_max,
+        "tess_200s_orbit_min": orbit_min,
+        "tess_200s_orbit_max": orbit_max,
         "tess_observations_json": np.asarray(json_payloads, dtype=object),
     }
 
@@ -334,7 +417,7 @@ def attach_tess_observation_columns(table: Table, observation_table: Table) -> T
                 data=np.asarray(data, dtype=f"U{max_len}"),
                 name=name,
                 description=(
-                    "JSON array of sector/camera/CCD/pixel coverage records for the target."
+                    "JSON array of orbit/sector/camera/CCD/pixel coverage records for the target."
                 ),
             )
         elif name == "has_tess_200s_coverage":
@@ -355,17 +438,35 @@ def attach_tess_observation_columns(table: Table, observation_table: Table) -> T
                 name=name,
                 description="Number of unique sectors represented in tess_observations_json.",
             )
+        elif name == "n_tess_200s_orbits":
+            column = Column(
+                data=data.astype(np.int16),
+                name=name,
+                description="Number of unique orbits represented in tess_observations_json.",
+            )
         elif name == "tess_200s_sector_min":
             column = Column(
                 data=data.astype(np.int16),
                 name=name,
                 description="Minimum attached sector. -1 means none attached.",
             )
-        else:
+        elif name == "tess_200s_sector_max":
             column = Column(
                 data=data.astype(np.int16),
                 name=name,
                 description="Maximum attached sector. -1 means none attached.",
+            )
+        elif name == "tess_200s_orbit_min":
+            column = Column(
+                data=data.astype(np.int16),
+                name=name,
+                description="Minimum attached orbit. -1 means none attached.",
+            )
+        else:
+            column = Column(
+                data=data.astype(np.int16),
+                name=name,
+                description="Maximum attached orbit. -1 means none attached.",
             )
 
         if name in updated.colnames:
@@ -403,6 +504,7 @@ def build_observation_export_table(base_table: Table, observation_table: Table) 
             export[name] = base_table[name][row_index]
 
     export["sector"] = observation_table["sector"]
+    export["orbit"] = observation_table["orbit"]
     export["camera"] = observation_table["camera"]
     export["ccd"] = observation_table["ccd"]
     export["colpix"] = observation_table["colpix"]
@@ -412,10 +514,10 @@ def build_observation_export_table(base_table: Table, observation_table: Table) 
 
 
 def build_detector_summary_table(observation_export_table: Table) -> Table:
-    grouped: dict[tuple[int, int, int], dict[str, int]] = {}
+    grouped: dict[tuple[int, int, int, int], dict[str, int]] = {}
 
     for row in observation_export_table:
-        key = (int(row["sector"]), int(row["camera"]), int(row["ccd"]))
+        key = (int(row["orbit"]), int(row["sector"]), int(row["camera"]), int(row["ccd"]))
         stats = grouped.setdefault(
             key,
             {
@@ -435,6 +537,7 @@ def build_detector_summary_table(observation_export_table: Table) -> Table:
                 stats["n_targets_highconf_unique_tic"] += 1
 
     summary = Table(names=[
+        "orbit",
         "sector",
         "camera",
         "ccd",
@@ -442,11 +545,12 @@ def build_detector_summary_table(observation_export_table: Table) -> Table:
         "n_targets_unique_tic",
         "n_targets_highconf",
         "n_targets_highconf_unique_tic",
-    ], dtype=[np.int16, np.int16, np.int16, np.int32, np.int32, np.int32, np.int32])
+    ], dtype=[np.int16, np.int16, np.int16, np.int16, np.int32, np.int32, np.int32, np.int32])
 
-    for (sector, camera, ccd), stats in sorted(grouped.items()):
+    for (orbit, sector, camera, ccd), stats in sorted(grouped.items()):
         summary.add_row(
             (
+                orbit,
                 sector,
                 camera,
                 ccd,
@@ -478,7 +582,7 @@ def build_sector_summary_table(observation_export_table: Table) -> Table:
     for row in observation_export_table:
         sector = int(row["sector"])
         source_id = int(row["source_id"])
-        detector_key = (int(row["camera"]), int(row["ccd"]))
+        detector_key = (int(row["orbit"]), int(row["camera"]), int(row["ccd"]))
         grouped[sector]["source_ids_all"].add(source_id)
         grouped[sector]["detector_keys"].add(detector_key)
         grouped[sector]["n_detector_target_rows"] += 1
@@ -501,7 +605,7 @@ def build_sector_summary_table(observation_export_table: Table) -> Table:
             "n_unique_targets_highconf",
             "n_unique_targets_highconf_unique_tic",
             "n_detector_target_rows",
-            "n_detector_footprints",
+            "n_orbit_detector_footprints",
         ],
         dtype=[np.int16, np.int32, np.int32, np.int32, np.int32, np.int32, np.int16],
     )
@@ -532,12 +636,12 @@ def write_detector_target_tables(
 
     grouped_indices: dict[tuple[int, int, int], list[int]] = defaultdict(list)
     for idx, row in enumerate(observation_export_table):
-        key = (int(row["sector"]), int(row["camera"]), int(row["ccd"]))
+        key = (int(row["orbit"]), int(row["camera"]), int(row["ccd"]))
         grouped_indices[key].append(idx)
 
-    for (sector, camera, ccd), indices in sorted(grouped_indices.items()):
+    for (orbit, camera, ccd), indices in sorted(grouped_indices.items()):
         subset = observation_export_table[np.asarray(indices, dtype=np.int32)]
-        path = output_directory / f"sector{sector:04d}_cam{camera}_ccd{ccd}_twirl_targets.ecsv"
+        path = output_directory / f"orbit{orbit:04d}_cam{camera}_ccd{ccd}_twirl_targets.ecsv"
         subset.write(path, format="ascii.ecsv", overwrite=overwrite)
         written_paths.append(path)
 

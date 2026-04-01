@@ -20,7 +20,7 @@ def estimate_tess_magnitude(
 ) -> np.ndarray:
     """Estimate TESS magnitude from Gaia photometry.
 
-    Uses the Gaia-to-TESS polynomial adopted in the existing Step 1 plotting
+    Uses the Gaia-to-TESS polynomial adopted in the existing Stage 1 plotting
     workflow. Rows with missing BP/RP fall back to a simple G-band offset.
     """
 

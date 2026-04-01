@@ -22,13 +22,13 @@ Beyond the `tess-gaia-light-curve` code itself, the MIT Kavli `qlp-ops` wiki con
 - Planet-search roadmap:
   `https://github.com/mit-kavli-institute/qlp-ops/wiki/Planet-Search-Roadmap`
 
-For TWIRL, the photometry roadmap is the more directly relevant reference because it documents the PDO operational context around orbit setup, `tglc all`, QLP ingestion, detrending, and CCD-level quality-flag handling on `/pdo/qlp-data`. The planet-search roadmap is less directly tied to TWIRL Step 1, but it is useful background on how MIT's broader PDO pipeline continues from finished light curves into BLS, astronet triage, difference imaging, and report generation.
+For TWIRL, the photometry roadmap is the more directly relevant reference because it documents the PDO operational context around orbit setup, `tglc all`, QLP ingestion, detrending, and CCD-level quality-flag handling on `/pdo/qlp-data`. The planet-search roadmap is less directly tied to TWIRL Stage 1, but it is useful background on how MIT's broader PDO pipeline continues from finished light curves into BLS, astronet triage, difference imaging, and report generation.
 
 These wiki pages should be treated as operational context rather than TWIRL requirements. TWIRL still differs from standard QLP operation in several important ways:
 
 - the scientific sample remains Gaia-first and WD-defined, not TIC-defined
 - the target regime is much fainter than the bright-star defaults used in standard QLP/TGLC operations
-- TWIRL Step 1 is about producing and indexing WD light curves, not automatically adopting the downstream QLP planet-search stack
+- TWIRL Stage 1 is about producing and indexing WD light curves, not automatically adopting the downstream QLP planet-search stack
 
 ## What Changed Relative To The Original Repo
 
@@ -266,7 +266,7 @@ Before launching full production, require the new workflow to:
 
 ## Recommendation For TWIRL
 
-Use the MIT fork as the Step 1 production engine, but keep TWIRL-specific logic outside it whenever possible:
+Use the MIT fork as the Stage 1 production engine, but keep TWIRL-specific logic outside it whenever possible:
 
 - WD catalog assembly
 - orbit/camera/CCD scheduling

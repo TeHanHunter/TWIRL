@@ -14,7 +14,7 @@ Before making substantive changes, read:
 
 Use `doc/twirl_plan.md` as the single project plan, `doc/ideas.md` for unresolved questions and brainstorming, `doc/local_data.md` for local-only data conventions, and `doc/plotting_style.md` for figure styling.
 
-Follow the Step 1-5 pipeline structure defined in `doc/twirl_plan.md`.
+Follow the Stage 1-5 pipeline structure defined in `doc/twirl_plan.md`.
 
 If this file and those docs disagree, treat the docs as authoritative and update `AGENTS.md`.
 
@@ -36,7 +36,7 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Large external inputs belong under `data_local/` or another user-configured local path, not in the git-managed repo root.
 - Do not commit raw FITS catalogs or staged survey data.
 - If code depends on a local catalog or local TGLC staging area, document the path convention and record provenance in outputs.
-- Use canonical versioned master-catalog releases such as `twirl_wd_master_catalog_v1.fits` for accepted states; treat suffix-heavy stage filenames such as `*_ticmatched.fits` or `*_tesscoverage.fits` as temporary intermediates.
+- Prefer concise, stable filenames for accepted master-catalog states, but do not duplicate large integrated FITS products solely to create cleaner names when the existing file already represents the accepted state.
 
 ## Scientific Scope
 
@@ -71,7 +71,7 @@ If this file and those docs disagree, treat the docs as authoritative and update
 
 ## MIT TGLC Operating Assumptions
 
-- Step 1 uses the MIT-adapted TGLC fork on MIT PDO machines.
+- Stage 1 uses the MIT-adapted TGLC fork on MIT PDO machines.
 - Treat the MIT fork as an orbit/camera/CCD production pipeline, not a `quick_lc.py` replacement.
 - Assume:
   - TICA FFIs are pre-staged on disk
@@ -136,7 +136,8 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Record assumptions and provenance in output metadata.
 - When progress is made against a milestone or deliverable in `doc/twirl_plan.md`, record that progress in the same turn if practical.
 - In `doc/twirl_plan.md`, record progress as concise dated bullets under the most relevant subsection rather than in a separate free-floating log when possible.
-- Include the relevant code or output path(s) in each progress bullet so the artifact is easy to inspect.
+- Keep the prose part of each progress bullet readable; do not stuff raw long paths into the sentence.
+- Keep file references inline when helpful, using short clickable Markdown link labels such as `[script]`, `[PNG]`, `[PDF]`, `[FITS]`, or `[CSV]` rather than raw long paths.
 - Use plain Markdown that renders everywhere.
 - Append a short status marker in parentheses to subsection headings when helpful: `(✓)` done, `(...)` in progress, `(?)` problematic, and nothing if not started.
 - Treat these markers as manually tuned section status labels rather than auto-generated output.
@@ -172,6 +173,8 @@ When choosing what to implement next, prefer this order:
 - Prefer small smoke tests on pilot samples before scaling to full production.
 - Avoid hidden scientific assumptions in code. Put important survey assumptions in docs or config.
 - For publication-facing plots, use the shared style module in `src/twirl/plotting/style.py` rather than script-local Seaborn theme blocks.
+- For publication-facing plots, do not add figure titles by default unless the user explicitly asks for them or the figure would otherwise be ambiguous.
+- For publication-facing vertically stacked comparison figures, prefer per-panel axis labels, concise panel titles when needed for disambiguation, and compact nearby shared colorbars or legends rather than oversized figure-level decorations.
 - For long-running scripts or batch jobs, add periodic progress reporting when practical so PDO runs are observable without attaching a debugger or guessing from zero-byte output files.
 
 ## When To Stop And Ask

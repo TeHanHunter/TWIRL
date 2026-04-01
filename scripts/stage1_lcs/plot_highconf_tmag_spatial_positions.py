@@ -23,7 +23,7 @@ from twirl.plotting.style import apply_twirl_style
 
 
 DEFAULT_CATALOG = Path("data_local/catalogs/GaiaEDR3_WD_main.fits")
-DEFAULT_OUTDIR = Path("reports/step1_lcs")
+DEFAULT_OUTDIR = Path("reports/stage1_lcs")
 
 
 class QuantileNormalize(Normalize):

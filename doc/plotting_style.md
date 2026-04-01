@@ -54,6 +54,14 @@ Both templates keep title, label, tick, legend, and annotation sizes internally 
 ## Figure Rules
 
 - Do not hardcode Seaborn theme settings inside individual plotting scripts unless there is a figure-specific reason.
+- Do not add figure titles by default; only include them when the user explicitly asks for them or when the plot would otherwise be ambiguous.
+- Do not add panel titles by default, but do use concise panel titles when they are the clearest way to distinguish stacked comparison panels.
+- For vertically stacked comparison figures, prefer vertical panel arrangement over side-by-side panels when that makes the comparison easier to scan.
+- For vertically stacked comparison figures, put the axis labels on each panel rather than relying on one shared figure label when the shared label would create ambiguity or excessive whitespace.
+- For vertically stacked comparison figures, keep the inter-panel spacing tight enough to read as one figure but wide enough to avoid title, label, and colorbar collisions.
+- For vertically stacked comparison figures, keep shared colorbars compact and close to the panels rather than spanning excessive width or height.
+- When the plotted quantity is integer-valued, use a discrete stepped colorbar rather than a continuous color ramp.
+- For dense guide overlays on all-sky Aitoff maps, prefer black dotted longitude guides, a black dashed Galactic-plane line, and black longitude labels with a thin white bezel.
 - Keep shared legends outside the data area when possible.
 - The legend border should be black.
 - Prefer tight panel spacing for multi-panel figures.

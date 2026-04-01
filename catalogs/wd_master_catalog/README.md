@@ -26,16 +26,19 @@ data_local/catalogs/twirl_master_catalog/
 - `has_tess_200s_coverage`: summary boolean for attached TESS coverage metadata
 - `n_tess_200s_observations`: number of TESS observation records attached
 - `n_tess_200s_sectors`: number of unique sectors represented
+- `n_tess_200s_orbits`: number of unique orbits represented
 - `tess_200s_sector_min`: minimum covered sector, `-1` when none
 - `tess_200s_sector_max`: maximum covered sector, `-1` when none
+- `tess_200s_orbit_min`: minimum covered orbit, `-1` when none
+- `tess_200s_orbit_max`: maximum covered orbit, `-1` when none
 - `tess_observations_json`: JSON array placeholder for per-target TESS observation records
 
 Example JSON payload for `tess_observations_json`:
 
 ```json
 [
-  {"sector": 56, "orbit": 185, "camera": 1, "ccd": 3},
-  {"sector": 56, "orbit": 186, "camera": 1, "ccd": 3}
+  {"sector": 56, "orbit": 119, "camera": 1, "ccd": 3},
+  {"sector": 56, "orbit": 120, "camera": 1, "ccd": 3}
 ]
 ```
 
@@ -47,16 +50,20 @@ The builder writes two local files:
 - a JSON sidecar manifest with provenance, build version, and seed-file metadata
 
 The coverage-mapping script
-`scripts/step1_lcs/map_tess_sector_coverage.py`
-fills the TESS coverage placeholder columns and writes companion sector/detector products such as:
+`scripts/stage1_lcs/map_tess_sector_coverage.py`
+fills the TESS coverage placeholder columns and writes companion sector/orbit products such as:
 
 - an updated master catalog with populated `tess_observations_json`
-- `twirl_wd_tess_observations_v0.fits`: one row per target-sector-camera-CCD hit
+- `twirl_wd_tess_observations_v0.fits`: one row per target-orbit-sector-camera-CCD hit
 - detector and sector summary tables
-- optional per-sector/camera/ccd TWIRL target tables in ECSV format
+- optional per-orbit/camera/ccd TWIRL target tables in ECSV format
+
+If the existing coverage products already contain sector/camera/ccd hits, the incremental script
+`scripts/stage1_lcs/backfill_tess_orbits.py`
+can expand them into orbit-aware products without rerunning the full sky-geometry pass.
 
 Once an intermediate catalog state is accepted, promote it into a canonical versioned release with
-`scripts/step1_lcs/promote_master_catalog_version.py`.
+`scripts/stage1_lcs/promote_master_catalog_version.py`.
 Use versioned names such as:
 
 - `twirl_wd_master_catalog_v1.fits`
@@ -69,7 +76,7 @@ intermediate products rather than the long-term canonical catalog names.
 ## PDO Match Export
 
 When run on PDO, the read-only script
-`scripts/step1_lcs/export_gaia_dr3_tic_matches.py`
+`scripts/stage1_lcs/export_gaia_dr3_tic_matches.py`
 can export Gaia DR3 to TIC matches for the `source_id` values in a local TWIRL catalog.
 
 It writes:
@@ -79,7 +86,7 @@ It writes:
 - `gaia_dr3_to_tic_export_manifest.json`: export metadata and summary counts
 
 After export, the script
-`scripts/step1_lcs/merge_tic_summary_into_master_catalog.py`
+`scripts/stage1_lcs/merge_tic_summary_into_master_catalog.py`
 can merge the summary CSV back into the master catalog. The current merge policy is conservative:
 
 - fill `tic_match_status` for all Gaia rows present in the summary CSV

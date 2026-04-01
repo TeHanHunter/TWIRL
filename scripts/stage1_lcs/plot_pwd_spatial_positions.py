@@ -23,7 +23,7 @@ from twirl.plotting.style import apply_twirl_style, get_ordered_palette
 
 
 DEFAULT_CATALOG = Path("data_local/catalogs/GaiaEDR3_WD_main.fits")
-DEFAULT_OUTDIR = Path("reports/step1_lcs")
+DEFAULT_OUTDIR = Path("reports/stage1_lcs")
 
 PWD_BIN_LABELS = [
     "0.00-0.25",
@@ -317,7 +317,7 @@ def plot_pwd_bins(
         zorder=5,
     )
     ax.text(
-        wd_theta,
+        wd_theta ,
         wd_dist + 200,
         "WD 1856",
         ha="right",

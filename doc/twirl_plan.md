@@ -10,7 +10,7 @@ This document turns the NHFP proposal into an executable software and survey pla
 - The seed WD catalog is a local external dependency, not a git-tracked repo asset.
 - `Pwd > 0.75` is the default high-confidence reference sample for pilot work, but the final TWIRL denominator is still to be determined later.
 - The first search should be interpretable and not ML-first.
-- Step 1 is now past initial catalog assembly and into TIC metadata consolidation; orbit/camera/CCD mapping tooling exists and the first full coverage run is in progress.
+- Stage 1 is now past initial catalog assembly and into sector-coverage planning; full Sector `56-121` coverage products, detector tables, and the first full-sky coverage diagnostics are in place.
 
 ## Project Goal
 
@@ -57,11 +57,11 @@ configs/
   detection/
   injections/
 scripts/
-  step1_lcs/
-  step2_detection/
-  step3_injections/
-  step4_search/
-  step5_validation/
+  stage1_lcs/
+  stage2_detection/
+  stage3_injections/
+  stage4_search/
+  stage5_validation/
 src/
   twirl/
     catalogs/
@@ -96,7 +96,7 @@ Rules:
 - record local input path, file size, and provenance in derived metadata products
 - version-control the code, configs, schemas, and derived table definitions that act on those local files
 
-## Step 1: Generate WD Light Curves On MIT PDO Machines
+## Stage 1: Generate WD Light Curves On MIT PDO Machines
 
 This is the foundation for everything else. The MIT fork is no longer a single-target `quick_lc.py` workflow. It is an orbit/camera/CCD production pipeline with separate catalog, cutout, ePSF, and light-curve stages.
 
@@ -147,11 +147,11 @@ The parent-sample protocol should be explicit in code and metadata, but the exac
 
 #### Progress
 
-- `2026-03-30`: Added the first high-confidence spatial plots in `scripts/step1_lcs/plot_highconf_tmag_spatial_positions.py` and `scripts/step1_lcs/plot_pwd_spatial_positions.py`; outputs are in `reports/step1_lcs/wd_highconf_tmag_spatial_positions.{pdf,png}`.
-- `2026-03-31`: Built `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits` from the local Gaia EDR3 seed catalog; the manifest is `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_manifest.json`.
-- `2026-04-01`: Completed the PDO Gaia DR3 to TIC export with `scripts/step1_lcs/export_gaia_dr3_tic_matches.py`; the sidecars are `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_matches.csv` and `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv`.
-- `2026-04-01`: Added conservative merge-back tooling in `scripts/step1_lcs/merge_tic_summary_into_master_catalog.py` so ambiguous TIC matches stay unresolved.
-- `2026-04-01`: Added `scripts/step1_lcs/promote_master_catalog_version.py` so accepted intermediate products can be promoted into canonical versioned releases such as `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v1.fits`.
+- `2026-03-30`: Added the first high-confidence spatial plots to sanity-check the seed catalog sky distribution in [script](../scripts/stage1_lcs/plot_highconf_tmag_spatial_positions.py), [script](../scripts/stage1_lcs/plot_pwd_spatial_positions.py), [PNG](../reports/stage1_lcs/wd_highconf_tmag_spatial_positions.png), and [PDF](../reports/stage1_lcs/wd_highconf_tmag_spatial_positions.pdf).
+- `2026-03-31`: Built the first TWIRL Gaia-first master catalog as [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits) with [manifest](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_manifest.json).
+- `2026-04-01`: Completed the PDO Gaia DR3 to TIC export with [script](../scripts/stage1_lcs/export_gaia_dr3_tic_matches.py), preserving the raw [CSV](../data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_matches.csv) and summarized [CSV](../data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv).
+- `2026-04-01`: Added conservative merge-back tooling in [script](../scripts/stage1_lcs/merge_tic_summary_into_master_catalog.py) so ambiguous TIC matches stay unresolved instead of being guessed.
+- `2026-04-01`: Added a promotion helper in [script](../scripts/stage1_lcs/promote_master_catalog_version.py) for cases where an accepted catalog state truly needs a shorter canonical release name.
 
 ### 1.2 Decide the production sample (...)
 
@@ -181,10 +181,14 @@ The exact TWIRL WD cut should be frozen only after:
 
 #### Progress
 
-- `2026-04-01`: Kept `Pwd > 0.75` as the default high-confidence reference sample in `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits`, which contains `359,073` such rows.
-- `2026-04-01`: Adopted the conservative TIC policy in `scripts/step1_lcs/merge_tic_summary_into_master_catalog.py` and `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv`: fill `tic_id` only for unique matches and keep multiple or missing-bridge cases unresolved.
+- `2026-04-01`: Kept `Pwd > 0.75` as the default high-confidence reference sample for pilot work; the current master catalog [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits) contains `359,073` such rows.
+- `2026-04-01`: Adopted the conservative TIC policy in [script](../scripts/stage1_lcs/merge_tic_summary_into_master_catalog.py): fill `tic_id` only for unique matches and keep multiple or missing-bridge cases unresolved in the summary [CSV](../data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv).
+- `2026-04-01`: Added the Sector `>= 56` coverage mapper and detector-table exporter for TWIRL planning products in [script](../scripts/stage1_lcs/map_tess_sector_coverage.py), [module](../src/twirl/catalogs/tess_coverage.py), and [README](../catalogs/sector_orbit_maps/README.md).
+- `2026-04-01`: Produced the first full-sky TESS coverage diagnostic and summary products with [script](../scripts/stage1_lcs/plot_tess_observation_sky_coverage.py), [PNG](../reports/stage1_lcs/wd_tess_observation_sky_coverage.png), [PDF](../reports/stage1_lcs/wd_tess_observation_sky_coverage.pdf), and [CSV](../reports/stage1_lcs/wd_tess_observation_sky_coverage_summary.csv).
+- `2026-04-01`: Completed the full `Sector 56-121` coverage run on PDO and wrote the integrated coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits), observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits), sector-summary [CSV](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_sector_summary_v0.csv), and detector-table [dir](../data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/).
+- `2026-04-01`: Measured the first simple TWIRL coverage fractions from the integrated coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits) and observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits): `1,231,702` WDs (`96.2%`) have at least one `Sector >= 56` footprint, `1,157,242` (`90.4%`) have observed coverage before Sector `100`, `59,678` (`4.7%`) appear in Sector `120+`, `44,939` (`3.5%`) appear in Sector `120`, and `33,588` (`2.6%`) appear in Sector `121`; the `Pwd > 0.75` subset counts are `339,292`, `320,049`, `33,532`, `24,233`, and `22,427`, respectively.
 
-### 1.3 Prepare the MIT PDO environment (...)
+### 1.3 Prepare the MIT PDO environment (✓)
 
 The MIT-adapted TGLC expects:
 
@@ -202,12 +206,10 @@ For TWIRL, the immediate operational tasks are:
 
 #### Progress
 
-- `2026-04-01`: Confirmed PDO exposes Python 3.9 in the visible path and created `~/TWIRL/.venv` for TWIRL helper scripts.
-- `2026-04-01`: Installed `pyticdb` into `~/TWIRL/.venv` from the MIT package index and verified `scripts/step1_lcs/export_gaia_dr3_tic_matches.py` can query `tic_82`.
-- `2026-04-01`: Added `scripts/step1_lcs/map_tess_sector_coverage.py` and `src/twirl/catalogs/tess_coverage.py` to map Sector `>= 56` detector coverage and export per-sector/camera/ccd TWIRL target tables; the output schema is documented in `catalogs/sector_orbit_maps/README.md`.
-- `2026-04-01`: Added `scripts/step1_lcs/plot_tess_observation_sky_coverage.py` to visualize the TWIRL sky coverage split between observed sectors `< 100` and future sectors `>= 100` from the promoted coverage products such as `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v1.fits`.
+- `2026-04-01`: Confirmed PDO exposes Python 3.9 in the visible path and created a TWIRL-local virtual environment for helper scripts.
+- `2026-04-01`: Installed `pyticdb` into the TWIRL virtual environment from the MIT package index and verified the PDO TIC export path can query `tic_82` with [script](../scripts/stage1_lcs/export_gaia_dr3_tic_matches.py).
 
-### 1.4 Generate catalogs and cutouts
+### 1.4 Generate catalogs and cutouts (...)
 
 The MIT fork runs in four logical stages:
 
@@ -223,6 +225,11 @@ Initial production assumptions:
 - run `--max-magnitude 20`
 - keep Gaia catalogs for all relevant field stars
 - run per orbit and per CCD, not per target
+
+#### Progress
+
+- `2026-04-01`: Updated the coverage-mapping code in [script](../scripts/stage1_lcs/map_tess_sector_coverage.py) and [module](../src/twirl/catalogs/tess_coverage.py) so each sector-level detector hit expands into one row per orbit, including the known four-orbit exceptions at Sectors `97` and `98`.
+- `2026-04-01`: Added the incremental orbit backfill [script](../scripts/stage1_lcs/backfill_tess_orbits.py) so the existing coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits), observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits), and orbit/camera/ccd target [dir](../data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/) can be regenerated without rerunning the full tess-point geometry stage.
 
 ### 1.5 Extract and consolidate WD light curves
 
@@ -290,7 +297,7 @@ Known gaps to track early:
 - The old `prior`-based single-target workflow is not exposed in the new CLI, so any need for floating-field-star priors must be added explicitly.
 - The catalogue completeness quoted by Gentile Fusillo et al. (2021) applies only in specific regimes; TWIRL must not generalize that completeness to the full search sample without its own end-to-end validation.
 
-### Step 1 Deliverables
+### Stage 1 Deliverables
 
 - WD master target catalog (✓)
   Current status: v0 catalog built and full Gaia DR3 to TIC export completed.
@@ -299,7 +306,7 @@ Known gaps to track early:
 - consolidated WD light-curve archive
 - QA report and reprocessing list
 
-## Step 2: Build The Search Stack And Optional WD-Specific Classifier
+## Stage 2: Build The Search Stack And Optional WD-Specific Classifier
 
 The proposal points toward Astronet-Triage-like deep-learning search, but the first survey version should not be ML-first. TWIRL should begin with an interpretable search stack and add ML only where it clearly improves ranking or false-positive control.
 
@@ -357,7 +364,7 @@ If a classifier is added, the training pipeline should include:
 - calibration of classifier scores
 - explicit evaluation versus magnitude, period, depth, and number of sectors
 
-### Step 2 Deliverables
+### Stage 2 Deliverables
 
 - reproducible periodic-search baseline
 - reproducible dip-search baseline
@@ -366,9 +373,9 @@ If a classifier is added, the training pipeline should include:
 - evaluation report
 - inference script that scores the full TWIRL archive
 
-## Step 3: Injection-Recovery Tests
+## Stage 3: Injection-Recovery Tests
 
-This is the completeness backbone of the survey and should run through the same search stack used in Step 4.
+This is the completeness backbone of the survey and should run through the same search stack used in Stage 4.
 
 ### 3.1 Injection design
 
@@ -410,13 +417,13 @@ Produce completeness surfaces as a function of:
 
 Completeness products should be tagged with the exact sample definition and search-branch definition they apply to. Do not present a completeness surface as survey-wide if it only applies to a provisional cut or one search mode.
 
-### Step 3 Deliverables
+### Stage 3 Deliverables
 
 - injection engine
 - recovery summaries
 - completeness grids for occurrence-rate work
 
-## Step 4: Search For WD Transiting Objects
+## Stage 4: Search For WD Transiting Objects
 
 After the light curves, detector, and completeness machinery are stable, run the production search.
 
@@ -441,13 +448,13 @@ For each candidate, store:
 - vetter outputs
 - links to diagnostic plots and files
 
-### Step 4 Deliverables
+### Stage 4 Deliverables
 
 - machine-generated candidate table
 - diagnostic plot package
 - ranked follow-up target list
 
-## Step 5: Validate The Targets
+## Stage 5: Validate The Targets
 
 Validation should combine automated filtering and external follow-up.
 
@@ -505,7 +512,7 @@ A publishable null result still requires:
 - a final vetted candidate table or null-candidate statement
 - upper limits stated only for the declared sample and event class
 
-### Step 5 Deliverables
+### Stage 5 Deliverables
 
 - validated-candidate list
 - follow-up status table

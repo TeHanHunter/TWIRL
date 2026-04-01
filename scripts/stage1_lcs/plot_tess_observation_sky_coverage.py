@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
+from matplotlib import patheffects
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
@@ -24,12 +25,12 @@ from twirl.plotting.style import apply_twirl_style
 
 
 DEFAULT_CATALOG = Path(
-    "data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v1.fits"
+    "data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits"
 )
 DEFAULT_OBSERVATIONS = Path(
-    "data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v1.fits"
+    "data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits"
 )
-DEFAULT_OUTDIR = Path("reports/step1_lcs")
+DEFAULT_OUTDIR = Path("reports/stage1_lcs")
 DEFAULT_OUTPUT_STEM = "wd_tess_observation_sky_coverage"
 
 
@@ -104,8 +105,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dense-marker-scale",
         type=float,
-        default=0.5,
+        default=0.16,
         help="Scale factor applied to the default dense scatter marker size.",
+    )
+    parser.add_argument(
+        "--figure-title",
+        type=str,
+        default=None,
+        help="Optional figure title. Omit to leave the figure untitled.",
+    )
+    parser.add_argument(
+        "--observed-panel-title",
+        type=str,
+        default=None,
+        help="Optional title for the observed-sector panel. Omit to leave it untitled.",
+    )
+    parser.add_argument(
+        "--future-panel-title",
+        type=str,
+        default=None,
+        help="Optional title for the future-sector panel. Omit to leave it untitled.",
     )
     return parser.parse_args()
 
@@ -134,6 +153,11 @@ def galactic_aitoff_coords(ra_deg: np.ndarray, dec_deg: np.ndarray) -> tuple[np.
     coords = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs").galactic
     lon_wrap = coords.l.wrap_at(180 * u.deg).radian
     return -lon_wrap, coords.b.radian
+
+
+AITOFF_XTICK_DEG = np.array([-180, -120, -60, 0, 60, 120], dtype=float)
+AITOFF_YTICK_DEG = np.array([-45, -30, -15, 0, 15, 30, 45, 60, 75], dtype=float)
+AITOFF_LONGITUDE_LABELS = ["", "120°", "60°", "0°", "300°", "240°"]
 
 
 def aggregate_counts(
@@ -230,11 +254,16 @@ def build_discrete_color_mapping(
 def write_summary_csv(
     path: Path,
     observed_counts: np.ndarray,
-    future_counts: np.ndarray,
+    all_counts: np.ndarray,
     observed_sector_max: int,
+    min_sector: int | None,
     count_mode: str,
     highconf_only: bool,
 ) -> None:
+    all_panel_label = "all_coverage"
+    if min_sector is not None:
+        all_panel_label = f"all_ge_s{min_sector}"
+
     rows = [
         (
             f"observed_lt_s{observed_sector_max + 1}",
@@ -243,10 +272,10 @@ def write_summary_csv(
             int(observed_counts.max()) if observed_counts.size else 0,
         ),
         (
-            f"future_ge_s{observed_sector_max + 1}",
-            int(np.count_nonzero(future_counts > 0)),
-            float(np.nanmedian(future_counts[future_counts > 0])) if np.any(future_counts > 0) else 0.0,
-            int(future_counts.max()) if future_counts.size else 0,
+            all_panel_label,
+            int(np.count_nonzero(all_counts > 0)),
+            float(np.nanmedian(all_counts[all_counts > 0])) if np.any(all_counts > 0) else 0.0,
+            int(all_counts.max()) if all_counts.size else 0,
         ),
     ]
 
@@ -264,16 +293,20 @@ def write_summary_csv(
 def plot_counts(
     catalog: Table,
     observed_counts: np.ndarray,
-    future_counts: np.ndarray,
+    all_counts: np.ndarray,
     outdir: Path,
     output_stem: str,
     summary_name: str,
     observed_sector_max: int,
+    min_sector: int | None,
     count_mode: str,
     color_scale: str,
     template_name: str,
     dense_marker_scale: float,
     highconf_only: bool,
+    figure_title: str | None,
+    observed_panel_title: str | None,
+    future_panel_title: str | None,
 ) -> tuple[Path, Path, Path]:
     template = apply_twirl_style(template_name)
     marker_size = template["dense_marker_size"] * dense_marker_scale
@@ -285,30 +318,37 @@ def plot_counts(
 
     cmap, norm, vmax, tick_values = build_discrete_color_mapping(
         observed_counts,
-        future_counts,
+        all_counts,
         color_scale,
     )
 
-    fig = plt.figure(figsize=template["figsize"])
+    fig = plt.figure(figsize=(template["figsize"][0], template["figsize"][1] * 1.55))
     grid = fig.add_gridspec(
-        1,
         2,
-        width_ratios=[1.0, 1.0],
-        wspace=max(template["panel_wspace"], 0.12),
+        1,
+        hspace=0.28,
     )
     ax_now = fig.add_subplot(grid[0, 0], projection="aitoff")
-    ax_future = fig.add_subplot(grid[0, 1], projection="aitoff")
+    ax_future = fig.add_subplot(grid[1, 0], projection="aitoff")
+
+    if observed_panel_title is None:
+        observed_panel_title = f"Observed Now ({min_sector} <= Sector < {observed_sector_max + 1})"
+    if future_panel_title is None:
+        if min_sector is None:
+            future_panel_title = "All Coverage"
+        else:
+            future_panel_title = f"All Coverage (Sector >= {min_sector})"
 
     panels = [
         (
             ax_now,
             observed_counts,
-            f"Observed Now (Sector < {observed_sector_max + 1})",
+            observed_panel_title,
         ),
         (
             ax_future,
-            future_counts,
-            f"Future Planned (Sector >= {observed_sector_max + 1})",
+            all_counts,
+            future_panel_title,
         ),
     ]
 
@@ -338,11 +378,44 @@ def plot_counts(
                 rasterized=True,
             )
 
-        ax.set_title(title)
-        ax.grid(True, linestyle="-", linewidth=0.45, alpha=0.75)
-        ax.set_xticklabels(
-            ["150°", "120°", "90°", "60°", "30°", "0°", "330°", "300°", "270°", "240°", "210°"]
-        )
+        if title:
+            ax.set_title(title, pad=20)
+        ax.set_ylabel("Galactic latitude (degree)", fontsize=template["label_size"], labelpad=4)
+        ax.yaxis.set_label_coords(-0.07, 0.5)
+        ax.set_xlabel("Galactic longitude (degree)", fontsize=template["label_size"], labelpad=7)
+        ax.set_xticks(np.radians(AITOFF_XTICK_DEG))
+        ax.set_xticklabels([])
+        ax.set_yticks(np.radians(AITOFF_YTICK_DEG))
+        ax.tick_params(axis="both", labelsize=template["tick_size"], colors="0.28", pad=4)
+        ax.grid(color="0.85", linewidth=template["grid_linewidth"])
+        latitudes = np.linspace(-np.pi / 2.0, np.pi / 2.0, 361)
+        for x_tick in np.radians(AITOFF_XTICK_DEG):
+            ax.plot(
+                np.full_like(latitudes, x_tick),
+                latitudes,
+                color="black",
+                linewidth=0.55,
+                linestyle=":",
+                alpha=0.75,
+                zorder=5.2,
+            )
+        ax.axhline(0.0, color="black", linewidth=0.75, linestyle="--", alpha=0.95, zorder=5.0)
+        for x_tick, label in zip(np.radians(AITOFF_XTICK_DEG), AITOFF_LONGITUDE_LABELS):
+            if not label:
+                continue
+            text = ax.text(
+                x_tick,
+                0.03,
+                label,
+                ha="center",
+                va="center",
+                color="black",
+                fontsize=max(template["tick_size"] - 1.0, 5.0),
+                zorder=5.5,
+            )
+            text.set_path_effects(
+                [patheffects.withStroke(linewidth=1.3, foreground=(1.0, 1.0, 1.0, 0.8))]
+            )
 
     count_label = (
         "Number of sectors per target"
@@ -351,26 +424,24 @@ def plot_counts(
     )
     sm = ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
+    cax = fig.add_axes([0.28, 0.065, 0.44, 0.020])
     cbar = fig.colorbar(
         sm,
-        ax=[ax_now, ax_future],
+        cax=cax,
         orientation="horizontal",
-        fraction=0.06,
-        pad=0.10,
     )
-    cbar.set_label(count_label)
+    cbar.set_label(count_label, labelpad=5)
     cbar.set_ticks(tick_values)
 
-    if highconf_only:
-        fig.suptitle("High-confidence WD TESS coverage", y=0.98)
-    else:
-        fig.suptitle("TWIRL WD TESS coverage", y=0.98)
+    if figure_title:
+        fig.suptitle(figure_title, y=0.98)
 
     outdir.mkdir(parents=True, exist_ok=True)
     png_path = outdir / f"{output_stem}.png"
     pdf_path = outdir / f"{output_stem}.pdf"
     summary_path = outdir / summary_name
 
+    fig.subplots_adjust(top=0.92 if figure_title else 0.95, bottom=0.16)
     fig.savefig(png_path, dpi=300, bbox_inches="tight")
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)
@@ -378,8 +449,9 @@ def plot_counts(
     write_summary_csv(
         path=summary_path,
         observed_counts=observed_counts,
-        future_counts=future_counts,
+        all_counts=all_counts,
         observed_sector_max=observed_sector_max,
+        min_sector=min_sector,
         count_mode=count_mode,
         highconf_only=highconf_only,
     )
@@ -396,9 +468,17 @@ def main() -> None:
     observations = load_observations(args.observations)
     progress(f"[plot] loaded observation rows={len(observations)}")
 
+    min_sector: int | None = None
+    if len(observations) > 0:
+        min_sector = int(np.min(np.asarray(observations["sector"], dtype=np.int16)))
+
     if args.highconf_only and "is_highconf_wd" in observations.colnames:
         observations = observations[np.asarray(observations["is_highconf_wd"], dtype=bool)]
         progress(f"[plot] filtered observation rows={len(observations)} to the high-confidence sample")
+        if len(observations) > 0:
+            min_sector = int(np.min(np.asarray(observations["sector"], dtype=np.int16)))
+        else:
+            min_sector = None
 
     observed_counts, future_counts = aggregate_counts(
         source_ids=np.asarray(catalog["source_id"], dtype=np.int64),
@@ -406,26 +486,31 @@ def main() -> None:
         observed_sector_max=args.observed_sector_max,
         count_mode=args.count_mode,
     )
+    all_counts = observed_counts + future_counts
     progress(
         "[plot] counts ready: "
         f"observed_nonzero={int(np.count_nonzero(observed_counts > 0))}, "
-        f"future_nonzero={int(np.count_nonzero(future_counts > 0))}, "
+        f"all_nonzero={int(np.count_nonzero(all_counts > 0))}, "
         f"count_mode={args.count_mode}"
     )
 
     png_path, pdf_path, summary_path = plot_counts(
         catalog=catalog,
         observed_counts=observed_counts,
-        future_counts=future_counts,
+        all_counts=all_counts,
         outdir=args.outdir,
         output_stem=args.output_stem,
         summary_name=args.summary_name,
         observed_sector_max=args.observed_sector_max,
+        min_sector=min_sector,
         count_mode=args.count_mode,
         color_scale=args.color_scale,
         template_name=args.template,
         dense_marker_scale=args.dense_marker_scale,
         highconf_only=args.highconf_only,
+        figure_title=args.figure_title,
+        observed_panel_title=args.observed_panel_title,
+        future_panel_title=args.future_panel_title,
     )
 
     progress(f"[plot] wrote PNG: {png_path}")

@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Attach TESS Sector >= 56 coverage metadata to the TWIRL master catalog and export "
-            "TWIRL-side detector target tables for planning and filtering."
+            "TWIRL-side orbit/camera/CCD target tables for planning and filtering."
         )
     )
     parser.add_argument(
@@ -78,13 +78,13 @@ def parse_args() -> argparse.Namespace:
         "--output-observations",
         type=Path,
         default=DEFAULT_OUTPUT_OBSERVATIONS,
-        help="Output FITS table with one row per source_id/sector/camera/ccd hit.",
+        help="Output FITS table with one row per source_id/orbit/sector/camera/ccd hit.",
     )
     parser.add_argument(
         "--output-detector-summary",
         type=Path,
         default=DEFAULT_OUTPUT_DETECTOR_SUMMARY,
-        help="Output CSV with one row per sector/camera/ccd footprint.",
+        help="Output CSV with one row per orbit/sector/camera/ccd footprint.",
     )
     parser.add_argument(
         "--output-sector-summary",
@@ -96,7 +96,7 @@ def parse_args() -> argparse.Namespace:
         "--detector-table-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DETECTOR_DIR,
-        help="Directory for per-sector/camera/ccd TWIRL target tables.",
+        help="Directory for per-orbit/camera/ccd TWIRL target tables.",
     )
     parser.add_argument(
         "--min-sector",
@@ -126,7 +126,7 @@ def parse_args() -> argparse.Namespace:
         "--export-detector-tables",
         action="store_true",
         help=(
-            "Write per-sector/camera/ccd ECSV target tables. "
+            "Write per-orbit/camera/ccd ECSV target tables. "
             "These are TWIRL planning/filtering tables, not replacements for full-field MKI catalogs."
         ),
     )
@@ -241,8 +241,9 @@ def main() -> None:
         ),
         "notes": [
             "Sector coverage uses tess-point detector geometry for all requested sectors.",
+            "Each sector hit is expanded into one row per orbit so the exported tables can drive orbit/camera/CCD jobs.",
             "Observed and future sectors are stored together; later extraction can filter by an observed-sector cutoff.",
-            "The per-sector/camera/ccd tables are TWIRL target subsets for planning and filtering.",
+            "The per-orbit/camera/ccd tables are TWIRL target subsets for planning and filtering.",
             "They do not replace the full-field MKI TGLC cached TIC/Gaia catalogs produced by `tglc catalogs`.",
         ],
     }
