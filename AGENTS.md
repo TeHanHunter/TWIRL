@@ -133,6 +133,12 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Put generated reports in `reports/`.
 - Put reusable config in `configs/`.
 - Record assumptions and provenance in output metadata.
+- When progress is made against a milestone or deliverable in `doc/twirl_plan.md`, record that progress in the same turn if practical.
+- In `doc/twirl_plan.md`, record progress as concise dated bullets under the most relevant subsection rather than in a separate free-floating log when possible.
+- Include the relevant code or output path(s) in each progress bullet so the artifact is easy to inspect.
+- Use plain Markdown that renders everywhere.
+- Append a short status marker in parentheses to subsection headings when helpful: `(✓)` done, `(...)` in progress, `(?)` problematic, and nothing if not started.
+- Treat these markers as manually tuned section status labels rather than auto-generated output.
 
 ## Current Priorities
 

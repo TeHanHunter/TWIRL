@@ -10,6 +10,7 @@ This document turns the NHFP proposal into an executable software and survey pla
 - The seed WD catalog is a local external dependency, not a git-tracked repo asset.
 - `Pwd > 0.75` is the default high-confidence reference sample for pilot work, but the final TWIRL denominator is still to be determined later.
 - The first search should be interpretable and not ML-first.
+- Step 1 is now past initial catalog assembly and into TIC metadata consolidation, but orbit/camera/CCD mapping and production job-table generation are still pending.
 
 ## Project Goal
 
@@ -99,7 +100,7 @@ Rules:
 
 This is the foundation for everything else. The MIT fork is no longer a single-target `quick_lc.py` workflow. It is an orbit/camera/CCD production pipeline with separate catalog, cutout, ePSF, and light-curve stages.
 
-### 1.1 Build the WD target table
+### 1.1 Build the WD target table (✓)
 
 The current seed catalogue for this repo is:
 
@@ -144,7 +145,14 @@ The parent-sample protocol should be explicit in code and metadata, but the exac
 - until `twirl_parent_sample` is frozen, any completeness or occurrence summaries must be labeled provisional
 - any exploratory search outside the final locked denominator must be labeled exploratory and excluded from occurrence-rate denominators by default
 
-### 1.2 Decide the production sample
+#### Progress
+
+- `2026-03-30`: Added the first high-confidence spatial plots in `scripts/step1_lcs/plot_highconf_tmag_spatial_positions.py` and `scripts/step1_lcs/plot_pwd_spatial_positions.py`; outputs are in `reports/step1_lcs/wd_highconf_tmag_spatial_positions.{pdf,png}`.
+- `2026-03-31`: Built `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits` from the local Gaia EDR3 seed catalog; the manifest is `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_manifest.json`.
+- `2026-04-01`: Completed the PDO Gaia DR3 to TIC export with `scripts/step1_lcs/export_gaia_dr3_tic_matches.py`; the sidecars are `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_matches.csv` and `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv`.
+- `2026-04-01`: Added conservative merge-back tooling in `scripts/step1_lcs/merge_tic_summary_into_master_catalog.py` so ambiguous TIC matches stay unresolved.
+
+### 1.2 Decide the production sample (...)
 
 Use two nested samples:
 
@@ -170,7 +178,12 @@ The exact TWIRL WD cut should be frozen only after:
 - benchmark QA is complete
 - the baseline search stack is defined well enough to support end-to-end injections
 
-### 1.3 Prepare the MIT PDO environment
+#### Progress
+
+- `2026-04-01`: Kept `Pwd > 0.75` as the default high-confidence reference sample in `data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits`, which contains `359,073` such rows.
+- `2026-04-01`: Adopted the conservative TIC policy in `scripts/step1_lcs/merge_tic_summary_into_master_catalog.py` and `data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv`: fill `tic_id` only for unique matches and keep multiple or missing-bridge cases unresolved.
+
+### 1.3 Prepare the MIT PDO environment (...)
 
 The MIT-adapted TGLC expects:
 
@@ -185,6 +198,12 @@ For TWIRL, the immediate operational tasks are:
 3. pre-stage the required 200 s FFIs,
 4. confirm the `pyticdb` databases resolve on PDO,
 5. define batch-job wrappers for one orbit-camera-CCD unit per job.
+
+#### Progress
+
+- `2026-04-01`: Confirmed PDO exposes Python 3.9 in the visible path and created `~/TWIRL/.venv` for TWIRL helper scripts.
+- `2026-04-01`: Installed `pyticdb` into `~/TWIRL/.venv` from the MIT package index and verified `scripts/step1_lcs/export_gaia_dr3_tic_matches.py` can query `tic_82`.
+- `2026-04-01`: Added `scripts/step1_lcs/map_tess_sector_coverage.py` and `src/twirl/catalogs/tess_coverage.py` to map Sector `>= 56` detector coverage and export per-sector/camera/ccd TWIRL target tables; the output schema is documented in `catalogs/sector_orbit_maps/README.md`.
 
 ### 1.4 Generate catalogs and cutouts
 
@@ -256,7 +275,7 @@ Before scaling beyond the pilot stage, the WD 1856 benchmark should satisfy all 
 - an independent extraction path has been compared on the benchmark set
 - the benchmark result is strong enough to serve as a smoke test for the first baseline search implementation
 
-### 1.8 Gaps to close in the current MIT fork
+### 1.8 Gaps to close in the current MIT fork (?)
 
 The MIT fork is close to what TWIRL needs, but not identical to the survey requirements.
 
@@ -271,7 +290,8 @@ Known gaps to track early:
 
 ### Step 1 Deliverables
 
-- WD master target catalog
+- WD master target catalog (✓)
+  Current status: v0 catalog built and full Gaia DR3 to TIC export completed.
 - orbit/camera/CCD job table
 - automated PDO production scripts
 - consolidated WD light-curve archive

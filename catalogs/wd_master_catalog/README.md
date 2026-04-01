@@ -46,6 +46,15 @@ The builder writes two local files:
 - a FITS master catalog
 - a JSON sidecar manifest with provenance, build version, and seed-file metadata
 
+The coverage-mapping script
+`scripts/step1_lcs/map_tess_sector_coverage.py`
+fills the TESS coverage placeholder columns and writes companion sector/detector products such as:
+
+- an updated master catalog with populated `tess_observations_json`
+- `twirl_wd_tess_observations_v0.fits`: one row per target-sector-camera-CCD hit
+- detector and sector summary tables
+- optional per-sector/camera/ccd TWIRL target tables in ECSV format
+
 ## PDO Match Export
 
 When run on PDO, the read-only script

@@ -57,6 +57,37 @@ class QuantileNormalize(Normalize):
         return np.interp(value, self._cdf_knots, self._value_knots)
 
 
+class ReverseShiftedLogNormalize(Normalize):
+    """Apply a reversed log stretch after shifting the maximum value above zero."""
+
+    def __init__(self, vmin: float, vmax: float, shift: float = 1.0):
+        if vmax <= vmin:
+            raise ValueError("ReverseShiftedLogNormalize requires vmax > vmin.")
+        if shift <= 0:
+            raise ValueError("ReverseShiftedLogNormalize requires a positive shift.")
+
+        self.shift = shift
+        self.log_min = np.log10(self.shift)
+        self.log_max = np.log10((vmax - vmin) + self.shift)
+        self.log_span = self.log_max - self.log_min
+        super().__init__(vmin=vmin, vmax=vmax, clip=True)
+
+    def __call__(self, value, clip=None):
+        result, is_scalar = self.process_value(value)
+        data = np.asarray(result.data, dtype=float)
+        data = np.clip(data, self.vmin, self.vmax)
+        shifted = (self.vmax - data) + self.shift
+        mapped = 1.0 - (np.log10(shifted) - self.log_min) / self.log_span
+        mapped = np.ma.masked_array(mapped, mask=result.mask, copy=False)
+        if is_scalar:
+            mapped = mapped[0]
+        return mapped
+
+    def inverse(self, value):
+        shifted = 10 ** ((1.0 - value) * self.log_span + self.log_min)
+        return self.vmax - shifted + self.shift
+
+
 class PwdLogNormalize(Normalize):
     """Log-stretch the contamination fraction so values near P_wd ~= 1 remain visible."""
 
@@ -127,9 +158,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--color-scale",
-        choices=("quantile", "linear"),
-        default="quantile",
-        help="Color normalization for TESS magnitude. 'quantile' spreads dense magnitude ranges across the colormap.",
+        choices=("log", "linear", "quantile"),
+        default="log",
+        help=(
+            "Color normalization for TESS magnitude. "
+            "'log' applies a reversed log stretch to the clipped magnitude range."
+        ),
     )
     return parser.parse_args()
 
@@ -230,11 +264,12 @@ def plot_sample(
     # Use a robust display range while preserving the true TESS magnitudes in the data arrays.
     tmag_vmin = max(17.0, float(np.nanpercentile(tmag, 1)))
     tmag_vmax = float(np.nanpercentile(tmag, 99))
+    color_values = np.clip(tmag, tmag_vmin, tmag_vmax)
     if color_scale == "quantile":
-        color_values = np.clip(tmag, tmag_vmin, tmag_vmax)
         tmag_norm = QuantileNormalize(color_values)
+    elif color_scale == "log":
+        tmag_norm = ReverseShiftedLogNormalize(vmin=tmag_vmin, vmax=tmag_vmax, shift=1.0)
     else:
-        color_values = np.clip(tmag, tmag_vmin, tmag_vmax)
         tmag_norm = Normalize(vmin=tmag_vmin, vmax=tmag_vmax)
     pwd_norm = PwdLogNormalize(vmin=0.75, vmax=1.0, epsilon=1e-4)
     pwd_cmap = plt.get_cmap("viridis")
