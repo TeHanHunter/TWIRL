@@ -212,6 +212,296 @@ tglc epsfs ... --no-gpu
 
 The other stages are CPU-oriented.
 
+### 7. Understand where `epsfs` parallelizes
+
+`tglc epsfs` parallelizes over cutout pickle files **within one CCD** through `--nprocs`.
+If multiple CCDs are passed in one command, the current implementation still loops over
+`camera,ccd` serially and only parallelizes the `source_*.pkl` files for the active CCD.
+
+Operational consequence for TWIRL:
+
+- one `orbit/camera/ccd` job with `--nprocs 4` launches one parent process and four worker
+  processes, plus one Python multiprocessing resource-tracker helper in GPU mode
+- scaling to a whole orbit through one serial `tglc epsfs` command is likely to be slow because all
+  `16` CCDs are processed one after another
+- before mass production, prefer a job launcher that parallelizes across independent
+  `orbit/camera/ccd` units, with a modest per-job `--nprocs`, rather than one monolithic orbit job
+- expect uneven CCD runtimes because crowded/heavy CCDs are slower than sparse CCDs
+
+## Known-Good PDO Environment And Benchmark Pattern
+
+The current PDO benchmark work established a concrete, working launch pattern for the MIT fork.
+
+### PDO environment notes
+
+- The orbit-local virtual environment at `/pdo/users/tehan/tglc-deep-catalogs/orbit-195/ffi/catalogs/.venv/` is not sufficient by itself on `pdogpu6`; calling its Python directly failed with `libpython3.11.so.1.0` missing.
+- The usable shared runtime is the QLP environment at `/sw/qlp-environment/.venv/`.
+- On PDO, the MIT fork is importable from that shared environment when the Python 3.11 library path is added through `LD_LIBRARY_PATH`.
+
+The minimal validated import test was:
+
+```bash
+deactivate 2>/dev/null
+env LD_LIBRARY_PATH=/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH} \
+  /sw/qlp-environment/.venv/bin/python \
+  -c "import sys, tglc; print(sys.executable); print(tglc.__file__)"
+```
+
+That resolved to:
+
+- `/sw/qlp-environment/.venv/bin/python`
+- `/sw/qlp-environment/.venv/lib/python3.11/site-packages/tglc/__init__.py`
+
+For current PDO work, prefer this shared environment pattern over trying to revive an orbit-local `.venv`.
+
+Two benchmark-specific runtime caveats found on `2026-04-02`:
+
+- on `pdogpu6`, the shared QLP environment currently reports `HAS_CUPY=False`, so `tglc epsfs`
+  is running CPU-only unless a `cupy`-enabled environment is prepared
+- on `pdogpu1`, importing `numba` from `/sw/qlp-environment/.venv/bin/python` failed until
+  `/pdo/app/anaconda/anaconda2-4.4.0/lib` was added ahead of the Python 3.11 library path so
+  `libffi.so.6` can be found
+
+The validated `pdogpu1` import pattern for the user-owned fork is:
+
+```bash
+deactivate 2>/dev/null
+env \
+  LD_LIBRARY_PATH=/pdo/app/anaconda/anaconda2-4.4.0/lib:/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH} \
+  PYTHONPATH=/pdo/users/tehan/tess-gaia-light-curve-twirl:${PYTHONPATH} \
+  /sw/qlp-environment/.venv/bin/python \
+  -c "import tglc; from tglc.utils._optional_deps import HAS_CUPY; print(tglc.__file__); print(HAS_CUPY)"
+```
+
+### Existing PDO template tree
+
+The existing deep-catalog production tree that TWIRL should mirror is:
+
+```text
+/pdo/users/tehan/tglc-deep-catalogs/
+```
+
+The checked template orbit is:
+
+```text
+/pdo/users/tehan/tglc-deep-catalogs/orbit-195/ffi/
+```
+
+What was confirmed there:
+
+- `catalogs` is complete, with `32` files in `orbit-195/ffi/catalogs/`
+- `cutouts` is complete, with `3136` `source_*.pkl` files under `orbit-195/ffi/`
+- the tree shape matches the MIT `Manifest` layout, including `catalogs/`, `camX/ccdY/`, and `run/`
+
+This is the safest operational template for new TWIRL benchmark runs because it writes into the same user-owned area without touching shared PDO staging more than necessary.
+
+The concrete user-owned tree observed for the Sector `56` benchmark currently looks like:
+
+```text
+/pdo/users/tehan/tglc-deep-catalogs/
+  orbit-119/
+    ffi/
+      catalogs/
+        Gaia_cam4_ccd1.ecsv
+        TIC_cam4_ccd1.ecsv
+      cam4/
+        ccd1/
+          ffi/
+            hlsp_tica_tess_ffi_s0056-o1-......-cam4-ccd1_tess_v01_img.fits -> /pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/...
+          source/
+            source_*.pkl
+  orbit-120/
+    ffi/
+      catalogs/
+        Gaia_cam4_ccd1.ecsv
+        TIC_cam4_ccd1.ecsv
+      cam4/
+        ccd1/
+          ffi/
+            hlsp_tica_tess_ffi_s0056-o2-......-cam4-ccd1_tess_v01_img.fits -> /pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/...
+```
+
+### PDO write boundary
+
+For TWIRL PDO work, treat `/pdo/users/tehan/` as the only writable area.
+
+- `/pdo/qlp-data/...` and other shared PDO trees are read-only inputs for TWIRL purposes.
+- Do not create, edit, overwrite, move, or delete anything outside `/pdo/users/tehan/`.
+- If TICA FFIs or other shared inputs are needed for a benchmark run, expose them under `/pdo/users/tehan/...` with user-owned staging or symlinks rather than changing the shared source tree.
+
+### Sector 56 benchmark unit for WD 1856
+
+For the fixed Sector `56` benchmark:
+
+- WD 1856 is on `cam4/ccd1`
+- Sector `56` maps to orbit `119` and orbit `120`
+
+So the first benchmark unit is not the whole sector. It is exactly these two orbit-camera-CCD jobs:
+
+- orbit `119`, `ccd 4,1`
+- orbit `120`, `ccd 4,1`
+
+### Known-good `catalogs` command pattern on PDO
+
+Use the shared QLP Python explicitly and keep the benchmark outputs under `/pdo/users/tehan/tglc-deep-catalogs/`.
+
+Orbit `119`:
+
+```bash
+mkdir -p /pdo/users/tehan/tglc-deep-catalogs/orbit-119/ffi/catalogs
+deactivate 2>/dev/null
+env LD_LIBRARY_PATH=/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH} \
+  /sw/qlp-environment/.venv/bin/python \
+  -m tglc catalogs \
+  --orbit 119 \
+  --ccd 4,1 \
+  --max-magnitude 20 \
+  --nprocs 16 \
+  --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
+```
+
+Orbit `120`:
+
+```bash
+mkdir -p /pdo/users/tehan/tglc-deep-catalogs/orbit-120/ffi/catalogs
+deactivate 2>/dev/null
+env LD_LIBRARY_PATH=/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH} \
+  /sw/qlp-environment/.venv/bin/python \
+  -m tglc catalogs \
+  --orbit 120 \
+  --ccd 4,1 \
+  --max-magnitude 20 \
+  --nprocs 16 \
+  --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
+```
+
+The expected output files for each orbit are:
+
+```text
+/pdo/users/tehan/tglc-deep-catalogs/orbit-<orbit>/ffi/catalogs/Gaia_cam4_ccd1.ecsv
+/pdo/users/tehan/tglc-deep-catalogs/orbit-<orbit>/ffi/catalogs/TIC_cam4_ccd1.ecsv
+```
+
+### Operational distinction between PDO trees
+
+Keep these two roles separate:
+
+- `/pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/...` is the raw TICA FFI delivery tree used as the Sector `56` benchmark input source
+- `/pdo/qlp-data/sector-56/ffi/cam4/ccd1/...` is a downstream QLP products tree (`BLS`, `DI`, `GPU`, `LC`, `MCMC`, `REPORTS`), not the raw TGLC `cutouts` input tree
+- `/pdo/users/tehan/tglc-deep-catalogs/...` is the user-owned TGLC production tree currently serving as the safest TWIRL benchmark root
+
+For the WD 1856 benchmark, first mirror the existing `tglc-deep-catalogs` arrangement and only then proceed to `cutouts`, `epsfs`, and `lightcurves`. In particular, keep all new writes under `/pdo/users/tehan/...` and treat `/pdo/qlp-data/...` as read-only.
+
+### Known-good `cutouts` staging pattern on PDO
+
+For Sector `56`, the raw TICA FFIs for WD 1856's benchmark CCD were found at:
+
+```text
+/pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/
+```
+
+The orbit-local `ffi/` directories under the user-owned benchmark tree can be populated with symlinks:
+
+```bash
+mkdir -p /pdo/users/tehan/tglc-deep-catalogs/orbit-119/ffi/cam4/ccd1/ffi
+mkdir -p /pdo/users/tehan/tglc-deep-catalogs/orbit-120/ffi/cam4/ccd1/ffi
+```
+
+```bash
+for f in /pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/*-o1-*-cam4-ccd1_tess_v01_img.fits; do
+  ln -sfn "$f" /pdo/users/tehan/tglc-deep-catalogs/orbit-119/ffi/cam4/ccd1/ffi/
+done
+```
+
+```bash
+for f in /pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/*-o2-*-cam4-ccd1_tess_v01_img.fits; do
+  ln -sfn "$f" /pdo/users/tehan/tglc-deep-catalogs/orbit-120/ffi/cam4/ccd1/ffi/
+done
+```
+
+The orbit `119` `o1` staging count was `5638` symlinks in
+`/pdo/users/tehan/tglc-deep-catalogs/orbit-119/ffi/cam4/ccd1/ffi/`.
+
+The corresponding `cutouts` command pattern is:
+
+```bash
+deactivate 2>/dev/null
+env LD_LIBRARY_PATH=/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH} \
+  /sw/qlp-environment/.venv/bin/python \
+  -m tglc cutouts \
+  --orbit 119 \
+  --ccd 4,1 \
+  --nprocs 16 \
+  --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
+```
+
+Known orbit `119` `cutouts` warnings from the Sector 56 benchmark:
+
+- one TICA file was skipped as invalid because the FITS header lacked `COARSE`:
+  `/pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/hlsp_tica_tess_ffi_s0056-o1-00694257-cam4-ccd1_tess_v01_img.fits`
+- `5637 cadence gaps != 1 detected` was reported after sorting by timestamp
+
+Despite those warnings, orbit `119` `cutouts` completed and wrote `196/196` source pickle files to
+`/pdo/users/tehan/tglc-deep-catalogs/orbit-119/ffi/cam4/ccd1/source/`.
+
+These warnings should be revisited during benchmark QA, but they do not block continuing to `epsfs` after both orbit `119` and orbit `120` finish `cutouts`.
+
+### User-owned fork for pre-Sector-67 TICA quality headers
+
+Sector `56` TICA FFIs predate the `FINE`, `COARSE`, `RW_DESAT`, and `STRAYLT1-4` headers that were
+added starting in Sector `67`, so the stock MIT reader treated missing quality headers as invalid
+FFIs.
+
+The current TWIRL benchmark therefore uses the user-owned fork at:
+
+```text
+/pdo/users/tehan/tess-gaia-light-curve-twirl/
+```
+
+That fork carries a pre-Sector-67 fallback patch in `tglc/ffi.py` so missing TICA quality headers
+default to zero only for `sector < 67`. On PDO, expose that fork ahead of the installed package with
+`PYTHONPATH`:
+
+```bash
+deactivate 2>/dev/null
+env \
+  LD_LIBRARY_PATH=/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH} \
+  PYTHONPATH=/pdo/users/tehan/tess-gaia-light-curve-twirl:${PYTHONPATH} \
+  /sw/qlp-environment/.venv/bin/python \
+  -m tglc cutouts \
+  --orbit 120 \
+  --ccd 4,1 \
+  --nprocs 16 \
+  --replace \
+  --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
+```
+
+### Live PDO process hygiene
+
+When rerunning a benchmark stage after code changes, check for stale stopped jobs before trusting the current outputs.
+
+In this benchmark, a pre-patch orbit `120` `cutouts` process remained stopped in `pts/10`:
+
+```text
+PID 71335  STAT Tl  /sw/qlp-environment/.venv/bin/python -m tglc cutouts --orbit 120 --ccd 4,1 --nprocs 16 --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
+```
+
+while the patched rerun was active in a user-owned tmux session:
+
+```text
+PID 91844  STAT Rl+  ... PYTHONPATH=/pdo/users/tehan/tess-gaia-light-curve-twirl:${PYTHONPATH} ... -m tglc cutouts --orbit 120 --ccd 4,1 --nprocs 16 --replace --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
+```
+
+Do not resume stale pre-patch jobs such as the stopped `pts/10` process, because they can overwrite user-owned benchmark products with old code.
+
+For the active benchmark, `pdogpu6` orbit `120` `epsf/` and `LC/` were temporarily made read-only in
+the main benchmark tree so the orbit `119` driver cannot overwrite orbit `120` products while a
+separate `pdogpu1` CPU-only `epsfs` benchmark is running in:
+
+```text
+/pdo/users/tehan/tglc-deep-catalogs-pdogpu1-epsf-test/
+```
+
 ## TWIRL-Specific Operating Advice
 
 ### Use a WD control table to drive production

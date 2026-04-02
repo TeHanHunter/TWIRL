@@ -62,8 +62,8 @@ If this file and those docs disagree, treat the docs as authoritative and update
 ## Benchmark And Search Strategy
 
 - `WD 1856+534` is the mandatory benchmark target.
-- The exact benchmark `Sector >= 56` containing WD 1856 is intentionally not fixed yet.
-- Do not silently choose or hardcode the benchmark sector unless the user asks.
+- The current fixed first benchmark is `Sector 56`, orbits `119` and `120`, `cam4/ccd1`, chosen explicitly by the user.
+- Do not silently change the benchmark sector/orbit/CCD unless the user asks.
 - The first search version should be interpretable:
   - periodic short-duration box or trapezoid search
   - separate dip-search branch for non-periodic or weakly periodic events
@@ -80,6 +80,7 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Use the MIT CLI stages: `catalogs`, `cutouts`, `epsfs`, `lightcurves`, or `all`.
 - For WD work, raise the target magnitude limit beyond the bright-star defaults, typically around `--max-magnitude 20`.
 - Preserve the MIT raw data layout. Add TWIRL metadata and indices on top rather than inventing a parallel raw layout.
+- On PDO, keep TWIRL-run outputs, symlinks, staging, and scratch products under `/pdo/users/tehan/` rather than writing into shared PDO trees.
 
 ## Data Product Expectations
 
@@ -97,6 +98,9 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Do not change archive formats without updating the relevant schema docs.
 - Do not introduce ML-first search changes unless the baseline search is already working.
 - Do not change the survey denominator or `Pwd` threshold implicitly; make that an explicit documented decision.
+- On PDO, never create, edit, overwrite, move, or delete anything outside `/pdo/users/tehan/`.
+- Reading shared PDO locations such as `/pdo/qlp-data/` is allowed, but treat them as read-only inputs.
+- If a PDO workflow needs files from a shared location, stage them under `/pdo/users/tehan/` with user-owned copies or symlinks rather than changing the shared source tree.
 
 ## Required QA And Validation Logic
 
@@ -176,6 +180,7 @@ When choosing what to implement next, prefer this order:
 - For publication-facing plots, do not add figure titles by default unless the user explicitly asks for them or the figure would otherwise be ambiguous.
 - For publication-facing vertically stacked comparison figures, prefer per-panel axis labels, concise panel titles when needed for disambiguation, and compact nearby shared colorbars or legends rather than oversized figure-level decorations.
 - For long-running scripts or batch jobs, add periodic progress reporting when practical so PDO runs are observable without attaching a debugger or guessing from zero-byte output files.
+- When giving shell commands to the user, prefer simple multi-line fenced command blocks without prompt text or forced one-line compression unless the user explicitly asks for one-liners.
 - When the user says to "wrap for the day", automatically do the end-of-day hygiene when the repo state is coherent: record useful progress in `doc/twirl_plan.md`, commit the current checkpoint, push it if possible, and leave the next concrete step clear.
 
 ## When To Stop And Ask
