@@ -317,7 +317,7 @@ def plot_pwd_bins(
         zorder=5,
     )
     ax.text(
-        wd_theta ,
+        wd_theta,
         wd_dist + 200,
         "WD 1856",
         ha="right",

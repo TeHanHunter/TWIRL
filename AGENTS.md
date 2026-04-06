@@ -7,12 +7,13 @@ This file is the operating protocol for agents working in the standalone `TWIRL`
 Before making substantive changes, read:
 
 - `doc/twirl_plan.md`
+- `doc/twirl_progress_log.md`
 - `doc/mit_tglc_usage_guide.md`
 - `doc/ideas.md`
 - `doc/local_data.md`
 - `doc/plotting_style.md` before making or revising publication-facing figures
 
-Use `doc/twirl_plan.md` as the single project plan, `doc/ideas.md` for unresolved questions and brainstorming, `doc/local_data.md` for local-only data conventions, and `doc/plotting_style.md` for figure styling.
+Use `doc/twirl_plan.md` as the single forward-looking project plan, `doc/twirl_progress_log.md` for dated execution history and benchmark notes, `doc/ideas.md` for unresolved questions and brainstorming, `doc/local_data.md` for local-only data conventions, and `doc/plotting_style.md` for figure styling.
 
 Follow the Stage 1-5 pipeline structure defined in `doc/twirl_plan.md`.
 
@@ -79,12 +80,15 @@ If this file and those docs disagree, treat the docs as authoritative and update
   - MIT `tglc-data` directory layout
 - Use the MIT CLI stages: `catalogs`, `cutouts`, `epsfs`, `lightcurves`, or `all`.
 - For WD work, raise the target magnitude limit beyond the bright-star defaults, typically around `--max-magnitude 20`.
+- For the current CPU-only benchmark, use `--nprocs 16` as the default one-CCD `epsfs` worker count unless a new timing test motivates a change.
+- Prefer `pdogpu1` for the current CPU-only Stage 1 benchmark work; reserve `pdogpu6` for follow-up only if a working `cupy`/GPU TGLC environment is prepared there.
 - Preserve the MIT raw data layout. Add TWIRL metadata and indices on top rather than inventing a parallel raw layout.
 - On PDO, keep TWIRL-run outputs, symlinks, staging, and scratch products under `/pdo/users/tehan/` rather than writing into shared PDO trees.
 
 ## Data Product Expectations
 
 - MIT TGLC outputs HDF5 light curves, not the old FITS products.
+- For TWIRL Stage 1, treat `TGLC end-to-end` as complete at the HDF5 `lightcurves` stage; public-style FITS products belong to the later QLP detrend + HLSP export path.
 - Downstream TWIRL code should expect decontaminated aperture photometry with `1x1`, `3x3`, and `5x5` apertures.
 - Do not assume old columns such as `cal_psf_flux` or `cal_aper_flux`.
 - TIC IDs are useful metadata and may still matter for the current MIT implementation, but they do not define the scientific sample.
@@ -138,8 +142,10 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Put generated reports in `reports/`.
 - Put reusable config in `configs/`.
 - Record assumptions and provenance in output metadata.
-- When progress is made against a milestone or deliverable in `doc/twirl_plan.md`, record that progress in the same turn if practical.
-- In `doc/twirl_plan.md`, record progress as concise dated bullets under the most relevant subsection rather than in a separate free-floating log when possible.
+- When progress is made against a milestone or deliverable, record it in the same turn if practical.
+- Keep `doc/twirl_plan.md` as the forward-looking plan plus compact milestone status summaries only; do not let it accumulate command-level run logs.
+- Record detailed dated execution history in `doc/twirl_progress_log.md` under the most relevant stage subsection.
+- In `doc/twirl_plan.md`, keep only 1-3 milestone-level status bullets per active subsection and link to the relevant `doc/twirl_progress_log.md` section.
 - Keep the prose part of each progress bullet readable; do not stuff raw long paths into the sentence.
 - Keep file references inline when helpful, using short clickable Markdown link labels such as `[script]`, `[PNG]`, `[PDF]`, `[FITS]`, or `[CSV]` rather than raw long paths.
 - Use plain Markdown that renders everywhere.
@@ -181,7 +187,7 @@ When choosing what to implement next, prefer this order:
 - For publication-facing vertically stacked comparison figures, prefer per-panel axis labels, concise panel titles when needed for disambiguation, and compact nearby shared colorbars or legends rather than oversized figure-level decorations.
 - For long-running scripts or batch jobs, add periodic progress reporting when practical so PDO runs are observable without attaching a debugger or guessing from zero-byte output files.
 - When giving shell commands to the user, prefer simple multi-line fenced command blocks without prompt text or forced one-line compression unless the user explicitly asks for one-liners.
-- When the user says to "wrap for the day", automatically do the end-of-day hygiene when the repo state is coherent: record useful progress in `doc/twirl_plan.md`, commit the current checkpoint, push it if possible, and leave the next concrete step clear.
+- When the user says to "wrap for the day", automatically do the end-of-day hygiene when the repo state is coherent: record milestone status in `doc/twirl_plan.md`, record dated execution notes in `doc/twirl_progress_log.md`, commit the current checkpoint, push it if possible, and leave the next concrete step clear.
 
 ## When To Stop And Ask
 

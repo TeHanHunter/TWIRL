@@ -172,7 +172,7 @@ A typical production sequence is:
 ```bash
 tglc catalogs --orbit 185 --ccd 1,1 --max-magnitude 20 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 tglc cutouts --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc-data
-tglc epsfs --orbit 185 --ccd 1,1 --nprocs 4 --tglc-data-dir /path/to/tglc-data
+tglc epsfs --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 tglc lightcurves --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 ```
 
@@ -180,6 +180,18 @@ In TWIRL, the first safe wrapper around this pattern is
 [`scripts/stage1_lcs/run_tglc_catalogs.py`](/Users/tehan/PycharmProjects/TWIRL/scripts/stage1_lcs/run_tglc_catalogs.py).
 It reads the orbit-aware TWIRL detector summary and, by default, prints or writes the exact
 `tglc catalogs` commands for the selected orbit/camera/CCD jobs before any execution happens.
+
+For the current Sector 56 full-orbit benchmark, use
+[`scripts/stage1_lcs/run_tglc_orbit_pipeline.py`](/Users/tehan/PycharmProjects/TWIRL/scripts/stage1_lcs/run_tglc_orbit_pipeline.py).
+That driver runs `catalogs -> cutouts -> epsfs -> lightcurves` sequentially for each CCD, launches
+multiple CCD jobs concurrently at the outer level, and filters `lightcurves` to WD TIC IDs from the
+TWIRL observation table.
+
+One extra `catalogs` caveat found in the Sector 56 orbit `119` benchmark: in dense CCDs, a single
+TIC-cone query can return more than `65,535` Gaia DR2 source IDs, and the stock DR2->DR3 bridge
+lookup then fails with `psycopg.OperationalError` because SQLAlchemy binds each ID as one query
+parameter in an `IN (...)` clause. The TWIRL user-owned TGLC fork now batches that bridge query in
+chunks of `50,000` IDs to stay below the Postgres parameter limit.
 
 Or, once the setup is trusted:
 
@@ -220,13 +232,20 @@ If multiple CCDs are passed in one command, the current implementation still loo
 
 Operational consequence for TWIRL:
 
-- one `orbit/camera/ccd` job with `--nprocs 4` launches one parent process and four worker
+- one `orbit/camera/ccd` job with `--nprocs 16` launches one parent process and sixteen worker
   processes, plus one Python multiprocessing resource-tracker helper in GPU mode
 - scaling to a whole orbit through one serial `tglc epsfs` command is likely to be slow because all
   `16` CCDs are processed one after another
 - before mass production, prefer a job launcher that parallelizes across independent
   `orbit/camera/ccd` units, with a modest per-job `--nprocs`, rather than one monolithic orbit job
+- the first full-orbit benchmark setting is orbit `119` on `pdogpu1` with `4` CCD jobs in parallel,
+  while keeping `catalogs/cutouts/epsfs/lightcurves` worker counts at `16/16/16/16` inside each CCD
+  job; orbit `120` should use a different outer CCD concurrency for comparison while leaving
+  `epsfs --nprocs 16` fixed
 - expect uneven CCD runtimes because crowded/heavy CCDs are slower than sparse CCDs
+- the current default for TWIRL one-CCD `epsfs` jobs is `--nprocs 16`: in the Sector 56 benchmark,
+  orbit `120` on `pdogpu1` with `--nprocs 16` finished in `4:01:31`, while orbit `119` on `pdogpu6`
+  with `--nprocs 64` finished in `4:03:04`, so `64` workers did not show a clear advantage
 
 ## Known-Good PDO Environment And Benchmark Pattern
 
@@ -261,6 +280,10 @@ Two benchmark-specific runtime caveats found on `2026-04-02`:
 - on `pdogpu1`, importing `numba` from `/sw/qlp-environment/.venv/bin/python` failed until
   `/pdo/app/anaconda/anaconda2-4.4.0/lib` was added ahead of the Python 3.11 library path so
   `libffi.so.6` can be found
+
+For the current CPU-only benchmark, prefer `pdogpu1` with `--nprocs 16` for `tglc epsfs` unless a
+new timing test changes that default. Do not assume `pdogpu6` is faster for `epsfs` until a
+`cupy`-enabled TGLC environment is available there.
 
 The validated `pdogpu1` import pattern for the user-owned fork is:
 

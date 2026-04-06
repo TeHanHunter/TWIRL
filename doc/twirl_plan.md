@@ -45,6 +45,7 @@ The repo should be organized around the pipeline stages rather than papers or no
 ```text
 doc/
   twirl_plan.md
+  twirl_progress_log.md
   mit_tglc_usage_guide.md
   ideas.md
   local_data.md
@@ -145,15 +146,13 @@ The parent-sample protocol should be explicit in code and metadata, but the exac
 - until `twirl_parent_sample` is frozen, any completeness or occurrence summaries must be labeled provisional
 - any exploratory search outside the final locked denominator must be labeled exploratory and excluded from occurrence-rate denominators by default
 
-#### Progress
+#### Status
 
-- `2026-03-30`: Added the first high-confidence spatial plots to sanity-check the seed catalog sky distribution in [script](../scripts/stage1_lcs/plot_highconf_tmag_spatial_positions.py), [script](../scripts/stage1_lcs/plot_pwd_spatial_positions.py), [PNG](../reports/stage1_lcs/wd_highconf_tmag_spatial_positions.png), and [PDF](../reports/stage1_lcs/wd_highconf_tmag_spatial_positions.pdf).
-- `2026-03-31`: Built the first TWIRL Gaia-first master catalog as [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits) with [manifest](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_manifest.json).
-- `2026-04-01`: Completed the PDO Gaia DR3 to TIC export with [script](../scripts/stage1_lcs/export_gaia_dr3_tic_matches.py), preserving the raw [CSV](../data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_matches.csv) and summarized [CSV](../data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv).
-- `2026-04-01`: Added conservative merge-back tooling in [script](../scripts/stage1_lcs/merge_tic_summary_into_master_catalog.py) so ambiguous TIC matches stay unresolved instead of being guessed.
-- `2026-04-01`: Added a promotion helper in [script](../scripts/stage1_lcs/promote_master_catalog_version.py) for cases where an accepted catalog state truly needs a shorter canonical release name.
+- First Gaia-first WD master catalog and conservative TIC merge path are in place.
+- Current milestone facts: `1,280,266` seed rows, `359,073` rows with `Pwd > 0.75`, `1,236,467` unique TIC matches, `43,035` ambiguous TIC matches, and `764` no-bridge cases.
+- Detailed dated notes live in the Stage 1.1 [log](twirl_progress_log.md#11-build-the-wd-target-table).
 
-### 1.2 Decide the production sample (...)
+### 1.2 Decide the production sample (✓)
 
 Use two nested samples:
 
@@ -179,14 +178,11 @@ The exact TWIRL WD cut should be frozen only after:
 - benchmark QA is complete
 - the baseline search stack is defined well enough to support end-to-end injections
 
-#### Progress
+#### Status
 
-- `2026-04-01`: Kept `Pwd > 0.75` as the default high-confidence reference sample for pilot work; the current master catalog [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits) contains `359,073` such rows.
-- `2026-04-01`: Adopted the conservative TIC policy in [script](../scripts/stage1_lcs/merge_tic_summary_into_master_catalog.py): fill `tic_id` only for unique matches and keep multiple or missing-bridge cases unresolved in the summary [CSV](../data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv).
-- `2026-04-01`: Added the Sector `>= 56` coverage mapper and detector-table exporter for TWIRL planning products in [script](../scripts/stage1_lcs/map_tess_sector_coverage.py), [module](../src/twirl/catalogs/tess_coverage.py), and [README](../catalogs/sector_orbit_maps/README.md).
-- `2026-04-01`: Produced the first full-sky TESS coverage diagnostic and summary products with [script](../scripts/stage1_lcs/plot_tess_observation_sky_coverage.py), [PNG](../reports/stage1_lcs/wd_tess_observation_sky_coverage.png), [PDF](../reports/stage1_lcs/wd_tess_observation_sky_coverage.pdf), and [CSV](../reports/stage1_lcs/wd_tess_observation_sky_coverage_summary.csv).
-- `2026-04-01`: Completed the full `Sector 56-121` coverage run on PDO and wrote the integrated coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits), observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits), sector-summary [CSV](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_sector_summary_v0.csv), and detector-table [dir](../data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/).
-- `2026-04-01`: Measured the first simple TWIRL coverage fractions from the integrated coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits) and observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits): `1,231,702` WDs (`96.2%`) have at least one `Sector >= 56` footprint, `1,157,242` (`90.4%`) have observed coverage before Sector `100`, `59,678` (`4.7%`) appear in Sector `120+`, `44,939` (`3.5%`) appear in Sector `120`, and `33,588` (`2.6%`) appear in Sector `121`; the `Pwd > 0.75` subset counts are `339,292`, `320,049`, `33,532`, `24,233`, and `22,427`, respectively.
+- The Stage 1 benchmark and pilot production-sample policy are set: use the Gaia-first parent catalog, keep `Pwd > 0.75` as the default high-confidence reference sample, and preserve unresolved final denominator choices for later occurrence-rate stages.
+- Current milestone facts: `1,231,702 / 1,280,266` WDs (`96.2%`) have at least one `Sector >= 56` footprint, and `1,157,242` (`90.4%`) have observed coverage before Sector `100`.
+- Detailed dated notes live in the Stage 1.2 [log](twirl_progress_log.md#12-decide-the-production-sample).
 
 ### 1.3 Prepare the MIT PDO environment (✓)
 
@@ -204,10 +200,10 @@ For TWIRL, the immediate operational tasks are:
 4. confirm the `pyticdb` databases resolve on PDO,
 5. define batch-job wrappers for one orbit-camera-CCD unit per job.
 
-#### Progress
+#### Status
 
-- `2026-04-01`: Confirmed PDO exposes Python 3.9 in the visible path and created a TWIRL-local virtual environment for helper scripts.
-- `2026-04-01`: Installed `pyticdb` into the TWIRL virtual environment from the MIT package index and verified the PDO TIC export path can query `tic_82` with [script](../scripts/stage1_lcs/export_gaia_dr3_tic_matches.py).
+- PDO helper-script environment and `pyticdb` access to `tic_82` are validated for the Gaia-to-TIC export path.
+- Detailed dated notes live in the Stage 1.3 [log](twirl_progress_log.md#13-prepare-the-mit-pdo-environment).
 
 ### 1.4 Generate catalogs and cutouts (...)
 
@@ -226,23 +222,12 @@ Initial production assumptions:
 - keep Gaia catalogs for all relevant field stars
 - run per orbit and per CCD, not per target
 
-#### Progress
+#### Status
 
-- `2026-04-01`: Updated the coverage-mapping code in [script](../scripts/stage1_lcs/map_tess_sector_coverage.py) and [module](../src/twirl/catalogs/tess_coverage.py) so each sector-level detector hit expands into one row per orbit, including the known four-orbit exceptions at Sectors `97` and `98`.
-- `2026-04-01`: Added the incremental orbit backfill [script](../scripts/stage1_lcs/backfill_tess_orbits.py) so the existing coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits), observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits), and orbit/camera/ccd target [dir](../data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/) can be regenerated without rerunning the full tess-point geometry stage.
-- `2026-04-01`: Added the first PDO `tglc catalogs` wrapper in [script](../scripts/stage1_lcs/run_tglc_catalogs.py); it reads the orbit-aware detector-summary [CSV](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_detector_summary_v0.csv), filters orbit/camera/CCD jobs, and by default prints or writes the exact MIT `tglc catalogs` commands before any execution.
-- `2026-04-01`: Completed the PDO orbit backfill for the current coverage products, so the integrated coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits) now carries orbit summary fields and the observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits) has one row per source/orbit/sector/camera/ccd, with `9,615,530` rows and `max_orbits_per_target = 48`.
-- `2026-04-01`: Fixed the benchmark choice to Sector `56` and identified WD 1856 in the orbit-aware products at `cam4/ccd1`; the target appears in Sector `56` plus later sectors, and the first benchmark `tglc catalogs` jobs are therefore orbit `119` and orbit `120` on `ccd 4,1`.
-- `2026-04-01`: Identified the existing PDO deep-catalog layout at `/pdo/users/tehan/tglc-deep-catalogs/orbit-195/ffi/` as the template to mirror for the Sector `56` benchmark, and confirmed that orbit `195` already has a complete `catalogs` stage with `32` catalog files in `/pdo/users/tehan/tglc-deep-catalogs/orbit-195/ffi/catalogs/`.
-- `2026-04-02`: Confirmed the shared PDO QLP runtime is the working MIT-TGLC environment, not the orbit-local `.venv`; the validated import path is documented in the updated [guide](mit_tglc_usage_guide.md), and the orbit `195` template also shows `3136` cutout pickle files under the existing deep-catalog tree.
-- `2026-04-02`: Launched the first real WD 1856 benchmark `tglc catalogs` job for orbit `119`, `ccd 4,1` using the shared QLP Python described in the [guide](mit_tglc_usage_guide.md); orbit `120` should follow with the same command pattern if orbit `119` finishes cleanly.
-- `2026-04-02`: Located the Sector `56` TICA FFI source tree at `/pdo/qlp-data/tica-delivery/s0056/cam4-ccd1/`, staged the orbit `119` `o1` files into the user-owned benchmark tree with `5638` symlinks, and recorded the `cutouts` staging pattern in the updated [guide](mit_tglc_usage_guide.md).
-- `2026-04-02`: Completed `tglc cutouts` for orbit `119`, `ccd 4,1`; the stage wrote `196/196` source pickle files but reported one invalid TICA FITS missing `COARSE` and a systematic `5637 cadence gaps != 1` warning, both of which should be revisited during WD 1856 QA rather than ignored.
-- `2026-04-02`: Confirmed from the current benchmark runs that `tglc epsfs` parallelizes over `source_*.pkl` cutouts within one CCD via `--nprocs`, but processes multiple CCDs serially if they are passed to one command; before mass production, Stage 1 should therefore add a launcher that parallelizes across independent orbit/camera/ccd jobs rather than one monolithic whole-orbit `epsfs` run, as documented in the [guide](mit_tglc_usage_guide.md).
-- `2026-04-02`: Forked the MIT TGLC code and patched pre-Sector-67 TICA quality headers so missing `COARSE`, `RW_DESAT`, and `STRAYLT*` default to zero instead of invalidating S56 FFIs; PDO is now importing the user-owned fork from `/pdo/users/tehan/tess-gaia-light-curve-twirl/` during benchmark `cutouts` and `epsfs`, as recorded in the [guide](mit_tglc_usage_guide.md).
-- `2026-04-02`: Re-ran orbit `119` and `120` `cutouts` with the patched fork and verified both now have `196/196` source pickle files; orbit `119` `epsfs` is running on `pdogpu6` with `--nprocs 4`, while an isolated CPU-only orbit `120` `epsfs` benchmark is running on `pdogpu1` with `--nprocs 16` under `/pdo/users/tehan/tglc-deep-catalogs-pdogpu1-epsf-test/`.
-- `2026-04-02`: Verified the shared `pdogpu6` QLP environment currently reports `HAS_CUPY=False`, so the active `epsfs` benchmark there is CPU-only despite available GPUs; `pdogpu1` can import the same forked TGLC code only if `LD_LIBRARY_PATH` also includes `/pdo/app/anaconda/anaconda2-4.4.0/lib` for `libffi.so.6`, and that runtime detail is now tracked in the [guide](mit_tglc_usage_guide.md).
-- `2026-04-02`: End-of-day live benchmark state is `16/196` orbit `119` ePSFs in the main `pdogpu6` tree and `10/196` orbit `120` ePSFs in the isolated `pdogpu1` comparison tree; the `pdogpu6` orbit `120` `epsf/` and `LC/` directories were intentionally made read-only so the main driver cannot overwrite the comparison run, and the active tmux/process layout is documented in the [guide](mit_tglc_usage_guide.md).
+- The fixed Sector `56`, orbit `119/120`, `cam4/ccd1` benchmark has been pushed through `catalogs`, `cutouts`, `epsfs`, and WD-only `lightcurves`; WD 1856 is present in both orbit trees as `267574918.h5`.
+- The pre-Sector-67 TICA header fallback is patched in the user-owned TGLC fork, and the current default per-CCD `epsfs` worker count is `--nprocs 16` based on the first one-CCD benchmark.
+- A full-orbit CCD-parallel driver now exists in [script](../scripts/stage1_lcs/run_tglc_orbit_pipeline.py); the current orbit `119` run on `pdogpu1` is the first real test of the two-layer parallel strategy: outer CCD concurrency `3`, inner stage workers `16/16/16/16`, with the first `cam1` and `cam2` waves already completed end-to-end and the `cam3` wave in progress.
+- Detailed dated notes live in the Stage 1.4 [log](twirl_progress_log.md#14-generate-catalogs-and-cutouts).
 
 ### 1.5 Extract and consolidate WD light curves
 
@@ -306,9 +291,19 @@ Known gaps to track early:
 - Gaia DR3 should remain the survey-defining target identifier even if the current MIT implementation is still partly TIC-oriented.
 - Gaia-to-TIC matching should be audited for metadata and implementation reasons, but it should not define the scientific parent sample by itself.
 - If important WD targets lack TIC IDs, the light-curve stage will need to be extended to support Gaia-selected targets directly.
+- For current terminology, distinguish `TGLC end-to-end` from `QLP/MAST end-to-end`: Stage 1 extraction is complete at the HDF5 `lightcurves` output, while public-style FITS deliverables require the later QLP detrend + HLSP export path.
+- After the full Sector 56 benchmark run, verify that all metadata needed to launch whole-sector TIC light-curve extraction with a magnitude cut is already present and discoverable from the generated products, not hidden in ad hoc scripts.
+- After the full Sector 56 benchmark run, confirm that the `cutouts` and `epsf` products under `/pdo/users/tehan/tglc-deep-catalogs/orbit-*/ffi/cam*/ccd*/` are exactly in the MKI TGLC `Manifest` layout so they can be reused by standard `tglc lightcurves` commands without special-case path handling.
 - The new output product is decontaminated aperture photometry in HDF5, not the old per-target FITS product with `cal_psf_flux` and `cal_aper_flux`.
 - The old `prior`-based single-target workflow is not exposed in the new CLI, so any need for floating-field-star priors must be added explicitly.
 - The catalogue completeness quoted by Gentile Fusillo et al. (2021) applies only in specific regimes; TWIRL must not generalize that completeness to the full search sample without its own end-to-end validation.
+
+Questions to answer before mass production:
+
+- What outer CCD concurrency should be used per stage once the first full-orbit benchmark finishes, especially for the DB-heavy `catalogs` stage versus the CPU-heavy `epsfs` stage?
+- Why do the WD-only `lightcurves` runs currently write fewer `.h5` files than requested TIC IDs, and is that shortfall astrophysical, metadata-driven, or an extraction/control-plane issue?
+- What is the official QLP/LCDB metadata path needed to run detrend and HLSP export without the current local benchmark shims?
+- Once the full Sector `56` benchmark is done, should whole-sector production stay WD-only at `lightcurves`, or should TWIRL also preserve a full-TIC sector archive for direct QLP/MAST-style downstream products?
 
 ### Stage 1 Deliverables
 
