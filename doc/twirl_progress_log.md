@@ -6,7 +6,8 @@ Use `doc/twirl_plan.md` for the forward-looking plan, milestone status, decision
 and acceptance criteria. Use this file for command-level progress, environment
 discoveries, run outcomes, warnings, and file-level benchmark notes.
 
-Keep each entry concise, dated, and attached to the most relevant stage subsection.
+Each entry: concise, dated, attached to the most relevant stage subsection.
+Each active subsection ends with a `**Next:**` line showing the single immediate action.
 
 ## Stage 1
 
@@ -18,6 +19,8 @@ Keep each entry concise, dated, and attached to the most relevant stage subsecti
 - `2026-04-01`: Added conservative merge-back tooling in [script](../scripts/stage1_lcs/merge_tic_summary_into_master_catalog.py) so ambiguous TIC matches stay unresolved instead of being guessed.
 - `2026-04-01`: Added a promotion helper in [script](../scripts/stage1_lcs/promote_master_catalog_version.py) for cases where an accepted catalog state truly needs a shorter canonical release name.
 
+**Next:** Characterize the `764` no-TIC-bridge WD targets — check magnitude distribution and sky position to assess whether Gaia-first LC emission is needed before mass production.
+
 ### 1.2 Decide the production sample
 
 - `2026-04-01`: Kept `Pwd > 0.75` as the default high-confidence reference sample for pilot work; the current master catalog [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0.fits) contains `359,073` such rows.
@@ -27,10 +30,14 @@ Keep each entry concise, dated, and attached to the most relevant stage subsecti
 - `2026-04-01`: Completed the full `Sector 56-121` coverage run on PDO and wrote the integrated coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits), observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits), sector-summary [CSV](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_sector_summary_v0.csv), and detector-table [dir](../data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/).
 - `2026-04-01`: Measured the first simple TWIRL coverage fractions from the integrated coverage [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_tesscoverage.fits) and observation [FITS](../data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits): `1,231,702` WDs (`96.2%`) have at least one `Sector >= 56` footprint, `1,157,242` (`90.4%`) have observed coverage before Sector `100`, `59,678` (`4.7%`) appear in Sector `120+`, `44,939` (`3.5%`) appear in Sector `120`, and `33,588` (`2.6%`) appear in Sector `121`; the `Pwd > 0.75` subset counts are `339,292`, `320,049`, `33,532`, `24,233`, and `22,427`, respectively.
 
+**Next:** Pending benchmark QA completion (1.6–1.7). No changes to the production sample definition until QA is signed off.
+
 ### 1.3 Prepare the MIT PDO environment
 
 - `2026-04-01`: Confirmed PDO exposes Python 3.9 in the visible path and created a TWIRL-local virtual environment for helper scripts.
 - `2026-04-01`: Installed `pyticdb` into the TWIRL virtual environment from the MIT package index and verified the PDO TIC export path can query `tic_82` with [script](../scripts/stage1_lcs/export_gaia_dr3_tic_matches.py).
+
+**Next:** No open items. Environment is validated for current benchmark scope.
 
 ### 1.4 Generate catalogs and cutouts
 
@@ -54,3 +61,30 @@ Keep each entry concise, dated, and attached to the most relevant stage subsecti
 - `2026-04-03`: Added the full-orbit CCD-parallel benchmark driver in [script](../scripts/stage1_lcs/run_tglc_orbit_pipeline.py) and launched orbit `119` on `pdogpu1` for the `15` CCDs other than `cam4/ccd1`, with outer CCD concurrency `4` and inner stage worker counts `16/16/16/16` for `catalogs/cutouts/epsfs/lightcurves`, respectively.
 - `2026-04-03`: The first orbit `119` full-CCD benchmark run failed in `catalogs` for the 15 non-benchmark CCDs because dense fields can generate more than `65,535` Gaia DR2 IDs in one `dr2_to_dr3` SQL `IN (...)` clause, triggering `psycopg.OperationalError`; the user-owned TGLC fork was patched to batch those bridge queries in chunks of `50,000` IDs, then `cam1/ccd1` was relaunched as a manual smoke test while the remaining 14 CCDs restarted in tmux session `twirl-s56-o119-fullsector-p3-r2` with `cam1/ccd1` and `cam4/ccd1` skipped.
 - `2026-04-05` to `2026-04-06`: The first restart exposed a TWIRL-side bug in [script](../scripts/stage1_lcs/run_tglc_orbit_pipeline.py): the PDO write-boundary guard followed existing `ffi/` symlinks and falsely treated user-owned paths as writes into `/pdo/qlp-data/`. After patching the guard and re-scping the driver, orbit `119` restarted in tmux session `twirl-s56-o119-fullsector-p3-r3` with outer CCD concurrency `3`; by the April 6 morning check, all `cam1` and `cam2` CCDs had finished end-to-end, the `cam3` wave was in `epsfs`, and the current per-CCD wall times for completed jobs were roughly `5-8 h`.
+- `2026-04-09`: The orbit `119` full-sector benchmark completed in tmux session `twirl-s56-o119-fullsector-p3-r3`. The clean wall time for the 15 non-benchmark CCDs was `33.66 h` at outer CCD concurrency `3` and inner workers `16/16/16/16`; completed per-CCD end-to-end wall times ranged from `4.63 h` (`cam4_ccd4`) to `9.14 h` (`cam3_ccd2`). With the original `cam4/ccd1` benchmark added back in, the orbit tree now has the full `16` CCDs represented with `32` catalog files, `3136` cutout pickles, `3136` ePSFs, and `19086` WD-only HDF5 light curves.
+
+**Next:** Run orbit `120` end-to-end (all 16 CCDs) to complete the full Sector `56` benchmark, then proceed to Stage 1.5 (light-curve consolidation) and Stage 1.6–1.7 (benchmark QA on WD 1856).
+
+### 1.5 Extract and consolidate WD light curves
+
+- `2026-04-09`: Reviewed `hlsp.py` (QLP lctools). Full pipeline is `tglc lightcurves → qlp lctools detrend → qlp lctools hlsp`. Detrend must run first — it writes `bestdmagkey` into HDF5 that hlsp reads. For Sector 56, HLSP uses `--flag-type spoc --flag-source fits` (TICA quality headers not present until Sector 67); SPOC flags confirmed present at `/pdo/qlp-data/spocflags/spocffiflag_s56_cam*.txt` for all 16 CCDs. Recovery rate (requested TIC IDs → h5 files → FITS files, binned by Tmag) is the standard per-CCD health check; Gaia-only targets are 0% recovered through this path until fork is extended. Details in [guide](mit_tglc_usage_guide.md).
+- `2026-04-09`: Built QLP env activation script at [script](../scripts/activate_qlp_env.sh). Root cause: system PYTHONPATH includes FFITools `qlp==0.1` which shadows the pip-installed `qlp==0.13.2` in `/pdo/app/qlp-environment/.venv/`. Fix: source the script, which sets `PYTHONPATH` to the TGLC fork only (no FFITools). Verified `qlp_run lctools detrend` and `qlp_run lctools hlsp` both work. `qlp==0.13.2` on Python 3.11.9, `lightcurvedb==3.0.0`. TGLC env (Python 3.11, `/sw/qlp-environment/`) and QLP env (Python 3.11, `/pdo/app/qlp-environment/`) are separate — use TGLC env for `tglc` stages, QLP env for `detrend`/`hlsp`.
+
+- `2026-04-09`: Discovered `lightcurvedb 3.0.0` requires `tess_orbit` table in `stelvar` DB (pdodb2:5435) which is not populated. Patched both call sites (`qlp.util.util._get_orbit_info` and `qlp.io.backends.default_io_backend.read_orbit_info`) in [script](../scripts/detrend_wrapper.py) with hardcoded orbit→sector mapping. Also added missing cam1–3 quat symlinks to `/pdo/users/tehan/tglc-deep-catalogs/orbit-119/ffi/run/`. Existing `qlp.cfg` at that path already had correct `IOSettings`.
+- `2026-04-09`: Validated detrend on TIC `113496532` (cam1/ccd1) — `bestdmagkey = QSPMagnitude` written in 7.73s. Initially launched with `--nprocs 8`; throughput settled at ~8.3 s/lc effective (severe NFS I/O contention from concurrent h5 writes). Killed and relaunched with `--nprocs 1`; immediately hit ~2.3 lc/s (~2.3 h ETA for 19086 LCs). **Lesson: sequential detrend is ~19× faster than 8-worker parallel on NFS.**
+- `2026-04-09`: Pre-staged orbit `120` detrend: created cam1–4 quat symlinks at `/pdo/users/tehan/tglc-deep-catalogs/orbit-120/ffi/run/` (qlp.cfg was already present with correct `orbit_id = 120`). Orbit `120` detrend can start immediately when its lightcurves complete.
+- `2026-04-09`: Launched orbit `120` full-sector pipeline (15 CCDs, skipping cam4/ccd1 which is already complete) in tmux session `twirl-s56-o120` on pdogpu1 with `--max-parallel-ccd-jobs 3 --epsfs-nprocs 16`. Both sessions running concurrently; detrend is I/O-sequential and does not contend with the CPU-bound tglc pipeline.
+
+**Next:** When orbit `119` detrend finishes (tmux `detrend119`, ~2.3 h from launch), run `qlp lctools hlsp` for all cam/ccd combinations to produce FITS files, then measure 3-level recovery rate (requested TIC → h5 → FITS, binned by Tmag). When orbit `120` pipeline and detrend complete, do the same for orbit `120` and proceed to WD 1856 benchmark QA (Stage 1.6–1.7).
+
+### 1.6 Run photometric QA
+
+_No entries yet. Blocked on light-curve consolidation (1.5)._
+
+**Next:** After index is built — read `267574918.h5` (WD 1856) from orbit `119` and `120`, plot the light curve, and record per-aperture RMS/MAD. Compare `1x1`/`3x3`/`5x5` apertures.
+
+### 1.7 Benchmark acceptance criteria
+
+_No entries yet. Blocked on photometric QA (1.6)._
+
+**Next:** After QA — check transit timing against the published WD 1856 ephemeris, confirm signal SNR ≥ the ~16 reported in the proposal, and log pass/fail against all Section 1.7 criteria in `twirl_plan.md`.

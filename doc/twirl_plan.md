@@ -1,6 +1,6 @@
 # twirl_plan.md
 
-This document turns the NHFP proposal into an executable software and survey plan for this repository.
+This document is the executable software and survey plan for TWIRL.
 
 ## Current Status Snapshot
 
@@ -8,9 +8,9 @@ This document turns the NHFP proposal into an executable software and survey pla
 - The core survey is limited to `200 s` TESS FFIs, which means `Sector >= 56`.
 - `WD 1856+534` is the benchmark target, and the first fixed benchmark is `Sector 56`, orbits `119` and `120`, `cam4/ccd1`.
 - The seed WD catalog is a local external dependency, not a git-tracked repo asset.
-- `Pwd > 0.75` is the default high-confidence reference sample for pilot work, but the final TWIRL denominator is still to be determined later.
-- The first search should be interpretable and not ML-first.
-- Stage 1 is now past initial catalog assembly and into sector-coverage planning; full Sector `56-121` coverage products, detector tables, and the first full-sky coverage diagnostics are in place.
+- Light curves will be gathered for all WDs in the full parent catalog. The statistical occurrence-rate sample (the locked denominator) will be defined separately after light-curve collection and QA are complete.
+- The search is interpretable-first: build a transparent periodic + dip baseline before considering ML triage.
+- Stage 1 is in active production. Orbit `119` (all 16 CCDs) has completed end-to-end with 19,086 WD HDF5 light curves; detrend (nprocs=1) is running now (~2.3 h ETA). Orbit `120` (15 CCDs, skipping the already-complete cam4/ccd1) is running the full tglc pipeline now. Detrend config for orbit `120` is pre-staged. Benchmark QA on WD 1856 and FITS production are the next steps after both detrend runs complete.
 
 ## Project Goal
 
@@ -21,14 +21,14 @@ TWIRL will use 200 s TESS FFIs, TGLC-based light-curve extraction, transparent t
 3. derive occurrence-rate constraints or upper limits for those regimes, and
 4. produce validated candidate lists and follow-up targets.
 
-The proposal already fixes the high-level sequence:
+The actual execution sequence:
 
-1. generate WD light curves with the MIT-adapted TGLC on MIT PDO machines,
-2. build a baseline search for periodic and non-periodic transit-like events,
-3. train or adapt a model only if it improves triage after the baseline search is understood,
-4. run injection-recovery tests,
-5. search the WD sample,
-6. validate the resulting targets.
+1. generate WD light curves with the MIT-adapted TGLC on MIT PDO machines (and via QLP for newer sectors — see Stage 1.8),
+2. build a transparent baseline search for periodic and non-periodic transit-like events,
+3. run injection-recovery tests to establish completeness,
+4. search the full WD sample,
+5. validate resulting candidates,
+6. add ML triage only if it materially improves the baseline search ranking or false-positive rate.
 
 ## Design Drivers From The Proposal
 
@@ -138,11 +138,12 @@ The master catalog should also include provenance fields that make later survey 
 - crossmatch recipe version
 - sample-selection recipe version
 
-The parent-sample protocol should be explicit in code and metadata, but the exact TWIRL cut is intentionally deferred for now:
+The parent-sample protocol should be explicit in code and metadata:
 
 - `seed_catalog`: all rows in the local Gentile Fusillo et al. (2021) main catalogue
-- `reference_highconf_sample`: rows with `Pwd > 0.75`, used as a default high-confidence comparison sample
-- `twirl_parent_sample`: the final locked denominator for occurrence-rate work, to be defined later
+- `reference_highconf_sample`: rows with `Pwd > 0.75`, used as a default high-confidence comparison sample for QA and pilot work
+- `lc_gather_sample`: all WDs in the full parent catalog — light curves are extracted for all of them; no sample cut is applied at this stage
+- `twirl_parent_sample`: the final locked denominator for occurrence-rate work, to be defined after light-curve collection and QA are complete; this cut must be frozen before any injection-recovery or occurrence-rate analysis begins
 - until `twirl_parent_sample` is frozen, any completeness or occurrence summaries must be labeled provisional
 - any exploratory search outside the final locked denominator must be labeled exploratory and excluded from occurrence-rate denominators by default
 
@@ -226,36 +227,43 @@ Initial production assumptions:
 
 - The fixed Sector `56`, orbit `119/120`, `cam4/ccd1` benchmark has been pushed through `catalogs`, `cutouts`, `epsfs`, and WD-only `lightcurves`; WD 1856 is present in both orbit trees as `267574918.h5`.
 - The pre-Sector-67 TICA header fallback is patched in the user-owned TGLC fork, and the current default per-CCD `epsfs` worker count is `--nprocs 16` based on the first one-CCD benchmark.
-- A full-orbit CCD-parallel driver now exists in [script](../scripts/stage1_lcs/run_tglc_orbit_pipeline.py); the current orbit `119` run on `pdogpu1` is the first real test of the two-layer parallel strategy: outer CCD concurrency `3`, inner stage workers `16/16/16/16`, with the first `cam1` and `cam2` waves already completed end-to-end and the `cam3` wave in progress.
+- The first full-orbit orbit `119` benchmark on `pdogpu1` has completed through HDF5 `lightcurves`: the 15-CCD sweep outside the original `cam4/ccd1` benchmark finished in `33.66 h` wall time with outer CCD concurrency `3` and inner workers `16/16/16/16`, and the final orbit tree now contains `32` catalog files, `3136` cutouts, `3136` ePSFs, and `19086` WD-only `.h5` light curves.
+- The clean stopwatch for current performance planning is therefore `33.66 h` for the 15 non-benchmark CCDs; the orbit is now complete across all 16 CCDs, but the original `cam4/ccd1` benchmark was produced earlier in separate runs with different tuning, so it should be treated as a separate seed benchmark rather than folded into one apples-to-apples full-sector wall-time claim.
 - Detailed dated notes live in the Stage 1.4 [log](twirl_progress_log.md#14-generate-catalogs-and-cutouts).
 
 ### 1.5 Extract and consolidate WD light curves
 
-The MIT fork writes one HDF5 file per TIC target. After production, build a TWIRL light-curve index with:
+The full Stage 1 pipeline per orbit/camera/CCD is:
 
-- TIC ID
-- Gaia DR3 ID
-- orbit
-- sector
-- camera/CCD
-- cutout ID
-- HDF5 path
-- summary quality metrics
+```
+tglc catalogs → tglc cutouts → tglc epsfs → tglc lightcurves
+  → qlp lctools detrend → qlp lctools hlsp (→ FITS per TIC)
+```
 
-Then create a target-centric view:
+`tglc lightcurves` writes one HDF5 file per TIC target. The `detrend` step (run via `qlp lctools detrend`) annotates those HDF5 files with a `bestdmagkey` attribute that `hlsp.py` reads to select the detrended magnitude column. **Without detrending, HLSP generation fails.** The `hlsp` step then converts HDF5 → FITS, requiring the full QLP environment (`lightcurvedb` + `qlp` package, not just TGLC).
 
-- all sectors for one WD grouped together
-- time stamps standardized
-- quality flags preserved
-- provenance recorded
+For Sector 56 specifically, HLSP generation uses SPOC quality flags (not TICA), because `get_ticaflags` in `hlsp.py` raises `ValueError` for `sector < 67`. These SPOC flags live at `/pdo/qlp-data/spocflags/`.
 
-The consolidated index format should explicitly distinguish:
+**Standard recovery rate check** — run after both HDF5 and FITS production:
 
-- raw imported columns from the seed catalogue
-- derived TWIRL metadata
-- crossmatch outputs
-- processing-status fields
-- sample-membership flags
+For each orbit/camera/CCD:
+1. Count TIC IDs requested (from TWIRL detector target table)
+2. Count HDF5 files produced (`tglc lightcurves` output)
+3. Count FITS files produced (`qlp lctools hlsp` output; missing TICs logged as warnings by `generate_qlp_hlsp_fits_file`)
+4. Bin the shortfall by TESS magnitude to detect faint-end dropout
+5. Cross-check against Gaia-only targets (no TIC bridge): these will always be 0% recovered until the MIT fork is extended to emit Gaia-selected targets directly
+
+This 3-level audit (requested → h5 → FITS) is the standard health check for every production run. Log counts and dropout fractions in the progress log.
+
+After production, build a TWIRL light-curve index with:
+
+- TIC ID and Gaia DR3 ID
+- orbit, sector, camera/CCD
+- HDF5 path and FITS path
+- production status flag (`h5_ok`, `fits_ok`)
+- summary quality metrics (RMS, MAD, cadence count)
+
+The index format should explicitly distinguish raw catalog columns, derived TWIRL metadata, crossmatch outputs, processing-status fields, and sample-membership flags.
 
 ### 1.6 Run photometric QA before any ML work
 
@@ -304,6 +312,7 @@ Questions to answer before mass production:
 - Why do the WD-only `lightcurves` runs currently write fewer `.h5` files than requested TIC IDs, and is that shortfall astrophysical, metadata-driven, or an extraction/control-plane issue?
 - What is the official QLP/LCDB metadata path needed to run detrend and HLSP export without the current local benchmark shims?
 - Once the full Sector `56` benchmark is done, should whole-sector production stay WD-only at `lightcurves`, or should TWIRL also preserve a full-TIC sector archive for direct QLP/MAST-style downstream products?
+- **QLP ingestion for Sectors 94+**: TGLC has been incorporated into QLP (Petitpas et al. 2025, in prep.) and is producing light curves from Sector 94 onward. Should TWIRL ingest those QLP/MAST products directly for recent sectors rather than re-running MIT PDO extraction? Key questions: format compatibility with the HDF5 archive, whether the WD magnitude limit (`--max-magnitude 20`) was applied, and whether the Gaia-first target list is recoverable from QLP outputs. Resolving this could substantially reduce the PDO compute load for newer sectors.
 
 ### Stage 1 Deliverables
 
@@ -332,7 +341,7 @@ For the first version, the cleanest path is:
 
 1. produce a transparent periodic candidate list with a short-duration box/trapezoid search,
 2. run a separate dip-search branch for non-periodic or weakly periodic events,
-3. pass candidates into automated vetting,
+3. pass candidates into automated vetting with LEO-vetter (Kunimoto et al. 2025) — assess input format compatibility with the TWIRL HDF5 archive before committing to it,
 4. add a WD-specific classifier later if it materially improves triage.
 
 ### 2.1b Minimum baseline search specification

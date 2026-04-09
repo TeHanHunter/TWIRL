@@ -242,10 +242,18 @@ Operational consequence for TWIRL:
   while keeping `catalogs/cutouts/epsfs/lightcurves` worker counts at `16/16/16/16` inside each CCD
   job; orbit `120` should use a different outer CCD concurrency for comparison while leaving
   `epsfs --nprocs 16` fixed
+- the completed orbit `119` benchmark used outer CCD concurrency `3` after the restart and finished
+  the 15 non-benchmark CCDs in `33.66 h` wall time; that produced `32` catalog files, `3136`
+  cutouts, `3136` ePSFs, and `19086` WD-only `.h5` files once the original `cam4/ccd1` benchmark
+  products were included
 - expect uneven CCD runtimes because crowded/heavy CCDs are slower than sparse CCDs
 - the current default for TWIRL one-CCD `epsfs` jobs is `--nprocs 16`: in the Sector 56 benchmark,
   orbit `120` on `pdogpu1` with `--nprocs 16` finished in `4:01:31`, while orbit `119` on `pdogpu6`
   with `--nprocs 64` finished in `4:03:04`, so `64` workers did not show a clear advantage
+
+For planning purposes, use `33.66 h` as the current clean stopwatch for the orbit `119` 15-CCD
+sweep after the benchmark seed CCD was already in place. Do not quote that as a single uniform
+16-CCD wall time without noting that `cam4/ccd1` was produced earlier in separate benchmark runs.
 
 ## Known-Good PDO Environment And Benchmark Pattern
 
@@ -582,13 +590,81 @@ Before launching full production, require the new workflow to:
 | inspect FITS `cal_aper_flux` / `cal_psf_flux` | read HDF5 aperture photometry outputs |
 | `save_aper=True` for extra aperture information | use the built-in small, primary, and large apertures in the HDF5 product |
 
+## QLP Environment Setup
+
+The `qlp lctools detrend` and `qlp lctools hlsp` steps require `qlp==0.13.2` (with `lctools`), which lives in `/pdo/app/qlp-environment/.venv/`. This is **different** from the shared `/sw/qlp-environment/.venv/`, which imports the old `qlp==0.1` from FFITools via the system PYTHONPATH and does not have `lctools`.
+
+**The system PYTHONPATH problem:** PDO sets `PYTHONPATH` to include `/pdo/app/ffitools-versions/FFITools-0.6.0/QLPTools`, which shadows the pip-installed qlp 0.13.2 with the old qlp 0.1. The fix is to set `PYTHONPATH` to the TGLC fork only (no FFITools paths).
+
+**Activation script:** [`scripts/activate_qlp_env.sh`](/Users/tehan/PycharmProjects/TWIRL/scripts/activate_qlp_env.sh)
+
+```bash
+source /pdo/users/tehan/TWIRL/scripts/activate_qlp_env.sh
+# Prints: "QLP env active: qlp 0.13.2 | Python 3.11.9"
+# Then use:
+qlp_run lctools detrend --help
+qlp_run lctools hlsp --help
+```
+
+This sets:
+- `TWIRL_QLP_PYTHON=/pdo/app/qlp-environment/.venv/bin/python`
+- `LD_LIBRARY_PATH=/pdo/app/anaconda/anaconda2-4.4.0/lib:/pdo/app/python-versions/python-3.11.9/lib`
+- `PYTHONPATH=/pdo/users/tehan/tess-gaia-light-curve-twirl` (TGLC fork only — FFITools intentionally excluded)
+
+This environment is separate from the TGLC environment (which uses `/sw/qlp-environment/.venv/bin/python`). Use the TGLC env for `tglc catalogs/cutouts/epsfs/lightcurves`, and the QLP env for `detrend` and `hlsp`.
+
+## HDF5 → FITS Conversion (detrend + hlsp)
+
+The `tglc lightcurves` HDF5 output is not the final archival product. Converting to FITS requires two additional QLP steps and the **full QLP environment** (`lightcurvedb` + `qlp` package), not just TGLC.
+
+### Step 1: Detrend
+
+```bash
+qlp lctools detrend --help
+```
+
+This annotates the HDF5 files with a `bestdmagkey` attribute (the chosen detrending method). The `hlsp` step reads this attribute to select which magnitude column to write as `DET_FLUX`. **Without detrending, HLSP generation fails** because the attribute is absent.
+
+### Step 2: HLSP FITS generation
+
+The reference implementation is `src/qlp/lctools/bin/hlsp.py` (copy at `/Users/tehan/Downloads/src_qlp_lctools_bin_hlsp.py`). It:
+
+- Reads HDF5 via `Manifest` (TIC ID / sector / camera / CCD / orbit), merging both orbits of a sector into one table
+- Pulls TIC metadata (RA, Dec, Tmag, logg, mass, Teff, etc.) from `tic_82` or `tic_81` depending on sector
+- Combines FFI quality flags + QLP flags into a single `QUALITY` column
+- Writes a two-HDU FITS file: `PRIMARY` (target metadata) + `LIGHTCURVE` BinTable
+
+FITS columns produced:
+`TIME`, `CADENCENO`, `SAP_FLUX` (raw 3×3), `DET_FLUX` (detrended 3×3), `DET_FLUX_ERR`, `QUALITY`, `ORBITID`, `SAP_X`, `SAP_Y`, `SAP_BKG`, `SAP_BKG_ERR`, `DET_FLUX_SML` (1×1), `DET_FLUX_LAG` (5×5), and optionally `SYS_RM_FLUX`.
+
+Output path convention:
+```
+<outdir>/<tic[0:4]>/<tic[4:8]>/<tic[8:12]>/<tic[12:16]>/
+  hlsp_qlp_tess_ffi_s<sector>-<tic16>_tess_v<version>_llc.fits
+```
+
+### Sector 56 flag caveat
+
+`hlsp.py` raises `ValueError` for `get_ticaflags(sector < 67)` because TICA quality headers didn't exist until Sector 67. For Sector 56, set `--flag-type spoc`. SPOC flags are read from `/pdo/qlp-data/spocflags/spocffiflag_s56_cam<c>_ccd<d>.txt`. Confirm these files exist before running HLSP generation on the Sector 56 benchmark.
+
+### Recovery rate surfaced by hlsp
+
+`generate_qlp_hlsp_fits_file` returns `False` and logs a warning for every TIC ID whose HDF5 file is missing. This makes HLSP production the natural place to measure the 3-level recovery rate:
+
+```
+requested TIC IDs (detector table) → h5 files → FITS files
+```
+
+Gaia-only targets (no TIC bridge) will never produce a FITS file through this path.
+
 ## Known Constraints To Plan Around
 
 - The MIT fork is designed for TICA FFIs, not arbitrary remote download flows.
 - The default target magnitude limits are not WD-ready.
-- The product format changed from FITS to HDF5.
+- The product format is HDF5; conversion to archival FITS requires `qlp lctools detrend` + `qlp lctools hlsp` and the full QLP environment.
 - The public CLI no longer exposes the old `prior` option.
 - Light-curve emission is TIC-based, so Gaia-only WD targets may require a small extension.
+- For Sector < 67, HLSP generation must use SPOC quality flags (`--flag-type spoc`), not TICA flags.
 
 ## Recommendation For TWIRL
 

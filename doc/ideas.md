@@ -5,16 +5,14 @@ This file is for brainstorming, referee-style concerns, unresolved decisions, an
 Nothing in this file is automatically a project decision.
 Project decisions belong in `doc/twirl_plan.md`, `AGENTS.md`, or another formal repo doc once they are accepted.
 
-## Why This File Exists
+## Critical Before Next Stage
 
-TWIRL has a mix of:
+These items genuinely block forward progress and should be resolved before Stage 2 begins.
 
-- executable pipeline tasks
-- scientific assumptions that are not fully frozen
-- strategic ideas that may be valuable later
-- referee-style risks that should shape the project before publication
-
-This file is the holding area for those items.
+1. **WD 1856 benchmark QA (Stage 1.6–1.7)**: Read `267574918.h5` from orbits `119` and `120`, verify transit timing against the published ephemeris, compare `1x1`/`3x3`/`5x5` apertures, and log the result. This gates everything downstream.
+2. **Light-curve consolidation (Stage 1.5)**: Build the TWIRL HDF5 index with target identifiers, orbit, camera/CCD, and summary QA metrics. Without this, Stage 2 has no stable input.
+3. **QLP Sector 94+ ingestion decision**: Determine whether TWIRL can consume QLP/MAST products directly for Sectors ≥ 94 (see Stage 1.8). This significantly affects PDO compute planning.
+4. **`twirl_parent_sample` freeze trigger**: The locked occurrence-rate denominator must be defined before any injection-recovery or occurrence-rate work begins. Agree on the freeze criteria now so Stage 3 can start cleanly.
 
 ## Referee-Style Scientific Challenges
 
@@ -52,10 +50,11 @@ The biggest likely referee objections are:
 ## Catalog And Sample Questions
 
 - How should Gaia-to-TIC matching be implemented and versioned?
-- What should happen to Gaia WDs with no usable TIC match?
+- What should happen to the `764` Gaia WDs with no usable TIC bridge? Characterize their magnitude and sky distribution before deciding whether to extend the MIT fork to emit Gaia-selected targets directly.
 - Should the repo support Gaia-first target emission if the MIT fork misses important targets?
 - Should pilot QA use only `Pwd > 0.75`, or compare several `Pwd` cuts from the start?
 - Which fields from the Gaia seed catalog are mandatory in the TWIRL master catalog?
+- **QLP ingestion for Sectors ≥ 94**: Can TWIRL consume QLP/MAST 200-s products directly instead of re-running MIT PDO extraction for newer sectors? Assess: magnitude limit applied, Gaia-WD target coverage, format compatibility with the HDF5 archive.
 
 ## Benchmark Questions
 
