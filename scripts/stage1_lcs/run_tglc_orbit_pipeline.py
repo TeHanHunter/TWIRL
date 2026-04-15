@@ -219,6 +219,37 @@ def _run_stage(
     }
 
 
+def _reuse_sibling_catalogs(
+    *,
+    job: CcdJob,
+    orbit: int,
+    reuse_from_orbit: int,
+    tglc_data_dir: Path,
+    catalogs_dir: Path,
+) -> list[str]:
+    """Symlink Gaia/TIC catalogs from a sibling orbit so the catalogs stage can skip the query.
+
+    Within a TESS sector, orbits point at the same sky, and TGLC's catalogs stage keys its
+    Gaia and TIC queries on (sector, camera, ccd). Sibling orbits in the same sector produce
+    identical catalog files, so reusing them avoids rerunning very slow dense-field queries.
+
+    The caller is responsible for passing a `reuse_from_orbit` that is in the same sector.
+    """
+    source_catalogs_dir = tglc_data_dir / f"orbit-{reuse_from_orbit}" / "ffi" / "catalogs"
+    symlinked: list[str] = []
+    for basename in (f"Gaia_cam{job.camera}_ccd{job.ccd}.ecsv", f"TIC_cam{job.camera}_ccd{job.ccd}.ecsv"):
+        target = catalogs_dir / basename
+        if target.exists() or target.is_symlink():
+            continue
+        source = source_catalogs_dir / basename
+        if not source.exists():
+            continue
+        _require_user_owned_write_path(target)
+        target.symlink_to(source.resolve())
+        symlinked.append(basename)
+    return symlinked
+
+
 def _process_one_ccd(
     *,
     job: CcdJob,
@@ -237,8 +268,13 @@ def _process_one_ccd(
     epsfs_nprocs: int,
     lightcurves_nprocs: int,
     stop_on_warning: bool,
+    reuse_catalogs_from_orbit: int | None,
+    no_gpu: bool = False,
+    gpu_id: str | None = None,
 ) -> dict[str, object]:
     job_start = time.perf_counter()
+    if gpu_id is not None:
+        runtime_env = {**runtime_env, "CUDA_VISIBLE_DEVICES": gpu_id}
     job_root = tglc_data_dir / f"orbit-{orbit}" / "ffi" / f"cam{job.camera}" / f"ccd{job.ccd}"
     catalogs_dir = tglc_data_dir / f"orbit-{orbit}" / "ffi" / "catalogs"
     source_dir = job_root / "source"
@@ -248,6 +284,21 @@ def _process_one_ccd(
 
     for path in [job_root, catalogs_dir, source_dir, epsf_dir, lc_dir, tic_list_path.parent, log_root]:
         _require_user_owned_write_path(path)
+
+    if reuse_catalogs_from_orbit is not None and reuse_catalogs_from_orbit != orbit:
+        reused = _reuse_sibling_catalogs(
+            job=job,
+            orbit=orbit,
+            reuse_from_orbit=reuse_catalogs_from_orbit,
+            tglc_data_dir=tglc_data_dir,
+            catalogs_dir=catalogs_dir,
+        )
+        if reused:
+            print(
+                f"[orbit-pipeline] {job.label}: reusing catalogs from orbit "
+                f"{reuse_catalogs_from_orbit}: {', '.join(reused)}",
+                flush=True,
+            )
 
     print(f"[orbit-pipeline] {job.label}: staging FFIs", flush=True)
     ffi_dir, n_symlinked = _stage_ffi_symlinks(
@@ -332,21 +383,29 @@ def _process_one_ccd(
             f"Expected 196 source pickles for orbit {orbit} {job.label}, got {source_count}"
         )
 
+    epsfs_command = [
+        *command_prefix,
+        "epsfs",
+        "--orbit",
+        str(orbit),
+        "--ccd",
+        f"{job.camera},{job.ccd}",
+        "--nprocs",
+        str(epsfs_nprocs),
+        "--replace",
+        "--tglc-data-dir",
+        str(tglc_data_dir),
+    ]
+    if no_gpu:
+        epsfs_command.append("--no-gpu")
+    elif gpu_id is not None:
+        print(
+            f"[orbit-pipeline] {job.label}: epsfs pinned to CUDA_VISIBLE_DEVICES={gpu_id}",
+            flush=True,
+        )
     epsfs_record = _run_stage(
         stage_name="epsfs",
-        command=[
-            *command_prefix,
-            "epsfs",
-            "--orbit",
-            str(orbit),
-            "--ccd",
-            f"{job.camera},{job.ccd}",
-            "--nprocs",
-            str(epsfs_nprocs),
-            "--replace",
-            "--tglc-data-dir",
-            str(tglc_data_dir),
-        ],
+        command=epsfs_command,
         env=runtime_env,
         log_path=log_root / f"orbit-{orbit}_{job.label}_epsfs.log",
     )
@@ -528,6 +587,38 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Treat warning markers in stage logs as fatal.",
     )
+    parser.add_argument(
+        "--no-gpu",
+        action="store_true",
+        help=(
+            "Pass --no-gpu to `tglc epsfs`. Use when CuPy is unavailable or when "
+            "benchmarking CPU baseline."
+        ),
+    )
+    parser.add_argument(
+        "--gpu-list",
+        default="",
+        help=(
+            "Comma-separated CUDA device IDs (e.g. '0,1,2,3,4,6') to cycle across "
+            "concurrent CCD jobs. Each CCD subprocess gets CUDA_VISIBLE_DEVICES set "
+            "to one entry. Empty (default) means no pinning (CuPy picks device 0 "
+            "for every concurrent job — only safe with --max-parallel-ccd-jobs 1 "
+            "on GPU, or with --no-gpu). Ignored when --no-gpu is set."
+        ),
+    )
+    parser.add_argument(
+        "--reuse-catalogs-from-orbit",
+        type=int,
+        default=None,
+        help=(
+            "Before the catalogs stage, symlink Gaia/TIC ecsv files from this sibling "
+            "orbit's catalogs directory into the current orbit's catalogs directory. "
+            "The catalogs stage will then skip the query via its native skip-if-exists "
+            "check. ONLY pass an orbit in the same TESS sector as --orbit; cross-sector "
+            "reuse would pull the wrong sky patch. Useful for dense fields where the "
+            "Gaia query is flaky (e.g. sector 56 cam3/ccd2)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -615,6 +706,14 @@ def main() -> int:
         ld_library_prefix=args.ld_library_prefix,
     )
 
+    gpu_ids: list[str] = [g.strip() for g in args.gpu_list.split(",") if g.strip()]
+    if gpu_ids and args.no_gpu:
+        print(
+            "[orbit-pipeline] --gpu-list ignored because --no-gpu is set",
+            flush=True,
+        )
+        gpu_ids = []
+
     run_start = time.perf_counter()
     summaries: list[dict[str, object]] = []
     with cf.ThreadPoolExecutor(max_workers=args.max_parallel_ccd_jobs) as executor:
@@ -622,6 +721,8 @@ def main() -> int:
             executor.submit(
                 _process_one_ccd,
                 job=job,
+                gpu_id=(gpu_ids[idx % len(gpu_ids)] if gpu_ids else None),
+                no_gpu=args.no_gpu,
                 orbit=args.orbit,
                 sector=args.sector,
                 orbit_tag=args.orbit_tag,
@@ -637,8 +738,9 @@ def main() -> int:
                 epsfs_nprocs=args.epsfs_nprocs,
                 lightcurves_nprocs=args.lightcurves_nprocs,
                 stop_on_warning=args.stop_on_warning,
+                reuse_catalogs_from_orbit=args.reuse_catalogs_from_orbit,
             ): job
-            for job in ccd_jobs
+            for idx, job in enumerate(ccd_jobs)
         }
 
         for future in cf.as_completed(futures):

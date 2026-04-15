@@ -193,6 +193,24 @@ lookup then fails with `psycopg.OperationalError` because SQLAlchemy binds each 
 parameter in an `IN (...)` clause. The TWIRL user-owned TGLC fork now batches that bridge query in
 chunks of `50,000` IDs to stay below the Postgres parameter limit.
 
+### Sibling-orbit catalog reuse (TWIRL-only)
+
+Stock MIT TGLC keys catalogs per-orbit: `tglc/utils/manifest.py` defines
+`catalog_directory = tglc_data_dir / orbit-<N> / ffi / catalogs` and stores
+`Gaia_camC_ccdD.ecsv` + `TIC_camC_ccdD.ecsv` inside. Sibling orbits in the same sector therefore
+each run the full catalogs stage, even though the queries are keyed on `(sector, camera, ccd)` in
+`tglc/scripts/catalogs.py` (lines 154, 222) and the outputs are bit-identical. This is an accepted
+redundancy in the stock pipeline, but on `pdogpu1` the dense-field Gaia query is flaky enough to
+hang for days (observed 2026-04-13: Sector 56 cam3/ccd2 orbit 120 hung 36+ h before being killed
+and replaced with the orbit 119 result).
+
+TWIRL's driver exposes `--reuse-catalogs-from-orbit N` to symlink a completed sibling orbit's
+ecsv files into the current orbit's catalogs directory before the stage runs. The catalogs stage's
+native skip-if-exists check (`catalogs.py` lines 284, 300) then short-circuits in seconds. Only
+pass an orbit **in the same TESS sector**; cross-sector reuse would silently pull the wrong sky
+patch. A potential upstream contribution to the MIT fork would be to move `catalog_directory` up
+to `sector-<S>/catalogs/` so the reuse is automatic.
+
 Or, once the setup is trusted:
 
 ```bash
@@ -223,6 +241,39 @@ tglc epsfs ... --no-gpu
 ```
 
 The other stages are CPU-oriented.
+
+#### pdogpu6 CuPy install (TWIRL, 2026-04-13)
+
+The shared venv `/sw/qlp-environment/.venv/` does not ship with `cupy`, and `pip install --user`
+is rejected because the venv hides the user site-packages. Install CuPy to a user overlay
+directory and put it on `PYTHONPATH`:
+
+```bash
+export LD_LIBRARY_PATH="/pdo/app/anaconda/anaconda2-4.4.0/lib:/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH:-}"
+mkdir -p "$HOME/python-overlay"
+/sw/qlp-environment/.venv/bin/python -m pip install --target="$HOME/python-overlay" --no-deps \
+    cupy-cuda11x fastrlock
+```
+
+`--no-deps` is required because cupy pulls `numpy>=2.x` whose build wheel needs GCC ≥ 9.3
+(PDO has 4.9.4). The shared venv's existing numpy satisfies cupy at runtime. Do not install
+numpy/scipy into the overlay — let them resolve from the shared venv.
+
+Sanity check:
+
+```bash
+PYTHONPATH="/pdo/users/tehan/tess-gaia-light-curve-twirl:$HOME/python-overlay" \
+    /sw/qlp-environment/.venv/bin/python -c \
+    "import cupy; print(cupy.cuda.runtime.getDeviceCount()); from tglc.scripts.epsfs import HAS_CUPY; print(HAS_CUPY)"
+```
+
+Expect `8` devices (6× A30 + 2× A100) and `HAS_CUPY: True`. For TWIRL production, always
+prepend `$HOME/python-overlay` **after** the TGLC fork on `PYTHONPATH` (fork first, overlay
+second) so the fork remains the authoritative `tglc` source.
+
+GPU affinity: when running multiple CCDs concurrently on pdogpu6, set
+`CUDA_VISIBLE_DEVICES=<n>` per CCD subprocess to bind each to a distinct GPU. GPU 5 has
+regularly been in use by another user — check `nvidia-smi` before launch.
 
 ### 7. Understand where `epsfs` parallelizes
 

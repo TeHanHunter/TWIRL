@@ -10,7 +10,7 @@ This document is the executable software and survey plan for TWIRL.
 - The seed WD catalog is a local external dependency, not a git-tracked repo asset.
 - Light curves will be gathered for all WDs in the full parent catalog. The statistical occurrence-rate sample (the locked denominator) will be defined separately after light-curve collection and QA are complete.
 - The search is interpretable-first: build a transparent periodic + dip baseline before considering ML triage.
-- Stage 1 is in active production. Orbit `119` (all 16 CCDs) has completed end-to-end with 19,086 WD HDF5 light curves; detrend (nprocs=1) is running now (~2.3 h ETA). Orbit `120` (15 CCDs, skipping the already-complete cam4/ccd1) is running the full tglc pipeline now. Detrend config for orbit `120` is pre-staged. Benchmark QA on WD 1856 and FITS production are the next steps after both detrend runs complete.
+- Stage 1 Sector 56 benchmark (orbits 119 + 120, all 16 CCDs): TGLC lightcurves, detrend, and HLSP FITS production have all run end-to-end. 19,086 detrended HDF5 lightcurves per orbit, **14,807 HLSP FITS** written to `/pdo/users/tehan/tglc-deep-catalogs/hlsp_s0056/` (78% of targets). The remaining 22% are entirely in `cam3` of orbit 120: every LC fails detrend with a 6137-vs-6136 shape mismatch between TGLC's BJD array and the QLP quaternion feature matrix — a genuine cadence-length disagreement that blocks `quatspline.fit_trend`. Next session: reconcile the cam3/o120 quaternion vs BJD cadence grid, then re-run detrend + HLSP for those CCDs. Tooling fix uncovered this session: BLAS/OpenMP thread caps (single-threaded per worker) turned detrend from ~16 h to ~5 min at `-n 32`; the fix is now baked into both wrappers.
 
 ## Project Goal
 
@@ -483,12 +483,22 @@ Validation should combine automated filtering and external follow-up.
 - ephemeris consistency across sectors
 - image-level inspection around predicted transits
 
-### 5.2 External follow-up
+### 5.2 Archival time-domain first pass (ZTF + ATLAS)
 
-For the strongest candidates:
+Before requesting any new telescope time, cross-match surviving candidates against the ZTF and ATLAS public archives. Both surveys provide multi-year optical light curves for most TWIRL targets with `g/r/i` or `c/o` coverage, which is sufficient to:
+
+- rule out obvious stellar variables misclassified as transit candidates (pulsators, eclipsing binaries, cataclysmic variables),
+- check for additional dips or flares at other epochs that argue for or against a transit-like interpretation,
+- extend the baseline for period refinement on periodic candidates using a single combined WD+ZTF+ATLAS ephemeris fit.
+
+This is a cheap, fully automated pre-filter; candidates that do not survive ZTF/ATLAS consistency do not advance to Stage 5.3 telescope follow-up.
+
+### 5.3 External follow-up
+
+For candidates that survive the archival first pass:
 
 - high-cadence photometry at predicted transit windows
-- archival imaging and catalog checks
+- archival imaging and catalog checks (beyond ZTF/ATLAS)
 - spectroscopy or RV constraints where physically meaningful
 - high-resolution imaging if blending is a concern
 
@@ -513,7 +523,7 @@ For apparently aperiodic or irregular events:
 - do not assume repeat-photometry confirmation is possible
 - define a separate follow-up path centered on classification, continued monitoring, or archival/context constraints
 
-### 5.3 Final population analysis
+### 5.4 Final population analysis
 
 Regardless of the number of validated planets, TWIRL should finish with:
 

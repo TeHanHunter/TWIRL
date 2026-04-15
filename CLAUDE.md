@@ -81,6 +81,10 @@ Activate the QLP env with `source scripts/activate_qlp_env.sh`, then use `qlp_ru
 
 The detrend step must run before hlsp — it writes `bestdmagkey` into HDF5. For Sector < 67 (including Sector 56), hlsp uses `--flag-type spoc --flag-source fits`. SPOC flags are at `/pdo/qlp-data/spocflags/` and confirmed present for all Sector 56 CCDs.
 
+**HLSP operates at the sector level, not per-orbit.** `qlp/lctools/bin/hlsp.py::get_h5_light_curve_data` iterates over all orbits in a sector and `vstack`s their detrended h5 light curves into a single combined FITS per TIC. All orbits in the sector must be detrended before HLSP runs.
+
+**Catalog reuse across orbits in the same sector.** TGLC's `catalogs` stage keys its Gaia/TIC queries on `(sector, camera, ccd)` (see `tglc/scripts/catalogs.py`), so sibling orbits in the same sector produce identical `Gaia_camC_ccdD.ecsv` and `TIC_camC_ccdD.ecsv` files. The stage has native skip-if-exists, so symlinking a completed sibling's catalogs into the current orbit's catalogs directory lets dense-field CCDs (e.g. Sector 56 cam3/ccd2, 2.9 GB Gaia file) skip the multi-hour query. `run_tglc_orbit_pipeline.py --reuse-catalogs-from-orbit N` does this automatically per CCD. Only pass sibling orbits in the same sector — cross-sector reuse would pull the wrong sky patch.
+
 **Standard recovery rate check** after each production run: requested TIC IDs (detector table) → h5 count → FITS count, binned by Tmag. Gaia-only targets (no TIC bridge) are always 0% recovered until the fork is extended.
 
 ### Key Constants
@@ -118,6 +122,8 @@ The detrend step must run before hlsp — it writes `bestdmagkey` into HDF5. For
 - TGLC CLI stages: `catalogs → cutouts → epsfs → lightcurves`
 - Prefer `pdogpu1` for CPU-only benchmark work; keep outputs under `/pdo/users/tehan/`
 - PDO fork requires a patch for pre-Sector-67 TICA headers (see `doc/mit_tglc_usage_guide.md`)
+- **Data access on PDO machines (any `pdo*` host): only edit files under `/pdo/users/tehan/`.** Read-only from anywhere else (`/pdo/qlp-data/`, `/sw/`, other users' dirs). Never modify, delete, or move files outside `/pdo/users/tehan/`. When another user's file is needed in our tree (e.g. qflag.txt, spocflags), symlink from `/pdo/users/tehan/` into the upstream path rather than copying or editing the upstream file.
+- Multiprocessing on PDO: always cap BLAS/OpenMP threads before launching a pool (`OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=NUMEXPR_NUM_THREADS=1`). Without this, each pool worker spawns BLAS threads equal to the full core count (128 on pdogpu1), causing ~8× oversubscription and 10–100× slowdown. The QLP detrend and HLSP wrappers bake these vars in at module load time.
 
 ## End-of-Day Wrap
 
