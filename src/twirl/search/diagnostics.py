@@ -411,6 +411,14 @@ def plot_vet_sheet(
         fontsize=11, y=0.997,
     )
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    # Also save the same figure as a PDF alongside the PNG. PDFs are lighter
+    # for archival vetting (vector text + scatter rendered as raster), and
+    # downstream collaborators tend to prefer them for paper figures.
+    pdf_path = out_path.with_suffix(".pdf")
+    try:
+        fig.savefig(pdf_path, bbox_inches="tight")
+    except Exception:
+        pass
     plt.close(fig)
     return out_path
 
