@@ -40,21 +40,114 @@ DEFAULT_OUT_DIR = "data_local/stage2/bls_first_pass"
 # Module-level config + state for pool workers (set by _init_worker via initializer).
 _WORKER_CFG: BLSConfig | None = None
 _WORKER_PERIODOGRAM_TICS: set[int] = set()
-_WORKER_PERIODOGRAM_DIR: Path | None = None
+_WORKER_SECTOR_OUT: Path | None = None
 _WORKER_RUN_ID: str = ""
 
 
 def _init_worker(cfg: BLSConfig, periodogram_tics: set[int],
-                 periodogram_dir: Path | None, run_id: str) -> None:
-    global _WORKER_CFG, _WORKER_PERIODOGRAM_TICS, _WORKER_PERIODOGRAM_DIR, _WORKER_RUN_ID
+                 sector_out: Path | None, run_id: str) -> None:
+    global _WORKER_CFG, _WORKER_PERIODOGRAM_TICS, _WORKER_SECTOR_OUT, _WORKER_RUN_ID
     _WORKER_CFG = cfg
     _WORKER_PERIODOGRAM_TICS = set(periodogram_tics)
-    _WORKER_PERIODOGRAM_DIR = periodogram_dir
+    _WORKER_SECTOR_OUT = sector_out
     _WORKER_RUN_ID = run_id
 
 
+def _emit_vet_sheets(sector_out: Path, tics: set[int],
+                      hlsp_paths: list[Path]) -> None:
+    """Generate a TOI-style vet sheet per TIC with saved periodograms."""
+    import pyarrow.parquet as pq
+    from twirl.search.diagnostics import plot_vet_sheet
+
+    candidates_pq = sector_out / "candidates.parquet"
+    if not candidates_pq.exists():
+        return
+    df = pq.read_table(candidates_pq).to_pandas()
+    consol_pq = sector_out / "consolidated.parquet"
+    consol_df = (pq.read_table(consol_pq).to_pandas()
+                 if consol_pq.exists() else None)
+    path_by_tic = {}
+    for p in hlsp_paths:
+        # filename pattern: hlsp_qlp_tess_ffi_sNNNN-TICTICTICTIC_tess_v01_llc.fits
+        name = p.name
+        try:
+            tic = int(name.split("-")[1].split("_")[0])
+        except Exception:
+            continue
+        path_by_tic[tic] = p
+
+    for tic in tics:
+        path = path_by_tic.get(tic)
+        if path is None:
+            continue
+        target_dir = _target_dir(sector_out, tic)
+        pg_dir = target_dir / "periodograms"
+        if not pg_dir.exists():
+            continue
+
+        spectra: dict[str, dict] = {}
+        peaks: dict[str, dict] = {}
+        for ap in ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG"):
+            npz = pg_dir / f"{ap}.npz"
+            if not npz.exists():
+                continue
+            with np.load(npz) as z:
+                spectra[ap] = {k: np.asarray(z[k]) for k in z.files}
+            sub = df[(df["tic"] == tic) & (df["aperture"] == ap)
+                     & (df["peak_rank"] == 1)]
+            if not sub.empty:
+                r = sub.iloc[0]
+                peaks[ap] = {
+                    "period_d": float(r["period_d"]),
+                    "t0_bjd": float(r["t0_bjd"]),
+                    "duration_min": float(r["duration_min"]),
+                    "depth": float(r["depth"]),
+                    "sde": float(r["sde"]),
+                }
+
+        if not peaks:
+            continue
+
+        from twirl.io.hlsp import read_hlsp
+        lc = read_hlsp(path)
+        if lc is None:
+            continue
+
+        # Emit one vet sheet per aperture, anchored at THAT aperture's rank-1
+        # (P, T0). Auto-picking a single "best aperture" is unreliable when the
+        # loud peak is a systematic (e.g. WD 1856 in S59: DET_FLUX rank-1 is
+        # the 6.4 d alias, not the 1.408 d truth visible in SML). Three
+        # sheets let the reviewer compare candidates without prejudice.
+        sheets_dir = target_dir / "vet_sheets"
+        sheets_dir.mkdir(parents=True, exist_ok=True)
+        for anchor_ap in peaks:
+            cluster_summary = None
+            if consol_df is not None and not consol_df.empty:
+                sub = consol_df[consol_df["tic"] == tic]
+                if not sub.empty:
+                    p_anchor = peaks[anchor_ap]["period_d"]
+                    idx = (sub["period_d"] - p_anchor).abs().idxmin()
+                    cluster_summary = sub.loc[idx].to_dict()
+            out_path = sheets_dir / f"vet_{anchor_ap}.png"
+            try:
+                plot_vet_sheet(lc, spectra, peaks, anchor_ap, out_path,
+                               cluster_summary=cluster_summary)
+                print(f"  [stage2-bls] vet sheet -> {out_path}", flush=True)
+            except Exception as exc:
+                print(f"  [stage2-bls] vet sheet FAIL for TIC {tic} {anchor_ap}: {exc}",
+                      flush=True)
+
+
+def _target_dir(sector_out: Path, tic: int) -> Path:
+    return sector_out / "targets" / f"tic_{tic:010d}"
+
+
 def _process_one(path: Path) -> list[dict[str, Any]]:
-    """Read + run BLS on one HLSP path. Returns candidate-table rows."""
+    """Read + run BLS on one HLSP path. Returns candidate-table rows.
+
+    For TICs in the periodogram-save list, also writes per-target
+    periodograms under sector_NNNN/targets/tic_TIC/periodograms/.
+    """
     cfg = _WORKER_CFG
     assert cfg is not None
     lc = read_hlsp(path)
@@ -70,14 +163,14 @@ def _process_one(path: Path) -> list[dict[str, Any]]:
         return result_to_rows(res, _WORKER_RUN_ID)
 
     rows: list[dict[str, Any]] = []
-    save_pg = lc.tic in _WORKER_PERIODOGRAM_TICS and _WORKER_PERIODOGRAM_DIR is not None
+    save_pg = lc.tic in _WORKER_PERIODOGRAM_TICS and _WORKER_SECTOR_OUT is not None
+    pg_dir = _target_dir(_WORKER_SECTOR_OUT, lc.tic) / "periodograms" if save_pg else None
     for ap in cfg.apertures:
         out = run_bls_on_lc(lc, cfg, aperture=ap, return_periodogram=save_pg)
         if save_pg:
             res, spec = out
-            pg_path = _WORKER_PERIODOGRAM_DIR / f"tic_{lc.tic}_{ap}.npz"
             try:
-                save_periodogram(spec, pg_path)
+                save_periodogram(spec, pg_dir / f"{ap}.npz")
             except Exception:
                 pass
         else:
@@ -124,10 +217,9 @@ def run_sector(
 
     sector_out = Path(out_dir) / f"sector_{sector:04d}{out_suffix}"
     sector_out.mkdir(parents=True, exist_ok=True)
-    pg_dir = sector_out / "periodograms"
     pg_tics = set(int(t) for t in periodogram_tics)
     if pg_tics:
-        pg_dir.mkdir(parents=True, exist_ok=True)
+        (sector_out / "targets").mkdir(parents=True, exist_ok=True)
 
     run_id = f"{_git_short_sha()}-{uuid.uuid4().hex[:8]}"
     t_start = time.time()
@@ -140,7 +232,7 @@ def run_sector(
           f" workers={workers} run_id={run_id}", flush=True)
 
     if workers <= 1:
-        _init_worker(cfg, pg_tics, pg_dir if pg_tics else None, run_id)
+        _init_worker(cfg, pg_tics, sector_out if pg_tics else None, run_id)
         for i, p in enumerate(paths):
             try:
                 target_rows = _process_one(p)
@@ -158,7 +250,7 @@ def run_sector(
         with mp.Pool(
             processes=workers,
             initializer=_init_worker,
-            initargs=(cfg, pg_tics, pg_dir if pg_tics else None, run_id),
+            initargs=(cfg, pg_tics, sector_out if pg_tics else None, run_id),
         ) as pool:
             for i, target_rows in enumerate(
                 pool.imap_unordered(_process_one, paths, chunksize=8)
@@ -174,6 +266,29 @@ def run_sector(
 
     candidates_path = sector_out / "candidates.parquet"
     write_parquet(rows, candidates_path)
+
+    # Cross-aperture consolidation: cluster peaks across apertures by (P, T0).
+    try:
+        from twirl.search.consolidate import (
+            ConsolidateConfig, consolidate_candidates,
+        )
+        import pyarrow.parquet as pq_mod
+        consol = consolidate_candidates(candidates_path, ConsolidateConfig())
+        if consol.num_rows > 0:
+            pq_mod.write_table(
+                consol, sector_out / "consolidated.parquet", compression="zstd",
+            )
+            print(f"  [stage2-bls] consolidated.parquet n_clusters={consol.num_rows}",
+                  flush=True)
+    except Exception as exc:
+        print(f"  [stage2-bls] consolidation failed: {exc}", flush=True)
+
+    # Per-target vet sheets for any TIC with saved periodograms.
+    if pg_tics:
+        try:
+            _emit_vet_sheets(sector_out, pg_tics, paths)
+        except Exception as exc:
+            print(f"  [stage2-bls] vet-sheet emit failed: {exc}", flush=True)
 
     wall_time = time.time() - t_start
     meta = {
