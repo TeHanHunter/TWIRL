@@ -30,8 +30,8 @@ class BLSConfig:
     max_period_fraction: float = 0.45
     p_max_cap_d: float = 15.0
     durations_min: tuple[float, ...] = (3.0, 5.0, 8.0, 12.0, 20.0)
-    n_periods: int = 100_000
-    n_peaks: int = 10
+    n_periods: int = 200_000
+    n_peaks: int = 20
     period_mask_frac: float = 0.005
     min_cadences: int = 200
     sigma_clip: float = 5.0  # Reject |f - median| > sigma_clip * 1.4826 * MAD before BLS.

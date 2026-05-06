@@ -217,8 +217,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                     help="Comma-separated list of aperture flux columns to search. "
                          "All three by default — different CCDs/fields favor different "
                          "apertures (see WD 1856 S59 recovery: SML works, medium fails).")
-    ap.add_argument("--n-periods", type=int, default=100_000)
-    ap.add_argument("--n-peaks", type=int, default=10)
+    ap.add_argument("--n-periods", type=int, default=200_000)
+    ap.add_argument("--n-peaks", type=int, default=20)
     ap.add_argument("--orbit-edge-trim-d", type=float, default=0.0,
                     help="Drop cadences within this many days of each orbit's "
                          "first/last cadence (default 0 = no trim).")

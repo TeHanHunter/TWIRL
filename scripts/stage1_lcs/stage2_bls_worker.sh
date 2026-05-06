@@ -49,6 +49,12 @@ fi
 
 "$PYTHON" -m twirl.search.sector_run "${ARGS[@]}"
 
+# Cross-aperture consolidation: cluster peaks across DET_FLUX_SML / DET_FLUX
+# / DET_FLUX_LAG so a real signal (matching P + T0) gets `n_apertures_agree`
+# = 2 or 3, while per-aperture systematics stay at 1.
+"$PYTHON" "$REPO/scripts/stage2_search/consolidate_candidates.py" \
+  --sector "$SECTOR" --out-dir "$OUT_DIR"
+
 # Audit gate: only relevant if WD 1856 is observed in this sector.
 # WD 1856 is in S56 and S59 in the 200 s era; tess-coverage drives the
 # auto-decision in audit_wd1856_recovery.py (which simply checks for a row).
