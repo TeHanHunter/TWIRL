@@ -222,61 +222,72 @@ def plot_vet_sheet(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Layout: 5 rows.
-    #   row 0: full LC (single panel spanning all 3 columns)
-    #   row 1: 3 periodograms
-    #   row 2: 3 phase folds
-    #   row 3: odd vs even fold (best aperture, single panel)
+    # Layout: 5 rows × 6 cols (use 6 so we can split row 3 into 2 sub-panels).
+    #   row 0: full LC (spans all columns)
+    #   row 1: 3 periodograms (each spans 2 cols)
+    #   row 2: 3 phase folds (each spans 2 cols), folded by their own best P
+    #   row 3: odd | even folds at anchor aperture (each spans 3 cols)
     #   row 4: summary text
-    fig = plt.figure(figsize=(11.0, 12.0))
+    fig = plt.figure(figsize=(11.0, 11.5))
     gs = fig.add_gridspec(
-        5, 3,
-        height_ratios=[1.0, 1.1, 1.1, 1.0, 0.6],
-        hspace=0.55, wspace=0.30,
+        5, 6,
+        height_ratios=[1.0, 1.05, 1.05, 1.0, 0.55],
+        hspace=0.42, wspace=0.40,
     )
 
-    # --- Row 0: full LC time series (best aperture only, with QUALITY mask)
+    # --- Row 0: full LC at anchor aperture; flagged cadences de-emphasized.
     ax_lc = fig.add_subplot(gs[0, :])
-    mask = quality_mask(lc, best_aperture)
-    t_rel = lc.time[mask]
-    flux = lc.flux[best_aperture][mask]
-    med = np.nanmedian(flux)
-    flux_n = flux / med if med > 0 else flux
-    ax_lc.scatter(t_rel, flux_n, s=1.5, c="0.3", alpha=0.5, rasterized=True)
+    flux_all = lc.flux[best_aperture]
+    finite_all = np.isfinite(flux_all) & np.isfinite(lc.time)
+    keep = (lc.quality == 0) & finite_all
+    flagged = (lc.quality != 0) & finite_all
+    med = np.nanmedian(flux_all[keep]) if keep.any() else np.nanmedian(flux_all[finite_all])
+    if not (np.isfinite(med) and med > 0):
+        med = 1.0
+    f_n_all = flux_all / med
+    # flagged points: light grey, smaller, drawn first
+    ax_lc.scatter(lc.time[flagged], f_n_all[flagged], s=1.0, c="0.78",
+                  alpha=0.45, rasterized=True, zorder=1, label="QUALITY≠0")
+    # kept points: dark, drawn on top
+    ax_lc.scatter(lc.time[keep], f_n_all[keep], s=1.5, c="0.2",
+                  alpha=0.7, rasterized=True, zorder=2, label="QUALITY=0")
     ax_lc.axhline(1.0, color="0.6", lw=0.5)
-    # Mark predicted transit times for the best (P, T0).
-    n_lo = int(np.ceil((t_rel.min() + BJDREFI - t0_best) / p_best))
-    n_hi = int(np.floor((t_rel.max() + BJDREFI - t0_best) / p_best))
+    n_lo = int(np.ceil((lc.time[keep].min() + BJDREFI - t0_best) / p_best))
+    n_hi = int(np.floor((lc.time[keep].max() + BJDREFI - t0_best) / p_best))
     for n in range(n_lo, n_hi + 1):
         tt = (t0_best + n * p_best) - BJDREFI
         ax_lc.axvline(tt, color="#c4452f", lw=0.4, alpha=0.5, zorder=0)
-    y_lo = float(np.nanpercentile(flux_n, 1))
-    y_hi = float(np.nanpercentile(flux_n, 99.5))
-    pad = 0.05 * (y_hi - y_lo) if y_hi > y_lo else 0.05
-    ax_lc.set_ylim(y_lo - pad, y_hi + pad)
-    ax_lc.set_xlim(t_rel.min(), t_rel.max())
+    if keep.any():
+        y_lo = float(np.nanpercentile(f_n_all[keep], 1))
+        y_hi = float(np.nanpercentile(f_n_all[keep], 99.5))
+        pad = 0.05 * (y_hi - y_lo) if y_hi > y_lo else 0.05
+        ax_lc.set_ylim(y_lo - pad, y_hi + pad)
+        ax_lc.set_xlim(lc.time[keep].min(), lc.time[keep].max())
     ax_lc.set_xlabel("BJD - 2457000 (d)")
     ax_lc.set_ylabel(f"{best_aperture}\nnorm. flux")
+    ax_lc.legend(loc="upper right", fontsize=6, ncol=2)
     ax_lc.set_title(
-        f"Full sector light curve  ({best_aperture}, n_kept={mask.sum()})  "
-        f"[red lines = predicted transits at P={p_best:.5f} d]",
+        f"Full sector LC ({best_aperture})  n_kept={keep.sum()}  "
+        f"n_flagged={flagged.sum()}  "
+        f"[red lines = anchor transits at P={p_best:.5f} d]",
         fontsize=8, loc="left",
     )
 
-    # --- Row 1: periodograms per aperture
+    # --- Row 1: periodograms per aperture (each spans 2 of 6 cols)
     for i, ap in enumerate(aps):
-        ax = fig.add_subplot(gs[1, i])
+        ax = fig.add_subplot(gs[1, 2 * i:2 * (i + 1)])
         spec = spectra[ap]
         period = np.asarray(spec["period"], dtype=np.float64)
         sde = np.asarray(spec["sde"], dtype=np.float64)
         ax.semilogx(period, sde, lw=0.5, color="0.25", rasterized=True)
         ax.axhline(0, color="0.7", lw=0.4)
         if ap in peaks:
-            p = float(peaks[ap]["period_d"])
-            ax.axvline(p, color="#c4452f", lw=0.8, ls="--",
-                       label=f"P={p:.5f} d")
-            ax.axvline(p_best, color="#1f3b6b", lw=0.5, ls=":", alpha=0.7,
-                       label=f"best ap P={p_best:.5f}")
+            p_ap = float(peaks[ap]["period_d"])
+            ax.axvline(p_ap, color="#c4452f", lw=0.8, ls="--",
+                       label=f"this ap P={p_ap:.5f}")
+            if ap != best_aperture:
+                ax.axvline(p_best, color="#1f3b6b", lw=0.5, ls=":", alpha=0.7,
+                           label=f"anchor P={p_best:.5f}")
             ax.legend(fontsize=6, loc="upper right")
         ax.set_xlim(period.min(), period.max())
         ax.set_xlabel("period (d)")
@@ -286,112 +297,143 @@ def plot_vet_sheet(
             title += f"  (rank-1 SDE={float(peaks[ap]['sde']):.1f})"
         ax.set_title(title, fontsize=8, loc="left")
 
-    # --- Row 2: phase folds per aperture, all using best (P, T0)
+    # --- Row 2: phase folds per aperture; each folded at ITS OWN rank-1 (P, T0).
+    # Apply the same upper-5σ clip BLS used so depth/dip match what the BLS box
+    # is reporting and the scatter doesn't get crushed by orbit-edge outliers.
     for i, ap in enumerate(aps):
-        ax = fig.add_subplot(gs[2, i])
+        ax = fig.add_subplot(gs[2, 2 * i:2 * (i + 1)])
+        if ap not in peaks:
+            ax.axis("off")
+            continue
+        p_ap = float(peaks[ap]["period_d"])
+        t0_ap = float(peaks[ap]["t0_bjd"])
+        dur_ap = float(peaks[ap]["duration_min"])
+        depth_ap = float(peaks[ap]["depth"])
         m = quality_mask(lc, ap)
         t_abs = lc.time[m] + BJDREFI
-        f = lc.flux[ap][m] / np.nanmedian(lc.flux[ap][m])
-        phase = _phase_fold(t_abs, p_best, t0_best)
-        in_win = np.abs(phase * p_best * 1440.0) < 60.0
-        ax.scatter(phase[in_win] * p_best * 1440.0, f[in_win],
-                   s=1.7, color="0.55", alpha=0.4, rasterized=True, zorder=1)
+        med_ap = np.nanmedian(lc.flux[ap][m])
+        f = lc.flux[ap][m] / med_ap if med_ap else lc.flux[ap][m]
+        # Match BLS's upper-5σ asymmetric clip (drop scattered-light spikes only).
+        mad_ = float(np.nanmedian(np.abs(f - 1.0)))
+        if mad_ > 0:
+            keep_clip = (f - 1.0) <= 5.0 * 1.4826 * mad_
+            t_abs = t_abs[keep_clip]
+            f = f[keep_clip]
+        phase = _phase_fold(t_abs, p_ap, t0_ap)
+        in_win = np.abs(phase * p_ap * 1440.0) < 60.0
+        ax.scatter(phase[in_win] * p_ap * 1440.0, f[in_win],
+                   s=4.0, color="0.45", alpha=0.5, rasterized=True, zorder=1)
         c, m_, e_ = _bin_phase(phase[in_win], f[in_win], n_bins=60,
-                                window=60.0 / (p_best * 1440.0))
+                                window=60.0 / (p_ap * 1440.0))
         ok = np.isfinite(m_)
-        ax.errorbar(c[ok] * p_best * 1440.0, m_[ok], yerr=e_[ok],
-                    fmt="o", ms=2.6, mfc="#1f3b6b", mec="#1f3b6b",
+        ax.errorbar(c[ok] * p_ap * 1440.0, m_[ok], yerr=e_[ok],
+                    fmt="o", ms=3.0, mfc="#1f3b6b", mec="#1f3b6b",
                     ecolor="#1f3b6b", elinewidth=0.6, capsize=0, zorder=3)
-        # BLS box from best aperture.
-        half = dur_best / 2.0
+        half = dur_ap / 2.0
         ax.plot([-60, -half, -half, half, half, 60],
-                [1.0, 1.0, 1.0 - depth_best, 1.0 - depth_best, 1.0, 1.0],
-                color="#c4452f", lw=1.0, zorder=2)
+                [1.0, 1.0, 1.0 - depth_ap, 1.0 - depth_ap, 1.0, 1.0],
+                color="#c4452f", lw=1.2, zorder=2)
         ax.axhline(1.0, color="0.65", lw=0.4)
         ax.set_xlim(-60, 60)
         if in_win.any():
-            ymin = float(min(np.nanpercentile(f[in_win], 1), 1.0 - depth_best))
+            ymin = float(min(np.nanpercentile(f[in_win], 1), 1.0 - depth_ap))
             ymax = float(np.nanpercentile(f[in_win], 99.5))
-            ax.set_ylim(ymin - 0.05, ymax + 0.05)
+            pad = 0.05 * max(ymax - ymin, 0.05)
+            ax.set_ylim(ymin - pad, ymax + pad)
         ax.set_xlabel("phase from t0 (min)")
         ax.set_ylabel(f"{ap}\nflux")
-        ax.set_title(f"phase fold @ best (P,T0) — {ap}", fontsize=8, loc="left")
+        ax.set_title(
+            f"{ap} fold @ own P={p_ap:.5f} d  "
+            f"(SDE={float(peaks[ap]['sde']):.1f})",
+            fontsize=8, loc="left",
+        )
 
-    # --- Row 3: odd vs even transit fold (best aperture)
-    ax_oe = fig.add_subplot(gs[3, :])
+    # --- Row 3: odd | even transit fold, side-by-side, anchored on best_aperture.
     m = quality_mask(lc, best_aperture)
     t_abs = lc.time[m] + BJDREFI
-    f = lc.flux[best_aperture][m] / np.nanmedian(lc.flux[best_aperture][m])
+    med_anchor = np.nanmedian(lc.flux[best_aperture][m])
+    f = lc.flux[best_aperture][m] / med_anchor if med_anchor else lc.flux[best_aperture][m]
+    # Same upper-5σ clip BLS used.
+    mad_anchor = float(np.nanmedian(np.abs(f - 1.0)))
+    if mad_anchor > 0:
+        keep_clip = (f - 1.0) <= 5.0 * 1.4826 * mad_anchor
+        t_abs = t_abs[keep_clip]
+        f = f[keep_clip]
     transit_index = np.floor((t_abs - t0_best) / p_best + 0.5).astype(int)
     is_odd = (transit_index % 2) != 0
     phase_min = ((t_abs - t0_best + 0.5 * p_best) % p_best - 0.5 * p_best) * 1440.0
     in_win = np.abs(phase_min) < 60.0
-
     odd_sel = in_win & is_odd
     even_sel = in_win & ~is_odd
-    ax_oe.scatter(phase_min[odd_sel], f[odd_sel], s=2, color="#c4452f",
-                  alpha=0.35, label="odd transits", rasterized=True, zorder=1)
-    ax_oe.scatter(phase_min[even_sel], f[even_sel], s=2, color="#1f3b6b",
-                  alpha=0.35, label="even transits", rasterized=True, zorder=1)
 
-    def _bin(phase, flux, label, color):
-        c, mvals, evals = _bin_phase(phase, flux, n_bins=40,
-                                      window=60.0 / (p_best * 1440.0))
-        ok = np.isfinite(mvals)
-        ax_oe.errorbar(c[ok] * p_best * 1440.0, mvals[ok], yerr=evals[ok],
-                       fmt="o", ms=4, mfc=color, mec=color, ecolor=color,
-                       elinewidth=0.8, capsize=0, zorder=3, label=f"{label} binned")
-        # Median in-transit depth for this subset.
-        in_tr = np.abs(c * p_best * 1440.0) < dur_best / 2
-        if (in_tr & ok).any():
-            return float(np.nanmedian(mvals[in_tr & ok]))
-        return float("nan")
+    def _draw_oe_panel(ax, sel, label, color):
+        ax.scatter(phase_min[sel], f[sel], s=4.0, color=color,
+                   alpha=0.45, rasterized=True, zorder=1)
+        c_, m_, e_ = _bin_phase(_phase_fold(t_abs[sel], p_best, t0_best),
+                                 f[sel], n_bins=40,
+                                 window=60.0 / (p_best * 1440.0))
+        ok = np.isfinite(m_)
+        ax.errorbar(c_[ok] * p_best * 1440.0, m_[ok], yerr=e_[ok],
+                    fmt="o", ms=4, mfc=color, mec=color, ecolor=color,
+                    elinewidth=0.8, capsize=0, zorder=3, label=f"{label} binned")
+        # Median in-transit depth (within ±dur_best/2).
+        in_tr = np.abs(c_ * p_best * 1440.0) < dur_best / 2
+        med_depth = (float(np.nanmedian(m_[in_tr & ok]))
+                     if (in_tr & ok).any() else float("nan"))
+        # BLS box overlay for reference (anchor-aperture box).
+        half = dur_best / 2.0
+        ax.plot([-60, -half, -half, half, half, 60],
+                [1.0, 1.0, 1.0 - depth_best, 1.0 - depth_best, 1.0, 1.0],
+                color="0.4", lw=0.8, ls="--", zorder=2)
+        ax.axhline(1.0, color="0.65", lw=0.4)
+        ax.set_xlim(-60, 60)
+        ax.set_xlabel("phase from t0 (min)")
+        ax.legend(fontsize=7, loc="lower right")
+        return med_depth, int(sel.sum())
 
-    odd_depth = _bin(_phase_fold(t_abs[odd_sel], p_best, t0_best),
-                      f[odd_sel], "odd", "#c4452f")
-    even_depth = _bin(_phase_fold(t_abs[even_sel], p_best, t0_best),
-                       f[even_sel], "even", "#1f3b6b")
-    half = dur_best / 2.0
-    ax_oe.plot([-60, -half, -half, half, half, 60],
-               [1.0, 1.0, 1.0 - depth_best, 1.0 - depth_best, 1.0, 1.0],
-               color="0.4", lw=0.8, ls="--", zorder=2)
-    ax_oe.axhline(1.0, color="0.65", lw=0.4)
-    ax_oe.set_xlim(-60, 60)
-    ax_oe.set_xlabel("phase from t0 (min)")
-    ax_oe.set_ylabel(f"{best_aperture}\nodd / even")
-    ax_oe.legend(fontsize=7, loc="lower right", ncol=2)
-    n_odd = int(odd_sel.sum())
-    n_even = int(even_sel.sum())
+    ax_odd = fig.add_subplot(gs[3, 0:3])
+    odd_depth, n_odd = _draw_oe_panel(ax_odd, odd_sel, "odd", "#c4452f")
+    ax_odd.set_ylabel(f"{best_aperture}\nodd flux")
+    ax_odd.set_title(
+        f"ODD transits @ anchor [{best_aperture}]  "
+        f"med={odd_depth:.3f}  n={n_odd}",
+        fontsize=8, loc="left",
+    )
+
+    ax_even = fig.add_subplot(gs[3, 3:6])
+    even_depth, n_even = _draw_oe_panel(ax_even, even_sel, "even", "#1f3b6b")
+    ax_even.set_ylabel("even flux")
+    ax_even.set_title(
+        f"EVEN transits @ anchor [{best_aperture}]  "
+        f"med={even_depth:.3f}  n={n_even}",
+        fontsize=8, loc="left",
+    )
+    # Match y-limits across odd/even for direct visual comparison.
+    y_lo = min(ax_odd.get_ylim()[0], ax_even.get_ylim()[0])
+    y_hi = max(ax_odd.get_ylim()[1], ax_even.get_ylim()[1])
+    ax_odd.set_ylim(y_lo, y_hi)
+    ax_even.set_ylim(y_lo, y_hi)
+
     odd_minus_even = (odd_depth - even_depth) if (
         np.isfinite(odd_depth) and np.isfinite(even_depth)
     ) else float("nan")
-    ax_oe.set_title(
-        f"odd/even transit fold (EB check)  "
-        f"odd_med={odd_depth:.3f} (n={n_odd})  "
-        f"even_med={even_depth:.3f} (n={n_even})  "
-        f"Δ={odd_minus_even:.3f}",
-        fontsize=8, loc="left",
-    )
 
     # --- Row 4: summary text panel
     ax_tx = fig.add_subplot(gs[4, :])
     ax_tx.axis("off")
     lines = [
-        f"TIC {lc.tic}   Sector {lc.sector}   cam{lc.cam}/ccd{lc.ccd}   "
-        f"Tmag={lc.tmag:.2f}",
-        f"best aperture: {best_aperture}",
-        f"  P     = {p_best:.6f} d",
-        f"  T0    = {t0_best:.6f} BJD",
-        f"  dur   = {dur_best:.2f} min",
-        f"  depth = {depth_best:.3f}",
-        f"  SDE   = {float(peaks[best_aperture]['sde']):.2f}",
+        f"anchor aperture: {best_aperture}    "
+        f"P={p_best:.6f} d   T0={t0_best:.6f} BJD   "
+        f"dur={dur_best:.2f} min   depth={depth_best:.3f}   "
+        f"SDE={float(peaks[best_aperture]['sde']):.2f}",
     ]
     if cluster_summary is not None:
-        lines.append(
+        cluster_line = (
             f"cross-aperture: n_apertures_agree="
-            f"{cluster_summary.get('n_apertures_agree', '?')}  "
-            f"({cluster_summary.get('apertures_agree', '')})"
+            f"{cluster_summary.get('n_apertures_agree', '?')}"
+            f"  ({cluster_summary.get('apertures_agree', '')})"
         )
+        lines.append(cluster_line)
         for ap in ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG"):
             sde_ap = cluster_summary.get(f"sde_{ap}")
             if sde_ap is not None and np.isfinite(sde_ap):
@@ -402,21 +444,24 @@ def plot_vet_sheet(
     if np.isfinite(odd_minus_even):
         verdict = ("ok" if abs(odd_minus_even) < 0.05
                    else "*** SUSPICIOUS odd/even Δ — possible EB ***")
-        lines.append(f"odd-even Δdepth = {odd_minus_even:+.3f}   [{verdict}]")
+        lines.append(
+            f"odd-even @ {best_aperture}: Δdepth={odd_minus_even:+.3f}  [{verdict}]"
+        )
     ax_tx.text(0.0, 1.0, "\n".join(lines), transform=ax_tx.transAxes,
                va="top", ha="left", fontsize=8, family="monospace")
 
     fig.suptitle(
-        f"TIC {lc.tic}  S{lc.sector} cam{lc.cam}/ccd{lc.ccd}  T={lc.tmag:.2f}  —  TWIRL BLS vet sheet",
-        fontsize=11, y=0.997,
+        f"TIC {lc.tic}  S{lc.sector} cam{lc.cam}/ccd{lc.ccd}  "
+        f"T={lc.tmag:.2f}  —  TWIRL BLS vet sheet (anchor: {best_aperture})",
+        fontsize=10, y=0.985,
     )
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    # Also save the same figure as a PDF alongside the PNG. PDFs are lighter
-    # for archival vetting (vector text + scatter rendered as raster), and
-    # downstream collaborators tend to prefer them for paper figures.
+    # Tight layout, leaving just enough room for the suptitle and no extra band.
+    fig.subplots_adjust(top=0.955, bottom=0.045, left=0.07, right=0.985)
+    fig.savefig(out_path, dpi=150)
+    # Also save the same figure as a PDF alongside the PNG.
     pdf_path = out_path.with_suffix(".pdf")
     try:
-        fig.savefig(pdf_path, bbox_inches="tight")
+        fig.savefig(pdf_path)
     except Exception:
         pass
     plt.close(fig)
