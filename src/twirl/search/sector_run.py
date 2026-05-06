@@ -114,12 +114,18 @@ def _emit_vet_sheets(sector_out: Path, tics: set[int],
             continue
 
         # Emit one vet sheet per aperture, anchored at THAT aperture's rank-1
-        # (P, T0). Auto-picking a single "best aperture" is unreliable when the
-        # loud peak is a systematic (e.g. WD 1856 in S59: DET_FLUX rank-1 is
-        # the 6.4 d alias, not the 1.408 d truth visible in SML). Three
-        # sheets let the reviewer compare candidates without prejudice.
+        # (P, T0). Auto-picking a single "best aperture" by max-SDE is
+        # unreliable when the loud peak is a systematic (S59 DET_FLUX rank-1 is
+        # the 6.4 d alias, not the 1.408 d truth visible in SML). Three sheets
+        # let the reviewer compare candidates without prejudice.
+        #
+        # The SML-anchored sheet is also written as the canonical `vet_sheet`
+        # at the target dir top: SML has lowest contamination dilution and is
+        # the right default for the LC top row and odd/even EB check on faint
+        # WD targets. MED/LAG remain as supplementary sheets.
         sheets_dir = target_dir / "vet_sheets"
         sheets_dir.mkdir(parents=True, exist_ok=True)
+        sml_sheet_path: Path | None = None
         for anchor_ap in peaks:
             cluster_summary = None
             if consol_df is not None and not consol_df.empty:
@@ -133,9 +139,30 @@ def _emit_vet_sheets(sector_out: Path, tics: set[int],
                 plot_vet_sheet(lc, spectra, peaks, anchor_ap, out_path,
                                cluster_summary=cluster_summary)
                 print(f"  [stage2-bls] vet sheet -> {out_path}", flush=True)
+                if anchor_ap == "DET_FLUX_SML":
+                    sml_sheet_path = out_path
             except Exception as exc:
                 print(f"  [stage2-bls] vet sheet FAIL for TIC {tic} {anchor_ap}: {exc}",
                       flush=True)
+
+        # Canonical sheet at target dir top: copy of SML if available, else MED.
+        canonical_src = sml_sheet_path
+        if canonical_src is None:
+            for ap in ("DET_FLUX", "DET_FLUX_LAG"):
+                cand = sheets_dir / f"vet_{ap}.png"
+                if cand.exists():
+                    canonical_src = cand
+                    break
+        if canonical_src is not None:
+            import shutil
+            for suffix in (".png", ".pdf"):
+                src = canonical_src.with_suffix(suffix)
+                dst = target_dir / f"vet_sheet{suffix}"
+                if src.exists():
+                    try:
+                        shutil.copyfile(src, dst)
+                    except Exception:
+                        pass
 
 
 def _target_dir(sector_out: Path, tic: int) -> Path:

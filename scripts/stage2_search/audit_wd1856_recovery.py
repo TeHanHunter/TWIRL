@@ -142,7 +142,14 @@ def audit_sector(candidates_parquet: Path) -> tuple[bool, dict]:
     best_failing_ap = None
     best_failing_sde = -float("inf")
 
-    for ap in sorted(sub_all["aperture"].unique()):
+    # Audit apertures in preference order: SML first (least contamination → most
+    # trustworthy depth + least systematic-driven false-positive). MED, LAG follow.
+    aperture_order = ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG")
+    available = list(sub_all["aperture"].unique())
+    ordered = [a for a in aperture_order if a in available] + \
+              [a for a in available if a not in aperture_order]
+
+    for ap in ordered:
         sub_ap = sub_all[sub_all["aperture"] == ap].sort_values("peak_rank").copy()
         ok, rep = _audit_one_aperture(sub_ap)
         per_aperture[ap] = {"passed": ok, **rep}
