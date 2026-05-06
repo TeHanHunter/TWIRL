@@ -1,0 +1,22 @@
+# TWIRL Stage 2 first-pass BLS configuration.
+#
+# Per-sector BLS over WD HLSP FITS, DET_FLUX (3x3 medium aperture).
+# Tuned so a single 27.8 d sector LC processes in ~1.5 s on one CPU core.
+# WD 1856 (P=1.408 d) recovers at SDE ~28 with these settings.
+apertures:
+  - DET_FLUX_SML       # 1x1; best on contaminated CCDs (recovers WD 1856 in S59 cam4/ccd4)
+  - DET_FLUX           # 3x3; primary on clean CCDs (best for WD 1856 in S56 cam4/ccd1)
+  - DET_FLUX_LAG       # 5x5; faint regime catch-all
+n_periods: 100000      # freq-uniform grid; 1e5 is the wall-time sweet spot
+p_min_d: 0.0833333     # 2 hours. 1 h hits BLS aliasing wall artifacts.
+max_period_fraction: 0.45   # need >=2 transits in baseline
+p_max_cap_d: 15.0      # absolute ceiling
+durations_min:
+  - 3.0
+  - 5.0
+  - 8.0
+  - 12.0
+  - 20.0
+n_peaks: 10
+period_mask_frac: 0.005     # +-0.5% mask in the peak walk
+min_cadences: 200

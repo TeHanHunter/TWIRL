@@ -5,3 +5,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 data_local/
+benchmark/tglc_wasp18_s96/
+# Stage 2 BLS periodograms are large (~1.5 MB/target) and regenerable from
+# the HLSP FITS; keep candidates.parquet and meta.json instead.
+benchmark/wd1856_bls/**/periodograms/
