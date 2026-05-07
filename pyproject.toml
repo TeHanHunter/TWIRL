@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twirl"
+version = "0.1.0"
+description = "TWIRL: TESS White dwarf Investigation of Remnant pLanets"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Te Han" },
+]
+dependencies = [
+    "numpy>=1.24,<2.0",
+    "astropy>=5.3",
+    "matplotlib>=3.7",
+    "seaborn>=0.13",
+    "pyarrow>=14.0",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "tess-point",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["twirl*"]
