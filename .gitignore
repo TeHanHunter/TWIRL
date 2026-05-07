@@ -10,3 +10,6 @@ benchmark/tglc_wasp18_s96/
 # the HLSP FITS; keep candidates.parquet and meta.json instead.
 benchmark/wd1856_bls/**/periodograms/
 benchmark/wd1856_bls/**/targets/*/periodograms/
+# 122 MB of top-N vet sheets from S56 production — regenerable from PDO via
+# scripts/stage2_search/filter_wd_candidates.py + sector_run --include-tics.
+benchmark/wd1856_bls_s56_top30/
