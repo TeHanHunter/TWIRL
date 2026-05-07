@@ -230,13 +230,26 @@ def run_sector(
     limit: int | None,
     periodogram_tics: list[int],
     out_suffix: str = "",
+    include_tics: set[int] | None = None,
 ) -> Path:
-    """Execute BLS over every HLSP target in `hlsp_root` for `sector`."""
+    """Execute BLS over every HLSP target in `hlsp_root` for `sector`.
+
+    If `include_tics` is non-empty, only HLSP files whose TIC is in the set
+    are processed — used for re-running BLS on top candidates to harvest
+    periodograms + per-target vet sheets without redoing the full sector.
+    """
     hlsp_root = Path(hlsp_root)
     if not hlsp_root.exists():
         raise FileNotFoundError(f"HLSP root not found: {hlsp_root}")
 
     paths = discover_sector_targets(hlsp_root, sector)
+    if include_tics:
+        def _tic_from(p: Path) -> int | None:
+            try:
+                return int(p.name.split("-")[1].split("_")[0])
+            except Exception:
+                return None
+        paths = [p for p in paths if _tic_from(p) in include_tics]
     if limit is not None:
         paths = paths[:limit]
     if not paths:
@@ -354,6 +367,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 1) // 2))
     ap.add_argument("--limit", type=int, default=None,
                     help="Process only the first N HLSP files (smoke testing).")
+    ap.add_argument("--include-tics", type=str, default="",
+                    help="Comma-separated TIC list OR path to a text file with "
+                         "TIC IDs (one per line). Filter the HLSP path list to "
+                         "only these targets — useful for re-running BLS on "
+                         "top candidates to harvest periodograms + vet sheets.")
     ap.add_argument("--apertures", type=str,
                     default="DET_FLUX_SML,DET_FLUX,DET_FLUX_LAG",
                     help="Comma-separated list of aperture flux columns to search. "
@@ -389,6 +407,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     hlsp_root = resolve_hlsp_root(args.sector, args.hlsp_root)
 
+    include_tics: set[int] = set()
+    if args.include_tics:
+        # Argument can be either a comma-separated TIC list or a path to a file.
+        as_path = Path(args.include_tics)
+        if as_path.exists():
+            for line in as_path.read_text().splitlines():
+                tok = line.strip().split()[0] if line.strip() else ""
+                if tok and tok[0].isdigit():
+                    include_tics.add(int(tok))
+        else:
+            for tok in args.include_tics.split(","):
+                tok = tok.strip()
+                if tok:
+                    include_tics.add(int(tok))
+        # Targets in include_tics get periodograms saved automatically.
+        pg_tics = sorted(set(pg_tics) | include_tics)
+
     run_sector(
         sector=int(args.sector),
         hlsp_root=hlsp_root,
@@ -398,6 +433,7 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
         periodogram_tics=pg_tics,
         out_suffix=args.out_suffix,
+        include_tics=include_tics,
     )
     return 0
 
