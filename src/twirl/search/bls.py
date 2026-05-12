@@ -25,13 +25,24 @@ from twirl.search.grids import build_period_grid, duration_grid_days
 @dataclass
 class BLSConfig:
     apertures: tuple[str, ...] = ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG")
-    p_min_d: float = 2.0 / 24.0  # 2 h. 1 h hits BLS aliasing wall artifacts; 2 h is
-                                 # still well above Roche limit for plausible WD planets.
+    # p_min_d raised from 2 h (v1) to 0.12 d (~2.9 h) to cut the empirical
+    # alias wall pile-up (26% of best-peaks landed in [0.083, 0.10] d in v1)
+    # and the cadence-sampling floor where even a central 2 R_jup transit
+    # has < 4 cadences at 200 s.
+    p_min_d: float = 0.12
     max_period_fraction: float = 0.45
     p_max_cap_d: float = 15.0
-    durations_min: tuple[float, ...] = (3.0, 5.0, 8.0, 12.0, 20.0)
+    # Denser duration grid: resolves the 5-13 min WD regime more finely than
+    # the v1 [3, 5, 8, 12, 20] grid, and extends to 30 min so PCEBs do not
+    # peg at the 21-min ceiling (an artifact we saw in v1 — most top-of-list
+    # FAs had duration_min == 21).
+    durations_min: tuple[float, ...] = (
+        3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 13.0, 16.0, 20.0, 30.0
+    )
     n_periods: int = 200_000
-    n_peaks: int = 20
+    # n_peaks dropped from 20 to 10: peaks 11-20 contributed no surviving
+    # candidates after the heuristic vetter in v1.
+    n_peaks: int = 10
     period_mask_frac: float = 0.005
     min_cadences: int = 200
     sigma_clip: float = 5.0  # Reject |f - median| > sigma_clip * 1.4826 * MAD before BLS.
