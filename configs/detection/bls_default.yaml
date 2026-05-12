@@ -1,24 +1,42 @@
 # TWIRL Stage 2 first-pass BLS configuration.
 #
-# Per-sector BLS over WD HLSP FITS, DET_FLUX (3x3 medium aperture).
-# Tuned so a single 27.8 d sector LC processes in ~1.5 s on one CPU core.
-# WD 1856 (P=1.408 d) recovers at SDE ~28 with these settings.
+# Per-sector BLS over WD HLSP FITS. Multi-aperture (SML, MED, LAG) so weak
+# signals that fall in only one aperture (e.g. WD 1856 in S59 cam4/ccd4) still
+# survive cross-aperture consolidation.
+#
+# v2 tuning (2026-05-12):
+#   - p_min_d raised to 0.12 d. The old 2-hour floor produced a sharp ~26%
+#     pile-up of best-peaks at the BLS p_min wall (instrumental alias, not
+#     astrophysics). 0.12 d is also above the cadence-sampling limit for a
+#     central transit of a 2 R_jup companion at 200 s (T_dur,max < 4 cadences
+#     below this period -> BLS structurally undersampled).
+#   - Denser durations_min grid (9 values vs 5). The old [3, 5, 8, 12, 20]
+#     min grid quantized WD 1856's true ~8 min transit to 6 min and forced
+#     many EBs / PCEBs onto the 21-min ceiling. The new grid resolves the
+#     5-13 min WD regime more finely and adds a wider step out to 30 min so
+#     post-CE WD+M-dwarf binaries don't peg at the ceiling.
+#   - n_peaks dropped to 10. Empirically peaks 11-20 contribute no surviving
+#     candidates after our heuristic vetter; cuts consolidated parquet size
+#     by ~2x.
 apertures:
-  - DET_FLUX_SML       # 1x1; best on contaminated CCDs (recovers WD 1856 in S59 cam4/ccd4)
-  - DET_FLUX           # 3x3; primary on clean CCDs (best for WD 1856 in S56 cam4/ccd1)
-  - DET_FLUX_LAG       # 5x5; faint regime catch-all
-n_periods: 200000      # freq-uniform grid; doubled from 1e5 to be more forgiving
-                       # to weak signals. Compute is cheap.
-p_min_d: 0.0833333     # 2 hours. 1 h hits BLS aliasing wall artifacts.
+  - DET_FLUX_SML
+  - DET_FLUX
+  - DET_FLUX_LAG
+n_periods: 200000      # freq-uniform grid; compute is cheap.
+p_min_d: 0.12          # ~2.9 h; cuts the 2-hour BLS alias wall + sub-cadence regime.
 max_period_fraction: 0.45   # need >=2 transits in baseline
 p_max_cap_d: 15.0      # absolute ceiling
 durations_min:
   - 3.0
+  - 4.0
   - 5.0
+  - 6.0
   - 8.0
-  - 12.0
+  - 10.0
+  - 13.0
+  - 16.0
   - 20.0
-n_peaks: 20                 # keep more candidates per aperture so weak signals
-                            # survive to cross-aperture consolidation
+  - 30.0
+n_peaks: 10            # peaks 11-20 contributed no survivors in the v1 run
 period_mask_frac: 0.005     # +-0.5% mask in the peak walk
 min_cadences: 200
