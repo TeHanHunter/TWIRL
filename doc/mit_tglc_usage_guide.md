@@ -676,6 +676,8 @@ qlp lctools detrend --help
 
 This annotates the HDF5 files with a `bestdmagkey` attribute (the chosen detrending method). The `hlsp` step reads this attribute to select which magnitude column to write as `DET_FLUX`. **Without detrending, HLSP generation fails** because the attribute is absent.
 
+**HLSP operates at the sector level, not per-orbit.** `hlsp.py::get_h5_light_curve_data` iterates over all orbits in a sector and `vstack`s their detrended h5 light curves into a single combined FITS per TIC. All orbits in the sector must therefore be detrended before HLSP runs.
+
 ### Step 2: HLSP FITS generation
 
 The reference implementation is `src/qlp/lctools/bin/hlsp.py` (copy at `/Users/tehan/Downloads/src_qlp_lctools_bin_hlsp.py`). It:
@@ -706,7 +708,7 @@ Output path convention:
 requested TIC IDs (detector table) → h5 files → FITS files
 ```
 
-Gaia-only targets (no TIC bridge) will never produce a FITS file through this path.
+Standard TWIRL audit after each production run: bin the shortfall by TESS magnitude to detect faint-end dropout, and log counts in the progress log. Gaia-only targets (no TIC bridge) will never produce a FITS file through this path until the fork is extended to emit Gaia-selected targets directly.
 
 ## Known Constraints To Plan Around
 

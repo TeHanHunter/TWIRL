@@ -111,3 +111,35 @@ def quality_mask(lc: HLSPLightCurve, aperture: str = "DET_FLUX") -> np.ndarray:
         return np.zeros(len(lc.time), dtype=bool)
     f = lc.flux[aperture]
     return (lc.quality == 0) & np.isfinite(f) & np.isfinite(lc.time)
+
+
+def tglc_mad_error(
+    lc: HLSPLightCurve,
+    aperture: str = "DET_FLUX",
+) -> np.ndarray:
+    """Canonical TWIRL per-cadence flux error: 1.4826 × MAD of the
+    good-quality detrended flux, broadcast across all good cadences.
+
+    This is the TGLC-recommended estimator and should be used unconditionally
+    — many QLP/HLSP FITS in our production tree (S56 included) ship with
+    ``DET_FLUX_ERR`` as all-NaN due to an upstream wrapper issue, so the
+    column is unreliable. The MAD method is robust to outliers (transit dips
+    and flags) and matches the TGLC photometric noise model.
+
+    Returns a same-length array as ``lc.time`` with ``sigma`` filled at every
+    good-quality cadence and ``NaN`` elsewhere, so it can be used as
+    per-cadence ``flux_err`` directly.
+    """
+    if aperture not in lc.flux:
+        raise KeyError(f"aperture {aperture!r} not loaded in HLSPLightCurve")
+    f = lc.flux[aperture]
+    keep = quality_mask(lc, aperture)
+    fg = f[keep]
+    if fg.size == 0:
+        return np.full_like(f, np.nan, dtype=np.float64)
+    med = np.nanmedian(fg)
+    mad = np.nanmedian(np.abs(fg - med))
+    sigma = 1.4826 * float(mad)
+    out = np.full_like(f, np.nan, dtype=np.float64)
+    out[keep] = sigma
+    return out

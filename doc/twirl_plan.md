@@ -22,6 +22,57 @@ This document is the executable software and survey plan for TWIRL.
 
 When we open Stage 2 (search), use William Fong's cuvarbase branch + persistent-context M-per-GPU queue architecture as the starting point — he validated S100 cam4/ccd4 equivalence within float roundoff. His numba-vectorized trapezoid fit is also a relevant pattern for any custom CPU-bound search code we write.
 
+## Three-Week Pre-Talk Vertical Slice (2026-05-12 → 2026-06-02)
+
+Time-boxed end-to-end run through Stages 2→5 on the **S56 footprint only**, gated by **WD 1856 blind recovery**. Purpose: surface Stage-2→5 unknowns now (rather than waiting for undergrads to start filling those stages in), and produce a credible talk for Andrew Vanderburg and Kevin Burdge on ~`2026-06-02`. Stage 1 mass production continues in parallel on its own pdogpu1+pdogpu6 schedule; the sprint does not pull resources from it.
+
+**Why S56 only.** It is the one sector that is fully done, validated, contains the WD 1856 ground truth, and is cadence-aligned. Anything else dilutes the experiment in the time available.
+
+**Non-goals for the sprint** (explicit so they don't creep in):
+
+- Multi-sector phase folding — S56 only.
+- Final occurrence-rate posterior — sample too small; any rate quoted is provisional.
+- ML triage — toy heuristic vetter only (cf. Stage 2 vetting decision, `2026-05-07`).
+- External follow-up coordination.
+- S57+ search runs — even if S57/S58 production finishes in time, freeze the talk results on S56.
+
+### Week 1 (2026-05-12 → 2026-05-19): Stage 2 detector trio, end-to-end on S56
+
+Add the two missing detector branches alongside the existing BLS pipeline, and run all three on the full S56 WD sample.
+
+- **Single-dip detector** ([src/twirl/search/dip_search.py](../src/twirl/search/dip_search.py), new): matched filter / 1-transit BLS for non-periodic WD-1856-class events that may show only 1–2 transits in S56. Output: `dip_sde`, `dip_t0`, `dip_duration`.
+- **Variable-depth template** ([src/twirl/search/variable_depth.py](../src/twirl/search/variable_depth.py), new): WD-1145-style detector that allows per-dip depth to vary; designed to fire on aperiodic dust-tail signatures (cf. the design driver added `2026-05-01` and the debris-transits section of `ideas.md`). Output: `vd_score`, `n_dips`, `dip_depth_range`.
+- **Orchestration**: extend `scripts/stage2_search/` with a `run_full_s56.py` driver that runs BLS + dip + variable-depth on every S56 WD light curve and writes a unified `consolidated_s56.parquet` with columns from all three branches.
+
+**Week-1 gate**: the pipeline runs to completion on every S56 WD (`~19,068` HLSP FITS under `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056/`) without per-target failures swallowing the run. The goal is "it runs," not "it's tuned" — tuning is Year-2 work. **Reuse**: [src/twirl/search/bls.py](../src/twirl/search/bls.py), `candidates.py`, `consolidate.py`, `sector_run.py`, `diagnostics.py`; [configs/detection/bls_default.yaml](../configs/detection/bls_default.yaml).
+
+### Week 2 (2026-05-19 → 2026-05-26): Stage 3 minimum + Stage 4 dry run
+
+- **Injection grid**: `~1,000–2,000` WD-1856-like signals (`R_comp ~ 0.5–2 R_jup`, `P = 0.5–10 d`, near-100% transit depths, durations 5–30 min) + `~300–500` WD-1145-like signals (variable depth `5–60%`, quasi-periodic dip clusters, periods `4.5–6 hr`). Hosts drawn from quiet S56 WDs (no flagged variability; RMS `< 1.5×` median for the Tmag bin) so injected-vs-recovered comparisons aren't blended with intrinsic variability.
+- **Recovery pass**: run injections through the Week-1 detector trio. Produce a rough recovery surface `R(depth, period, Tmag)` for the periodic branch and `R(mean_depth, dip_count, Tmag)` for the dip branch. Statistically thin is fine — the point is the *shape* and the *gotchas* surfaced.
+- **Stage 4 dry run**: identical search stack on the uninjected (real) S56 sample → ranked candidate table `candidates_s56.parquet`. No multi-sector merge — S56 only.
+
+**Week-2 gate**: completeness curves have qualitatively sensible shape (rises with depth, falls with Tmag and period), and WD 1856 appears *somewhere* in the blind candidate ranking — not necessarily rank 1. New code: `src/twirl/injections/wd_signals.py`, `src/twirl/injections/recovery.py`, `scripts/stage3_injections/inject_s56.py`.
+
+### Week 3 (2026-05-26 → 2026-06-02): Stage 5 toy vetting + talk anchor
+
+- **Toy heuristic vetter** (`src/twirl/vetting/heuristic.py`, new — building on the `2026-05-07` vetting plan): engineered features `aperture_slope`, `oot_to_dip_ratio`, `predicted_duration_min` (from Gaia parallax → `R_WD` → expected duration at the fitted period), `duration_residual_z`. Append as columns to `candidates_s56.parquet`.
+- **Triage**: push the top `~50–100` candidates through the vetter; produce a ranked vetted table.
+- **WD 1856 blind-recovery confirmation** — the gating milestone for the talk. WD 1856 (TIC `267574918`) must (a) be recovered blind in the S56 search, (b) survive the heuristic vetter, (c) end up in the top tier. If any of (a)–(c) fails, the failure mode itself becomes a slide (why it failed → what the search/vetter needs).
+- **FP-class characterization** for the Burdge slide: classify the surviving top candidates into expected WD-specific FP modes — PCEBs (WD+M dwarf), centroid-shift contaminators, systematics ladder peaks, ZZ Ceti pulsators leaking into the dip branch. Count each class.
+- **Talk slide outline**: motivation → S56 vertical slice → completeness curve → blind WD 1856 recovery → FP classes → roadmap to the full 40-sector campaign.
+
+**Week-3 gate**: a self-contained narrative slide deck that holds up under questions from Vanderburg (completeness rigor) and Burdge (FP discrimination, WD-specific eclipsing systems).
+
+### Sprint deliverables
+
+- `consolidated_s56.parquet` — BLS + dip + variable-depth columns for every S56 WD.
+- Rough completeness grids for the WD-1856-like and WD-1145-like regimes.
+- `candidates_s56.parquet` with appended heuristic-vetter features.
+- Documented blind WD 1856 recovery (or documented failure mode if it doesn't recover).
+- FP-class breakdown of top vetted candidates.
+- Talk slide deck.
+
 ## Project Goal
 
 TWIRL will use 200 s TESS FFIs, TGLC-based light-curve extraction, transparent transit/dip searches, optional machine-learning triage, automated vetting, and injection-recovery tests to:
