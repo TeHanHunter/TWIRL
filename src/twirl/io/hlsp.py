@@ -40,18 +40,24 @@ class HLSPLightCurve:
 
 
 def iter_hlsp_fits(hlsp_root: Path) -> Iterator[Path]:
-    """Yield every `hlsp_qlp_tess_ffi_*.fits` under `hlsp_root`, sorted."""
-    yield from sorted(Path(hlsp_root).rglob("hlsp_qlp_tess_ffi_*.fits"))
+    """Yield every `hlsp_{qlp,twirl}_tess_ffi_*.fits` under `hlsp_root`, sorted.
+
+    Matches both the QLP-produced HLSPs (`hlsp_qlp_*`) and the TWIRL v3
+    flux-space-detrended HLSPs (`hlsp_twirl_*`) so downstream code reads
+    whichever tree it's pointed at without changes.
+    """
+    yield from sorted(Path(hlsp_root).rglob("hlsp_*_tess_ffi_*.fits"))
 
 
 def discover_sector_targets(hlsp_root: Path, sector: int) -> list[Path]:
     """All HLSP files for `sector` under `hlsp_root`.
 
-    Files are named `hlsp_qlp_tess_ffi_s{sector:04d}-{tic:016d}_tess_v01_llc.fits`,
-    so we filter by the `s{NNNN}` prefix to avoid loading unrelated sectors that
-    might co-exist in the tree.
+    Files are named `hlsp_{qlp,twirl}_tess_ffi_s{sector:04d}-{tic:016d}_tess_v01_llc.fits`;
+    we filter by the `s{NNNN}` prefix to avoid loading unrelated sectors that
+    might co-exist in the tree. The wildcard between `hlsp_` and `_tess_ffi_`
+    matches both QLP (`qlp`) and TWIRL v3 (`twirl`) HLSP variants.
     """
-    pat = f"hlsp_qlp_tess_ffi_s{sector:04d}-*.fits"
+    pat = f"hlsp_*_tess_ffi_s{sector:04d}-*.fits"
     return sorted(Path(hlsp_root).rglob(pat))
 
 
