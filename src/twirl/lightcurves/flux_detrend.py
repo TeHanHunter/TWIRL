@@ -125,40 +125,72 @@ def flux_space_detrend(
     order = np.argsort(t_fit)
     t_fit, f_fit, w_fit = t_fit[order], f_fit[order], w_fit[order]
 
+    # LSQUnivariateSpline needs strictly increasing knots inside the data
+    # range AND strictly increasing x — dedupe pathological identical times.
+    uniq_mask = np.concatenate(([True], np.diff(t_fit) > 0))
+    t_fit, f_fit, w_fit = t_fit[uniq_mask], f_fit[uniq_mask], w_fit[uniq_mask]
+
     knots = _build_knots(t_fit, cfg.bkspace_d, cfg.edge_pad_d)
     if len(knots) < 2:
         # Time baseline shorter than 3 * bkspace; fall back to a polynomial.
-        coeffs = np.polyfit(t_fit, f_fit, deg=2, w=w_fit)
-        spline_at = np.polyval(coeffs, time)
-    else:
-        good = np.ones_like(f_fit, dtype=bool)
-        for _ in range(cfg.max_iter):
-            try:
-                spl = LSQUnivariateSpline(
-                    t_fit[good], f_fit[good], t=knots, k=cfg.k, w=w_fit[good]
-                )
-            except Exception:
-                # Knot configuration invalid (e.g., empty regions); back off
-                # to a polynomial.
-                coeffs = np.polyfit(t_fit, f_fit, deg=2, w=w_fit)
-                spline_at = np.polyval(coeffs, time)
-                break
-            resid = f_fit - spl(t_fit)
-            mad = np.nanmedian(np.abs(resid - np.nanmedian(resid)))
-            sigma = 1.4826 * mad if mad > 0 else np.std(resid)
-            new_good = np.abs(resid) < cfg.sigma_clip * sigma
-            if np.array_equal(new_good, good):
-                break
-            good = new_good
-        else:
-            spl = LSQUnivariateSpline(
+        spline_at = _safe_poly(t_fit, f_fit, w_fit, time, flux)
+        det_flux = np.where(np.isfinite(flux), flux / spline_at, np.nan)
+        return det_flux, _broadcast_mad(det_flux), spline_at
+
+    good = np.ones_like(f_fit, dtype=bool)
+    spl = None  # last successful spline; None means every iter raised
+    for _ in range(cfg.max_iter):
+        try:
+            new_spl = LSQUnivariateSpline(
                 t_fit[good], f_fit[good], t=knots, k=cfg.k, w=w_fit[good]
             )
+        except Exception:
+            # Knot configuration invalid (e.g. surviving t_fit[good] no longer
+            # spans the knot range after sigma-clip). Keep the last successful
+            # spl (if any) and stop iterating.
+            break
+        spl = new_spl
+        resid = f_fit - spl(t_fit)
+        mad = np.nanmedian(np.abs(resid - np.nanmedian(resid)))
+        sigma = 1.4826 * mad if mad > 0 else np.std(resid)
+        new_good = np.abs(resid) < cfg.sigma_clip * sigma
+        if np.array_equal(new_good, good):
+            break
+        good = new_good
+
+    if spl is None:
+        # Never produced a spline — polynomial fallback.
+        spline_at = _safe_poly(t_fit, f_fit, w_fit, time, flux)
+    else:
         spline_at = spl(time)
 
     det_flux = np.where(np.isfinite(flux), flux / spline_at, np.nan)
     det_flux_err = _broadcast_mad(det_flux)
     return det_flux, det_flux_err, spline_at
+
+
+def _safe_poly(
+    t_fit: np.ndarray,
+    f_fit: np.ndarray,
+    w_fit: np.ndarray,
+    time: np.ndarray,
+    flux: np.ndarray,
+) -> np.ndarray:
+    """Polynomial cotrend fallback. Tries deg-2 weighted; degrades to
+    deg-1 unweighted; ultimately returns the median, so the caller
+    always gets a finite ``spline_at`` of the right shape.
+    """
+    for deg, use_w in ((2, True), (1, True), (1, False), (0, False)):
+        try:
+            if use_w:
+                coeffs = np.polyfit(t_fit, f_fit, deg=deg, w=w_fit)
+            else:
+                coeffs = np.polyfit(t_fit, f_fit, deg=deg)
+            return np.polyval(coeffs, time)
+        except Exception:
+            continue
+    med = np.nanmedian(flux)
+    return np.full(len(time), med if np.isfinite(med) else 1.0)
 
 
 def _broadcast_mad(x: np.ndarray) -> np.ndarray:

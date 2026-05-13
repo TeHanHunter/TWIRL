@@ -231,7 +231,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.workers <= 1:
         for w in work:
             tic, ok, msg = process_one(w)
-            (n_ok if ok else n_fail).__iadd__(1)  # noqa: F841 (placeholder)
             n_ok += int(ok)
             n_fail += int(not ok)
             if not ok:
