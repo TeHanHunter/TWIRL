@@ -28,12 +28,39 @@ Per-target host parameters via Gaia parallax + Teff is Day-2 work.
 from __future__ import annotations
 
 import sys
+import time
 import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from astropy.io import fits
+
+
+def _log_row(i: int, n: int, out: dict) -> None:
+    tic = int(out.get("tic", -1))
+    flag = " *WD1856*" if tic == WD_1856_TIC else ""
+    if "error" in out and out["error"]:
+        print(f"  [{i:>5}/{n}] TIC {tic:>11}  -> ERROR {out['error']}{flag}")
+        return
+    label = (
+        "PC" if out.get("leo_PC") else
+        ("FA" if out.get("leo_FA") else ("FP" if out.get("leo_FP") else "?"))
+    )
+    print(
+        f"  [{i:>5}/{n}] TIC {tic:>11}  P={out.get('P_bls', float('nan')):6.3f}d  "
+        f"SDE={out.get('sde_bls', float('nan')):7.1f}  "
+        f"MES={out.get('MES', float('nan')):6.2f}  "
+        f"SHP={out.get('SHP', float('nan')):5.2f}  "
+        f"-> {label}{flag}"
+    )
+
+
+def _log_pace(i: int, n: int, t0: float) -> None:
+    elapsed = time.time() - t0
+    rate = i / elapsed
+    eta = (n - i) / rate
+    print(f"  [leo] {i}/{n} done  rate={rate:.2f}/s  eta={eta / 60:.1f}min")
 
 # The data_local/ tree lives in the main repo (not the worktree). Use the
 # canonical PycharmProjects/TWIRL path for inputs/outputs so the script works
@@ -57,19 +84,33 @@ from twirl.io.hlsp import read_hlsp, quality_mask, tglc_mad_error  # noqa: E402
 
 WD_1856_TIC = 267574918
 SECTOR = 56
-HLSP_LOCAL_ROOT = (
-    DATA_ROOT
-    / "data_local/stage2/leo_inputs/sector_0056"
-    / "pdo/users/tehan/tglc-gpu-production"
-    / f"hlsp_s{SECTOR:04d}"
-)
-BLS_PARQUET = (
-    DATA_ROOT
-    / "data_local/stage2/bls_first_pass"
-    / f"sector_{SECTOR:04d}"
-    / "vetted_planet_candidates.parquet"
-)
-BENCHMARK_DIR = DATA_ROOT / "benchmark" / "leo_vetter_s56_top50"
+import os  # noqa: E402
+
+# All paths env-var override-able so the same script runs locally (Mac) and on PDO.
+# Defaults preserve the v1 local layout.
+_HLSP_ROOT = Path(os.environ.get(
+    "TWIRL_HLSP_ROOT",
+    str(DATA_ROOT
+        / "data_local/stage2/leo_inputs/sector_0056"
+        / "pdo/users/tehan/tglc-gpu-production"
+        / f"hlsp_s{SECTOR:04d}"),
+))
+_BLS_DIR = Path(os.environ.get(
+    "TWIRL_BLS_DIR",
+    str(DATA_ROOT / "data_local/stage2/bls_first_pass"),
+))
+_LEO_OUT = Path(os.environ.get(
+    "TWIRL_LEO_OUT",
+    str(DATA_ROOT / "benchmark" / "leo_vetter_s56_top50"),
+))
+_TOP_N = int(os.environ.get("TWIRL_TOP_N", "50"))    # 0 = run all survivors
+_WORKERS = int(os.environ.get("TWIRL_WORKERS", "1")) # multiprocessing pool size
+_VET_REPORT_POLICY = os.environ.get(
+    "TWIRL_VET_REPORT_POLICY", "all"
+)  # "all" | "pc_only" | "pc_plus_top20"
+HLSP_LOCAL_ROOT = _HLSP_ROOT
+BLS_PARQUET = _BLS_DIR / f"sector_{SECTOR:04d}" / "vetted_planet_candidates.parquet"
+BENCHMARK_DIR = _LEO_OUT
 VET_REPORTS_DIR = BENCHMARK_DIR / "vet_reports"
 
 
@@ -177,7 +218,16 @@ def vet_one(row: pd.Series, rank: int) -> dict:
         fa = bool(check_thresholds_wd(tlc.metrics, "FA"))
         fp = bool(check_thresholds_wd(tlc.metrics, "FP"))
         label = class_label(fa, fp)
-        render_vet_report(tlc, star, rank, label, tmag, P, VET_REPORTS_DIR)
+        # Render PDF only per policy. "all" = every TIC; "pc_only" = PCs only;
+        # "pc_plus_top20" = PCs + top-20 of each non-PC class (handled
+        # post-hoc by the driver, so vet_one always renders PCs at minimum).
+        should_render = (
+            _VET_REPORT_POLICY == "all"
+            or (label == "PC")
+            or (_VET_REPORT_POLICY == "pc_plus_top20" and rank <= 20)
+        )
+        if should_render:
+            render_vet_report(tlc, star, rank, label, tmag, P, VET_REPORTS_DIR)
         m = dict(tlc.metrics)
         m["leo_FA"] = fa
         m["leo_FP"] = fp
@@ -188,42 +238,55 @@ def vet_one(row: pd.Series, rank: int) -> dict:
         return {"tic": tic, "error": f"{type(e).__name__}: {e}"}
 
 
+def _vet_one_row(row_dict: dict) -> dict:
+    """Multiprocessing-friendly entry. Receives a plain dict (not pd.Series)."""
+    row = pd.Series(row_dict)
+    out = vet_one(row, rank=int(row["planet_rank"]))
+    out["rank_in"] = int(row["planet_rank"])
+    out["P_bls"] = float(row["period_d"])
+    out["dur_bls_min"] = float(row["duration_min"])
+    out["sde_bls"] = float(row["sde_max"])
+    out["tmag"] = float(row["tmag"])
+    out["n_apertures_agree"] = int(row["n_apertures_agree"])
+    return out
+
+
 def main() -> int:
     print(f"[leo] reading {BLS_PARQUET}")
-    df = pd.read_parquet(BLS_PARQUET).head(50).copy()
+    df = pd.read_parquet(BLS_PARQUET)
+    if _TOP_N > 0:
+        df = df.head(_TOP_N).copy()
+    else:
+        df = df.copy()
     df = df.reset_index(drop=True)
-    print(f"[leo] {len(df)} TICs to vet  (WD 1856 at rank "
-          f"{int(df.index[df['tic']==WD_1856_TIC][0])+1})")
+    wd_match = df.index[df["tic"] == WD_1856_TIC]
+    wd_msg = f" (WD 1856 at rank {int(wd_match[0]) + 1})" if len(wd_match) else ""
+    print(f"[leo] {len(df):,} TICs to vet  workers={_WORKERS}  "
+          f"vet_report_policy={_VET_REPORT_POLICY}{wd_msg}")
 
     BENCHMARK_DIR.mkdir(parents=True, exist_ok=True)
-    rows = []
-    for i, r in df.iterrows():
-        out = vet_one(r, rank=int(r["planet_rank"]))
-        out["rank_in"] = int(r["planet_rank"])
-        out["P_bls"] = float(r["period_d"])
-        out["dur_bls_min"] = float(r["duration_min"])
-        out["sde_bls"] = float(r["sde_max"])
-        out["tmag"] = float(r["tmag"])
-        out["n_apertures_agree"] = int(r["n_apertures_agree"])
-        rows.append(out)
-        tic = int(r["tic"])
-        flag = " *WD1856*" if tic == WD_1856_TIC else ""
-        if "error" in out:
-            print(f"  [{i+1:02d}/{len(df)}] TIC {tic:>11}  -> ERROR {out['error']}{flag}")
-        else:
-            label = (
-                "PC" if out.get("leo_PC")
-                else ("FA" if out.get("leo_FA")
-                      else ("FP" if out.get("leo_FP") else "?"))
-            )
-            print(
-                f"  [{i+1:02d}/{len(df)}] TIC {tic:>11}  "
-                f"P={out['P_bls']:6.3f}d  SDE_bls={out['sde_bls']:7.2f}  "
-                f"MES={out.get('MES',float('nan')):6.2f}  "
-                f"SHP={out.get('SHP',float('nan')):5.2f}  "
-                f"sine_sig={out.get('sine_sig',float('nan')):6.2f}  "
-                f"-> {label}{flag}"
-            )
+    VET_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    rows_in = df.to_dict("records")
+    rows: list[dict] = []
+    t0 = time.time()
+    if _WORKERS <= 1:
+        for i, r in enumerate(rows_in, 1):
+            out = _vet_one_row(r)
+            rows.append(out)
+            _log_row(i, len(rows_in), out)
+            if i % 100 == 0:
+                _log_pace(i, len(rows_in), t0)
+    else:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        with ProcessPoolExecutor(max_workers=_WORKERS) as ex:
+            futures = [ex.submit(_vet_one_row, r) for r in rows_in]
+            for i, fut in enumerate(as_completed(futures), 1):
+                out = fut.result()
+                rows.append(out)
+                _log_row(i, len(rows_in), out)
+                if i % 100 == 0:
+                    _log_pace(i, len(rows_in), t0)
 
     metrics = pd.DataFrame(rows)
     out_path = BENCHMARK_DIR / "leo_metrics.parquet"
