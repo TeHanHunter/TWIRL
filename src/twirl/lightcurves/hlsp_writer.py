@@ -1,0 +1,139 @@
+"""TWIRL HLSP FITS writer.
+
+Emits a 2-HDU FITS file (PRIMARY metadata + LIGHTCURVE BinTable) in the
+column schema produced by QLP ``lctools hlsp``, so that the existing
+:mod:`twirl.io.hlsp` reader and all downstream code (BLS, heuristic
+vetter, LEO adapter) consume TWIRL HLSPs unchanged.
+
+Difference from QLP HLSPs:
+
+* ``SAP_FLUX`` / ``DET_FLUX`` are emitted in **linear relative-flux
+  units**, not magnitudes-converted-back. Cadences where QLP would have
+  silently dropped a measurement (``flux <= 0`` pre-detrend) are
+  preserved here as real negative values.
+* ``DET_FLUX_ERR`` is the MAD-broadcast per-cadence sigma from our
+  flux-space detrender, not propagated through a magnitude space.
+
+Filename convention: ``hlsp_twirl_tess_ffi_s<sector>-<tic16>_tess_v01_llc.fits``
+distinguishes our output from QLP's ``hlsp_qlp_tess_ffi_*``.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+from astropy.io import fits
+
+
+HLSP_COLUMN_SCHEMA: tuple[tuple[str, str, str | None], ...] = (
+    ("TIME",         "D", "BJD-2457000, days"),
+    ("CADENCENO",    "J", None),
+    ("SAP_FLUX",     "E", None),
+    ("DET_FLUX",     "E", None),
+    ("DET_FLUX_ERR", "E", None),
+    ("QUALITY",      "J", None),
+    ("ORBITID",      "J", None),
+    ("SAP_X",        "E", "pixel"),
+    ("SAP_Y",        "E", "pixel"),
+    ("SAP_BKG",      "E", None),
+    ("SAP_BKG_ERR",  "E", None),
+    ("DET_FLUX_SML", "E", None),
+    ("DET_FLUX_LAG", "E", None),
+    ("SYS_RM_FLUX",  "E", None),
+)
+
+
+@dataclass
+class HLSPTarget:
+    """Per-target metadata for the PRIMARY HDU header."""
+    tic: int
+    sector: int
+    cam: int
+    ccd: int
+    tmag: float
+    ra: float
+    dec: float
+    version: str = "v01"
+
+
+def hlsp_filename(target: HLSPTarget) -> str:
+    """``hlsp_twirl_tess_ffi_s<sector>-<tic16>_tess_<version>_llc.fits``."""
+    return (
+        f"hlsp_twirl_tess_ffi_s{target.sector:04d}-{target.tic:016d}"
+        f"_tess_{target.version}_llc.fits"
+    )
+
+
+def hlsp_path(out_root: Path, target: HLSPTarget) -> Path:
+    """Mirror the QLP HLSP path convention (4-deep TIC-prefix directories)."""
+    s = f"{target.tic:016d}"
+    return (
+        Path(out_root) / s[0:4] / s[4:8] / s[8:12] / s[12:16]
+        / hlsp_filename(target)
+    )
+
+
+def write_twirl_hlsp(
+    out_path: Path,
+    target: HLSPTarget,
+    *,
+    time_btjd: np.ndarray,
+    cadenceno: np.ndarray,
+    sap_flux: np.ndarray,        # raw (pre-detrend) median-normalized flux
+    det_flux: np.ndarray,        # detrended median-normalized flux
+    det_flux_err: np.ndarray,    # MAD-broadcast per-cadence sigma
+    quality: np.ndarray,
+    orbitid: np.ndarray,
+    sap_x: np.ndarray,
+    sap_y: np.ndarray,
+    sap_bkg: np.ndarray,
+    sap_bkg_err: np.ndarray,
+    det_flux_sml: np.ndarray,    # detrended small-aperture flux
+    det_flux_lag: np.ndarray,    # detrended large-aperture flux
+    sys_rm_flux: np.ndarray | None = None,   # optional systematics-removed
+) -> Path:
+    """Write a single TWIRL HLSP FITS file in QLP-compatible schema.
+
+    Negative values in any FLUX column are preserved as real numbers.
+    """
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    n = len(time_btjd)
+    if sys_rm_flux is None:
+        sys_rm_flux = np.full(n, np.nan, dtype=np.float32)
+
+    cols = [
+        fits.Column(name="TIME", format="D", unit="BJD-2457000, days", array=time_btjd),
+        fits.Column(name="CADENCENO", format="J", array=cadenceno.astype(np.int32)),
+        fits.Column(name="SAP_FLUX", format="E", array=sap_flux.astype(np.float32)),
+        fits.Column(name="DET_FLUX", format="E", array=det_flux.astype(np.float32)),
+        fits.Column(name="DET_FLUX_ERR", format="E", array=det_flux_err.astype(np.float32)),
+        fits.Column(name="QUALITY", format="J", array=quality.astype(np.int32)),
+        fits.Column(name="ORBITID", format="J", array=orbitid.astype(np.int32)),
+        fits.Column(name="SAP_X", format="E", unit="pixel", array=sap_x.astype(np.float32)),
+        fits.Column(name="SAP_Y", format="E", unit="pixel", array=sap_y.astype(np.float32)),
+        fits.Column(name="SAP_BKG", format="E", array=sap_bkg.astype(np.float32)),
+        fits.Column(name="SAP_BKG_ERR", format="E", array=sap_bkg_err.astype(np.float32)),
+        fits.Column(name="DET_FLUX_SML", format="E", array=det_flux_sml.astype(np.float32)),
+        fits.Column(name="DET_FLUX_LAG", format="E", array=det_flux_lag.astype(np.float32)),
+        fits.Column(name="SYS_RM_FLUX", format="E", array=sys_rm_flux.astype(np.float32)),
+    ]
+    lc_hdu = fits.BinTableHDU.from_columns(cols, name="LIGHTCURVE")
+
+    primary = fits.PrimaryHDU()
+    h = primary.header
+    h["TICID"]   = (int(target.tic), "TIC identifier")
+    h["TESSMAG"] = (float(target.tmag), "TESS magnitude")
+    h["SECTOR"]  = (int(target.sector), "TESS sector")
+    h["CAMERA"]  = (int(target.cam), "TESS camera")
+    h["CCD"]     = (int(target.ccd), "TESS CCD")
+    h["RA"]      = (float(target.ra), "Right ascension (deg)")
+    h["DEC"]     = (float(target.dec), "Declination (deg)")
+    h["ORIGIN"]  = ("TWIRL", "Producer pipeline")
+    h["PIPELINE"] = ("twirl-flux-detrend", "TWIRL flux-space cotrend")
+    h["VERSION"] = (str(target.version), "HLSP version tag")
+    h["BJDREFI"] = (2457000, "Integer BJD epoch reference")
+
+    fits.HDUList([primary, lc_hdu]).writeto(out_path, overwrite=True)
+    return out_path
