@@ -138,17 +138,28 @@ def main() -> int:
     print(f"  combined (AND):                                  "
           f"{n_out:>6,} / {n_total:,}  ({100 * n_out / n_total:.1f}%)")
 
-    # Planet-regime split: WD planets stay below the BLS duration ceiling
-    # (transit duration <= 20 min for any super-Jupiter at P < few d).
-    # Grid-ceiling-pegged candidates are likely PCEBs / WD+M-dwarf binaries
-    # (cf. progress log 2026-05-07: BLS duration grid truncates these at 21 min).
-    planet = survivors[~survivors["dur_grid_ceiling_hit"]].copy().reset_index(drop=True)
-    planet["planet_rank"] = np.arange(1, len(planet) + 1)
-    pceb = survivors[survivors["dur_grid_ceiling_hit"]].copy().reset_index(drop=True)
-    pceb["pceb_rank"] = np.arange(1, len(pceb) + 1)
-    print(f"\n[vet] planet-regime / PCEB-class split:\n"
-          f"  planet candidates (dur < grid ceiling): {len(planet):>6,}\n"
-          f"  PCEB candidates (dur >= grid ceiling):  {len(pceb):>6,}")
+    # Class-based labeling — vet_class column now produced by
+    # add_vetting_features. Non-rejecting: every survivor keeps a label;
+    # consumers filter by class. Classes:
+    #   planet_candidate        — passes Roche AND below grid ceiling
+    #   sub_roche_pceb_suspect  — sub-Roche period (P < 0.216 d at iron density);
+    #                             likely WD+M-dwarf / WD+WD binary / pulsator
+    #   pceb_grid_ceiling       — dur pegged at BLS ceiling; long-duration PCEB
+    #   alias_artifact          — period in BLS alias band or known cluster
+    #   duration_violator       — observed dur exceeds chord envelope
+    class_counts = survivors["vet_class"].value_counts()
+    print(f"\n[vet] vet_class distribution:")
+    for cls in ["planet_candidate", "sub_roche_pceb_suspect",
+                "pceb_grid_ceiling", "alias_artifact", "duration_violator"]:
+        n_c = int(class_counts.get(cls, 0))
+        print(f"  {cls:<28} {n_c:>6,}")
+
+    # Per-class ranking (by sde_max, descending) for downstream "top-N within class" reporting.
+    survivors["class_rank"] = (
+        survivors.groupby("vet_class")["sde_max"]
+        .rank(method="dense", ascending=False)
+        .astype(int)
+    )
 
     wd_blind = vetted[vetted["tic"] == WD_1856_TIC]
     if not wd_blind.empty:
@@ -165,41 +176,37 @@ def main() -> int:
         print(f"  p_alias_pass     : {bool(r['p_alias_pass'])}")
         print(f"  period_cluster   : {int(r['period_cluster_count'])} TICs in same period band")
 
-    wd_planet = planet[planet["tic"] == WD_1856_TIC]
-    wd_pceb = pceb[pceb["tic"] == WD_1856_TIC]
     wd_vetted = survivors[survivors["tic"] == WD_1856_TIC]
     print(f"\n[wd1856] AFTER vetting:")
     if not wd_vetted.empty:
         r = wd_vetted.iloc[0]
         print(f"  vetted_rank (all survivors): {int(r['vetted_rank']):>5,} / {len(survivors):,}")
-    if not wd_planet.empty:
-        r = wd_planet.iloc[0]
-        print(f"  planet_rank (planet regime): {int(r['planet_rank']):>5,} / {len(planet):,}")
-    elif not wd_pceb.empty:
-        r = wd_pceb.iloc[0]
-        print(f"  pceb_rank (PCEB-class):      {int(r['pceb_rank']):>5,} / {len(pceb):,}  (grid-ceiling)")
+        print(f"  vet_class                  : {r['vet_class']}")
+        print(f"  class_rank                 : {int(r['class_rank'])}")
+        print(f"  roche_pass                 : {bool(r['roche_pass'])} (P_Roche={r['roche_period_d']:.3f} d)")
     elif not wd_blind.empty:
         print("  REJECTED by hard vetter cut")
         return 1
 
-    print(f"\n[vet] top 20 planet-regime candidates (post all cuts, no grid ceiling):")
+    planet = survivors[survivors["vet_class"] == "planet_candidate"]
+    print(f"\n[vet] top 20 planet_candidate class (sorted by SDE):")
     for _, r in planet.head(20).iterrows():
         flag = " *WD1856*" if int(r["tic"]) == WD_1856_TIC else ""
         print(
-            f"  p#{int(r['planet_rank']):>3} (blind #{int(r['blind_rank']):>5}) "
+            f"  c#{int(r['class_rank']):>3} (blind #{int(r['blind_rank']):>5}) "
             f"TIC {int(r['tic']):>11}  T={r['tmag']:5.2f}  "
             f"P={r['period_d']:8.4f}d  dur={r['duration_min']:5.1f}min  "
             f"SDE={r['sde_max']:7.2f}  env={r['dur_envelope_min']:5.1f}min  "
             f"agree={int(r['n_apertures_agree'])}{flag}"
         )
 
+    # Single classified output; backward-compat aliases for downstream
+    # code that still expects vetted_planet_candidates.parquet.
     survivors.to_parquet(sector_dir / "vetted_per_tic.parquet", compression="zstd")
     planet.to_parquet(sector_dir / "vetted_planet_candidates.parquet", compression="zstd")
-    pceb.to_parquet(sector_dir / "vetted_pceb_candidates.parquet", compression="zstd")
     print(f"\n[vet] wrote:")
-    print(f"  {sector_dir / 'vetted_per_tic.parquet'}        ({len(survivors):,} rows)")
-    print(f"  {sector_dir / 'vetted_planet_candidates.parquet'}  ({len(planet):,} rows)")
-    print(f"  {sector_dir / 'vetted_pceb_candidates.parquet'}    ({len(pceb):,} rows)")
+    print(f"  {sector_dir / 'vetted_per_tic.parquet'}         ({len(survivors):,} rows, all classes)")
+    print(f"  {sector_dir / 'vetted_planet_candidates.parquet'}   ({len(planet):,} planet_candidate rows — alias for downstream)")
     return 0
 
 

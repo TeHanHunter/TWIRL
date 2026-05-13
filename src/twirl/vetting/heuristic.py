@@ -51,6 +51,30 @@ DEFAULT_CADENCE_BUFFER_MIN = 3.34  # 200 s ingress+egress smear at TESS FFI cade
 # safety net.
 DEFAULT_P_ALIAS_MIN_D = 0.10
 
+# Roche-limit period below which no body of plausible planet density can
+# survive tidal disruption around any WD. Independent of WD mass; pure
+# function of the companion's density. P_Roche(rho_p) = 12.6 hr *
+# sqrt(rho_Jup / rho_p). Defaults below pick pure iron (7.87 g/cc) as the
+# absolute floor for "could be a planet at all":
+#   * iron rocky (7.87 g/cc): P_Roche = 5.18 h = 0.216 d   <- our default
+#   * Earth rocky (5.50 g/cc): P_Roche = 6.20 h = 0.258 d
+#   * Jupiter (1.33 g/cc):    P_Roche = 12.6 h = 0.525 d
+# Candidates below this are not "rejected" — they are reclassified as
+# sub-Roche-suspect (likely WD+M-dwarf compact PCEB, WD+WD binary, or
+# pulsator). The reclassification keeps them in the catalog with a
+# different ``vet_class`` so the PCEB / ultra-compact-binary census is
+# preserved as a survey by-product.
+DEFAULT_RHO_P_MIN_G_CM3 = 7.87
+_RHO_JUP_G_CM3 = 1.33
+
+
+def roche_period_d(rho_p_g_cm3: float = DEFAULT_RHO_P_MIN_G_CM3) -> float:
+    """Fluid Roche-limit orbital period (days) below which a body of
+    density ``rho_p`` tidally disrupts around any WD host. Independent of
+    M_WD because the WD mass cancels between the orbital separation and
+    the Roche distance for fluid bodies."""
+    return (12.6 / 24.0) * np.sqrt(_RHO_JUP_G_CM3 / float(rho_p_g_cm3))
+
 
 def duration_envelope_min(
     period_d,
@@ -82,11 +106,13 @@ def add_vetting_features(
     df: pd.DataFrame,
     grid_max_duration_min: float = 20.0,
     p_alias_min_d: float = DEFAULT_P_ALIAS_MIN_D,
+    rho_p_min_g_cm3: float = DEFAULT_RHO_P_MIN_G_CM3,
     **envelope_kwargs,
 ) -> pd.DataFrame:
-    """Append heuristic-vetter features to a BLS consolidated table.
+    """Append heuristic-vetter features + a ``vet_class`` label to a BLS
+    consolidated table.
 
-    Adds columns:
+    Features added (booleans except where noted):
       * ``dur_envelope_min`` — upper duration cap at the row's fitted period
       * ``dur_envelope_pass`` — ``duration_min <= dur_envelope_min``;
         auto-True when the envelope itself exceeds the BLS duration grid
@@ -95,8 +121,28 @@ def add_vetting_features(
         so the true best-fit duration may be larger and the candidate is a
         PCEB / long-duration-EB suspect
       * ``p_alias_pass`` — period above the BLS p_min aliasing band
+      * ``period_cluster_count`` (int) — how many TICs share this period
+        band (instrumental-alias diagnostic)
+      * ``roche_pass`` — period above the fluid Roche limit for the chosen
+        minimum companion density (default 7.87 g/cc = pure iron, the
+        absolute floor for "could be a planet at all")
+      * ``roche_period_d`` — the Roche threshold itself (constant across rows)
 
-    Does not drop any rows. The driver decides which features become cuts.
+    Derived label (string):
+      * ``vet_class`` — one of
+          ``planet_candidate``       passes alias, cluster, duration envelope,
+                                     Roche, AND below grid ceiling
+          ``sub_roche_pceb_suspect`` like above but sub-Roche period
+                                     (likely PCEB / WD+WD / pulsator —
+                                     a real signal, just not a planet)
+          ``pceb_grid_ceiling``      grid-ceiling duration (likely a
+                                     long-duration WD+M-dwarf binary)
+          ``alias_artifact``         period below alias-min or in a cluster
+          ``duration_violator``      observed duration exceeds chord envelope
+                                     (BD / stellar regime)
+        ``vet_class`` is **non-rejecting** — every row in the input keeps
+        a label and stays in the output. Downstream consumers filter by
+        class.
     """
     out = df.copy()
     envelope = duration_envelope_min(out["period_d"].values, **envelope_kwargs)
@@ -124,4 +170,20 @@ def add_vetting_features(
     counts = pd.Series(bin_idx).value_counts()
     out["period_cluster_count"] = bin_idx
     out["period_cluster_count"] = out["period_cluster_count"].map(counts).astype(int)
+
+    # Roche-period cut (default iron density = absolute floor)
+    p_roche = roche_period_d(rho_p_min_g_cm3)
+    out["roche_period_d"] = p_roche
+    out["roche_pass"] = out["period_d"].values >= p_roche
+
+    # Derived vet_class label (one per row, non-rejecting)
+    # Note: order matters — earliest matching class wins.
+    cluster_pass = out["period_cluster_count"].values <= 50
+    n = len(out)
+    vc = np.array(["planet_candidate"] * n, dtype=object)
+    vc[~out["p_alias_pass"].values | ~cluster_pass] = "alias_artifact"
+    vc[~out["dur_envelope_pass"].values] = "duration_violator"
+    vc[(vc == "planet_candidate") & out["dur_grid_ceiling_hit"].values] = "pceb_grid_ceiling"
+    vc[(vc == "planet_candidate") & ~out["roche_pass"].values] = "sub_roche_pceb_suspect"
+    out["vet_class"] = vc
     return out
