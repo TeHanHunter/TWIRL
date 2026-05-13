@@ -169,6 +169,58 @@ The biggest likely referee objections are:
 - IR excess / dusty disk cross-match design (AllWISE W4)
 - Metal-polluted WD cross-match design (SDSS/LAMOST/DESI)
 
+### TODO: robust per-pixel pixel-map vetting tool
+
+The TGLC `mitpdo` branch already builds a per-pixel residual LC cube as a
+side product of `tglc.effective_psf.fit_lc` (lines ~199-202): the
+`aperture` array is shape `(n_cadences, n_pixels_y, n_pixels_x)` where
+each pixel is the post-ePSF-subtraction residual. That IS the prebuilt
+pixel map — what's missing is a vetting wrapper that consumes it for
+on-target / off-target classification.
+
+The TWIRL-canonical on-target test today (2026-05-13) is the **flux-weighted
+centroid shift** at the aperture level
+([src/twirl/vetting/centroid_offset.py](../src/twirl/vetting/centroid_offset.py)),
+which is a single (Δx, Δy) per target. Cheap (~1 ms per TIC), runs on
+the existing HLSP `SAP_X`/`SAP_Y` columns, no dependency on SPOC TPFs,
+covers 100% of survey targets at FFI cadence — good Tier-1 filter.
+
+But it's a scalar test, so it misses information available in the full
+pixel cube. A robust Tier-2 / paper-grade pixel-map vetting tool should:
+
+1. Use `effective_psf.fit_lc`'s `aperture` cube (or compute it directly
+   from the cutouts at `/pdo/users/tehan/tglc-gpu-production/orbit-*/
+   ffi/cam*/ccd*/source/source_*.pkl`).
+2. For each pixel in the cube, phase-fold its LC at the candidate
+   `(P, T0, dur)` and measure the dip amplitude (e.g. fit a box of
+   the BLS duration centered on T0 in phase).
+3. Build a 2D dip-amplitude map and a 2D significance map (per-pixel
+   MAD-based sigma).
+4. Compare the **peak of the dip map** to the target's known pixel
+   location:
+     * On-target: peak aligned with target PSF (within ~0.5 pix), dip
+       falls off radially matching the PSF model
+     * Off-target / bg-EB: peak displaced from target by > 1 pix
+     * Pulsator: dip pattern matches the full PSF rather than a
+       single-pixel transit (the variability is intrinsic, so it scales
+       with the target's flux distribution rather than appearing as a
+       spatially localized signal on top of the PSF)
+5. Fit the dip-amplitude map to a 2D PSF model centered on the target
+   versus centered on each plausible neighbor (from the Gaia / TIC
+   crossmatch already in `source.gaia`); report `pixel_offset_arcsec`
+   and which star best matches the dip pattern.
+
+The aperture-depth ladder is NOT a substitute (retracted 2026-05-13;
+see progress log §2.4). LEO's pixel `offset` test is the proper
+analogue but requires SPOC TPFs that most faint WDs lack.
+
+Time / scope estimate: ~1-2 days to build cleanly + ~few hours to run
+on the v2 heuristic-vetter survivors (per-cutout amortizes nicely;
+~600 TICs share one cutout in a CCD).
+
+Trigger: do this before the first publication-ready candidate list,
+not before the talk on `2026-06-02`.
+
 ---
 
 ## Maintenance Rule
