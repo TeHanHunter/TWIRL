@@ -43,7 +43,7 @@ The fix is structural, in three coordinated parts:
      magnitude-only schema converts mag -> flux for the bright regime
      where the loss is invisible.
 
-3. **Driver** (`scripts/stage1_lcs/build_twirl_hlsp.py`):
+3. **Driver** (`scripts/stage1_lightcurves/build_twirl_hlsp.py`):
    Per TIC, merge orbits in the sector, run flux_detrend on each
    aperture, write a TWIRL HLSP FITS. Replaces the `qlp lctools
    detrend -> qlp lctools hlsp` step of the existing pipeline.

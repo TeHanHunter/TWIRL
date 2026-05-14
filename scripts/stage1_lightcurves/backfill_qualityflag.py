@@ -10,7 +10,7 @@ QualityFlag of shape (len(BJD),) into any h5 missing it. Existing datasets
 are left alone (idempotent).
 
 Usage (on PDO):
-    python scripts/stage1_lcs/backfill_qualityflag.py \\
+    python scripts/stage1_lightcurves/backfill_qualityflag.py \\
         /pdo/qlp-data/orbit-119/ffi/cam*/ccd*/LC \\
         /pdo/qlp-data/orbit-120/ffi/cam*/ccd*/LC \\
         --nprocs 16

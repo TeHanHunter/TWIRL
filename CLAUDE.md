@@ -8,11 +8,10 @@ TWIRL (TESS White dwarf Investigation of Remnant pLanets) searches for transitin
 
 Before any task, consult `doc/`:
 
-- `twirl_plan.md` — forward plan; `## Current Status Snapshot` and the active sprint section show where things stand
+- `twirl_plan.md` — forward plan; `## Current Status Snapshot`, the active sprint section, and `## External Data Policy` for local data paths
 - `twirl_progress_log.md` — dated history; active subsections end with `**Next:**`
 - `ideas.md` — open questions / referee risks; starts with `## Critical Before Next Stage`
 - `mit_tglc_usage_guide.md` — PDO operational details (envs, per-orbit pipeline, recovery audits, Sector < 67 flag handling)
-- `local_data.md` — local data paths (not in git)
 
 No formal test suite. Validation is manual via script outputs and checkpoint files.
 
@@ -37,7 +36,16 @@ No formal test suite. Validation is manual via script outputs and checkpoint fil
 - Plan first, then edit. Prefer minimal, local changes; don't refactor files unrelated to the task.
 - Production code goes in `src/twirl/` and `scripts/`, not notebooks.
 - `astropy.table.Table` for structured catalog data; FITS for catalogs, HDF5 for light curves, JSON for metadata.
-- Plotting: use `src/twirl/plotting/style.py` templates (`column` 3.4×2.65 in, `full_page` 7.1×4.1 in); no figure titles by default.
+- Plotting (style authority is [`src/twirl/plotting/style.py`](src/twirl/plotting/style.py); update the code first, then any docs that reference it):
+  - Use `apply_twirl_style(template)` to pick up the templates (`column` 3.4×2.65 in, `full_page` 7.1×4.1 in). Don't hardcode Seaborn `rc` blocks per-script.
+  - Use `get_ordered_palette(n)` for color sets; default is `viridis` ordered.
+  - Default look: serif (`DejaVu Serif`), `whitegrid` theme, `paper` context, white background, light grey grid, dark grey axes, publication-oriented (not slide-oriented).
+  - No figure or panel titles by default; only add them when the comparison would otherwise be ambiguous.
+  - Vertically stacked comparison figures: per-panel axis labels (not one shared), tight inter-panel spacing, compact shared colorbars close to the panels.
+  - Integer-valued color quantities use a stepped colorbar, not a continuous ramp.
+  - Aitoff guide overlays: black dotted longitude guides, black dashed Galactic-plane line, longitude labels with a thin white bezel.
+  - Legend border is black; place legends outside the data area when possible.
+  - Save publication figures as both PDF and PNG. Rasterize only dense scatter layers, not the whole figure.
 - Update `doc/twirl_progress_log.md` after completing a milestone.
 
 ## PDO Rules (any `pdo*` host)
@@ -62,3 +70,4 @@ When the user says **"wrap for the day"**:
 - Merging content from `TWIRL_proposal`
 - Committing to a follow-up instrument
 - Changing repo scope
+- **Changing collaboration scope or paper-leadership commitments.** TWIRL is now a Schwamb-group collaboration (`2026-05-13`); ownership division and paper leadership are tracked in `doc/twirl_plan.md` §Collaboration & Ownership. Don't unilaterally promise contributions to or away from this division.

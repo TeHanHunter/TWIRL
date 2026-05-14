@@ -18,7 +18,7 @@ export PYTHONPATH="${FORK}:${PYTHONPATH:-}"
 
 echo "[finish-o120] $(date): Starting pipeline for cam3_ccd2 + cam4_ccd4"
 
-${PYTHON} ${REPO}/scripts/stage1_lcs/run_tglc_orbit_pipeline.py \
+${PYTHON} ${REPO}/scripts/stage1_lightcurves/run_tglc_orbit_pipeline.py \
     --orbit 120 --sector 56 --orbit-tag o2 \
     --ccd 3,2 --ccd 4,4 \
     --max-parallel-ccd-jobs 2 \

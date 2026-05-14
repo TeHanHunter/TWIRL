@@ -30,7 +30,7 @@ DEFAULT_CATALOG = Path(
 DEFAULT_OBSERVATIONS = Path(
     "data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits"
 )
-DEFAULT_OUTDIR = Path("reports/stage1_lcs")
+DEFAULT_OUTDIR = Path("reports/stage1_lightcurves")
 DEFAULT_OUTPUT_STEM = "wd_tess_observation_sky_coverage"
 
 
@@ -95,7 +95,7 @@ def parse_args() -> argparse.Namespace:
         "--template",
         choices=("column", "full_page"),
         default="full_page",
-        help="Named TWIRL plotting template from doc/plotting_style.md.",
+        help="Named TWIRL plotting template from `src/twirl/plotting/style.py`.",
     )
     parser.add_argument(
         "--highconf-only",

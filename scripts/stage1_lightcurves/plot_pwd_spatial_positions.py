@@ -23,7 +23,7 @@ from twirl.plotting.style import apply_twirl_style, get_ordered_palette
 
 
 DEFAULT_CATALOG = Path("data_local/catalogs/GaiaEDR3_WD_main.fits")
-DEFAULT_OUTDIR = Path("reports/stage1_lcs")
+DEFAULT_OUTDIR = Path("reports/stage1_lightcurves")
 
 PWD_BIN_LABELS = [
     "0.00-0.25",
@@ -81,7 +81,7 @@ def parse_args() -> argparse.Namespace:
         "--template",
         choices=("column", "full_page"),
         default="full_page",
-        help="Named TWIRL plotting template from doc/plotting_style.md.",
+        help="Named TWIRL plotting template from `src/twirl/plotting/style.py`.",
     )
     parser.add_argument(
         "--plot-all-points",

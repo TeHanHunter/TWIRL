@@ -10,15 +10,16 @@ This document is the executable software and survey plan for TWIRL.
 - The seed WD catalog is a local external dependency, not a git-tracked repo asset.
 - Light curves will be gathered for all WDs in the full parent catalog. The statistical occurrence-rate sample (the locked denominator) will be defined separately after light-curve collection and QA are complete.
 - The search is interpretable-first: build a transparent periodic + dip baseline before considering ML triage.
-- Stage 1 Sector 56 benchmark (orbits 119 + 120, all 16 CCDs): TGLC lightcurves, detrend, and HLSP FITS production are complete. The cam3/orbit-120 cadence-mismatch blocker has been resolved by `scripts/stage1_lcs/fix_tglc_quat_cadence_mismatch.py` (drops the TGLC-only orbit-boundary cadence from every equal-length dataset in each h5; the quat file is left untouched as the authoritative pointing record). After re-running detrend + HLSP at the sector level, **`19,072 / 19,086 = 99.93%`** HLSP FITS are written to `/pdo/users/tehan/tglc-deep-catalogs/hlsp_s0056/` and validation passes with `0/19086 files had issues`. `14` targets remain unrecovered (root cause TBD; pull from `[hlsp skip]` lines in the r2 run log). Next session: Stage 1.6 WD 1856 photometric QA — read `267574918` HLSP FITS, plot stitched LC across orbits 119/120, and record per-aperture RMS/MAD for the `1×1`/`3×3`/`5×5` apertures.
+- Stage 1 Sector 56 benchmark (orbits 119 + 120, all 16 CCDs): TGLC lightcurves, detrend, and HLSP FITS production are complete. The cam3/orbit-120 cadence-mismatch blocker has been resolved by `scripts/stage1_lightcurves/fix_tglc_quat_cadence_mismatch.py` (drops the TGLC-only orbit-boundary cadence from every equal-length dataset in each h5; the quat file is left untouched as the authoritative pointing record). After re-running detrend + HLSP at the sector level, **`19,072 / 19,086 = 99.93%`** HLSP FITS are written to `/pdo/users/tehan/tglc-deep-catalogs/hlsp_s0056/` and validation passes with `0/19086 files had issues`. `14` targets remain unrecovered (root cause TBD; pull from `[hlsp skip]` lines in the r2 run log). Next session: Stage 1.6 WD 1856 photometric QA — read `267574918` HLSP FITS, plot stitched LC across orbits 119/120, and record per-aperture RMS/MAD for the `1×1`/`3×3`/`5×5` apertures.
 - `2026-04-27`: tglc-mki GPU ePSF path is unblocked. Built `/pdo/users/tehan/twirl-gpu-venv` (`--system-site-packages` + `cupy-cuda11x`) and benchmarked `tglc epsfs` on `pdogpu6`: S56 cam4/ccd1 finished `196/196` in **`30:42`** vs the `4:01:31` CPU baseline → **`~7.9× speedup`** with outputs bit-equivalent to CPU at machine precision. Future Stage 1 ePSF runs should default to this venv on `pdogpu6` (8 GPUs); see progress log §1.4 (`2026-04-27`).
-- `2026-04-30`: **S56 GPU production complete and validated.** New tree at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056/`: `19,068 / 19,086 = 99.91%` HLSP FITS, validation `4 / 19086` issues. WD 1856 parity vs the frozen `tglc-deep-catalogs/hlsp_s0056/` baseline within `~2%` per aperture (medium aperture MAD-RMS `0.1111` vs `0.1087`). The new tree is the science tree of record going forward; the deep-catalogs benchmark stays frozen for reference. Mass-production scale-out to S57+ uses [run_sector_gpu_production.sh](../scripts/stage1_lcs/run_sector_gpu_production.sh) + [run_s56_post_lc_chain.sh](../scripts/stage1_lcs/run_s56_post_lc_chain.sh) (parameterize per sector). See progress log §1.4 entries for `2026-04-30`.
-- `2026-05-01`: Switched S58+ to a two-node pipelined architecture: pdogpu1 prepares catalogs+cutouts (no GPU), pdogpu6 finalizes ePSFs+lightcurves+post-LC chain one sector at a time (sequential for QC). Driver gained `--stages CSV` flag; new prep/finalize scripts and worker loops at `scripts/stage1_lcs/`. Projected 39-sector campaign (S58–S96) wall time **`~12 days`** (vs `~32 d` single-node). S57 left undisturbed on pdogpu6 with the older monolithic launcher; new pipeline kicks in at S58.
-- `2026-05-06`: **Mass production in flight.** S56–S60 DONE (`5/41` sectors finalized via the new pipeline; HLSP totals: S56 `19,068`, S57 `16,337`, S58 `14,656`, S59 `13,467`, S60 `16,143`). S61 finalizing (currently ~88% of step A; galactic-plane sectors S58–S64 run `~10–12 hr` per finalize wall instead of the `~5–6 hr` budget on sparser fields). pdogpu1 prep stays ahead of pdogpu6 finalize: S62 fully prepped, S63/S64 in flight. Live status at `/pdo/users/tehan/tglc-gpu-production/STATUS.md` rendered every `10 min` by [sector_status.py](../scripts/stage1_lcs/sector_status.py) in tmux `twirl-status`. Realistic completion ETA for S61–S94 backlog: **~16 days, finishing ~2026-05-22**.
-- `2026-05-06`: Per-sector HLSP QC PDF system shipped. [qc_sector_pdf.py](../scripts/stage1_lcs/qc_sector_pdf.py) emits a 7-page PDF per sector (Tmag distribution, galactic-Aitoff sky-coverage map, photometric-precision panel using DMAD recipe overlaid with σ_base from Sullivan+2015, example LCs in 5 Tmag bins with QUALITY-flag + 5σ-clip annotations). Wired into [finalize_sector_gpu.sh](../scripts/stage1_lcs/finalize_sector_gpu.sh) as step H so the PDF + companion `.npz` are auto-generated after every HLSP run. Local sync via [sync_qc_pdfs.sh](../scripts/sync_qc_pdfs.sh) (rsync wrapper, PDF-only by default).
+- `2026-04-30`: **S56 GPU production complete and validated.** New tree at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056/`: `19,068 / 19,086 = 99.91%` HLSP FITS, validation `4 / 19086` issues. WD 1856 parity vs the frozen `tglc-deep-catalogs/hlsp_s0056/` baseline within `~2%` per aperture (medium aperture MAD-RMS `0.1111` vs `0.1087`). The new tree is the science tree of record going forward; the deep-catalogs benchmark stays frozen for reference. Mass-production scale-out to S57+ uses [run_sector_gpu_production.sh](../scripts/stage1_lightcurves/run_sector_gpu_production.sh) + [run_s56_post_lc_chain.sh](../scripts/stage1_lightcurves/run_s56_post_lc_chain.sh) (parameterize per sector). See progress log §1.4 entries for `2026-04-30`.
+- `2026-05-01`: Switched S58+ to a two-node pipelined architecture: pdogpu1 prepares catalogs+cutouts (no GPU), pdogpu6 finalizes ePSFs+lightcurves+post-LC chain one sector at a time (sequential for QC). Driver gained `--stages CSV` flag; new prep/finalize scripts and worker loops at `scripts/stage1_lightcurves/`. Projected 39-sector campaign (S58–S96) wall time **`~12 days`** (vs `~32 d` single-node). S57 left undisturbed on pdogpu6 with the older monolithic launcher; new pipeline kicks in at S58.
+- `2026-05-06`: **Mass production in flight.** S56–S60 DONE (`5/41` sectors finalized via the new pipeline; HLSP totals: S56 `19,068`, S57 `16,337`, S58 `14,656`, S59 `13,467`, S60 `16,143`). S61 finalizing (currently ~88% of step A; galactic-plane sectors S58–S64 run `~10–12 hr` per finalize wall instead of the `~5–6 hr` budget on sparser fields). pdogpu1 prep stays ahead of pdogpu6 finalize: S62 fully prepped, S63/S64 in flight. Live status at `/pdo/users/tehan/tglc-gpu-production/STATUS.md` rendered every `10 min` by [sector_status.py](../scripts/stage1_lightcurves/sector_status.py) in tmux `twirl-status`. Realistic completion ETA for S61–S94 backlog: **~16 days, finishing ~2026-05-22**.
+- `2026-05-06`: Per-sector HLSP QC PDF system shipped. [qc_sector_pdf.py](../scripts/stage1_lightcurves/qc_sector_pdf.py) emits a 7-page PDF per sector (Tmag distribution, galactic-Aitoff sky-coverage map, photometric-precision panel using DMAD recipe overlaid with σ_base from Sullivan+2015, example LCs in 5 Tmag bins with QUALITY-flag + 5σ-clip annotations). Wired into [finalize_sector_gpu.sh](../scripts/stage1_lightcurves/finalize_sector_gpu.sh) as step H so the PDF + companion `.npz` are auto-generated after every HLSP run. Local sync via [sync_qc_pdfs.sh](../scripts/sync_qc_pdfs.sh) (rsync wrapper, PDF-only by default).
 - `2026-05-06`: **Pipeline unit-conversion audit complete.** TICA `e-/cadence` → TGLC `e-/s` conversion at `aperture_photometry.py:120` is correct; TESS magnitude zeropoint at `15,000 e-/s @ T=10` matches the TESS Instrument Handbook. Gaia → TESS magnitude polynomial in `ffi.py:202–215` matches Stassun+2019 ApJS 243 Eq. 1; the ePSF design matrix uses dimensionless `tess_flux_ratio` so absolute units cancel in the fit. **Caveat**: HLSP `SAP_FLUX`/`DET_FLUX` are median-normalized relative flux (not e-/s) because QLP `lctools/bin/hlsp.py:258 flux_from_mag` subtracts the median magnitude; `SAP_BKG` is `e-/cadence/pixel`; FITS columns 3/4/10 carry no `TUNIT`. Recovery factor for true e-/s: `15000 * 10**(-0.4*(TESSMAG-10))`. Decision on whether to fork `flux_from_mag` or post-process HLSPs deferred.
 - `2026-05-12`–`2026-05-13`: **Pre-talk sprint Week-1 done end-to-end on the existing QLP HLSPs.** Heuristic vetter ([src/twirl/vetting/heuristic.py](../src/twirl/vetting/heuristic.py)) moves WD 1856 from blind rank `1258 / 19,040` to planet-regime rank **`9 / 5,403`** (140× improvement) using three physics-motivated cuts on existing BLS columns — duration upper-envelope at `R_comp_max = 2 R_jup` (chord-sum, M_WD generous at `0.4 M☉`), period-alias rejection at `P > 0.10 d`, and period-cluster pile-up detection. LEO-Vetter integration via [TeHanHunter/LEO-Vetter@wd-host-tuning](https://github.com/TeHanHunter/LEO-Vetter/tree/wd-host-tuning) (new TWIRL fork) — adds WD-host preset + 4 override functions (`vshaped_wd` disabled, `unphysical_duration_wd` chord-sum, `invalid_transits_wd` drops post-pruning MES requirement at 200 s cadence, `non_unique_wd` drops MS3 sig_pos clause); WD 1856 labels as **PC**. Outputs in [benchmark/leo_vetter_s56_top50/](../benchmark/leo_vetter_s56_top50/) with one PDF per TIC named `<CLASS>_rank<NN>_tic<TIC>_T<MAG>_P<P>d.pdf` for fast triage. BLS v2 config ([src/twirl/search/bls.py:BLSConfig](../src/twirl/search/bls.py)) with `p_min=0.12 d`, denser duration grid `[3,4,5,6,8,10,13,16,20,30]`, `n_peaks=10` was re-run on S56 in `5.87 hr` wall on `pdogpu1`; WD 1856 blind rank improved `1258 → 560` but the heuristic vetter already does the work BLS v2 also does, so the post-vetting rank is essentially unchanged.
-- `2026-05-13`: **Plan A — flux-space cotrending — scaffolded and TGLC-side patched.** Root cause of the faint-end cadence loss pinned to [TGLC fork twirl/preserve-negative-flux](https://github.com/TeHanHunter/TESS_Gaia_Light_Curve/tree/twirl/preserve-negative-flux) commit `8235695`: `aperture_photometry.py:114` `flux[flux <= 0] = np.nan` clipped real Poisson + background-subtraction excursions on faint (T≥19) targets before the magnitude conversion, dropping ~50% of `QUALITY=0` cadences for T=19.5+ HLSPs. Patch preserves linear flux through the magnitude conversion and adds `RawFlux`/`RawFluxError` HDF5 datasets per aperture; validated on WD 1856 on `pdogpu1` (magnitude column bit-identical, `RawFlux` keeps 155 previously-NaN'd cadences with values in `[-2922, +22005] e-/s`). Local pipeline modules built and synthetic-tested end-to-end ([src/twirl/lightcurves/{flux_detrend,tglc_h5_reader,hlsp_writer}.py](../src/twirl/lightcurves/), [scripts/stage1_lcs/build_twirl_hlsp.py](../scripts/stage1_lcs/build_twirl_hlsp.py)); writes TWIRL HLSP FITS in QLP-compatible schema (`hlsp_twirl_tess_ffi_*`) so the existing [src/twirl/io/hlsp.py](../src/twirl/io/hlsp.py) reader and all downstream code (BLS, heuristic vetter, LEO adapter) consume them unchanged. **S56 mass relight on pdogpu6 launched at 00:26 EDT and failed within 16 min** with `ModuleNotFoundError: astropy.coordinates.representation.spherical` — pre-existing astropy version mismatch in `/pdo/users/tehan/twirl-gpu-venv`, not the patch (the pdogpu1 single-TIC validation used `/sw/qlp-environment/.venv/bin/python` and worked cleanly). Next-day fix is venv-side; pipeline code unchanged.
+- `2026-05-13`: **Plan A — flux-space cotrending — scaffolded and TGLC-side patched.** Root cause of the faint-end cadence loss pinned to [TGLC fork twirl/preserve-negative-flux](https://github.com/TeHanHunter/TESS_Gaia_Light_Curve/tree/twirl/preserve-negative-flux) commit `8235695`: `aperture_photometry.py:114` `flux[flux <= 0] = np.nan` clipped real Poisson + background-subtraction excursions on faint (T≥19) targets before the magnitude conversion, dropping ~50% of `QUALITY=0` cadences for T=19.5+ HLSPs. Patch preserves linear flux through the magnitude conversion and adds `RawFlux`/`RawFluxError` HDF5 datasets per aperture; validated on WD 1856 on `pdogpu1` (magnitude column bit-identical, `RawFlux` keeps 155 previously-NaN'd cadences with values in `[-2922, +22005] e-/s`). Local pipeline modules built and synthetic-tested end-to-end ([src/twirl/lightcurves/{flux_detrend,tglc_h5_reader,hlsp_writer}.py](../src/twirl/lightcurves/), [scripts/stage1_lightcurves/build_twirl_hlsp.py](../scripts/stage1_lightcurves/build_twirl_hlsp.py)); writes TWIRL HLSP FITS in QLP-compatible schema (`hlsp_twirl_tess_ffi_*`) so the existing [src/twirl/io/hlsp.py](../src/twirl/io/hlsp.py) reader and all downstream code (BLS, heuristic vetter, LEO adapter) consume them unchanged. **S56 v3 TWIRL HLSP production succeeded on `pdogpu1` after a `flux_space_detrend` UnboundLocalError fix** (commit `f0e844c`): `19,068 / 19,072 = 99.98%` ok in `7.5 min` wall; 4 failures are upstream corrupt TGLC HDF5s. WD 1856 sanity vs v2 QLP HLSP: `+155 negative-flux cadences preserved`, `+6.3% usable q=0 cadences`, transit shape preserved. Tree at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl/`. BLS v3 launched on `pdogpu1` (tmux `bls_s56_v3`) immediately after; v3-vs-v2 comparison is the headline result for the talk.
+- `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
 ### Stage 2 note (2026-05-01)
 
@@ -26,7 +27,9 @@ When we open Stage 2 (search), use William Fong's cuvarbase branch + persistent-
 
 ## Three-Week Pre-Talk Vertical Slice (2026-05-12 → 2026-06-02)
 
-Time-boxed end-to-end run through Stages 2→5 on the **S56 footprint only**, gated by **WD 1856 blind recovery**. Purpose: surface Stage-2→5 unknowns now (rather than waiting for undergrads to start filling those stages in), and produce a credible talk for Andrew Vanderburg and Kevin Burdge on ~`2026-06-02`. Stage 1 mass production continues in parallel on its own pdogpu1+pdogpu6 schedule; the sprint does not pull resources from it.
+> **Revised 2026-05-13** to reflect the Schwamb-group collaboration kickoff (see [§Collaboration & Ownership](#collaboration--ownership-2026-05-13) below and progress log [§2.5](twirl_progress_log.md)). Original sprint plan focused on us standing up Stage 2 search + vetting alone; with Michelle's group now bringing a tuned BLS and LEO-Vetter expertise, the sprint reweights toward our actual contribution — light curve quality, the v2-QLP-vs-v3-TWIRL HLSP comparison, and WD 1856 blind recovery as a joint gating milestone.
+
+Time-boxed end-to-end run through Stages 2→5 on the **S56 footprint only**, gated by **WD 1856 blind recovery**. Purpose: surface unknowns now and produce a credible talk for Andrew Vanderburg and Kevin Burdge on ~`2026-06-02`. Stage 1 mass production continues in parallel on its own pdogpu1+pdogpu6 schedule; the sprint does not pull resources from it.
 
 **Why S56 only.** It is the one sector that is fully done, validated, contains the WD 1856 ground truth, and is cadence-aligned. Anything else dilutes the experiment in the time available.
 
@@ -34,46 +37,175 @@ Time-boxed end-to-end run through Stages 2→5 on the **S56 footprint only**, ga
 
 - Multi-sector phase folding — S56 only.
 - Final occurrence-rate posterior — sample too small; any rate quoted is provisional.
-- ML triage — toy heuristic vetter only (cf. Stage 2 vetting decision, `2026-05-07`).
+- ML triage — heuristic vetter + LEO-Vetter only.
 - External follow-up coordination.
 - S57+ search runs — even if S57/S58 production finishes in time, freeze the talk results on S56.
+- **New non-goal (2026-05-13):** standing up our own dip-search and variable-depth detectors. Deferred until post-talk; Michelle's BLS covers the periodic channel and the WD-1145-style dip-class slide can be motivated with the existing literature.
 
-### Week 1 (2026-05-12 → 2026-05-19): Stage 2 detector trio, end-to-end on S56
+### Week 1 (2026-05-12 → 2026-05-19): v3 TWIRL HLSPs as the shared survey input
 
-Add the two missing detector branches alongside the existing BLS pipeline, and run all three on the full S56 WD sample.
+**Done (2026-05-13)**: TGLC negative-flux preservation patch shipped on the [twirl/preserve-negative-flux](https://github.com/TeHanHunter/TESS_Gaia_Light_Curve/tree/twirl/preserve-negative-flux) branch; `flux_space_detrend` UnboundLocalError fix landed (commit `f0e844c`); v3 TWIRL HLSP tree built end-to-end on S56 (`19,068 / 19,072 = 99.98%`); WD 1856 sanity confirms 155 negative-flux cadences preserved and +6.3% usable q=0 cadences with the transit shape intact.
 
-- **Single-dip detector** ([src/twirl/search/dip_search.py](../src/twirl/search/dip_search.py), new): matched filter / 1-transit BLS for non-periodic WD-1856-class events that may show only 1–2 transits in S56. Output: `dip_sde`, `dip_t0`, `dip_duration`.
-- **Variable-depth template** ([src/twirl/search/variable_depth.py](../src/twirl/search/variable_depth.py), new): WD-1145-style detector that allows per-dip depth to vary; designed to fire on aperiodic dust-tail signatures (cf. the design driver added `2026-05-01` and the debris-transits section of `ideas.md`). Output: `vd_score`, `n_dips`, `dip_depth_range`.
-- **Orchestration**: extend `scripts/stage2_search/` with a `run_full_s56.py` driver that runs BLS + dip + variable-depth on every S56 WD light curve and writes a unified `consolidated_s56.parquet` with columns from all three branches.
+**Still to ship by 2026-05-19:**
 
-**Week-1 gate**: the pipeline runs to completion on every S56 WD (`~19,068` HLSP FITS under `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056/`) without per-target failures swallowing the run. The goal is "it runs," not "it's tuned" — tuning is Year-2 work. **Reuse**: [src/twirl/search/bls.py](../src/twirl/search/bls.py), `candidates.py`, `consolidate.py`, `sector_run.py`, `diagnostics.py`; [configs/detection/bls_default.yaml](../configs/detection/bls_default.yaml).
+- **Hand the v3 TWIRL HLSP tree to Michelle's group as the production search input** (`/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl/`). Schema is QLP-compatible (`hlsp_twirl_tess_ffi_*`), so their reader works without changes.
+- **Run our own BLS v3 + heuristic vetter + LEO-Vetter on the v3 tree** as a comparison stack — quantifies what changes vs the v2 QLP run (rank movement for WD 1856, MES recovery for faint hosts, alias-wall behaviour).
+- **Build the headline v2-vs-v3 comparison table for the talk**: WD 1856 + ~5 representative faint and bright hosts, side-by-side rank / MES / cadence-count change.
 
-### Week 2 (2026-05-19 → 2026-05-26): Stage 3 minimum + Stage 4 dry run
+**Week-1 gate**: v3 HLSPs handed off, our own search stack runs end-to-end on v3, comparison table populated.
 
-- **Injection grid**: `~1,000–2,000` WD-1856-like signals (`R_comp ~ 0.5–2 R_jup`, `P = 0.5–10 d`, near-100% transit depths, durations 5–30 min) + `~300–500` WD-1145-like signals (variable depth `5–60%`, quasi-periodic dip clusters, periods `4.5–6 hr`). Hosts drawn from quiet S56 WDs (no flagged variability; RMS `< 1.5×` median for the Tmag bin) so injected-vs-recovered comparisons aren't blended with intrinsic variability.
-- **Recovery pass**: run injections through the Week-1 detector trio. Produce a rough recovery surface `R(depth, period, Tmag)` for the periodic branch and `R(mean_depth, dip_count, Tmag)` for the dip branch. Statistically thin is fine — the point is the *shape* and the *gotchas* surfaced.
-- **Stage 4 dry run**: identical search stack on the uninjected (real) S56 sample → ranked candidate table `candidates_s56.parquet`. No multi-sector merge — S56 only.
+### Week 2 (2026-05-19 → 2026-05-26): Injection-recovery (shared exploration) + LEO-Vetter tuning experiment
 
-**Week-2 gate**: completeness curves have qualitatively sensible shape (rises with depth, falls with Tmag and period), and WD 1856 appears *somewhere* in the blind candidate ranking — not necessarily rank 1. New code: `src/twirl/injections/wd_signals.py`, `src/twirl/injections/recovery.py`, `scripts/stage3_injections/inject_s56.py`.
+Two parallel work streams; we own the LC-side comparison angle, Schwamb group owns search-side variations. Both are exploratory — multiple approaches in parallel rather than one canonical pipeline. This is now the area where the most methodological learning happens.
 
-### Week 3 (2026-05-26 → 2026-06-02): Stage 5 toy vetting + talk anchor
+- **Our angle — LC-side completeness comparison**: same injected signal grid (`~1,000–2,000` WD-1856-like + `~300–500` WD-1145-like; ranges as in the original sprint) recovered through (a) v2 QLP HLSPs and (b) v3 TWIRL HLSPs with the same downstream search + vetter. The recovered-fraction delta isolates the contribution of the negative-flux preservation as a function of Tmag, depth, and period. This is the cleanest possible methods result for the methods paper.
+- **Schwamb-group angle** (parallel): signal-template variations, recovery-statistic alternatives, BLS-vs-other-detector comparisons. Coordination via shared parquet schemas; no need to converge on a single approach.
+- **LEO-Vetter tuning experiment**: our [wd-host-tuning](https://github.com/TeHanHunter/LEO-Vetter/tree/wd-host-tuning) fork vs Michelle-student + Franklin's independent tuning. Compare on the same top-N S56 v3 candidate list. Whichever performs better on WD 1856 + the FP-class breakdown wins the talk slide.
 
-- **Toy heuristic vetter** (`src/twirl/vetting/heuristic.py`, new — building on the `2026-05-07` vetting plan): engineered features `aperture_slope`, `oot_to_dip_ratio`, `predicted_duration_min` (from Gaia parallax → `R_WD` → expected duration at the fitted period), `duration_residual_z`. Append as columns to `candidates_s56.parquet`.
-- **Triage**: push the top `~50–100` candidates through the vetter; produce a ranked vetted table.
-- **WD 1856 blind-recovery confirmation** — the gating milestone for the talk. WD 1856 (TIC `267574918`) must (a) be recovered blind in the S56 search, (b) survive the heuristic vetter, (c) end up in the top tier. If any of (a)–(c) fails, the failure mode itself becomes a slide (why it failed → what the search/vetter needs).
-- **FP-class characterization** for the Burdge slide: classify the surviving top candidates into expected WD-specific FP modes — PCEBs (WD+M dwarf), centroid-shift contaminators, systematics ladder peaks, ZZ Ceti pulsators leaking into the dip branch. Count each class.
-- **Talk slide outline**: motivation → S56 vertical slice → completeness curve → blind WD 1856 recovery → FP classes → roadmap to the full 40-sector campaign.
+**Week-2 gate**: completeness deltas characterized (qualitatively at minimum) for v2 vs v3, and at least one LEO-Vetter tuning passes WD 1856 as PC.
 
-**Week-3 gate**: a self-contained narrative slide deck that holds up under questions from Vanderburg (completeness rigor) and Burdge (FP discrimination, WD-specific eclipsing systems).
+### Week 3 (2026-05-26 → 2026-06-02): WD 1856 joint blind recovery + talk anchor
+
+- **WD 1856 blind-recovery confirmation across the search/vetter combinations** — the gating milestone for the talk. Concretely: WD 1856 (TIC `267574918`) must end up classified as PC by *at least one* (search × vetter) combination on the v3 HLSPs after blind ranking + vetting. The current v2-QLP heuristic-vetter result (rank 9 / 5,403 after vetting) is already proof-of-concept; the v3 run quantifies improvement. If the joint recovery fails, the failure mode becomes the most interesting slide (why → what the search/vetter needs).
+- **FP-class characterization** for the Burdge slide — joint with Franklin + Michelle's student: classify the top vetted candidates into PCEBs (WD + M-dwarf), centroid-shift contaminators, systematics ladder peaks, ZZ Ceti pulsators. Count each class. Multi-tuner agreement on these classes is a stronger statement than any single-tuner result.
+- **Talk slide outline** (revised for the collaboration framing):
+    1. Motivation: WD 1856 + WD 1145, why 200 s FFI matters
+    2. The Schwamb-group + Te Han collaboration model (one slide naming who-does-what — keeps the contributions visually distinct)
+    3. Light curves: TGLC negative-flux preservation result (Te Han methods slide — v2 vs v3, 155 cadences recovered on WD 1856, +6.3% usable cadences, transit preserved)
+    4. Search: BLS rank improvements on v3 (joint with Schwamb-BLS comparison)
+    5. Vetting: LEO-Vetter tuning experiment results (joint, two independent tunings)
+    6. WD 1856 blind recovery (joint headline)
+    7. Injection-recovery preview (multi-approach, work in progress)
+    8. FP classes
+    9. Roadmap: 40-sector campaign, occurrence-rate paper, catalog paper
+
+**Week-3 gate**: a self-contained narrative deck that names the collaborators clearly, attributes contributions explicitly, and holds up under questions from Vanderburg (completeness rigor) and Burdge (FP discrimination, WD-specific eclipsing systems).
 
 ### Sprint deliverables
 
-- `consolidated_s56.parquet` — BLS + dip + variable-depth columns for every S56 WD.
-- Rough completeness grids for the WD-1856-like and WD-1145-like regimes.
-- `candidates_s56.parquet` with appended heuristic-vetter features.
-- Documented blind WD 1856 recovery (or documented failure mode if it doesn't recover).
+- v3 TWIRL HLSP tree at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl/` (**shipped 2026-05-13**).
+- v2-vs-v3 HLSP comparison table on a representative TIC sample, with WD 1856 as the headline.
+- Side-by-side LEO-Vetter tuning comparison: TWIRL fork vs Michelle-student + Franklin's tuning.
+- Rough completeness deltas (v2 vs v3) for the WD-1856-like and WD-1145-like signal regimes.
+- Documented WD 1856 blind recovery across (search × vetter) combinations.
 - FP-class breakdown of top vetted candidates.
-- Talk slide deck.
+- Talk slide deck with explicit collaborator attribution.
+
+## Collaboration & Ownership (2026-05-13)
+
+This section captures the division of labor and the ownership-protection steps agreed at the Schwamb-group kickoff meeting on `2026-05-13`. Treat as live — update at every meeting with Michelle. Companion meeting note in progress log [§2.5](twirl_progress_log.md).
+
+### Who owns what
+
+| Layer | Owner | Notes |
+|---|---|---|
+| **TGLC light-curve production** (v3 flux-space-detrended HLSPs at scale) | Te Han (this repo) | Unambiguously ours. Includes the [twirl/preserve-negative-flux](https://github.com/TeHanHunter/TESS_Gaia_Light_Curve/tree/twirl/preserve-negative-flux) TGLC patch and the [flux_space_detrend](../src/twirl/lightcurves/flux_detrend.py) cotrend. Foundation of every downstream result. |
+| **Data steward for the survey LCs** | Te Han | Versioned tree, sidecar manifests, public release decisions. |
+| **BLS (production search)** | Michelle's group | Their well-tuned implementation is the primary tool. Our [src/twirl/search/bls.py](../src/twirl/search/bls.py) becomes a comparison reference — useful as a sanity-check and for the v2-vs-v3 talk slide, not the headline. |
+| **LEO-Vetter tuning for WDs** | Joint experiment: Michelle's student + Franklin Chen one tuning; our [wd-host-tuning](https://github.com/TeHanHunter/LEO-Vetter/tree/wd-host-tuning) fork the other | Two independent tunings produce more learning than one. Talk presents both side-by-side. |
+| **Heuristic vetter** | Te Han (this repo) | [src/twirl/vetting/heuristic.py](../src/twirl/vetting/heuristic.py) — physics-motivated, non-rejecting, classifies into `vet_class`. Complementary to LEO. |
+| **Injection-recovery** | **Shared exploratory work** — multiple approaches in parallel | Our angle: v2-QLP-vs-v3-TWIRL completeness comparison. Their angle: signal-template + statistic variations. |
+| **Centroid / pixel-map on-target test** | Te Han (TODO in `ideas.md`) | Per-pixel residual LC cube from `effective_psf.fit_lc` is in the TGLC mitpdo branch already; the build-out is on our side. |
+| **Occurrence-rate paper** | **Te Han, lead author** (verbal commitment, to be confirmed by email this week) | Highest-priority ownership prize from this collaboration. |
+| **Catalog paper** | **Target: led by a TWIRL student, Te Han as senior/last author.** Michelle's group accommodated with a parallel student-led paper instead. Not yet proposed. | Mentoring credit is the explicit goal — search committees weight student-led papers heavily for faculty applications. Catalog is the natural mentoring vehicle since it sits on the data we produce. Specific TWIRL student to be named before the next meeting (candidate seniority needs to match a catalog-paper workload). |
+| **WD-tuned LEO-Vetter methodology paper** | **Proposed: led by Michelle's student** (the parallel-tuning experiment is its natural first-author result) | Offer at the next meeting as a swap for the catalog paper. Frames Michelle's student's tuning work as its own clean first-author deliverable rather than a sub-result inside the catalog paper. Both groups end up with student-led papers. |
+| **Methods / pipeline paper** | **Te Han, lead author** (Te Han to propose) | Separate first-author deliverable covering the TGLC negative-flux patch + flux-space cotrend + per-orbit detrend. Decoupling from the occurrence-rate paper protects authorship on at least two papers regardless of how the catalog paper falls. |
+| **TGLC fork PR upstream to MIT-Kavli** | Te Han | Preserves Te Han as the patch author of record before any wider adoption. |
+| **Discovery paper(s)** — if TWIRL finds new planets / debris systems | **Currently undefined; default convention favors whoever shepherds validation, NOT the survey lead.** Highest-priority item to pre-commit. | See [§Discovery-paper authorship](#discovery-paper-authorship-2026-05-13) below. The first TWIRL discovery should be Te Han lead or TWIRL-student lead (Te Han senior); subsequent discoveries follow a "candidate champion" rule with Te Han as senior author on all TWIRL-originated discoveries. Requires explicit pre-commit with Michelle, Vanderburg, and Burdge *before* any candidate emerges. |
+
+### Strategic trade-off (named explicitly)
+
+The pivot from solo project to group effort is a positive-net trade with a known downside that we should not suppress:
+
+- **Wins:** more productive, broader expertise, higher credibility for the talk and papers, faster convergence on the right BLS + vetter recipe, multiple LEO tunings to compare, shared injection-recovery exploration.
+- **Cost:** less individual ownership on the search/vetting layers. Those layers are now group products.
+
+The mitigations in the ownership table above are the concrete response. The v3 HLSP production work and the negative-flux preservation patch remain unambiguously ours; the methods paper makes that contribution a distinct first-author deliverable.
+
+### Items to lock in writing (this week)
+
+1. **Email Michelle** explicitly confirming Te Han leads the occurrence-rate paper — turn the verbal commitment into a written one.
+2. **Propose the methods/pipeline paper** in the same email, with a one-paragraph scope (TGLC negative-flux patch + flux-space cotrend + per-orbit detrend + the recovery-fraction-by-Tmag result that quantifies the contribution).
+3. **Acknowledge funding** — confirm TGLC compute (PDO) goes through Te Han's affiliation in any joint paper acks.
+
+### Discovery-paper authorship (2026-05-13)
+
+**The most under-defined and most consequential ownership gap in the collaboration.** Currently nothing has been agreed about who leads if TWIRL finds a new WD planet or a new debris-transit system. Defaulting to "whoever shepherds validation leads" — the field convention — is structurally bad for Te Han because validation expertise lives with Vanderburg and Burdge (telescope time, RV mass measurements, spectroscopic FP rejection), not with the survey lead.
+
+**Target structure:**
+
+- **First TWIRL discovery**: Te Han lead, OR a TWIRL student lead with Te Han as senior author (decide at the time based on student readiness). This anchors Te Han as "the person who discovered WD planets with TWIRL" — career-defining for the faculty market.
+- **Subsequent discoveries**: "candidate champion" rule — whoever drives validation leads — but Te Han is **always senior author** on TWIRL-originated discoveries. Lets students lead (mentoring credit) and lets collaborators lead (relationship credit) without giving away the survey-author thread.
+- **Joint discoveries** (e.g., simultaneous TWIRL + ground-based detection): co-first-authorship with explicit TWIRL contribution statement.
+
+**Why this has to be pre-committed *before* any candidate emerges:**
+
+Once a real candidate is on the table, the political pressure to assign discovery authorship to whoever has telescope time is enormous, and the negotiation becomes retroactive — which always favors the seniority + capability side over the survey side. Raising the question proactively, with no candidate at stake, is the only way to get a fair outcome. Doing it after a candidate emerges marks Te Han as someone trying to grab credit retroactively, which is much worse than not asking at all.
+
+**Critical infrastructure investment: Te Han's independent validation capability.**
+
+Defaulting to Vanderburg or Burdge for follow-up makes the "candidate champion" rule structurally cede discovery authorship to them. Building independent validation capacity — telescope time for follow-up (Magellan, Keck, Gemini proposals), spectroscopy reduction pipeline, RV mass measurement workflow — is the **most important infrastructure investment for the next 12-24 months**, more important than any pipeline code, because it converts the field convention from "works against the survey lead" to "works for the survey lead." Without it, no amount of authorship agreement on paper survives contact with the realities of validation logistics.
+
+**The validation landscape — what Vanderburg actually did for WD 1856, and what Te Han can do:**
+
+**Reality check (corrected 2026-05-13):** the WD 1856 b discovery paper (Vanderburg et al. 2020, *Nature*) was validated using **zero PI-class instruments**. The toolkit was TESS (public), Spitzer IRAC (now JWST, open TAC), Gemini North (facility, open TAC), Hobby-Eberly Telescope (facility), and Gran Telescopio Canarias (facility). Vanderburg first-authored because he recognized the candidate and wrote the proposals — not because he had access to anything we don't.
+
+The Vanderburg-playbook validation chain for a TWIRL discovery — every step facility-accessible:
+
+| Step | Tool | TAC route |
+|------|------|-----------|
+| Multi-sector photometric confirmation (when applicable) | TESS itself | Public |
+| Higher-cadence ground photometric confirmation | **LCO 1m/2m network** (1-2 min cadence) | NSF-funded, free queue access for US researchers — **read the docs this week** |
+| Brighter / faster ground photometry | Gemini imaging | Facility, MIT TAC |
+| Thermal emission constraint (the planet-vs-BD test) | **JWST** (replaces Spitzer) | Open NASA TAC |
+| Spectroscopic companion exclusion | Gemini, Keck, MIKE on Magellan, HET | All facility |
+| High-res imaging (background-EB exclusion) | Gemini speckle, Keck AO | Facility |
+| RV mass (rare; only if model demands it) | MIKE (Magellan facility, no PI gate) — or ESPRESSO/HARPS via ESO | Mostly facility |
+| **Optional faint-end enhancement (T>18 only)** | proto-Lightspeed on Magellan Clay | PI-class — Burdge collaboration only required if read noise matters, i.e. for the very faint regime |
+
+**proto-Lightspeed** ([2026B Magellan list](https://lweb.cfa.harvard.edu/files/tac/2026B_MagInstr.txt), [Burdge group page](https://binaries.mit.edu/proto-lightspeed/)): a high-speed qCMOS imager on Magellan Clay Nasmyth East with 0.29 e⁻ read noise in quiet mode, up to 6600 Hz windowed cadence. PI-class instrument under Kevin Burdge — the official 2026B note is "may be opportunity to collaborate." It's the best-in-class faint-end tool. It is **not** required for validating bright WD candidates (T < ~17), where facility imaging is sufficient. WD 1856 itself (T=16.34) was validated entirely without it.
+
+**Implications for Te Han's first-authorship path:**
+
+1. **For most of the TWIRL Tmag distribution (T < 17), the Vanderburg playbook works directly.** Te Han can first-author discoveries using TESS + LCO + Gemini + JWST + MIKE — all open TAC, no PI gates. Identical structurally to how Vanderburg first-authored WD 1856 b.
+2. **proto-Lightspeed is a faint-end add-on, not a gate.** For T > 18 candidates where read noise matters, Burdge collaboration is required and discovery authorship is co-/shared. But that's the minority regime.
+3. **LCO is the single most actionable item this week.** Free queue-scheduled time on a global 1m/2m network for US researchers; it's what carries the ground-based photometric confirmation in nearly every TESS planet discovery paper. Te Han should read LCO docs and identify the right observing mode (typically the 1m network with a SDSS-r filter, ~30-60 s exposures).
+4. **JWST proposal cycle planning** should start within 6 months of the first TWIRL candidate emerging. The thermal-emission test (planet vs BD discrimination) is the headline validation result for any WD 1856-class candidate. JWST cycle proposals are competitive (~20% acceptance) but no PI gate.
+5. **Build the validation pipeline NOW**, before candidates emerge. LCO photometric reduction, MIKE spectroscopic reduction, basic high-res imaging analysis. Each of these is a 1-2 month project. Doing them under no time pressure now is much easier than doing them under candidate-deadline pressure later.
+
+**Burdge collaboration is still strategically valuable, just not mandatory.** A proto-Lightspeed sub-electron-read-noise light curve adds confidence beyond what facility instruments give, especially for the faint regime. Co-PI with Kevin on a Lightspeed proposal *and* independent Te-Han-led LCO+JWST validation isn't an either/or — the strongest discovery papers will use both, with Te Han as lead on the assembled story.
+
+**Critical timing caveat:** Magellan + LCO + Gemini all run ~6-9 month proposal lead times. First TWIRL candidates likely emerge before Te Han's first allocated time. Plan for this: build the *infrastructure* (data reduction pipelines, proposal templates) before candidates emerge; the first candidate's validation may use Director's Discretionary Time (DDT) on facility instruments (faster turnaround), or piggyback on a collaborator's existing time. The *first-discovery authorship rule* must commit Te Han (or a TWIRL student) as lead/co-first/senior on the resulting paper regardless of whose telescope time was used.
+
+**Conversations to have:**
+
+1. **Schwamb-group next meeting**: lock the "first TWIRL discovery → Te Han or TWIRL student lead" rule with Michelle. Frame as "let's settle this now while there are no candidates" — collaborative, not adversarial.
+2. **At the 2026-06-02 talk**: raise discovery-authorship with Vanderburg and Burdge. Not "promise me lead authorship" but "what does discovery authorship look like for TWIRL candidates? — want to understand the collaboration model before candidates emerge." Both have been through this many times; they'll respect the early framing.
+3. **Internal**: identify TWIRL student(s) who could plausibly lead a discovery paper. Franklin Chen is the obvious candidate but probably too early-PhD to drive validation. The student who leads the catalog paper is the natural candidate for second-discovery lead if and when that happens.
+
+### Catalog-paper negotiation — bring to next meeting
+
+**Goal:** TWIRL student leads catalog paper, Te Han as senior/last author — mentoring credit is explicitly important for faculty-market positioning. Michelle's group offered a parallel student-led paper (WD-tuned LEO-Vetter methodology) so both groups end up with student-led first-author papers.
+
+**Specific TWIRL student to lead:** to be named before the meeting. Candidate seniority needs to match a catalog-paper workload (sample definition, candidate vetting, all the operational pain). Franklin Chen is the obvious candidate given his LEO-tuning involvement, but seniority and readiness need a separate assessment — naming the wrong student is worse than leaving the slot generic.
+
+**Recommended framing for the conversation** (don't open with this — wait until paper authorship comes up naturally):
+
+> "I'd like a TWIRL student to lead the catalog paper. I need to demonstrate mentoring for the faculty market, and catalog is the natural fit since it sits on the data we're producing. For your student — they're doing interesting work on LEO-Vetter WD tuning, and that's its own first-author methods paper: thresholds, override rationale, validation on v3 HLSPs, fork-vs-fork comparison. That gives them a clean first-author paper distinctly theirs, and we end up with a clean portfolio: occurrence rate (Te), catalog (TWIRL student), LEO-WD-tuning (your student), and pipeline methods (Te). Four clean first-author papers, no shared leads, both groups mentoring."
+
+**Risk flags:**
+
+1. **Michelle counters with co-lead on catalog.** Hold the line — shared catalog leads tend to go badly. Better outcome: their student leads LEO paper clean, our student leads catalog clean.
+2. **The named TWIRL student isn't ready.** Catalog papers are operationally hard. Real assessment of Franklin (or whichever student) before the meeting.
+3. **Order of publication matters.** Set explicit target timelines for both student-led papers so neither student feels deprioritized.
+4. **Methods paper out first or in parallel** is doubly important now — fences the pipeline contribution off so it isn't absorbed into the catalog paper's data section.
+
+### Items to bring to the next meeting
+
+- v3 vs v2 HLSP comparison results (WD 1856 + a faint-end sample).
+- LEO-Vetter tuning comparison once both tunings have run on the same v3 top-N.
+- The fact that the existing TGLC HDF5 has a pre-built per-pixel residual LC cube (`effective_psf.fit_lc` in the mitpdo branch) that the per-pixel pixel-map vetting tool should read — this is a Te Han-side build but uses an existing TGLC artifact.
+- Authorship list draft for both the occurrence-rate paper and the methods paper.
 
 ## Project Goal
 
@@ -112,8 +244,6 @@ doc/
   twirl_progress_log.md
   mit_tglc_usage_guide.md
   ideas.md
-  local_data.md
-  plotting_style.md
 catalogs/
   wd_master_catalog/
   sector_orbit_maps/
@@ -122,20 +252,20 @@ configs/
   detection/
   injections/
 scripts/
-  stage1_lcs/
-  stage2_detection/
-  stage3_injections/
-  stage4_search/
-  stage5_validation/
+  stage1_lightcurves/   # TGLC pipeline + HLSP build (live)
+  stage2_search/        # per-sector BLS + candidate consolidation (live)
+  stage3_injections/    # planned, not built yet
+  stage4_search/        # planned, not built yet (full-sample search; will reuse stage2_search code with different drivers)
+  stage5_validation/    # heuristic vetter + LEO adapter + centroid test (live)
 src/
   twirl/
     catalogs/
     io/
     lightcurves/
-    detection/
-    injections/
+    plotting/
     search/
-    validation/
+    vetting/
+    # detection/, injections/ — planned, not built yet
 notebooks/
 reports/
 ```

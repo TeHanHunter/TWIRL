@@ -1,7 +1,7 @@
 """HLSP (`hlsp_qlp_tess_ffi_*_v01_llc.fits`) reader for TWIRL Stage 2.
 
 Centralizes the load/quality/aperture pattern that previously lived in
-`benchmark/plot_wd1856.py` and `scripts/stage1_lcs/qc_plot_hlsp_sample.py`.
+`benchmark/plot_wd1856.py` and `scripts/stage1_lightcurves/qc_plot_hlsp_sample.py`.
 
 HLSP files are produced by `qlp lctools hlsp` at the sector level (vstack of
 all orbits in the sector). Per-target schema:

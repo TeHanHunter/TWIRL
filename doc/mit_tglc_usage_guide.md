@@ -177,12 +177,12 @@ tglc lightcurves --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc
 ```
 
 In TWIRL, the first safe wrapper around this pattern is
-[`scripts/stage1_lcs/run_tglc_catalogs.py`](/Users/tehan/PycharmProjects/TWIRL/scripts/stage1_lcs/run_tglc_catalogs.py).
+[`scripts/stage1_lightcurves/run_tglc_catalogs.py`](/Users/tehan/PycharmProjects/TWIRL/scripts/stage1_lightcurves/run_tglc_catalogs.py).
 It reads the orbit-aware TWIRL detector summary and, by default, prints or writes the exact
 `tglc catalogs` commands for the selected orbit/camera/CCD jobs before any execution happens.
 
 For the current Sector 56 full-orbit benchmark, use
-[`scripts/stage1_lcs/run_tglc_orbit_pipeline.py`](/Users/tehan/PycharmProjects/TWIRL/scripts/stage1_lcs/run_tglc_orbit_pipeline.py).
+[`scripts/stage1_lightcurves/run_tglc_orbit_pipeline.py`](/Users/tehan/PycharmProjects/TWIRL/scripts/stage1_lightcurves/run_tglc_orbit_pipeline.py).
 That driver runs `catalogs -> cutouts -> epsfs -> lightcurves` sequentially for each CCD, launches
 multiple CCD jobs concurrently at the outer level, and filters `lightcurves` to WD TIC IDs from the
 TWIRL observation table.

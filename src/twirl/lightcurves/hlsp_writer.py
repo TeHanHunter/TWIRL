@@ -128,8 +128,14 @@ def write_twirl_hlsp(
     h["SECTOR"]  = (int(target.sector), "TESS sector")
     h["CAMERA"]  = (int(target.cam), "TESS camera")
     h["CCD"]     = (int(target.ccd), "TESS CCD")
-    h["RA"]      = (float(target.ra), "Right ascension (deg)")
-    h["DEC"]     = (float(target.dec), "Declination (deg)")
+    # QLP convention uses RA_OBJ / DEC_OBJ for the primary-header sky position.
+    # We write RA_OBJ / DEC_OBJ as the canonical keys so QC + reader code that
+    # follows QLP conventions (e.g. qc_sector_pdf.py) finds them, and keep
+    # RA / DEC as backward-compat aliases for earlier TWIRL-only consumers.
+    h["RA_OBJ"]  = (float(target.ra), "Right ascension (deg)")
+    h["DEC_OBJ"] = (float(target.dec), "Declination (deg)")
+    h["RA"]      = (float(target.ra), "Right ascension (deg), alias of RA_OBJ")
+    h["DEC"]     = (float(target.dec), "Declination (deg), alias of DEC_OBJ")
     h["ORIGIN"]  = ("TWIRL", "Producer pipeline")
     h["PIPELINE"] = ("twirl-flux-detrend", "TWIRL flux-space cotrend")
     h["VERSION"] = (str(target.version), "HLSP version tag")
