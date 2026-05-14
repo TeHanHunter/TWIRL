@@ -32,6 +32,7 @@ WD 1145+017 and ~10 other systems show chaotic, quasi-periodic dips from disrupt
 - Only ~10 known; this is almost certainly a severe detection-completeness problem, not a true rarity
 - ~25–50% of WDs are metal-polluted from accreted rocky material — the statistical connection between transiting debris and atmospheric pollution is the key science
 - A TWIRL dip search over 350,000 high-confidence WDs could increase the known sample by 10–100×
+- Recent BD+05 4868 (2024–25, MS host) demonstrates that present-generation pipelines can recover comet-like dust-tail signatures end-to-end; same methodology should transfer to WD hosts. Confirmed as Stage-4 secondary goal in `doc/twirl_plan.md` (`Search target` line, 2026-05-01).
 
 ### What happens to planetary systems at stellar death?
 The occurrence rate tests physical models of post-main-sequence planetary system evolution:

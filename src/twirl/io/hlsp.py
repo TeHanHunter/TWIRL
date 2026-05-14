@@ -31,6 +31,8 @@ class HLSPLightCurve:
     sector: int
     cam: int
     ccd: int
+    ra: float
+    dec: float
     time: np.ndarray
     cadenceno: np.ndarray
     orbitid: np.ndarray
@@ -83,6 +85,8 @@ def read_hlsp(
             sector = int(hdr.get("SECTOR", -1))
             cam = int(hdr.get("CAMERA", -1))
             ccd = int(hdr.get("CCD", -1))
+            ra = float(hdr.get("RA_OBJ", np.nan))
+            dec = float(hdr.get("DEC_OBJ", np.nan))
             time = np.asarray(tab["TIME"], dtype=np.float64)
             cadenceno = np.asarray(
                 tab["CADENCENO"] if "CADENCENO" in tab.columns.names else np.arange(n)
@@ -99,6 +103,7 @@ def read_hlsp(
                     flux[c] = np.asarray(tab[c], dtype=np.float64)
         return HLSPLightCurve(
             tic=tic, tmag=tmag, sector=sector, cam=cam, ccd=ccd,
+            ra=ra, dec=dec,
             time=time, cadenceno=cadenceno, orbitid=orbitid, quality=quality,
             flux=flux, path=Path(path),
         )

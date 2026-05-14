@@ -37,10 +37,29 @@ for _v in (
 ):
     _os.environ.setdefault(_v, "1")
 
+import json
 import sys
+from pathlib import Path
+
 from qlp.io.datastructures import OrbitalInfo
 
 ORBIT_SECTOR_MAP = {119: 56, 120: 56}
+
+
+def _load_extra_orbit_sector_entries() -> None:
+    """Merge $TWIRL_SECTOR_ORBIT_JSON into ORBIT_SECTOR_MAP. Same schema as
+    hlsp_wrapper's loader so one JSON file drives both stages."""
+    path = _os.environ.get("TWIRL_SECTOR_ORBIT_JSON")
+    if not path:
+        return
+    data = json.loads(Path(path).read_text())
+    for sector_str, entries in data.items():
+        sector = int(sector_str)
+        for e in entries:
+            ORBIT_SECTOR_MAP[int(e["orbit_number"])] = sector
+
+
+_load_extra_orbit_sector_entries()
 
 
 def _mock_read_orbit_info(orbit_number: int) -> OrbitalInfo:
