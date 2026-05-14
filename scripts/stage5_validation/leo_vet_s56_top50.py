@@ -11,7 +11,7 @@ of LEO-Vetter-twirl. It:
    ``TCELightCurve``, fills a canonical-WD ``star`` dict, runs LEO's
    ``compute_flux_metrics``, and applies ``check_thresholds_wd``.
 3. Writes per-TIC LEO vetting reports under
-   ``benchmark/leo_vetter_s56_top50/vet_reports/<class>_rank<NN>_tic<TIC>_*.pdf``
+   ``reports/stage5_validation/leo_vetter_s56_top50/vet_reports/<class>_rank<NN>_tic<TIC>_*.pdf``
    so they can be flipped through in one sortable directory.
 4. Writes ``leo_metrics.parquet`` with metrics + FA/FP labels.
 5. Prints a per-TIC class summary highlighting WD 1856.

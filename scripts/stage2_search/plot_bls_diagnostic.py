@@ -7,10 +7,10 @@ light curve with BLS box overlay. Used to visually verify every BLS search.
 Example
 -------
     python scripts/stage2_search/plot_bls_diagnostic.py \\
-        --npz benchmark/wd1856_bls/sector_0056/periodograms/tic_267574918_DET_FLUX.npz \\
-        --hlsp benchmark/gpu_production/hlsp_qlp_tess_ffi_s0056-0000000267574918_tess_v01_llc.fits \\
-        --candidates benchmark/wd1856_bls/sector_0056/candidates.parquet \\
-        --out benchmark/wd1856_bls/wd1856_s56_bls_diagnostic.png
+        --npz reports/stage2_search/wd1856_bls/sector_0056/periodograms/tic_267574918_DET_FLUX.npz \\
+        --hlsp reports/stage1_lightcurves/gpu_production_samples/hlsp_qlp_tess_ffi_s0056-0000000267574918_tess_v01_llc.fits \\
+        --candidates reports/stage2_search/wd1856_bls/sector_0056/candidates.parquet \\
+        --out reports/stage2_search/wd1856_bls/wd1856_s56_bls_diagnostic.png
 """
 from __future__ import annotations
 

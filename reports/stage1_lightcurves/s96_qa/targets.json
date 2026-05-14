@@ -1,0 +1,38 @@
+{
+  "sector": 96,
+  "description": "Known exoplanet transit hosts observed in TESS sector 96 (200 s FFIs). Chosen to span Tmag 9-14 so the TGLC-TICA vs QLP HLSP comparison probes bright saturation regime through faint noise floor. Coordinates are ICRS J2000 from SIMBAD. Cam/CCD is resolved at run-time on PDO via tess-point so this file does not go stale when TESS pointing changes.",
+  "targets": [
+    {
+      "slug": "wasp18",
+      "display": "WASP-18 b",
+      "tic": 100100827,
+      "ra_deg": 24.354279,
+      "dec_deg": -45.677944,
+      "tmag": 9.30,
+      "period_d": 0.94145300,
+      "t0_bjd": 2458361.525468,
+      "duration_h": 2.186,
+      "depth_frac": 0.00907,
+      "ephemeris_source": "Shporer+ 2019 (TESS S2), BJD_TDB"
+    },
+    {
+      "slug": "wasp96",
+      "display": "WASP-96 b",
+      "tic": 160148385,
+      "ra_deg": 1.050333,
+      "dec_deg": -47.360778,
+      "tmag": 11.9116,
+      "period_d": 3.4252602,
+      "t0_bjd": 2456258.0621,
+      "duration_h": 2.4264,
+      "depth_frac": 0.0138,
+      "ephemeris_source": "Hellier+ 2014"
+    }
+  ],
+  "excluded": [
+    {
+      "slug": "hats71", "tic": 234523599, "tmag": 14.1266,
+      "reason": "tess-point on PDO reports HATS-71 is NOT in S96, contradicting a prior MAST Tesscut result that claimed S96 cam3/ccd2. Likely a CCD-edge / science-border exclusion. Re-evaluate if the TICA delivery for cam3/ccd2 actually contains this target's pixels."
+    }
+  ]
+}

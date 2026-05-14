@@ -1,0 +1,8 @@
+panel,nonzero_targets,median_positive_count,max_count
+observed_lt_s100,1157242,2.0,19
+all_ge_s56,1231702,3.0,24
+
+setting,value
+count_mode,sectors
+observed_sector_max,99
+highconf_only,False
