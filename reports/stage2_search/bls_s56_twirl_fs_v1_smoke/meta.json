@@ -1,0 +1,22 @@
+{
+  "hlsp_root": "/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v1",
+  "sector": 56,
+  "tics": [
+    267574918,
+    2052947887,
+    2003450414,
+    2004754584,
+    1201143622,
+    2001403034,
+    2053744433
+  ],
+  "apertures": [
+    "DET_FLUX_SML",
+    "DET_FLUX",
+    "DET_FLUX_LAG"
+  ],
+  "n_periods": 50000,
+  "n_peaks": 3,
+  "wall_s": 193.65679287910461,
+  "csv": "/pdo/users/tehan/tglc-gpu-production/bls_s0056_twirl_fs_v1_smoke/bls_smoke_top_peaks.csv"
+}
