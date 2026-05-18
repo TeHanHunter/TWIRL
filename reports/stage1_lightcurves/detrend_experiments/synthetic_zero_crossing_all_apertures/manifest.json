@@ -1,0 +1,48 @@
+{
+  "n_cases": 36,
+  "n_rows": 144,
+  "n_injection_rows": 144,
+  "variants": {
+    "divisive": {
+      "output_mode": "divisive",
+      "scale_strategy": "auto",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    },
+    "sub_median": {
+      "output_mode": "subtractive",
+      "scale_strategy": "median",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    },
+    "sub_median_abs": {
+      "output_mode": "subtractive",
+      "scale_strategy": "median_abs",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    },
+    "sub_auto": {
+      "output_mode": "subtractive",
+      "scale_strategy": "auto",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    }
+  },
+  "inputs": {
+    "h5": [],
+    "synthetic": 12,
+    "apertures": [
+      "Primary",
+      "Small",
+      "Large"
+    ],
+    "tmag_min": null,
+    "limit": null
+  },
+  "outputs": {
+    "summary_csv": "reports/stage1_lightcurves/detrend_experiments/synthetic_zero_crossing_all_apertures/detrend_model_summary.csv",
+    "injection_csv": "reports/stage1_lightcurves/detrend_experiments/synthetic_zero_crossing_all_apertures/detrend_injection_summary.csv",
+    "summary_md": "reports/stage1_lightcurves/detrend_experiments/synthetic_zero_crossing_all_apertures/summary.md",
+    "plot_dir": "reports/stage1_lightcurves/detrend_experiments/synthetic_zero_crossing_all_apertures/plots"
+  }
+}

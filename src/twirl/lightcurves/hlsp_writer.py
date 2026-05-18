@@ -1,21 +1,22 @@
-"""TWIRL HLSP FITS writer.
+"""TWIRL-FS HLSP FITS writer.
 
 Emits a 2-HDU FITS file (PRIMARY metadata + LIGHTCURVE BinTable) in the
 column schema produced by QLP ``lctools hlsp``, so that the existing
 :mod:`twirl.io.hlsp` reader and all downstream code (BLS, heuristic
-vetter, LEO adapter) consume TWIRL HLSPs unchanged.
+vetter, LEO adapter) consume TWIRL-FS HLSPs unchanged.
 
 Difference from QLP HLSPs:
 
 * ``SAP_FLUX`` / ``DET_FLUX`` are emitted in **linear relative-flux
-  units**, not magnitudes-converted-back. Cadences where QLP would have
-  silently dropped a measurement (``flux <= 0`` pre-detrend) are
-  preserved here as real negative values.
+  units** using the TWIRL-FS robust positive flux scale, not
+  magnitudes-converted-back. Cadences where QLP would have silently
+  dropped a measurement (``flux <= 0`` pre-detrend) are preserved here
+  as real negative values.
 * ``DET_FLUX_ERR`` is the MAD-broadcast per-cadence sigma from our
   flux-space detrender, not propagated through a magnitude space.
 
-Filename convention: ``hlsp_twirl_tess_ffi_s<sector>-<tic16>_tess_v01_llc.fits``
-distinguishes our output from QLP's ``hlsp_qlp_tess_ffi_*``.
+Filename convention:
+``hlsp_twirlfs_tess_ffi_s<sector>-<tic16>_tess_v01_llc.fits``.
 """
 from __future__ import annotations
 
@@ -25,6 +26,12 @@ from pathlib import Path
 import numpy as np
 from astropy.io import fits
 
+from .flux_detrend import FluxDetrendConfig
+
+
+PRODUCT_PREFIX = "twirlfs"
+PIPELINE_NAME = "TWIRL-FS"
+METHOD_VERSION = "twirl-fs-v1"
 
 HLSP_COLUMN_SCHEMA: tuple[tuple[str, str, str | None], ...] = (
     ("TIME",         "D", "BJD-2457000, days"),
@@ -58,9 +65,9 @@ class HLSPTarget:
 
 
 def hlsp_filename(target: HLSPTarget) -> str:
-    """``hlsp_twirl_tess_ffi_s<sector>-<tic16>_tess_<version>_llc.fits``."""
+    """``hlsp_twirlfs_tess_ffi_s<sector>-<tic16>_tess_<version>_llc.fits``."""
     return (
-        f"hlsp_twirl_tess_ffi_s{target.sector:04d}-{target.tic:016d}"
+        f"hlsp_{PRODUCT_PREFIX}_tess_ffi_s{target.sector:04d}-{target.tic:016d}"
         f"_tess_{target.version}_llc.fits"
     )
 
@@ -80,8 +87,8 @@ def write_twirl_hlsp(
     *,
     time_btjd: np.ndarray,
     cadenceno: np.ndarray,
-    sap_flux: np.ndarray,        # raw (pre-detrend) median-normalized flux
-    det_flux: np.ndarray,        # detrended median-normalized flux
+    sap_flux: np.ndarray,        # raw (pre-detrend) robust-scale flux
+    det_flux: np.ndarray,        # detrended robust-scale flux
     det_flux_err: np.ndarray,    # MAD-broadcast per-cadence sigma
     quality: np.ndarray,
     orbitid: np.ndarray,
@@ -92,11 +99,14 @@ def write_twirl_hlsp(
     det_flux_sml: np.ndarray,    # detrended small-aperture flux
     det_flux_lag: np.ndarray,    # detrended large-aperture flux
     sys_rm_flux: np.ndarray | None = None,   # optional systematics-removed
+    detrend_config: FluxDetrendConfig | None = None,
+    method_version: str = METHOD_VERSION,
 ) -> Path:
-    """Write a single TWIRL HLSP FITS file in QLP-compatible schema.
+    """Write a single TWIRL-FS HLSP FITS file in QLP-compatible schema.
 
     Negative values in any FLUX column are preserved as real numbers.
     """
+    detrend_config = detrend_config or FluxDetrendConfig()
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     n = len(time_btjd)
@@ -137,8 +147,17 @@ def write_twirl_hlsp(
     h["RA"]      = (float(target.ra), "Right ascension (deg), alias of RA_OBJ")
     h["DEC"]     = (float(target.dec), "Declination (deg), alias of DEC_OBJ")
     h["ORIGIN"]  = ("TWIRL", "Producer pipeline")
-    h["PIPELINE"] = ("twirl-flux-detrend", "TWIRL flux-space cotrend")
+    h["PIPELINE"] = (PIPELINE_NAME, "TWIRL Flux-Spline detrend")
+    h["METHOD"] = (str(method_version), "Detrend method version")
     h["VERSION"] = (str(target.version), "HLSP version tag")
+    h["BKSPACE"] = (float(detrend_config.bkspace_d), "Spline knot spacing (d)")
+    h["BSPLK"] = (int(detrend_config.k), "BSpline degree")
+    h["SIGCLIP"] = (float(detrend_config.sigma_clip), "Spline rejection threshold")
+    h["MAXITER"] = (int(detrend_config.max_iter), "Maximum spline clip iterations")
+    h["EDGEPAD"] = (float(detrend_config.edge_pad_d), "Knot edge padding (d)")
+    h["OUTMODE"] = (str(detrend_config.output_mode), "Detrended output mode")
+    h["SCALE"] = (str(detrend_config.scale_strategy), "Flux-scale strategy")
+    h["MINSNR"] = (float(detrend_config.min_scale_snr), "Auto-scale median S/N floor")
     h["BJDREFI"] = (2457000, "Integer BJD epoch reference")
 
     fits.HDUList([primary, lc_hdu]).writeto(out_path, overwrite=True)

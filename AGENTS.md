@@ -31,6 +31,23 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Prefer minimal, local changes.
 - Do not refactor unrelated files.
 - Production code belongs in `src/twirl/` and `scripts/`, not notebooks.
+- For structured catalog data, prefer `astropy.table.Table`; use FITS for catalogs, HDF5 for light curves, and JSON for metadata/provenance.
+
+## Key Constants And Layout
+
+- `FIRST_200S_SECTOR = 56`.
+- High-confidence WD reference cut: `Pwd > 0.75`.
+- Authoritative target identifier: Gaia DR3 `source_id`; TIC is operational metadata.
+- `src/twirl/` is the importable production package:
+  - `catalogs/` builds the WD master catalog and sector/orbit/camera/CCD coverage maps.
+  - `io/hlsp.py` reads both `hlsp_qlp_*` and `hlsp_twirl_*` FITS schemas.
+  - `lightcurves/` reads TGLC HDF5, detrends in flux space, and writes TWIRL HLSP FITS.
+  - `plotting/style.py` is the plotting style authority.
+  - `search/` contains BLS/search tooling and candidate consolidation.
+  - `vetting/` contains heuristic vetting, LEO-Vetter adapters, and centroid checks.
+- `scripts/stage{1_lightcurves,2_search,5_validation}/` should stay as thin CLI drivers over `src/twirl/`.
+- `stage3_injections/` and `stage4_search/` are planned but not yet built.
+- Existing scripts add `src/` to `sys.path` directly rather than requiring an editable install; follow that local pattern unless the package setup changes.
 
 ## Local Data Policy
 
@@ -81,9 +98,14 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Use the MIT CLI stages: `catalogs`, `cutouts`, `epsfs`, `lightcurves`, or `all`.
 - For WD work, raise the target magnitude limit beyond the bright-star defaults, typically around `--max-magnitude 20`.
 - For the current CPU-only benchmark, use `--nprocs 16` as the default one-CCD `epsfs` worker count unless a new timing test motivates a change.
-- Prefer `pdogpu1` for the current CPU-only Stage 1 benchmark work; reserve `pdogpu6` for follow-up only if a working `cupy`/GPU TGLC environment is prepared there.
+- Prefer `pdogpu1` for CPU-only benchmark and Stage 2 work; use `pdogpu6` for GPU ePSF production when the `cupy` environment is active.
 - Preserve the MIT raw data layout. Add TWIRL metadata and indices on top rather than inventing a parallel raw layout.
 - On PDO, keep TWIRL-run outputs, symlinks, staging, and scratch products under `/pdo/users/tehan/` rather than writing into shared PDO trees.
+- The TGLC env for `tglc` stages is `/sw/qlp-environment/.venv/bin/python` with the TWIRL TGLC fork on `PYTHONPATH`; it has the newer Astropy layout needed by `tglc lightcurves`.
+- The legacy QLP env for `lctools detrend` and `lctools hlsp` is `/pdo/app/qlp-environment/.venv/bin/python` with `qlp==0.13.2`.
+- For Sector `< 67` including S56, HLSP uses `--flag-type spoc --flag-source fits`; SPOC flags live under `/pdo/qlp-data/spocflags/`.
+- Cap BLAS/OpenMP threads before multiprocessing pools on PDO: `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=NUMEXPR_NUM_THREADS=1`.
+- The GPU ePSF path requires the TWIRL-local venv at `/pdo/users/tehan/twirl-gpu-venv` with `cupy-cuda11x`, `LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib`, and the TGLC fork resolving first on `PYTHONPATH`.
 
 ## Data Product Expectations
 
@@ -95,6 +117,24 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - A major early engineering risk is TIC-oriented target emission:
   - audit how Gaia-selected targets propagate through the MIT fork
   - be prepared to recommend a Gaia-first extension if scientifically important WDs are missing
+- QLP HLSP export operates at the sector level, not per orbit. All orbits in a sector must be detrended before legacy HLSP export runs.
+- Before legacy QLP detrending, verify each TGLC `LightCurve/Cadence` array is a subset of the camera `camC_quat.txt` cadence column. If TGLC kept an orbit-boundary cadence missing from the quat file, trim the TGLC HDF5 with `scripts/stage1_lightcurves/fix_tglc_quat_cadence_mismatch.py`; the quat file is authoritative.
+
+## Stage 1 Data Flow
+
+```text
+GaiaEDR3_WD_main.fits (external seed, data_local/)
+  -> catalogs.master_catalog
+  -> twirl_wd_master_catalog_v*.fits + JSON sidecar
+  -> catalogs.tess_coverage
+  -> TIC merge on PDO
+  -> detector tables
+  -> MIT TGLC HDF5 light curves
+  -> TWIRL-FS flux-space detrend
+  -> TWIRL-FS HLSP FITS (hlsp_twirlfs_*)
+```
+
+Current faint-end LC work should focus on the labeled TWIRL-FS v1 product: robust-auto subtractive residuals with `bkspace_d=0.8`, `sigma_clip=5`, and `hlsp_twirlfs_tess_ffi_*` FITS outputs. The key behavior is preserving legitimate negative and near-zero background-subtracted flux cadences while avoiding a fragile `flux / spline` ratio.
 
 ## Safety And Boundaries
 
@@ -156,14 +196,14 @@ If this file and those docs disagree, treat the docs as authoritative and update
 
 When choosing what to implement next, prefer this order:
 
-1. WD master catalog builder
-2. orbit/camera/CCD mapper
-3. PDO batch wrappers around the MIT TGLC CLI
-4. consolidated HDF5-to-TWIRL index format
-5. WD 1856 QA benchmark
-6. Gaia-first target-support decision in the MIT fork
-7. baseline periodic and dip-search pipelines
-8. follow-up coordination support
+1. Run BLS/heuristic/LEO checks on the S56 TWIRL-FS v1 tree and compare against prior QLP/TWIRL S56 products.
+2. Complete full-product QA for TWIRL-FS v1, including cadence retention, RMS/MAD, quality-flag behavior, WD 1856 timing, and injected short-event preservation.
+3. Decide whether TWIRL-FS v1 replaces the normal QLP detrending path for production sectors.
+4. Build v2/v3/TWIRL-FS comparison tables only after the light-curve product is clearly validated.
+5. Consolidate the HDF5-to-TWIRL index format and QA reports for the production sectors.
+6. Continue Gaia-first target-support audit and no-TIC bridge characterization.
+7. Build transparent periodic and dip-search baselines before committing to ML-heavy triage.
+8. Develop follow-up coordination support after candidate validation criteria are stable.
 
 ## Follow-Up Planning Assumptions
 
@@ -198,6 +238,7 @@ Ask the user before:
 - merging proposal-repo content into this repo
 - committing to a follow-up instrument path that has not been verified
 - changing the repo scope away from the standalone pipeline project
+- changing collaboration scope or paper-leadership commitments. TWIRL is now a Schwamb-group collaboration; ownership and paper-leadership expectations are tracked in `doc/twirl_plan.md`.
 
 ## Maintenance Rule
 

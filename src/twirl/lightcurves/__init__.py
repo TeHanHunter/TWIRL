@@ -1,4 +1,4 @@
-"""TWIRL flux-space cotrending — Plan A.
+"""TWIRL-FS flux-space cotrending.
 
 Replaces QLP `lctools detrend` for the TWIRL pipeline. The reason the
 replacement exists is a single line in upstream TGLC photometry:
@@ -17,7 +17,8 @@ sit precisely where the background-subtracted flux is most likely to be
 negative, so the survey loses sensitivity exactly where it should be
 strongest.
 
-The fix is structural, in three coordinated parts:
+The TWIRL-FS (`twirl-fs-v1`) fix is structural, in three coordinated
+parts:
 
 1. **TGLC patch** (upstream, our fork at /pdo/users/tehan/tess-gaia-light-curve-twirl/):
    - `aperture_photometry.py`: do not NaN the flux array. Compute the
@@ -28,15 +29,16 @@ The fix is structural, in three coordinated parts:
      `RawMagnitude` / `RawMagnitudeError`.
 
 2. **This module** (`src/twirl/lightcurves/`):
-   - `flux_detrend.py`: flux-space BSpline cotrend, mirrors QLP
-     `lctools detrend` knot spacing (bkspace = 0.3 d) but operates on
-     linear flux. NaN inputs are interpolated through; negatives are
-     kept and weighted normally.
+   - `flux_detrend.py`: flux-space BSpline cotrend. The current
+     production default is `bkspace = 0.8 d`, chosen from S56 injection
+     sweeps to preserve 5 min-6 hr transit/eclipse signals better than
+     QLP's historical 0.3 d spacing. NaN inputs are interpolated through;
+     negatives are kept and weighted normally.
    - `hlsp_writer.py`: emits FITS files in the QLP HLSP schema
      (TIME, SAP_FLUX, DET_FLUX, DET_FLUX_ERR, QUALITY, SAP_X, SAP_Y,
      SAP_BKG, DET_FLUX_SML, DET_FLUX_LAG, ...) so all existing
      downstream code (BLS, heuristic vetter, LEO adapter) reads
-     these unchanged. Naming convention: `hlsp_twirl_tess_ffi_*` to
+     these unchanged. Naming convention: `hlsp_twirlfs_tess_ffi_*` to
      coexist with QLP's `hlsp_qlp_tess_ffi_*`.
    - `tglc_h5_reader.py`: reads the (post-patch) TGLC HDF5 with
      `RawFlux` columns; backward-compatible path for the legacy
@@ -45,7 +47,7 @@ The fix is structural, in three coordinated parts:
 
 3. **Driver** (`scripts/stage1_lightcurves/build_twirl_hlsp.py`):
    Per TIC, merge orbits in the sector, run flux_detrend on each
-   aperture, write a TWIRL HLSP FITS. Replaces the `qlp lctools
+   aperture, write a TWIRL-FS HLSP FITS. Replaces the `qlp lctools
    detrend -> qlp lctools hlsp` step of the existing pipeline.
 
 The TGLC photometry layer is untouched; the ePSF fit, aperture summing,

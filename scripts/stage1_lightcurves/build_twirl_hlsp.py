@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate TWIRL HLSP FITS for a sector from TGLC per-orbit HDF5 files.
+"""Generate TWIRL-FS HLSP FITS for a sector from TGLC per-orbit HDF5 files.
 
 Per TIC: read both orbits' HDF5 → merge by time → flux-space detrend each
-aperture (Small / Primary / Large) → write a single TWIRL HLSP FITS
+aperture (Small / Primary / Large) → write a single TWIRL-FS HLSP FITS
 mirroring the QLP HLSP schema.
 
 The TGLC HDF5 must have the ``RawFlux`` / ``RawFluxError`` datasets added
@@ -12,8 +12,8 @@ flux-from-magnitude path with a warning — usable for sectors not yet
 re-extracted, but loses the negative-cadence preservation.
 
 Output layout mirrors QLP HLSP: ``<out_root>/<tic[0:4]>/<tic[4:8]>/...``.
-The filename is ``hlsp_twirl_tess_ffi_*`` so the TWIRL HLSPs coexist with
-QLP's HLSPs in a parallel tree.
+The filename is ``hlsp_twirlfs_tess_ffi_*`` so the TWIRL-FS HLSPs coexist
+with QLP's HLSPs in a parallel tree.
 """
 from __future__ import annotations
 
@@ -30,7 +30,10 @@ if str(SRC_ROOT) not in sys.path:
 
 import numpy as np  # noqa: E402
 
-from twirl.lightcurves.flux_detrend import flux_space_detrend  # noqa: E402
+from twirl.lightcurves.flux_detrend import (  # noqa: E402
+    FluxDetrendConfig,
+    flux_space_detrend_result,
+)
 from twirl.lightcurves.hlsp_writer import (  # noqa: E402
     HLSPTarget,
     hlsp_path,
@@ -41,6 +44,9 @@ from twirl.lightcurves.tglc_h5_reader import (  # noqa: E402
     TGLCLightCurve,
     read_tglc_h5,
 )
+
+
+DETREND_CONFIG = FluxDetrendConfig(output_mode="subtractive", scale_strategy="auto")
 
 
 def discover_orbit_hdf5(orbit_root: Path) -> dict[int, Path]:
@@ -113,15 +119,24 @@ def detrend_apertures(lc: TGLCLightCurve) -> dict[str, np.ndarray]:
     """Run flux-space detrend on each aperture, return relative-flux arrays.
 
     Returns ``{aperture_key: (sap_rel, det_rel, det_err_rel)}`` where
-    ``sap_rel`` is the median-normalized raw flux (no detrend) and
-    ``det_rel`` is the cotrend-divided flux. All relative to the
-    aperture's own median to match QLP HLSP conventions.
+    ``sap_rel`` is robust-scale-normalized raw flux (no detrend) and
+    ``det_rel`` is the robust-scale subtractive cotrend residual. All
+    outputs are recentered to a good-cadence median of 1 to match QLP
+    HLSP conventions without using a potentially negative faint-target
+    median as the residual denominator.
     """
     out = {}
     for ap_key in APERTURE_KEYS:
         ap = lc.apertures[ap_key]
-        med = np.nanmedian(ap.raw_flux[np.isfinite(ap.raw_flux) & (lc.quality == 0)])
-        if not np.isfinite(med) or med == 0:
+        result = flux_space_detrend_result(
+            lc.time,
+            ap.raw_flux,
+            quality=lc.quality,
+            flux_err=ap.raw_flux_err,
+            cfg=DETREND_CONFIG,
+        )
+        scale = result.scale
+        if not np.isfinite(scale) or scale <= 0:
             n = len(ap.raw_flux)
             out[ap_key] = (
                 np.full(n, np.nan, dtype=np.float32),
@@ -129,15 +144,14 @@ def detrend_apertures(lc: TGLCLightCurve) -> dict[str, np.ndarray]:
                 np.full(n, np.nan, dtype=np.float32),
             )
             continue
-        sap_rel = (ap.raw_flux / med).astype(np.float32)
-        det_rel, det_err_rel, _ = flux_space_detrend(
-            lc.time, ap.raw_flux, quality=lc.quality, flux_err=ap.raw_flux_err
-        )
-        # flux_space_detrend already returns flux/spline ~ 1; normalize median to 1
+        sap_rel = (ap.raw_flux / scale).astype(np.float32)
+        det_rel = result.det_flux
+        det_err_rel = result.det_flux_err
+        # flux_space_detrend_result returns subtractive residual centered ~1;
+        # pin the good-cadence median to exactly 1 with an additive shift.
         m2 = np.nanmedian(det_rel[np.isfinite(det_rel) & (lc.quality == 0)])
-        if np.isfinite(m2) and m2 != 0:
-            det_rel = det_rel / m2
-            det_err_rel = det_err_rel / abs(m2)
+        if np.isfinite(m2):
+            det_rel = det_rel - m2 + 1.0
         out[ap_key] = (sap_rel, det_rel.astype(np.float32), det_err_rel.astype(np.float32))
     return out
 
@@ -176,6 +190,7 @@ def process_one(args: tuple[int, list[Path], Path]) -> tuple[int, bool, str]:
             sap_bkg_err=merged.background_err.astype(np.float32),
             det_flux_sml=det_sml,
             det_flux_lag=det_lag,
+            detrend_config=DETREND_CONFIG,
         )
         return tic, True, "ok"
     except Exception as e:

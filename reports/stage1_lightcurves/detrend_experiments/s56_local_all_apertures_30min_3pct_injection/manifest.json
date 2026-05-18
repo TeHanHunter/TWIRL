@@ -1,0 +1,60 @@
+{
+  "n_cases": 33,
+  "n_rows": 132,
+  "n_injection_rows": 132,
+  "variants": {
+    "divisive": {
+      "output_mode": "divisive",
+      "scale_strategy": "auto",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    },
+    "sub_median": {
+      "output_mode": "subtractive",
+      "scale_strategy": "median",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    },
+    "sub_median_abs": {
+      "output_mode": "subtractive",
+      "scale_strategy": "median_abs",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    },
+    "sub_auto": {
+      "output_mode": "subtractive",
+      "scale_strategy": "auto",
+      "bkspace_d": 0.3,
+      "sigma_clip": 5.0
+    }
+  },
+  "inputs": {
+    "h5": [
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/1884514391.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/1981551646.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/1981662747.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/2014550155.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/2041357363.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/2053290277.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/2053292543.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/2053333283.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/267574918.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/611160627.h5",
+      "data_local/stage1_lightcurves/detrend_experiments/s56_h5_sample/611190313.h5"
+    ],
+    "synthetic": 0,
+    "apertures": [
+      "Primary",
+      "Small",
+      "Large"
+    ],
+    "tmag_min": null,
+    "limit": null
+  },
+  "outputs": {
+    "summary_csv": "reports/stage1_lightcurves/detrend_experiments/s56_local_all_apertures_30min_3pct_injection/detrend_model_summary.csv",
+    "injection_csv": "reports/stage1_lightcurves/detrend_experiments/s56_local_all_apertures_30min_3pct_injection/detrend_injection_summary.csv",
+    "summary_md": "reports/stage1_lightcurves/detrend_experiments/s56_local_all_apertures_30min_3pct_injection/summary.md",
+    "plot_dir": "reports/stage1_lightcurves/detrend_experiments/s56_local_all_apertures_30min_3pct_injection/plots"
+  }
+}
