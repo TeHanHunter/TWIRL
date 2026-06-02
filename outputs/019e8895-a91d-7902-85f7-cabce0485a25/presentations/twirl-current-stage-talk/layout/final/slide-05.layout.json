@@ -1,0 +1,1365 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/6nk17y",
+    "id": "6nk17y",
+    "slide": 5,
+    "layoutId": "8e636729-6505-47ff-ab48-768e42eadb3e",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "c9f936af-a0ad-4522-a1c9-eba3c719ace7",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Aptos",
+      "Aptos Display"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "8e636729-6505-47ff-ab48-768e42eadb3e",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "c9f936af-a0ad-4522-a1c9-eba3c719ace7",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "c9f936af-a0ad-4522-a1c9-eba3c719ace7",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/a5gbq1or",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#FFFFFF",
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/lszqtcj6",
+      "id": "2",
+      "bbox": [
+        52,
+        28,
+        400,
+        20
+      ],
+      "geometry": "rect",
+      "text": "History",
+      "textPreview": "History",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 14,
+        "typeface": "Aptos",
+        "color": "#636363",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "History"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "History",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Aptos",
+            "color": "#636363",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "History",
+              "fontSize": 14,
+              "typeface": "Aptos",
+              "color": "#636363",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/s72x4nap",
+      "id": "3",
+      "bbox": [
+        52,
+        58,
+        1000,
+        54
+      ],
+      "geometry": "rect",
+      "text": "The field moved from circumstellar debris to a planet-scale benchmark.",
+      "textPreview": "The field moved from circumstellar debris to a planet-scale benchmark.",
+      "resolvedFontSize": 31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 31,
+        "typeface": "Aptos Display",
+        "color": "#111111",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "The field moved from circumstellar debris to a planet-scale"
+          },
+          {
+            "index": 2,
+            "text": "benchmark."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "The field moved from circumstellar debris to a planet-scale benchmark.",
+          "resolvedTextStyle": {
+            "fontSize": 31,
+            "typeface": "Aptos Display",
+            "color": "#111111",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "The field moved from circumstellar debris to a planet-scale benchmark.",
+              "fontSize": 31,
+              "typeface": "Aptos Display",
+              "color": "#111111",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3ylc7u54",
+      "id": "4",
+      "bbox": [
+        70,
+        178,
+        345,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#F6F6F3",
+      "lineColor": "#B8B8B1",
+      "lineWidth": 1
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/adsji5sn",
+      "id": "5",
+      "bbox": [
+        90,
+        196,
+        305,
+        26
+      ],
+      "geometry": "rect",
+      "text": "Polluted WDs",
+      "textPreview": "Polluted WDs",
+      "resolvedFontSize": 20.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20.31,
+        "typeface": "Aptos",
+        "color": "#111111",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Polluted WDs"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Polluted WDs",
+          "resolvedTextStyle": {
+            "fontSize": 20.31,
+            "typeface": "Aptos",
+            "color": "#111111",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Polluted WDs",
+              "fontSize": 20.31,
+              "typeface": "Aptos",
+              "color": "#111111",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/h4byhgn2",
+      "id": "6",
+      "bbox": [
+        90,
+        234,
+        305,
+        46
+      ],
+      "geometry": "rect",
+      "text": "metal pollution implies rocky material survives and is accreted",
+      "textPreview": "metal pollution implies rocky material survives and is accreted",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Aptos",
+        "color": "#636363",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "metal pollution implies rocky material"
+          },
+          {
+            "index": 2,
+            "text": "survives and is accreted"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "metal pollution implies rocky material survives and is accreted",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Aptos",
+            "color": "#636363",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "metal pollution implies rocky material survives and is accreted",
+              "fontSize": 18,
+              "typeface": "Aptos",
+              "color": "#636363"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sji5snel",
+      "id": "7",
+      "bbox": [
+        457,
+        178,
+        345,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#F6F6F3",
+      "lineColor": "#B8B8B1",
+      "lineWidth": 1
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/za1gvy90",
+      "id": "8",
+      "bbox": [
+        477,
+        196,
+        305,
+        26
+      ],
+      "geometry": "rect",
+      "text": "2015: WD 1145",
+      "textPreview": "2015: WD 1145",
+      "resolvedFontSize": 20.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20.31,
+        "typeface": "Aptos",
+        "color": "#111111",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "2015: WD 1145"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "2015: WD 1145",
+          "resolvedTextStyle": {
+            "fontSize": 20.31,
+            "typeface": "Aptos",
+            "color": "#111111",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "2015: WD 1145",
+              "fontSize": 20.31,
+              "typeface": "Aptos",
+              "color": "#111111",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ap4r65wj",
+      "id": "9",
+      "bbox": [
+        477,
+        234,
+        305,
+        46
+      ],
+      "geometry": "rect",
+      "text": "K2 reveals variable debris transits around a white dwarf",
+      "textPreview": "K2 reveals variable debris transits around a white dwarf",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Aptos",
+        "color": "#636363",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "K2 reveals variable debris transits"
+          },
+          {
+            "index": 2,
+            "text": "around a white dwarf"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "K2 reveals variable debris transits around a white dwarf",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Aptos",
+            "color": "#636363",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "K2 reveals variable debris transits around a white dwarf",
+              "fontSize": 18,
+              "typeface": "Aptos",
+              "color": "#636363"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0je9cvix",
+      "id": "10",
+      "bbox": [
+        844,
+        178,
+        345,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#F6F6F3",
+      "lineColor": "#B8B8B1",
+      "lineWidth": 1
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/t47y1kre",
+      "id": "11",
+      "bbox": [
+        864,
+        196,
+        305,
+        26
+      ],
+      "geometry": "rect",
+      "text": "ZTF searches",
+      "textPreview": "ZTF searches",
+      "resolvedFontSize": 20.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20.31,
+        "typeface": "Aptos",
+        "color": "#111111",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "ZTF searches"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "ZTF searches",
+          "resolvedTextStyle": {
+            "fontSize": 20.31,
+            "typeface": "Aptos",
+            "color": "#111111",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "ZTF searches",
+              "fontSize": 20.31,
+              "typeface": "Aptos",
+              "color": "#111111",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/idonyd0z",
+      "id": "12",
+      "bbox": [
+        864,
+        234,
+        305,
+        46
+      ],
+      "geometry": "rect",
+      "text": "wide-field monitoring finds new debris-transit candidates",
+      "textPreview": "wide-field monitoring finds new debris-transit candidates",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Aptos",
+        "color": "#636363",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "wide-field monitoring finds new"
+          },
+          {
+            "index": 2,
+            "text": "debris-transit candidates"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "wide-field monitoring finds new debris-transit candidates",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Aptos",
+            "color": "#636363",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "wide-field monitoring finds new debris-transit candidates",
+              "fontSize": 18,
+              "typeface": "Aptos",
+              "color": "#636363"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/byhgn29g",
+      "id": "13",
+      "bbox": [
+        70,
+        348,
+        345,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#F6F6F3",
+      "lineColor": "#B8B8B1",
+      "lineWidth": 1
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0rqd4vmt",
+      "id": "14",
+      "bbox": [
+        90,
+        366,
+        305,
+        26
+      ],
+      "geometry": "rect",
+      "text": "2020: WD 1856 b",
+      "textPreview": "2020: WD 1856 b",
+      "resolvedFontSize": 20.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20.31,
+        "typeface": "Aptos",
+        "color": "#111111",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "2020: WD 1856 b"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "2020: WD 1856 b",
+          "resolvedTextStyle": {
+            "fontSize": 20.31,
+            "typeface": "Aptos",
+            "color": "#111111",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "2020: WD 1856 b",
+              "fontSize": 20.31,
+              "typeface": "Aptos",
+              "color": "#111111",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tcj6tova",
+      "id": "15",
+      "bbox": [
+        90,
+        404,
+        305,
+        46
+      ],
+      "geometry": "rect",
+      "text": "TESS finds a stable deep transit by a planet-scale object",
+      "textPreview": "TESS finds a stable deep transit by a planet-scale object",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Aptos",
+        "color": "#636363",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TESS finds a stable deep transit by a"
+          },
+          {
+            "index": 2,
+            "text": "planet-scale object"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TESS finds a stable deep transit by a planet-scale object",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Aptos",
+            "color": "#636363",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "TESS finds a stable deep transit by a planet-scale object",
+              "fontSize": 18,
+              "typeface": "Aptos",
+              "color": "#636363"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/il0rqd4v",
+      "id": "16",
+      "bbox": [
+        457,
+        348,
+        345,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#F6F6F3",
+      "lineColor": "#B8B8B1",
+      "lineWidth": 1
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/b6xkf6dc",
+      "id": "17",
+      "bbox": [
+        477,
+        366,
+        305,
+        26
+      ],
+      "geometry": "rect",
+      "text": "2025: JWST/MIRI",
+      "textPreview": "2025: JWST/MIRI",
+      "resolvedFontSize": 20.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20.31,
+        "typeface": "Aptos",
+        "color": "#111111",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "2025: JWST/MIRI"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "2025: JWST/MIRI",
+          "resolvedTextStyle": {
+            "fontSize": 20.31,
+            "typeface": "Aptos",
+            "color": "#111111",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "2025: JWST/MIRI",
+              "fontSize": 20.31,
+              "typeface": "Aptos",
+              "color": "#111111",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/032lszqt",
+      "id": "18",
+      "bbox": [
+        477,
+        404,
+        305,
+        46
+      ],
+      "geometry": "rect",
+      "text": "infrared data strengthen the physical planet interpretation",
+      "textPreview": "infrared data strengthen the physical planet interpretation",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Aptos",
+        "color": "#636363",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "infrared data strengthen the physical"
+          },
+          {
+            "index": 2,
+            "text": "planet interpretation"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "infrared data strengthen the physical planet interpretation",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Aptos",
+            "color": "#636363",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "infrared data strengthen the physical planet interpretation",
+              "fontSize": 18,
+              "typeface": "Aptos",
+              "color": "#636363"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tovahoza",
+      "id": "19",
+      "bbox": [
+        844,
+        348,
+        345,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#FBF6E7",
+      "lineColor": "#D4BA72",
+      "lineWidth": 1
+    },
+    {
+      "order": 20,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tgfmlkjm",
+      "id": "20",
+      "bbox": [
+        864,
+        366,
+        305,
+        26
+      ],
+      "geometry": "rect",
+      "text": "TWIRL",
+      "textPreview": "TWIRL",
+      "resolvedFontSize": 20.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20.31,
+        "typeface": "Aptos",
+        "color": "#C69A28",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TWIRL"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TWIRL",
+          "resolvedTextStyle": {
+            "fontSize": 20.31,
+            "typeface": "Aptos",
+            "color": "#C69A28",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "TWIRL",
+              "fontSize": 20.31,
+              "typeface": "Aptos",
+              "color": "#C69A28",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 21,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4vmtwra5",
+      "id": "21",
+      "bbox": [
+        864,
+        404,
+        305,
+        46
+      ],
+      "geometry": "rect",
+      "text": "200 s TESS FFI survey tests this window at scale",
+      "textPreview": "200 s TESS FFI survey tests this window at scale",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Aptos",
+        "color": "#636363",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "200 s TESS FFI survey tests this"
+          },
+          {
+            "index": 2,
+            "text": "window at scale"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "200 s TESS FFI survey tests this window at scale",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Aptos",
+            "color": "#636363",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "200 s TESS FFI survey tests this window at scale",
+              "fontSize": 18,
+              "typeface": "Aptos",
+              "color": "#636363"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 22,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/bat47y1k",
+      "id": "22",
+      "bbox": [
+        138,
+        562,
+        940,
+        30
+      ],
+      "geometry": "rect",
+      "text": "History motivates two search modes: stable periodic events and evolving debris/dip systems.",
+      "textPreview": "History motivates two search modes: stable periodic events and evolving debris/dip systems.",
+      "resolvedFontSize": 20.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20.31,
+        "typeface": "Aptos",
+        "color": "#111111",
+        "bold": true,
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "History motivates two search modes: stable periodic events and evolving debris/dip systems."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "History motivates two search modes: stable periodic events and evolving debris/dip systems.",
+          "resolvedTextStyle": {
+            "fontSize": 20.31,
+            "typeface": "Aptos",
+            "color": "#111111",
+            "bold": true,
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "History motivates two search modes: stable periodic events and evolving debris/dip systems.",
+              "fontSize": 20.31,
+              "typeface": "Aptos",
+              "color": "#111111",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 23,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/mp0bi9s3",
+      "id": "23",
+      "bbox": [
+        52,
+        681,
+        1076,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#D0D0CA",
+      "lineColor": "#D0D0CA",
+      "lineWidth": 0
+    },
+    {
+      "order": 24,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tsvu9kni",
+      "id": "24",
+      "bbox": [
+        52,
+        688,
+        1080,
+        24
+      ],
+      "geometry": "rect",
+      "text": "Source: Vanderburg et al. 2015, Nature, https://www.nature.com/articles/nature15527. Source: Vanderburg et al. 2020, Nature, https://www.nature.com/articles/s41586-020-2713-y. Source: Limbach et al. 2025, arXiv, https://arxiv.org/abs/2504.16982. Source: Bhattacharjee et al. 2025, PASP, https://doi.org/10.1088/1538-3873/ade0ea.",
+      "textPreview": "Source: Vanderburg et al. 2015, Nature, https://www.nature.com/articles/nature15527. Source: Vanderburg et al. 2020, Nature, https://www....",
+      "resolvedFontSize": 10.8,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10.8,
+        "typeface": "Aptos",
+        "color": "#6F6F6B",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Source: Vanderburg et al. 2015, Nature, https://www.nature.com/articles/nature15527. Source: Vanderburg et al. 2020, Nature, https://www.nature.com/articles/s41586-020-2713-y. Source: Limbach et al. 2025, arXiv,"
+          },
+          {
+            "index": 2,
+            "text": "https://arxiv.org/abs/2504.16982. Source: Bhattacharjee et al. 2025, PASP, https://doi.org/10.1088/1538-3873/ade0ea."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Source: Vanderburg et al. 2015, Nature, https://www.nature.com/articles/nature15527. Source: Vanderburg et al. 2020, Nature, https://www.nature.com/articles/s41586-020-2713-y. Source: Limbach et al. 2025, arXiv, https://arxiv.org/abs/2504.16982. Source: Bhattacharjee et al. 2025, PASP, https://doi.org/10.1088/1538-3873/ade0ea.",
+          "resolvedTextStyle": {
+            "fontSize": 10.8,
+            "typeface": "Aptos",
+            "color": "#6F6F6B",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Source: Vanderburg et al. 2015, Nature, https://www.nature.com/articles/nature15527. Source: Vanderburg et al. 2020, Nature, https://www.nature.com/articles/s41586-020-2713-y. Source: Limbach et al. 2025, arXiv, https://arxiv.org/abs/2504.16982. Source: Bhattacharjee et al. 2025, PASP, https://doi.org/10.1088/1538-3873/ade0ea.",
+              "fontSize": 10.8,
+              "typeface": "Aptos",
+              "color": "#6F6F6B"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 25,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/47y1kre1",
+      "id": "25",
+      "bbox": [
+        1200,
+        688,
+        42,
+        18
+      ],
+      "geometry": "rect",
+      "text": "05",
+      "textPreview": "05",
+      "resolvedFontSize": 10.31,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10.31,
+        "typeface": "Aptos",
+        "color": "#9A9A94",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "05"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "05",
+          "resolvedTextStyle": {
+            "fontSize": 10.31,
+            "typeface": "Aptos",
+            "color": "#9A9A94",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "05",
+              "fontSize": 10.31,
+              "typeface": "Aptos",
+              "color": "#9A9A94"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

@@ -1,0 +1,408 @@
+{
+  "output": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/output/twirl-current-stage-expert-talk.pptx",
+  "outputBytes": 22362184,
+  "slideCount": 39,
+  "slideSize": {
+    "width": 1280,
+    "height": 720
+  },
+  "previewDir": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews",
+  "previewPaths": [
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-01.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-02.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-03.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-04.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-05.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-06.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-07.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-08.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-09.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-10.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-11.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-12.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-13.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-14.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-15.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-16.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-17.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-18.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-19.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-20.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-21.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-22.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-23.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-24.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-25.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-26.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-27.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-28.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-29.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-30.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-31.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-32.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-33.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-34.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-35.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-36.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-37.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-38.png",
+    "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/previews/slide-39.png"
+  ],
+  "layoutDir": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final",
+  "layoutResults": [
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-01.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-02.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-03.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-04.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-05.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-06.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-07.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-08.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-09.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-10.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-11.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-12.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-13.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-14.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-15.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-16.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-17.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-18.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-19.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-20.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-21.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-22.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-23.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-24.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-25.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-26.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-27.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-28.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-29.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-30.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-31.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-32.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-33.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-34.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-35.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-36.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-37.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-38.layout.json"
+    },
+    {
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/layout/final/slide-39.layout.json"
+    }
+  ],
+  "contactSheet": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/output/twirl-current-stage-expert-talk-contact-sheet.png",
+  "slides": [
+    {
+      "index": 1,
+      "requestedSlideNumber": 1,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-01.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 2,
+      "requestedSlideNumber": 2,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-02.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 3,
+      "requestedSlideNumber": 3,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-03.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 4,
+      "requestedSlideNumber": 4,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-04.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 5,
+      "requestedSlideNumber": 5,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-05.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 6,
+      "requestedSlideNumber": 6,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-06.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 7,
+      "requestedSlideNumber": 7,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-07.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 8,
+      "requestedSlideNumber": 8,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-08.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 9,
+      "requestedSlideNumber": 9,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-09.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 10,
+      "requestedSlideNumber": 10,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-10.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 11,
+      "requestedSlideNumber": 11,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-11.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 12,
+      "requestedSlideNumber": 12,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-12.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 13,
+      "requestedSlideNumber": 13,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-13.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 14,
+      "requestedSlideNumber": 14,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-14.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 15,
+      "requestedSlideNumber": 15,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-15.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 16,
+      "requestedSlideNumber": 16,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-16.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 17,
+      "requestedSlideNumber": 17,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-17.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 18,
+      "requestedSlideNumber": 18,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-18.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 19,
+      "requestedSlideNumber": 19,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-19.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 20,
+      "requestedSlideNumber": 20,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-20.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 21,
+      "requestedSlideNumber": 21,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-21.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 22,
+      "requestedSlideNumber": 22,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-22.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 23,
+      "requestedSlideNumber": 23,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-23.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 24,
+      "requestedSlideNumber": 24,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-24.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 25,
+      "requestedSlideNumber": 25,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-25.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 26,
+      "requestedSlideNumber": 26,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-26.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 27,
+      "requestedSlideNumber": 27,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-27.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 28,
+      "requestedSlideNumber": 28,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-28.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 29,
+      "requestedSlideNumber": 29,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-29.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 30,
+      "requestedSlideNumber": 30,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-30.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 31,
+      "requestedSlideNumber": 31,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-31.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 32,
+      "requestedSlideNumber": 32,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-32.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 33,
+      "requestedSlideNumber": 33,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-33.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 34,
+      "requestedSlideNumber": 34,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-34.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 35,
+      "requestedSlideNumber": 35,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-35.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 36,
+      "requestedSlideNumber": 36,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-36.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 37,
+      "requestedSlideNumber": 37,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-37.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 38,
+      "requestedSlideNumber": 38,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-38.mjs",
+      "exportName": "default"
+    },
+    {
+      "index": 39,
+      "requestedSlideNumber": 39,
+      "modulePath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e8895-a91d-7902-85f7-cabce0485a25/presentations/twirl-current-stage-talk/slides/slide-39.mjs",
+      "exportName": "default"
+    }
+  ]
+}
