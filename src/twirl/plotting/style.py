@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-import seaborn as sns
+try:
+    import seaborn as sns
+except ModuleNotFoundError:  # PDO QLP/TGLC envs do not always include seaborn.
+    sns = None
 
 
 PLOT_TEMPLATES = {
@@ -28,6 +31,18 @@ PLOT_TEMPLATES = {
         "annotation_size": 7,
         "dense_marker_size": 1.7,
         "grid_linewidth": 0.6,
+        "panel_wspace": 0.08,
+    },
+    "tglc_precision": {
+        "figsize": (7.1, 7.0),
+        "title_size": 20,
+        "label_size": 19,
+        "tick_size": 15,
+        "legend_size": 11,
+        "legend_title_size": 11,
+        "annotation_size": 11,
+        "dense_marker_size": 1.1,
+        "grid_linewidth": 1.0,
         "panel_wspace": 0.08,
     },
 }
@@ -59,7 +74,14 @@ BASE_RC = {
 
 
 def get_ordered_palette(n_colors: int, palette: str = "viridis"):
-    return sns.color_palette(palette, n_colors)
+    if sns is not None:
+        return sns.color_palette(palette, n_colors)
+    import matplotlib.pyplot as plt
+
+    cmap = plt.get_cmap(palette)
+    if n_colors <= 1:
+        return [cmap(0.5)]
+    return [cmap(i / (n_colors - 1)) for i in range(n_colors)]
 
 
 def apply_twirl_style(template_name: str = "column") -> dict[str, float]:
@@ -78,5 +100,11 @@ def apply_twirl_style(template_name: str = "column") -> dict[str, float]:
         "legend.title_fontsize": template["legend_title_size"],
         "grid.linewidth": template["grid_linewidth"],
     }
-    sns.set_theme(style="whitegrid", context="paper", rc=rc)
+    if sns is not None:
+        sns.set_theme(style="whitegrid", context="paper", rc=rc)
+    else:
+        import matplotlib.pyplot as plt
+
+        plt.rcParams.update(rc)
+        plt.rcParams["axes.grid"] = True
     return template

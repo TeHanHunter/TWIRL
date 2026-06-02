@@ -49,6 +49,7 @@ from twirl.io.hlsp import (  # noqa: E402
     read_hlsp,
     tglc_mad_error,
 )
+from twirl.plotting.style import apply_twirl_style  # noqa: E402
 
 
 # ----------------------------- Sullivan 2015 model -----------------------------
@@ -197,6 +198,20 @@ def _aitoff_xy(ra_deg: np.ndarray, dec_deg: np.ndarray):
     return lon, lat
 
 
+def _galactic_lonlat_deg(ra_deg: np.ndarray, dec_deg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    coords = SkyCoord(
+        ra=np.asarray(ra_deg) * u.deg,
+        dec=np.asarray(dec_deg) * u.deg,
+        frame="icrs",
+    ).galactic
+    return coords.l.wrap_at(180 * u.deg).deg, coords.b.deg
+
+
+def _aitoff_from_galactic_lonlat(l_deg: np.ndarray, b_deg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    l_wrapped = ((np.asarray(l_deg, dtype=float) + 180.0) % 360.0) - 180.0
+    return -np.radians(l_wrapped), np.radians(np.asarray(b_deg, dtype=float))
+
+
 def _decorate_aitoff(ax, *, label_size=8, tick_size=7, grid_lw=0.55):
     xtk = np.array([-180, -120, -60, 0, 60, 120], dtype=float)
     ytk = np.array([-45, -30, -15, 0, 15, 30, 45, 60, 75], dtype=float)
@@ -204,7 +219,7 @@ def _decorate_aitoff(ax, *, label_size=8, tick_size=7, grid_lw=0.55):
     ax.set_xticks(np.radians(xtk)); ax.set_xticklabels([])
     ax.set_yticks(np.radians(ytk))
     ax.tick_params(axis="both", labelsize=tick_size, colors="0.28", pad=4)
-    ax.grid(color="0.85", linewidth=grid_lw)
+    ax.grid(color="0.78", linewidth=grid_lw, alpha=0.65)
     lats = np.linspace(-np.pi / 2, np.pi / 2, 361)
     for x in np.radians(xtk):
         ax.plot(np.full_like(lats, x), lats, color="black", lw=0.55,
@@ -219,26 +234,77 @@ def _decorate_aitoff(ax, *, label_size=8, tick_size=7, grid_lw=0.55):
                                           foreground=(1.0, 1.0, 1.0, 0.8))])
 
 
-def _sector_hull_xy(ra_deg: np.ndarray, dec_deg: np.ndarray):
-    """Convex-hull boundary of this-sector points in galactic-Aitoff space.
-    Aitoff is non-Euclidean so we hull in (l_wrap_deg, b_deg) Cartesian then
-    convert. Robust enough as a visual border, not a precise FOV polygon.
+def _unwrap_longitudes_for_boundary(l_deg: np.ndarray) -> tuple[np.ndarray, float]:
+    """Rotate Galactic longitude so the sector occupies one continuous interval."""
+    lon360 = np.mod(np.asarray(l_deg, dtype=float), 360.0)
+    if lon360.size == 0:
+        return lon360, 0.0
+    ordered = np.sort(lon360)
+    gaps = np.diff(np.r_[ordered, ordered[0] + 360.0])
+    seam = ordered[(int(np.argmax(gaps)) + 1) % ordered.size]
+    return np.mod(lon360 - seam, 360.0), seam
+
+
+def _smooth_boundary(values: np.ndarray, window: int = 5) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    if values.size < 2 * window + 1:
+        return values
+    kernel = np.ones(window, dtype=float) / float(window)
+    pad = window // 2
+    padded = np.pad(values, pad_width=pad, mode="edge")
+    return np.convolve(padded, kernel, mode="valid")
+
+
+def _sector_boundary_xy(
+    ra_deg: np.ndarray,
+    dec_deg: np.ndarray,
+    *,
+    n_bins: int = 64,
+    min_per_bin: int = 15,
+    quantile: float = 1.0,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Concave visual boundary for a single TESS sector on a Galactic Aitoff map.
+
+    A convex hull is misleading for TESS sector crescents because it draws a
+    chord across the concave inner edge. Instead, unwrap longitude around the
+    sector and trace a lower/upper latitude envelope in longitude bins.
     """
-    if len(ra_deg) < 4:
+    if len(ra_deg) < max(2 * min_per_bin, 20):
         return None
-    coords = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs").galactic
-    l = coords.l.wrap_at(180 * u.deg).deg
-    b = coords.b.deg
-    pts = np.column_stack([l, b])
-    try:
-        from scipy.spatial import ConvexHull
-        hull = ConvexHull(pts)
-        l_h = pts[hull.vertices, 0]
-        b_h = pts[hull.vertices, 1]
-    except Exception:
+
+    l_deg, b_deg = _galactic_lonlat_deg(ra_deg, dec_deg)
+    valid = np.isfinite(l_deg) & np.isfinite(b_deg)
+    if valid.sum() < max(2 * min_per_bin, 20):
         return None
-    l_h = np.append(l_h, l_h[0]); b_h = np.append(b_h, b_h[0])
-    return -np.radians(l_h), np.radians(b_h)
+
+    l_unwrapped, seam = _unwrap_longitudes_for_boundary(l_deg[valid])
+    b = b_deg[valid]
+    span = float(np.nanmax(l_unwrapped) - np.nanmin(l_unwrapped))
+    if not np.isfinite(span) or span <= 0:
+        return None
+
+    bin_count = int(np.clip(n_bins, 12, max(12, valid.sum() // min_per_bin)))
+    edges = np.linspace(np.nanmin(l_unwrapped), np.nanmax(l_unwrapped), bin_count + 1)
+    l_mid, b_low, b_high = [], [], []
+    for left, right in zip(edges[:-1], edges[1:]):
+        in_bin = (l_unwrapped >= left) & (l_unwrapped < right)
+        if in_bin.sum() < min_per_bin:
+            continue
+        l_mid.append(float(np.nanmedian(l_unwrapped[in_bin])))
+        b_low.append(float(np.nanpercentile(b[in_bin], quantile)))
+        b_high.append(float(np.nanpercentile(b[in_bin], 100.0 - quantile)))
+
+    if len(l_mid) < 4:
+        return None
+
+    l_mid = np.asarray(l_mid)
+    b_low = _smooth_boundary(np.asarray(b_low))
+    b_high = _smooth_boundary(np.asarray(b_high))
+    l_poly_unwrapped = np.r_[l_mid, l_mid[::-1], l_mid[0]]
+    b_poly = np.r_[b_high, b_low[::-1], b_high[0]]
+    l_poly = np.mod(l_poly_unwrapped + seam, 360.0)
+    l_poly = ((l_poly + 180.0) % 360.0) - 180.0
+    return _aitoff_from_galactic_lonlat(l_poly, b_poly)
 
 
 def page_summary(pdf, sector: int, headers: list[dict], n_total: int,
@@ -246,7 +312,8 @@ def page_summary(pdf, sector: int, headers: list[dict], n_total: int,
                  observations_path: Path | None = None):
     """Page 1: Tmag distribution, table of counts. Page 2: Aitoff sky map
     showing all WDs faint, other-sector WDs as a lighter background, and the
-    current sector highlighted with a convex-hull border."""
+    current sector highlighted with a longitude-envelope boundary."""
+    template = apply_twirl_style("full_page")
     tmags = np.array([h["tmag"] for h in headers if np.isfinite(h["tmag"])])
     ras_obs = np.array([h["ra"] for h in headers if np.isfinite(h["ra"])])
     decs_obs = np.array([h["dec"] for h in headers if np.isfinite(h["dec"])])
@@ -285,7 +352,7 @@ def page_summary(pdf, sector: int, headers: list[dict], n_total: int,
             dec_all = np.asarray(cat["dec"], dtype=float)
             ok = np.isfinite(ra_all) & np.isfinite(dec_all)
             x_all, y_all = _aitoff_xy(ra_all[ok], dec_all[ok])
-            ax.scatter(x_all, y_all, c="0.88", s=0.5, alpha=0.20,
+            ax.scatter(x_all, y_all, c="0.86", s=0.45, alpha=0.18,
                        linewidths=0, rasterized=True, zorder=1,
                        label="all WD catalog")
         except Exception as e:
@@ -303,7 +370,7 @@ def page_summary(pdf, sector: int, headers: list[dict], n_total: int,
             mask_other = (sec_arr != sector) & np.isfinite(ra_o) & np.isfinite(dec_o)
             other_ra = ra_o[mask_other]; other_dec = dec_o[mask_other]
             x_o, y_o = _aitoff_xy(other_ra, other_dec)
-            ax.scatter(x_o, y_o, c="0.62", s=0.6, alpha=0.30,
+            ax.scatter(x_o, y_o, c="0.58", s=0.55, alpha=0.24,
                        linewidths=0, rasterized=True, zorder=2,
                        label="other sectors")
         except Exception as e:
@@ -311,23 +378,27 @@ def page_summary(pdf, sector: int, headers: list[dict], n_total: int,
 
     # Layer 3: this sector's WDs (from HLSP headers we already read)
     x_s, y_s = _aitoff_xy(ras_obs, decs_obs)
-    ax.scatter(x_s, y_s, c="#c44d10", s=2.0, alpha=0.85,
+    ax.scatter(x_s, y_s, c="#c44d10", s=2.0, alpha=0.80,
                linewidths=0, rasterized=True, zorder=3,
                label=f"S{sector}  (N={len(ras_obs)})")
 
-    # Layer 4: convex-hull border outline of the highlighted sector
-    hull_drawn = False
-    hull = _sector_hull_xy(ras_obs, decs_obs)
-    if hull is not None:
-        # Drop hull edges that wrap across the antimeridian (l = ±180°),
-        # otherwise the polygon draws a long ribbon across the projection.
-        x_h, y_h = hull
-        for i in range(len(x_h) - 1):
-            if abs(x_h[i + 1] - x_h[i]) < np.pi:
-                ax.plot([x_h[i], x_h[i + 1]],
-                        [y_h[i], y_h[i + 1]],
-                        color="#7a2c08", lw=1.2, zorder=4)
-                hull_drawn = True
+    # Layer 4: concave longitude-envelope boundary for the highlighted sector.
+    boundary_drawn = False
+    boundary = _sector_boundary_xy(ras_obs, decs_obs)
+    if boundary is not None:
+        x_b, y_b = boundary
+        if np.nanmax(np.abs(np.diff(x_b))) < np.pi:
+            ax.fill(x_b, y_b, facecolor="#c44d10", edgecolor="none",
+                    alpha=0.22, zorder=2.8)
+            ax.plot(x_b, y_b, color="#7a2c08", lw=1.1, zorder=4)
+            boundary_drawn = True
+        else:
+            for i in range(len(x_b) - 1):
+                if abs(x_b[i + 1] - x_b[i]) < np.pi:
+                    ax.plot([x_b[i], x_b[i + 1]],
+                            [y_b[i], y_b[i + 1]],
+                            color="#7a2c08", lw=1.1, zorder=4)
+                    boundary_drawn = True
 
     legend_handles = []
     from matplotlib.lines import Line2D
@@ -341,16 +412,22 @@ def page_summary(pdf, sector: int, headers: list[dict], n_total: int,
     legend_handles.append(Line2D([0], [0], marker="o", color="w",
                                   markerfacecolor="#c44d10", markersize=6,
                                   label=f"S{sector}  (N={len(ras_obs)})"))
-    if hull_drawn:
-        legend_handles.append(Line2D([0], [0], color="#7a2c08", lw=1.2,
-                                      label="sector hull"))
+    if boundary_drawn:
+        legend_handles.append(Line2D([0], [0], color="#7a2c08", lw=1.1,
+                                      label="sector boundary"))
 
-    _decorate_aitoff(ax)
-    ax.set_title(f"S{sector} sky coverage  (galactic Aitoff)", pad=14)
-    ax.set_xlabel("Galactic longitude")
-    ax.set_ylabel("Galactic latitude")
+    _decorate_aitoff(
+        ax,
+        label_size=template["label_size"],
+        tick_size=template["tick_size"],
+        grid_lw=template["grid_linewidth"],
+    )
+    ax.set_title(f"S{sector} sky coverage  (galactic Aitoff)", pad=18,
+                 fontsize=template["title_size"] + 2)
+    ax.set_xlabel("Galactic longitude (degree)", labelpad=8)
+    ax.set_ylabel("Galactic latitude (degree)", labelpad=5)
     ax.legend(handles=legend_handles, loc="lower left", fontsize=8,
-              bbox_to_anchor=(0.0, -0.10))
+              bbox_to_anchor=(0.0, -0.11), frameon=True, edgecolor="black")
     fig.tight_layout()
     pdf.savefig(fig); plt.close(fig)
 

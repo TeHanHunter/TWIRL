@@ -1,0 +1,12 @@
+{
+  "sector": 56,
+  "source_roots": [
+    "/pdo/users/tehan/tglc-gpu-production/orbit-119/ffi",
+    "/pdo/users/tehan/tglc-gpu-production/orbit-120/ffi"
+  ],
+  "n_tics": 19072,
+  "created_utc": "2026-06-01T18:58:23.836946Z",
+  "txt": "/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare/tic_ids_s0056_lightcurves_orbits119_120.txt",
+  "csv": "/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare/tic_ids_s0056_lightcurves_orbits119_120.csv",
+  "note": "Union of TIC IDs with TGLC HDF5 light curves in S56 orbits 119 and 120."
+}

@@ -20,6 +20,7 @@ Filename convention:
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,7 +32,7 @@ from .flux_detrend import FluxDetrendConfig
 
 PRODUCT_PREFIX = "twirlfs"
 PIPELINE_NAME = "TWIRL-FS"
-METHOD_VERSION = "twirl-fs-v1"
+METHOD_VERSION = "twirl-fs-v2"
 
 HLSP_COLUMN_SCHEMA: tuple[tuple[str, str, str | None], ...] = (
     ("TIME",         "D", "BJD-2457000, days"),
@@ -100,7 +101,10 @@ def write_twirl_hlsp(
     det_flux_lag: np.ndarray,    # detrended large-aperture flux
     sys_rm_flux: np.ndarray | None = None,   # optional systematics-removed
     detrend_config: FluxDetrendConfig | None = None,
+    detrend_diagnostics: Mapping[str, object] | None = None,
     method_version: str = METHOD_VERSION,
+    extra_flux_columns: Mapping[str, np.ndarray] | None = None,
+    extra_header: Mapping[str, object] | None = None,
 ) -> Path:
     """Write a single TWIRL-FS HLSP FITS file in QLP-compatible schema.
 
@@ -129,6 +133,20 @@ def write_twirl_hlsp(
         fits.Column(name="DET_FLUX_LAG", format="E", array=det_flux_lag.astype(np.float32)),
         fits.Column(name="SYS_RM_FLUX", format="E", array=sys_rm_flux.astype(np.float32)),
     ]
+    if extra_flux_columns:
+        for name, values in extra_flux_columns.items():
+            values = np.asarray(values)
+            if len(values) != n:
+                raise ValueError(
+                    f"extra FITS column {name!r} has length {len(values)}; expected {n}"
+                )
+            cols.append(
+                fits.Column(
+                    name=str(name),
+                    format="E",
+                    array=values.astype(np.float32),
+                )
+            )
     lc_hdu = fits.BinTableHDU.from_columns(cols, name="LIGHTCURVE")
 
     primary = fits.PrimaryHDU()
@@ -155,10 +173,43 @@ def write_twirl_hlsp(
     h["SIGCLIP"] = (float(detrend_config.sigma_clip), "Spline rejection threshold")
     h["MAXITER"] = (int(detrend_config.max_iter), "Maximum spline clip iterations")
     h["EDGEPAD"] = (float(detrend_config.edge_pad_d), "Knot edge padding (d)")
+    h["GAPSPLIT"] = (float(detrend_config.gap_split_d), "Independent fit gap threshold (d)")
+    h["KNOTSTR"] = (str(detrend_config.knot_strategy), "Spline knot placement strategy")
     h["OUTMODE"] = (str(detrend_config.output_mode), "Detrended output mode")
     h["SCALE"] = (str(detrend_config.scale_strategy), "Flux-scale strategy")
     h["MINSNR"] = (float(detrend_config.min_scale_snr), "Auto-scale median S/N floor")
+    if detrend_diagnostics:
+        h["NSEG"] = (int(detrend_diagnostics.get("n_segments", -1)), "Cotrend segment count")
+        h["FITCNT"] = (int(detrend_diagnostics.get("fit_count", -1)), "Good cadences used for fit")
+        h["SCALESRC"] = (
+            str(detrend_diagnostics.get("scale_source", ""))[:68],
+            "Subtractive scale source",
+        )
+        h["COTSTAT"] = (
+            str(detrend_diagnostics.get("cotrend_status", ""))[:68],
+            "Cotrend fit status",
+        )
+    if extra_header:
+        for key, value in extra_header.items():
+            key = str(key)
+            if isinstance(value, tuple) and len(value) == 2:
+                h[key] = (_fits_header_value(value[0]), str(value[1])[:68])
+            else:
+                h[key] = _fits_header_value(value)
     h["BJDREFI"] = (2457000, "Integer BJD epoch reference")
 
     fits.HDUList([primary, lc_hdu]).writeto(out_path, overwrite=True)
     return out_path
+
+
+def _fits_header_value(value: object) -> object:
+    """Return a FITS-header-safe scalar value."""
+    if isinstance(value, np.generic):
+        value = value.item()
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value[:68]
+    if isinstance(value, (bool, int, float)):
+        return value
+    return str(value)[:68]

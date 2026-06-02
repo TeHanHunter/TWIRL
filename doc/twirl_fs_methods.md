@@ -3,8 +3,8 @@
 ## Method Name
 
 Use **TWIRL-FS** for the faint-target flux-space detrending product. The
-method-version tag for the current implementation is `twirl-fs-v1`, short
-for **TWIRL Flux-Spline version 1**.
+method-version tag for the current implementation is `twirl-fs-v2`, short
+for **TWIRL Flux-Spline version 2**.
 
 ## Motivation
 
@@ -18,15 +18,22 @@ can pass through zero.
 TWIRL-FS therefore detrends in linear flux and writes QLP-compatible HLSP
 columns while preserving negative cadences.
 
-## Current `twirl-fs-v1` Parameters
+## Current `twirl-fs-v2` Parameters
 
 - Input flux: TGLC HDF5 `RawFlux` and `RawFluxError`, one sector merged
   across all available orbits.
 - Fit model: cubic `LSQUnivariateSpline`.
+- Gap handling: independent cotrend fits across time gaps larger than
+  `gap_split_d = 0.5` days. This prevents the multi-day gap between TESS
+  orbits from violating the spline knot conditions and silently degrading
+  to a low-order polynomial.
 - Knot spacing: `bkspace_d = 0.8` days.
 - Edge padding: `edge_pad_d = 0.5` days.
 - Iterative rejection: `sigma_clip = 5.0`, `max_iter = 5`.
 - Fit mask: finite flux, finite positive flux error, and `QUALITY == 0`.
+- Capped evaluation: flagged edge cadences outside the fitted quality-zero
+  time span are evaluated at the nearest fitted boundary, avoiding
+  unconstrained spline extrapolation in HLSP diagnostics.
 - Output mode: subtractive relative flux,
   `DET_FLUX = 1 + (flux - spline) / scale`, recentered so the good-cadence
   median is exactly 1.
@@ -59,12 +66,35 @@ TWIRL-FS FITS files use:
 
 - Filename prefix: `hlsp_twirlfs_tess_ffi_*`.
 - FITS `PIPELINE`: `TWIRL-FS`.
-- FITS `METHOD`: `twirl-fs-v1`.
+- FITS `METHOD`: `twirl-fs-v2`.
 - FITS detrend metadata: `BKSPACE`, `BSPLK`, `SIGCLIP`, `MAXITER`,
-  `EDGEPAD`, `OUTMODE`, `SCALE`, and `MINSNR`.
+  `EDGEPAD`, `GAPSPLIT`, `OUTMODE`, `SCALE`, `MINSNR`, `NSEG`,
+  `FITCNT`, `SCALESRC`, and `COTSTAT`.
 
 For the S56 production test, use an output tree named
-`hlsp_s0056_twirl_fs_v1`.
+`hlsp_s0056_twirl_fs_v2`.
+
+## S56 Compare Columns
+
+The Franklin/Michelle S56 handoff also has a compare tree named
+`hlsp_s0056_twirl_fs_v2_compare`. In that tree, the normal columns remain
+canonical `twirl-fs-v2` and should be the default search input:
+
+- `DET_FLUX`, `DET_FLUX_ERR`, `DET_FLUX_SML`, `DET_FLUX_LAG`.
+
+The same FITS files also include opt-in adaptive columns:
+
+- `DET_FLUX_ADP`, `DET_FLUX_ADP_ERR`, `DET_FLUX_ADP_SML`,
+  `DET_FLUX_ADP_LAG`.
+
+These adaptive columns use method tag `twirl-fs-v2-adp03q`: the same
+robust-auto subtractive residual, but with `bkspace_d = 0.3` days,
+`gap_split_d = 0.2` days, and quantile-based knot placement. Quantile knots
+are important here; a first uniform-knot 0.3 day attempt failed QA because
+quality-zero cadence gaps caused many adaptive fits to fall back to the
+polynomial path. The corrected compare product records adaptive diagnostics
+in `ADPMETH`, `ADPBKSP`, `ADPGAP`, `ADPKNOT`, `ADPNSEG`, `ADPFIT`,
+`ADPSCAL`, and `ADPCOTS`.
 
 ## Validation Gate Before Production Replacement
 

@@ -1,0 +1,19 @@
+{
+  "sourcePptx": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/twirl-wd1856-franklin-flow-edit/output/twirl-wd1856-keynote-bw-talk-franklin-flow.pptx",
+  "outputPptx": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/output/twirl-wd1856-keynote-bw-talk-franklin-flow-wd-background.pptx",
+  "outputBytes": 4561175,
+  "previewDir": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/previews",
+  "contactSheet": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/output/twirl-wd1856-keynote-bw-talk-franklin-flow-wd-background-contact-sheet.png",
+  "insertedAfterSlide": 1,
+  "insertedSlides": [
+    "Background section title",
+    "White dwarf basics and transit geometry",
+    "Current search efforts",
+    "White dwarf planet search challenges and TWIRL scope"
+  ],
+  "sourcesUsedForSlideClaims": [
+    "Vanderburg et al. 2020, Nature, arXiv:2009.07282",
+    "Limbach et al. 2025, arXiv:2504.16982",
+    "white dwarf pollution/debris disk review literature summarized qualitatively"
+  ]
+}

@@ -54,6 +54,11 @@ class FluxDetrendConfig:
     scale_strategy: str = "auto"      # "median", "median_abs", or "auto"
     min_scale_abs: float = 1.0e-12
     min_scale_snr: float = 3.0        # auto mode trusts median only above this S/N
+    gap_split_d: float = 0.5          # fit independent cotrends across gaps larger
+                                      # than this, e.g. the multi-day orbit gap
+    knot_strategy: str = "uniform"    # "uniform" or "quantile"; quantile keeps
+                                      # tight splines from placing knots inside
+                                      # quality-masked cadence gaps
 
 
 @dataclass
@@ -66,9 +71,16 @@ class FluxDetrendResult:
     fit_count: int
     output_mode: str
     scale_strategy: str
+    n_segments: int = 1
+    cotrend_status: str = "spline"
 
 
-def _build_knots(time: np.ndarray, bkspace_d: float, edge_pad_d: float) -> np.ndarray:
+def _build_knots(
+    time: np.ndarray,
+    bkspace_d: float,
+    edge_pad_d: float,
+    knot_strategy: str = "uniform",
+) -> np.ndarray:
     """Interior knots for LSQUnivariateSpline, every ``bkspace_d`` days,
     padded ``edge_pad_d`` from the time range endpoints.
     """
@@ -78,7 +90,15 @@ def _build_knots(time: np.ndarray, bkspace_d: float, edge_pad_d: float) -> np.nd
     if interior_end <= interior_start:
         return np.array([], dtype=float)
     n_knots = max(1, int(np.floor((interior_end - interior_start) / bkspace_d)))
-    return np.linspace(interior_start, interior_end, n_knots + 1)[1:-1]
+    if knot_strategy == "uniform":
+        return np.linspace(interior_start, interior_end, n_knots + 1)[1:-1]
+
+    interior_time = time[(time > interior_start) & (time < interior_end)]
+    if interior_time.size < max(2, n_knots):
+        return np.array([], dtype=float)
+    quantiles = np.linspace(0.0, 1.0, n_knots + 2)[1:-1]
+    knots = np.quantile(interior_time, quantiles)
+    return np.unique(knots)
 
 
 def flux_space_detrend(
@@ -173,7 +193,84 @@ def flux_space_detrend_result(
             fit_count=int(fit_mask.sum()),
             output_mode=cfg.output_mode,
             scale_strategy=cfg.scale_strategy,
+            n_segments=1,
+            cotrend_status="constant_insufficient_fit",
         )
+
+    segments = _time_gap_segments(time, cfg.gap_split_d)
+    if len(segments) > 1:
+        cotrend = np.full(n, np.nan, dtype=np.float64)
+        statuses = []
+        for idx in segments:
+            seg_cotrend, status = _fit_cotrend_segment(
+                time=time[idx],
+                flux=flux[idx],
+                fit_mask=fit_mask[idx],
+                flux_err=np.asarray(flux_err)[idx] if flux_err is not None else None,
+                cfg=cfg,
+            )
+            cotrend[idx] = seg_cotrend
+            statuses.append(status)
+        det_flux, scale, scale_source = _relative_flux(
+            flux=flux,
+            cotrend=cotrend,
+            fit_flux=flux[fit_mask],
+            cfg=cfg,
+        )
+        return FluxDetrendResult(
+            det_flux=det_flux,
+            det_flux_err=_broadcast_mad(det_flux),
+            cotrend=cotrend,
+            scale=scale,
+            scale_source=scale_source,
+            fit_count=int(fit_mask.sum()),
+            output_mode=cfg.output_mode,
+            scale_strategy=cfg.scale_strategy,
+            n_segments=len(segments),
+            cotrend_status=";".join(statuses),
+        )
+
+    spline_at, status = _fit_cotrend_segment(
+        time=time,
+        flux=flux,
+        fit_mask=fit_mask,
+        flux_err=flux_err,
+        cfg=cfg,
+    )
+    det_flux, scale, scale_source = _relative_flux(
+        flux=flux,
+        cotrend=spline_at,
+        fit_flux=flux[fit_mask],
+        cfg=cfg,
+    )
+    det_flux_err = _broadcast_mad(det_flux)
+    return FluxDetrendResult(
+        det_flux=det_flux,
+        det_flux_err=det_flux_err,
+        cotrend=spline_at,
+        scale=scale,
+        scale_source=scale_source,
+        fit_count=int(fit_mask.sum()),
+        output_mode=cfg.output_mode,
+        scale_strategy=cfg.scale_strategy,
+        n_segments=1,
+        cotrend_status=status,
+    )
+
+
+def _fit_cotrend_segment(
+    *,
+    time: np.ndarray,
+    flux: np.ndarray,
+    fit_mask: np.ndarray,
+    flux_err: np.ndarray | None,
+    cfg: FluxDetrendConfig,
+) -> tuple[np.ndarray, str]:
+    """Fit one contiguous time segment and return the cotrend on that segment."""
+    if fit_mask.sum() < 50:
+        med = np.nanmedian(flux[fit_mask]) if fit_mask.any() else np.nan
+        fill = med if np.isfinite(med) else np.nan
+        return np.full(len(flux), fill, dtype=np.float64), "constant_insufficient_fit"
 
     t_fit = time[fit_mask]
     f_fit = flux[fit_mask]
@@ -192,26 +289,10 @@ def flux_space_detrend_result(
     uniq_mask = np.concatenate(([True], np.diff(t_fit) > 0))
     t_fit, f_fit, w_fit = t_fit[uniq_mask], f_fit[uniq_mask], w_fit[uniq_mask]
 
-    knots = _build_knots(t_fit, cfg.bkspace_d, cfg.edge_pad_d)
+    knots = _build_knots(t_fit, cfg.bkspace_d, cfg.edge_pad_d, cfg.knot_strategy)
     if len(knots) < 2:
         # Time baseline shorter than 3 * bkspace; fall back to a polynomial.
-        spline_at = _safe_poly(t_fit, f_fit, w_fit, time, flux)
-        det_flux, scale, scale_source = _relative_flux(
-            flux=flux,
-            cotrend=spline_at,
-            fit_flux=f_fit,
-            cfg=cfg,
-        )
-        return FluxDetrendResult(
-            det_flux=det_flux,
-            det_flux_err=_broadcast_mad(det_flux),
-            cotrend=spline_at,
-            scale=scale,
-            scale_source=scale_source,
-            fit_count=int(fit_mask.sum()),
-            output_mode=cfg.output_mode,
-            scale_strategy=cfg.scale_strategy,
-        )
+        return _safe_poly(t_fit, f_fit, w_fit, time, flux), "poly_short_segment"
 
     good = np.ones_like(f_fit, dtype=bool)
     spl = None  # last successful spline; None means every iter raised
@@ -237,27 +318,35 @@ def flux_space_detrend_result(
 
     if spl is None:
         # Never produced a spline — polynomial fallback.
-        spline_at = _safe_poly(t_fit, f_fit, w_fit, time, flux)
-    else:
-        spline_at = spl(time)
+        return _safe_poly(t_fit, f_fit, w_fit, time, flux), "poly_spline_failed"
+    # TGLC can keep flagged edge cadences outside the quality-zero fit span.
+    # Avoid unconstrained spline extrapolation there; downstream searches
+    # quality-mask these points, but HLSP diagnostics should still stay sane.
+    return spl(_clip_to_fit_range(time, t_fit)), "spline"
 
-    det_flux, scale, scale_source = _relative_flux(
-        flux=flux,
-        cotrend=spline_at,
-        fit_flux=f_fit,
-        cfg=cfg,
-    )
-    det_flux_err = _broadcast_mad(det_flux)
-    return FluxDetrendResult(
-        det_flux=det_flux,
-        det_flux_err=det_flux_err,
-        cotrend=spline_at,
-        scale=scale,
-        scale_source=scale_source,
-        fit_count=int(fit_mask.sum()),
-        output_mode=cfg.output_mode,
-        scale_strategy=cfg.scale_strategy,
-    )
+
+def _time_gap_segments(time: np.ndarray, gap_split_d: float) -> list[np.ndarray]:
+    """Return original-index segments separated by time gaps larger than a threshold."""
+    if not np.isfinite(gap_split_d) or gap_split_d <= 0:
+        return [np.arange(len(time), dtype=int)]
+    finite_time = np.isfinite(time)
+    if finite_time.sum() <= 1:
+        return [np.arange(len(time), dtype=int)]
+    order = np.argsort(np.where(finite_time, time, np.inf), kind="stable")
+    finite_order = order[finite_time[order]]
+    if finite_order.size <= 1:
+        return [np.arange(len(time), dtype=int)]
+    t_sorted = time[finite_order]
+    cuts = np.where(np.diff(t_sorted) > gap_split_d)[0] + 1
+    if cuts.size == 0:
+        return [np.arange(len(time), dtype=int)]
+    starts = np.concatenate(([0], cuts))
+    ends = np.concatenate((cuts, [finite_order.size]))
+    segments = [np.sort(finite_order[start:end]) for start, end in zip(starts, ends)]
+    nonfinite = np.where(~finite_time)[0]
+    if nonfinite.size:
+        segments[-1] = np.sort(np.concatenate((segments[-1], nonfinite)))
+    return segments
 
 
 def _validate_cfg(cfg: FluxDetrendConfig) -> None:
@@ -269,6 +358,10 @@ def _validate_cfg(cfg: FluxDetrendConfig) -> None:
         raise ValueError("min_scale_abs must be positive")
     if cfg.min_scale_snr <= 0:
         raise ValueError("min_scale_snr must be positive")
+    if not np.isfinite(cfg.gap_split_d):
+        raise ValueError("gap_split_d must be finite")
+    if cfg.knot_strategy not in {"uniform", "quantile"}:
+        raise ValueError(f"unknown knot_strategy: {cfg.knot_strategy!r}")
 
 
 def _relative_flux(
@@ -376,11 +469,22 @@ def _safe_poly(
                 coeffs = np.polyfit(t_fit, f_fit, deg=deg, w=w_fit)
             else:
                 coeffs = np.polyfit(t_fit, f_fit, deg=deg)
-            return np.polyval(coeffs, time)
+            return np.polyval(coeffs, _clip_to_fit_range(time, t_fit))
         except Exception:
             continue
     med = np.nanmedian(flux)
     return np.full(len(time), med if np.isfinite(med) else 1.0)
+
+
+def _clip_to_fit_range(time: np.ndarray, t_fit: np.ndarray) -> np.ndarray:
+    """Clamp evaluation times to the constrained fit interval."""
+    if t_fit.size == 0:
+        return time
+    lo = float(np.nanmin(t_fit))
+    hi = float(np.nanmax(t_fit))
+    if not np.isfinite(lo) or not np.isfinite(hi) or hi < lo:
+        return time
+    return np.clip(time, lo, hi)
 
 
 def _broadcast_mad(x: np.ndarray) -> np.ndarray:

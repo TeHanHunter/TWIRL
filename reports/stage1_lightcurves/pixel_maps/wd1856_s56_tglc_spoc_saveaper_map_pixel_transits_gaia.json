@@ -1,0 +1,188 @@
+{
+  "input_fits": "data_local/stage1_lightcurves/tglc_saveaper_wd1856_s56_spoc/lc/hlsp_tglc_tess_ffi_gaiaid-2146576589564898688-s0056-cam4-ccd1_tess_v2.1_llc.fits",
+  "output_png": "reports/stage1_lightcurves/pixel_maps/wd1856_s56_tglc_spoc_saveaper_map_pixel_transits_gaia.png",
+  "output_pdf": "reports/stage1_lightcurves/pixel_maps/wd1856_s56_tglc_spoc_saveaper_map_pixel_transits_gaia.pdf",
+  "period_d": 1.407983,
+  "t0_bjd": 2459825.473398,
+  "t0_in_time_column": 2825.473398000002,
+  "time_system_inferred": "BTJD",
+  "duration_min": 6.0,
+  "pixel_normalization": "aperture",
+  "phase_window_min": 60.0,
+  "pixel_detrend_window_d": 0.3,
+  "clip_sigma": 7.0,
+  "right_panel": "pixel-grid",
+  "right_panel_summary": {},
+  "source_pickle": "data_local/stage1_lightcurves/tglc_saveaper_wd1856_s56_spoc/source/source_SPOC_TIC 267574918_sector_56.pkl",
+  "show_model_contours": false,
+  "gaia_cutout_geometry": {
+    "source_pickle": "data_local/stage1_lightcurves/tglc_saveaper_wd1856_s56_spoc/source/source_SPOC_TIC 267574918_sector_56.pkl",
+    "target_gaia_dr3": 2146576589564898688,
+    "target_sector_x": 45.36918226398589,
+    "target_sector_y": 45.38744078023536,
+    "crop_origin_x": 43.0,
+    "crop_origin_y": 43.0,
+    "star_x_from_header": 2.3691822639858913,
+    "star_y_from_header": 2.3874407802353588
+  },
+  "gaia_neighbors": [
+    {
+      "designation": "Gaia DR3 2146576589564898688",
+      "source_id": 2146576589564898688,
+      "x": 2.3691822639858913,
+      "y": 2.3874407802353588,
+      "phot_g_mean_mag": 16.942256927490234,
+      "tess_mag": 16.32809517853846,
+      "is_target": true
+    },
+    {
+      "designation": "Gaia DR3 2146576757065535360",
+      "source_id": 2146576757065535360,
+      "x": 4.2662108570396455,
+      "y": 3.792467848616667,
+      "phot_g_mean_mag": 12.018860816955566,
+      "tess_mag": 10.940106869357988,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576761360909056",
+      "source_id": 2146576761360909056,
+      "x": 4.149677336015088,
+      "y": 3.7850591860978042,
+      "phot_g_mean_mag": 12.103304862976074,
+      "tess_mag": 11.025413403139414,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576761363236352",
+      "source_id": 2146576761363236352,
+      "x": 3.6734604416885333,
+      "y": 3.454938864559338,
+      "phot_g_mean_mag": 15.947826385498047,
+      "tess_mag": 15.412634743803116,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576585267260672",
+      "source_id": 2146576585267260672,
+      "x": 0.09406354477024337,
+      "y": 0.7035319158754447,
+      "phot_g_mean_mag": 18.57235336303711,
+      "tess_mag": 18.082375144961084,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576692641433856",
+      "source_id": 2146576692641433856,
+      "x": 2.300980088295212,
+      "y": 0.42955747873497074,
+      "phot_g_mean_mag": 19.147396087646484,
+      "tess_mag": 17.992624849932398,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576619627005056",
+      "source_id": 2146576619627005056,
+      "x": 0.3495408277870382,
+      "y": 2.921341008289879,
+      "phot_g_mean_mag": 19.6961669921875,
+      "tess_mag": 18.790162631818298,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576585267267456",
+      "source_id": 2146576585267267456,
+      "x": 0.9799266994256541,
+      "y": 1.4688531785638617,
+      "phot_g_mean_mag": 19.874324798583984,
+      "tess_mag": 19.069597860724706,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576688346501760",
+      "source_id": 2146576688346501760,
+      "x": 4.480852973813931,
+      "y": 2.278336640075132,
+      "phot_g_mean_mag": 20.327974319458008,
+      "tess_mag": 19.540023813368272,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576658283022080",
+      "source_id": 2146576658283022080,
+      "x": 1.192418721653354,
+      "y": 2.913745290009892,
+      "phot_g_mean_mag": 20.447683334350586,
+      "tess_mag": 19.784583373440796,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576589562213376",
+      "source_id": 2146576589562213376,
+      "x": 2.3701176223626135,
+      "y": 1.84994793851466,
+      "phot_g_mean_mag": 20.822872161865234,
+      "tess_mag": 19.966386366731655,
+      "is_target": false
+    },
+    {
+      "designation": "Gaia DR3 2146576692642864256",
+      "source_id": 2146576692642864256,
+      "x": 3.0360369107913385,
+      "y": -0.1232698130243719,
+      "phot_g_mean_mag": 20.846723556518555,
+      "tess_mag": 20.47042804960441,
+      "is_target": false
+    }
+  ],
+  "cube_shape": [
+    11775,
+    5,
+    5
+  ],
+  "quality_zero_cadences": 11007,
+  "total_cadences": 11775,
+  "best_depth_pixel_yx": [
+    2,
+    3
+  ],
+  "best_depth": 3.849177263330859,
+  "best_depth_sigma": 2.040927416738684,
+  "normalization_modes": {
+    "0,0": "aperture",
+    "0,1": "aperture",
+    "0,2": "aperture",
+    "0,3": "aperture",
+    "0,4": "aperture",
+    "1,0": "aperture",
+    "1,1": "aperture",
+    "1,2": "aperture",
+    "1,3": "aperture",
+    "1,4": "aperture",
+    "2,0": "aperture",
+    "2,1": "aperture",
+    "2,2": "aperture",
+    "2,3": "aperture",
+    "2,4": "aperture",
+    "3,0": "aperture",
+    "3,1": "aperture",
+    "3,2": "aperture",
+    "3,3": "aperture",
+    "3,4": "aperture",
+    "4,0": "aperture",
+    "4,1": "aperture",
+    "4,2": "aperture",
+    "4,3": "aperture",
+    "4,4": "aperture"
+  },
+  "header": {
+    "TICID": "267574918",
+    "GAIADR3": "2146576589564898688",
+    "SECTOR": "56",
+    "CAMERA": "4",
+    "CCD": "1",
+    "FFIVER": "SPOC",
+    "TGLCVER": "0.7.0",
+    "CONTAMRT": "63.693114103"
+  }
+}

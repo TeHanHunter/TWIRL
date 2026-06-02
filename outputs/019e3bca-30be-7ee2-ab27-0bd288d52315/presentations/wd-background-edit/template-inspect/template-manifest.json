@@ -1,0 +1,323 @@
+{
+  "sourcePptx": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/twirl-wd1856-franklin-flow-edit/output/twirl-wd1856-keynote-bw-talk-franklin-flow.pptx",
+  "workspace": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit",
+  "outDir": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect",
+  "generatedAt": "2026-06-02T13:46:50.563Z",
+  "slideCount": 24,
+  "slideArtifacts": [
+    {
+      "slide": 1,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-01.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-01.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-01.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-01.layout.json"
+    },
+    {
+      "slide": 2,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-02.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-02.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-02.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-02.layout.json"
+    },
+    {
+      "slide": 3,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-03.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-03.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-03.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-03.layout.json"
+    },
+    {
+      "slide": 4,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-04.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-04.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-04.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-04.layout.json"
+    },
+    {
+      "slide": 5,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-05.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-05.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-05.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-05.layout.json"
+    },
+    {
+      "slide": 6,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-06.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-06.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-06.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-06.layout.json"
+    },
+    {
+      "slide": 7,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-07.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-07.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-07.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-07.layout.json"
+    },
+    {
+      "slide": 8,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-08.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-08.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-08.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-08.layout.json"
+    },
+    {
+      "slide": 9,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-09.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-09.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-09.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-09.layout.json"
+    },
+    {
+      "slide": 10,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-10.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-10.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-10.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-10.layout.json"
+    },
+    {
+      "slide": 11,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-11.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-11.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-11.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-11.layout.json"
+    },
+    {
+      "slide": 12,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-12.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-12.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-12.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-12.layout.json"
+    },
+    {
+      "slide": 13,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-13.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-13.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-13.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-13.layout.json"
+    },
+    {
+      "slide": 14,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-14.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-14.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-14.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-14.layout.json"
+    },
+    {
+      "slide": 15,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-15.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-15.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-15.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-15.layout.json"
+    },
+    {
+      "slide": 16,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-16.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-16.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-16.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-16.layout.json"
+    },
+    {
+      "slide": 17,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-17.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-17.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-17.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-17.layout.json"
+    },
+    {
+      "slide": 18,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-18.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-18.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-18.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-18.layout.json"
+    },
+    {
+      "slide": 19,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-19.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-19.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-19.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-19.layout.json"
+    },
+    {
+      "slide": 20,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-20.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-20.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-20.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-20.layout.json"
+    },
+    {
+      "slide": 21,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-21.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-21.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-21.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-21.layout.json"
+    },
+    {
+      "slide": 22,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-22.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-22.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-22.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-22.layout.json"
+    },
+    {
+      "slide": 23,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-23.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-23.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-23.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-23.layout.json"
+    },
+    {
+      "slide": 24,
+      "previewPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/source-slides/source-slide-24.png",
+      "previewRelativePath": "template-inspect/source-slides/source-slide-24.png",
+      "layoutPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/layouts/source-slide-24.layout.json",
+      "layoutRelativePath": "template-inspect/layouts/source-slide-24.layout.json"
+    }
+  ],
+  "inspectPath": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/template-inspect.ndjson",
+  "inspectRelativePath": "template-inspect/template-inspect.ndjson",
+  "inspectTruncated": true,
+  "inspectMetadata": {
+    "revision": "dr6v2j",
+    "target": {
+      "id": "pr/my0v74"
+    },
+    "kind": {
+      "requested": "slide,textbox,shape,image,table,chart",
+      "tokens": [
+        "slide",
+        "textbox",
+        "shape",
+        "image",
+        "table",
+        "chart"
+      ]
+    },
+    "include": {
+      "tokens": []
+    },
+    "exclude": {
+      "tokens": []
+    },
+    "notices": []
+  },
+  "extractedMedia": [
+    {
+      "entry": "ppt/media/image.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image.png",
+      "relativePath": "template-inspect/assets/ppt/media/image.png",
+      "bytes": 703459
+    },
+    {
+      "entry": "ppt/media/image2.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image2.png",
+      "relativePath": "template-inspect/assets/ppt/media/image2.png",
+      "bytes": 206523
+    },
+    {
+      "entry": "ppt/media/image3.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image3.png",
+      "relativePath": "template-inspect/assets/ppt/media/image3.png",
+      "bytes": 166746
+    },
+    {
+      "entry": "ppt/media/image4.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image4.png",
+      "relativePath": "template-inspect/assets/ppt/media/image4.png",
+      "bytes": 628908
+    },
+    {
+      "entry": "ppt/media/image5.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image5.png",
+      "relativePath": "template-inspect/assets/ppt/media/image5.png",
+      "bytes": 36112
+    },
+    {
+      "entry": "ppt/media/image6.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image6.png",
+      "relativePath": "template-inspect/assets/ppt/media/image6.png",
+      "bytes": 139299
+    },
+    {
+      "entry": "ppt/media/image7.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image7.png",
+      "relativePath": "template-inspect/assets/ppt/media/image7.png",
+      "bytes": 718128
+    },
+    {
+      "entry": "ppt/media/image8.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image8.png",
+      "relativePath": "template-inspect/assets/ppt/media/image8.png",
+      "bytes": 166746
+    },
+    {
+      "entry": "ppt/media/image9.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image9.png",
+      "relativePath": "template-inspect/assets/ppt/media/image9.png",
+      "bytes": 166746
+    },
+    {
+      "entry": "ppt/media/image10.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image10.png",
+      "relativePath": "template-inspect/assets/ppt/media/image10.png",
+      "bytes": 92821
+    },
+    {
+      "entry": "ppt/media/image11.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image11.png",
+      "relativePath": "template-inspect/assets/ppt/media/image11.png",
+      "bytes": 184679
+    },
+    {
+      "entry": "ppt/media/image12.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image12.png",
+      "relativePath": "template-inspect/assets/ppt/media/image12.png",
+      "bytes": 115773
+    },
+    {
+      "entry": "ppt/media/image13.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image13.png",
+      "relativePath": "template-inspect/assets/ppt/media/image13.png",
+      "bytes": 494323
+    },
+    {
+      "entry": "ppt/media/image14.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image14.png",
+      "relativePath": "template-inspect/assets/ppt/media/image14.png",
+      "bytes": 241339
+    },
+    {
+      "entry": "ppt/media/image15.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image15.png",
+      "relativePath": "template-inspect/assets/ppt/media/image15.png",
+      "bytes": 166746
+    },
+    {
+      "entry": "ppt/media/image16.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image16.png",
+      "relativePath": "template-inspect/assets/ppt/media/image16.png",
+      "bytes": 139299
+    },
+    {
+      "entry": "ppt/media/image17.png",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/outputs/019e3bca-30be-7ee2-ab27-0bd288d52315/presentations/wd-background-edit/template-inspect/assets/ppt/media/image17.png",
+      "relativePath": "template-inspect/assets/ppt/media/image17.png",
+      "bytes": 241339
+    }
+  ],
+  "fonts": [
+    "+mj-lt",
+    "+mn-lt",
+    "Aptos",
+    "Aptos Display",
+    "Calibri",
+    "Calibri Light",
+    "Helvetica Neue"
+  ],
+  "packageParts": {
+    "mediaCount": 17,
+    "slideXmlCount": 24,
+    "chartCount": 0,
+    "tableSlideCount": 0
+  }
+}

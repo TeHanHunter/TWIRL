@@ -2,12 +2,14 @@
 """Render a real-time markdown dashboard of TWIRL sector production status.
 
 Reads:
-  - $REPO/scripts/stage1_lightcurves/sector_queue.txt
+  - sector_queue.txt next to this script, unless --queue overrides it
   - $ROOT/markers/s<NN>_cutouts_done.flag
   - $ROOT/markers/s<NN>_done.flag
   - $ROOT/orbit-<NN>/ffi/cam*/ccd*/{source,epsf,LC}/ counts
   - $ROOT/twirl_logs/s<NN>-{gpu,prep}/orbit-<NN>_*_summary.json (wall times)
-  - $ROOT/hlsp_s00<NN>/ FITS counts (when present)
+  - $ROOT/hlsp_s00<NN>_twirl_fs_v2/ FITS counts when present, then
+    $ROOT/hlsp_s00<NN>_twirl_fs_v1/, otherwise
+    legacy $ROOT/hlsp_s00<NN>/ counts
 
 Writes: $ROOT/STATUS.md (and prints to stdout if --stdout).
 
@@ -26,7 +28,7 @@ import time
 from pathlib import Path
 
 DEFAULT_ROOT = Path("/pdo/users/tehan/tglc-gpu-production")
-DEFAULT_QUEUE = Path("/pdo/users/tehan/TWIRL/scripts/stage1_lightcurves/sector_queue.txt")
+DEFAULT_QUEUE = Path(__file__).resolve().parent / "sector_queue.txt"
 NCCD = 16
 NPATCH_PER_CCD = 196
 NPATCH_PER_ORBIT = NCCD * NPATCH_PER_CCD  # 3136
@@ -72,28 +74,39 @@ def orbit_counts(root: Path, orbit: int) -> dict[str, int]:
     return {"source": src, "epsf": epsf, "lc": lc}
 
 
-def hlsp_count(root: Path, sector: int, only_if_done: bool = True) -> int:
+def hlsp_count(root: Path, sector: int, only_if_done: bool = True) -> tuple[int, str]:
     """rglob over HLSP shards is slow (~19k files in 4-level sharded tree).
     Skip unless the sector marker says DONE. Cache the per-sector count in
     markers/s<NN>_hlsp_count.txt so subsequent dashboard refreshes are O(1).
     """
     if only_if_done and not (root / "markers" / f"s{sector:02d}_done.flag").is_file():
-        return 0
-    cache = root / "markers" / f"s{sector:02d}_hlsp_count.txt"
+        return 0, ""
+    candidates = (
+        ("twirl_fs_v2", root / f"hlsp_s{sector:04d}_twirl_fs_v2"),
+        ("twirl_fs_v1", root / f"hlsp_s{sector:04d}_twirl_fs_v1"),
+        ("legacy", root / f"hlsp_s{sector:04d}"),
+    )
+    product = ""
+    d = None
+    for name, path in candidates:
+        if path.exists():
+            product = name
+            d = path
+            break
+    if d is None:
+        return 0, ""
+    cache = root / "markers" / f"s{sector:02d}_{product}_hlsp_count.txt"
     if cache.is_file():
         try:
-            return int(cache.read_text().strip())
+            return int(cache.read_text().strip()), product
         except Exception:
             pass
-    d = root / f"hlsp_s{sector:04d}"
-    if not d.exists():
-        return 0
     n = sum(1 for _ in d.rglob("*.fits"))
     try:
         cache.write_text(str(n))
     except Exception:
         pass
-    return n
+    return n, product
 
 
 def sector_state(root: Path, sector: int, orbit_1: int, orbit_2: int) -> dict:
@@ -115,6 +128,7 @@ def sector_state(root: Path, sector: int, orbit_1: int, orbit_2: int) -> dict:
         state = "prep done"
     elif total_src > 0:
         state = "prepping"
+    n_hlsp, hlsp_product = hlsp_count(root, sector)
     return {
         "sector": sector,
         "orbits": (orbit_1, orbit_2),
@@ -122,7 +136,8 @@ def sector_state(root: Path, sector: int, orbit_1: int, orbit_2: int) -> dict:
         "src": o1["source"] + o2["source"],
         "epsf": o1["epsf"] + o2["epsf"],
         "lc": o1["lc"] + o2["lc"],
-        "hlsp": hlsp_count(root, sector),
+        "hlsp": n_hlsp,
+        "hlsp_product": hlsp_product,
         "cutouts_flag_mtime": cutouts_flag.stat().st_mtime if cutouts_flag.exists() else 0,
         "done_flag_mtime": done_flag.stat().st_mtime if done_flag.exists() else 0,
     }
@@ -147,7 +162,11 @@ def render(root: Path, queue: list[tuple[int, int, int]]) -> str:
     n_prepped = sum(1 for r in rows if r["state"] in ("prep done", "finalizing", "DONE"))
     lines.append(f"**{n_done} / {len(rows)} sectors DONE; {n_prepped} prep complete.**")
     lines.append("")
-    lines.append(f"Markers dir: `{root}/markers/`  •  HLSP roots: `{root}/hlsp_s00XX/`")
+    lines.append(
+        f"Markers dir: `{root}/markers/`  •  HLSP roots: "
+        f"`{root}/hlsp_s00XX_twirl_fs_v2/` (preferred), "
+        f"`{root}/hlsp_s00XX_twirl_fs_v1/` (failed QA), legacy `{root}/hlsp_s00XX/`"
+    )
     lines.append("")
     lines.append("| state | sector | orbits | src/6272 | epsf/6272 | LC | HLSP FITS |")
     lines.append("|---|---|---|---|---|---|---|")
@@ -163,7 +182,16 @@ def render(root: Path, queue: list[tuple[int, int, int]]) -> str:
         src_s = f"{r['src']}/{2*NPATCH_PER_ORBIT}"
         epsf_s = f"{r['epsf']}/{2*NPATCH_PER_ORBIT}"
         lc_s = str(r['lc']) if r['lc'] else "-"
-        hlsp_s = str(r['hlsp']) if r['hlsp'] else "-"
+        if r["hlsp"]:
+            if r["hlsp_product"] == "twirl_fs_v2":
+                suffix = "FSv2"
+            elif r["hlsp_product"] == "twirl_fs_v1":
+                suffix = "FSv1"
+            else:
+                suffix = "legacy"
+            hlsp_s = f"{r['hlsp']} {suffix}"
+        else:
+            hlsp_s = "-"
         lines.append(f"| {emoji} | {sec_tag} | {orbits} | {src_s} | {epsf_s} | {lc_s} | {hlsp_s} |")
     lines.append("")
     lines.append("Legend: ⏸ queued · 🟡 prepping (cutouts in flight) · 🟦 prep done (waiting for finalize GPU) · 🟠 finalizing (ePSF/LC/detrend/HLSP) · ✅ DONE")

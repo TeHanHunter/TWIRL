@@ -57,6 +57,13 @@ VARIANTS: dict[str, FluxDetrendConfig] = {
     "sub_median": FluxDetrendConfig(output_mode="subtractive", scale_strategy="median"),
     "sub_median_abs": FluxDetrendConfig(output_mode="subtractive", scale_strategy="median_abs"),
     "sub_auto": FluxDetrendConfig(output_mode="subtractive", scale_strategy="auto"),
+    "sub_auto_adp03q": FluxDetrendConfig(
+        bkspace_d=0.3,
+        output_mode="subtractive",
+        scale_strategy="auto",
+        gap_split_d=0.2,
+        knot_strategy="quantile",
+    ),
 }
 
 MAX_REASONABLE_REL_MAD = 10.0

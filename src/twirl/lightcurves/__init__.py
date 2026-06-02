@@ -17,7 +17,7 @@ sit precisely where the background-subtracted flux is most likely to be
 negative, so the survey loses sensitivity exactly where it should be
 strongest.
 
-The TWIRL-FS (`twirl-fs-v1`) fix is structural, in three coordinated
+The TWIRL-FS (`twirl-fs-v2`) fix is structural, in three coordinated
 parts:
 
 1. **TGLC patch** (upstream, our fork at /pdo/users/tehan/tess-gaia-light-curve-twirl/):
@@ -32,8 +32,10 @@ parts:
    - `flux_detrend.py`: flux-space BSpline cotrend. The current
      production default is `bkspace = 0.8 d`, chosen from S56 injection
      sweeps to preserve 5 min-6 hr transit/eclipse signals better than
-     QLP's historical 0.3 d spacing. NaN inputs are interpolated through;
-     negatives are kept and weighted normally.
+     QLP's historical 0.3 d spacing. It fits independent cotrends across
+     large time gaps so inter-orbit gaps do not force a polynomial
+     fallback. NaN inputs are interpolated through; negatives are kept
+     and weighted normally.
    - `hlsp_writer.py`: emits FITS files in the QLP HLSP schema
      (TIME, SAP_FLUX, DET_FLUX, DET_FLUX_ERR, QUALITY, SAP_X, SAP_Y,
      SAP_BKG, DET_FLUX_SML, DET_FLUX_LAG, ...) so all existing

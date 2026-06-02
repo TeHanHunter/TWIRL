@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot random TWIRL-FS S56 detrending examples from a FITS product tree."""
+"""Plot random TWIRL-FS detrending examples from a FITS product tree."""
 from __future__ import annotations
 
 import argparse
@@ -55,7 +55,7 @@ def _finite_ylim(values: np.ndarray, pad_frac: float = 0.08) -> tuple[float, flo
     return float(lo - pad), float(hi + pad)
 
 
-def _plot_one(path: Path, out_dir: Path) -> dict[str, object] | None:
+def _plot_one(path: Path, out_dir: Path, product_label: str) -> dict[str, object] | None:
     with fits.open(path, memmap=False) as hdul:
         header = hdul[0].header
         data = hdul[1].data
@@ -106,7 +106,7 @@ def _plot_one(path: Path, out_dir: Path) -> dict[str, object] | None:
             f"DET MAD={det_mad:.4f}"
         )
         axes[0].set_title(title, fontsize=11)
-        out_png = out_dir / f"tic{tic:010d}_twirl_fs_v1.png"
+        out_png = out_dir / f"tic{tic:010d}_{product_label}.png"
         fig.savefig(out_png, dpi=160)
         plt.close(fig)
 
@@ -138,9 +138,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=56)
     parser.add_argument("--min-tmag", type=float, default=18.5)
     parser.add_argument("--min-neg-q0", type=int, default=100)
+    parser.add_argument(
+        "--product-label",
+        default="twirl_fs",
+        help="Short label used in output filenames and report title.",
+    )
     args = parser.parse_args(argv)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    product_label = args.product_label.replace("-", "_")
     tics = _discover_tics(args.orbit_roots)
     rng = random.Random(args.seed)
     rng.shuffle(tics)
@@ -161,13 +167,13 @@ def main(argv: list[str] | None = None) -> int:
             continue
         if neg_q0 < args.min_neg_q0:
             continue
-        row = _plot_one(path, args.out_dir)
+        row = _plot_one(path, args.out_dir, product_label)
         if row is not None:
             rows.append(row)
         if len(rows) >= args.n:
             break
 
-    csv_path = args.out_dir / "random_twirl_fs_v1_sample.csv"
+    csv_path = args.out_dir / f"random_{product_label}_sample.csv"
     with csv_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else ["tic"])
         writer.writeheader()
@@ -175,10 +181,11 @@ def main(argv: list[str] | None = None) -> int:
 
     md_path = args.out_dir / "summary.md"
     with md_path.open("w") as f:
-        f.write("# Random TWIRL-FS v1 Detrending Preview\n\n")
+        f.write(f"# Random {product_label} Detrending Preview\n\n")
         f.write(f"Seed: `{args.seed}`\n\n")
         f.write(
-            f"Selection: random S56 TWIRL-FS targets with `TESSMAG >= {args.min_tmag}` "
+            f"Selection: random S{args.sector:02d} TWIRL-FS targets with "
+            f"`TESSMAG >= {args.min_tmag}` "
             f"and at least `{args.min_neg_q0}` negative quality-zero `SAP_FLUX` cadences.\n\n"
         )
         f.write("| TIC | Tmag | q0 | negative SAP q0 | finite DET q0 | DET q0 MAD | PNG |\n")
