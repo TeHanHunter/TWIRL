@@ -10,6 +10,7 @@ This document is the executable software and survey plan for TWIRL.
 - The seed WD catalog is a local external dependency, not a git-tracked repo asset.
 - Light curves will be gathered for all WDs in the full parent catalog. The statistical occurrence-rate sample (the locked denominator) will be defined separately after light-curve collection and QA are complete.
 - The search is interpretable-first: build a transparent periodic + dip baseline before considering ML triage.
+- `2026-06-02`: **TWIRL I is the active manuscript target.** It is a framework/overview paper, not the final occurrence-rate paper or a discovery paper, titled *TWIRL I: A Systematic TESS Search for Transiting Planetary Remnants around White Dwarfs*. The clean Overleaf-ready scaffold lives in the independent sibling repo `/Users/tehan/PycharmProjects/twirl-survey-paper`; this pipeline repo remains focused on code, data products, QA, and provenance.
 - Stage 1 Sector 56 benchmark (orbits 119 + 120, all 16 CCDs): TGLC lightcurves, detrend, and HLSP FITS production are complete. The cam3/orbit-120 cadence-mismatch blocker has been resolved by `scripts/stage1_lightcurves/fix_tglc_quat_cadence_mismatch.py` (drops the TGLC-only orbit-boundary cadence from every equal-length dataset in each h5; the quat file is left untouched as the authoritative pointing record). After re-running detrend + HLSP at the sector level, **`19,072 / 19,086 = 99.93%`** HLSP FITS are written to `/pdo/users/tehan/tglc-deep-catalogs/hlsp_s0056/` and validation passes with `0/19086 files had issues`. `14` targets remain unrecovered (root cause TBD; pull from `[hlsp skip]` lines in the r2 run log). Next session: Stage 1.6 WD 1856 photometric QA — read `267574918` HLSP FITS, plot stitched LC across orbits 119/120, and record per-aperture RMS/MAD for the `1×1`/`3×3`/`5×5` apertures.
 - `2026-04-27`: tglc-mki GPU ePSF path is unblocked. Built `/pdo/users/tehan/twirl-gpu-venv` (`--system-site-packages` + `cupy-cuda11x`) and benchmarked `tglc epsfs` on `pdogpu6`: S56 cam4/ccd1 finished `196/196` in **`30:42`** vs the `4:01:31` CPU baseline → **`~7.9× speedup`** with outputs bit-equivalent to CPU at machine precision. Future Stage 1 ePSF runs should default to this venv on `pdogpu6` (8 GPUs); see progress log §1.4 (`2026-04-27`).
 - `2026-04-30`: **S56 GPU production complete and validated.** New tree at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056/`: `19,068 / 19,086 = 99.91%` HLSP FITS, validation `4 / 19086` issues. WD 1856 parity vs the frozen `tglc-deep-catalogs/hlsp_s0056/` baseline within `~2%` per aperture (medium aperture MAD-RMS `0.1111` vs `0.1087`). The new tree is the science tree of record going forward; the deep-catalogs benchmark stays frozen for reference. Mass-production scale-out to S57+ uses [run_sector_gpu_production.sh](../scripts/stage1_lightcurves/run_sector_gpu_production.sh) + [run_s56_post_lc_chain.sh](../scripts/stage1_lightcurves/run_s56_post_lc_chain.sh) (parameterize per sector). See progress log §1.4 entries for `2026-04-30`.
@@ -30,6 +31,19 @@ This document is the executable software and survey plan for TWIRL.
 ### Stage 2 note (2026-05-01)
 
 When we open Stage 2 (search), use William Fong's cuvarbase branch + persistent-context M-per-GPU queue architecture as the starting point — he validated S100 cam4/ccd4 equivalence within float roundoff. His numba-vectorized trapezoid fit is also a relevant pattern for any custom CPU-bound search code we write.
+
+## Publication Roadmap
+
+The active writing target is **TWIRL I**, the survey framework and overview paper. It should establish the WD sample motivation, 200 s TESS/TGLC data-product path, TWIRL-FS light-curve strategy, search/vetting framework, WD 1856 benchmark logic, and completeness plan.
+
+Non-goals for TWIRL I:
+
+- final occurrence-rate posteriors or upper limits
+- individual discovery claims
+- Earth-size or habitable-zone occurrence claims
+- a locked statistical denominator beyond the documented current parent-sample assumptions
+
+Those outputs remain later papers or later sections only after the parent sample, full search definition, end-to-end completeness, and candidate validation are complete.
 
 ## Three-Week Pre-Talk Vertical Slice (2026-05-12 → 2026-06-02)
 

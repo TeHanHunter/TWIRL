@@ -24,6 +24,12 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - This repo is a standalone project and must remain separate from `TWIRL_proposal`.
 - Do not pull proposal-only files, plots, or git history into this repo unless the user explicitly asks.
 - Keep this repo focused on the executable survey pipeline, not proposal drafting artifacts.
+- The active survey-paper manuscript is the separate sibling repo
+  `/Users/tehan/PycharmProjects/twirl-survey-paper`, intended for Overleaf
+  git sync. Do not vendor the paper repo into `TWIRL`.
+- `TWIRL I: A Systematic TESS Search for Transiting Planetary Remnants
+  around White Dwarfs` is the current framework/overview paper. It is not the
+  final occurrence-rate paper and not an individual discovery paper.
 
 ## Working Style
 
@@ -64,6 +70,10 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Do not propose or hardcode sectors `1-55` as the primary TGLC survey input.
 - First-year science is optimized for large, deep, short-duration events in the WD 1856-like regime.
 - Do not overclaim Earth-size or habitable-zone occurrence constraints before completeness is demonstrated.
+- For TWIRL I writing, describe the pipeline, survey framework, benchmark,
+  validation plan, and completeness strategy. Do not write occurrence-rate
+  constraints, final null-result claims, or discovery claims before the locked
+  parent sample, end-to-end completeness, and candidate validation support them.
 
 ## Parent Sample Definition
 
