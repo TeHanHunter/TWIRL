@@ -1,0 +1,39 @@
+snapshot_remote_time,sector,orbit_1,orbit_2,source_count,source_expected,prepared_status,epsf_count,epsf_expected,epsf_status,hdf5_status,hlsp_count,hlsp_product,final_status,qc_pause,note
+2026-06-02T20:55:55-04:00,56,119,120,6272,6272,complete,6272,6272,complete,complete,19072,twirl_fs_v2,complete,present,current TWIRL-FS v2 product.
+2026-06-02T20:55:55-04:00,57,121,122,6272,6272,complete,6272,6272,complete,complete,16337,twirl_fs_v1,complete,present,TWIRL-FS v1 product exists; v2 product not complete.
+2026-06-02T20:55:55-04:00,58,123,124,6272,6272,complete,6272,6272,complete,complete,14656,legacy,complete,present,Legacy QLP product exists; current done marker absent after relight.
+2026-06-02T20:55:55-04:00,59,125,126,6272,6272,complete,6272,6272,complete,complete,13467,legacy,complete,present,Legacy QLP product exists.
+2026-06-02T20:55:55-04:00,60,127,128,6272,6272,complete,6272,6272,complete,complete,16143,legacy,complete,present,Legacy QLP product exists.
+2026-06-02T20:55:55-04:00,61,129,130,6272,6272,complete,6272,6272,complete,complete,27861,legacy,complete,present,Legacy QLP product exists.
+2026-06-02T20:55:55-04:00,62,131,132,6272,6272,complete,6272,6272,complete,complete,0,,missing,present,"TGLC ePSF/HDF5 stage reached, but no final FITS marker/count exists in this snapshot."
+2026-06-02T20:55:55-04:00,63,133,134,6272,6272,complete,6272,6272,complete,complete,33984,legacy,complete,present,Legacy QLP product exists.
+2026-06-02T20:55:55-04:00,64,135,136,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,65,137,138,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,66,139,140,4045,6272,partial,0,6272,missing,missing,0,,missing,present,Stale lease s66.lease from 2026-05-07; source count is 4045/6272 and no cutout-done marker exists.
+2026-06-02T20:55:55-04:00,67,141,142,0,6272,pending,0,6272,missing,missing,0,,missing,present,Stale lease s67.lease from 2026-05-12; source count is 0/6272 and no cutout-done marker exists.
+2026-06-02T20:55:55-04:00,68,143,144,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,69,145,146,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,70,147,148,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,71,149,150,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,72,151,152,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,73,153,154,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,74,155,156,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,75,157,158,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,76,159,160,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,77,161,162,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,78,163,164,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,79,165,166,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,80,167,168,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,81,169,170,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,82,171,172,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,83,173,174,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,84,175,176,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,85,177,178,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,86,179,180,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,87,181,182,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,88,183,184,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,89,185,186,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,90,187,188,6272,6272,complete,0,6272,missing,missing,0,,missing,present,
+2026-06-02T20:55:55-04:00,91,189,190,2870,6272,active,0,6272,missing,missing,0,,missing,present,Active prep lane-B from 2026-05-30; orbit 189 has 2870/3136 source pickles and orbit 190 has not started.
+2026-06-02T20:55:55-04:00,92,191,192,0,6272,active,0,6272,missing,missing,0,,missing,present,Active prep lane-A from 2026-06-01; orbit 191 is still at 0/3136 source pickles and orbit 192 has not started.
+2026-06-02T20:55:55-04:00,93,193,194,0,6272,pending,0,6272,missing,missing,0,,missing,present,Pending; no source-count progress or cutout-done marker in this snapshot.

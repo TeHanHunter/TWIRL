@@ -360,7 +360,9 @@ def running_median(y: np.ndarray, window: int) -> np.ndarray:
     for i in range(y.size):
         lo = max(0, i - half)
         hi = min(y.size, i + half + 1)
-        out[i] = np.nanmedian(y[lo:hi])
+        segment = y[lo:hi]
+        finite = np.isfinite(segment)
+        out[i] = np.nanmedian(segment[finite]) if finite.any() else np.nan
     return out
 
 
@@ -415,9 +417,13 @@ def plot_precision(
     line_color = "#d95f02" if style == "tglc" else "#9b3f13"
     alpha = 0.22 if style == "tglc" else 0.16
     marker_size = max(template["dense_marker_size"], 4.0 if style == "tglc" else 3.0)
-    median_lw = 2.2 if style == "tglc" else 1.8
+    median_lw = 2.8 if style == "tglc" else 1.8
     baseline_lw = 2.0 if style == "tglc" else 1.3
-    stroke_width = 0.0 if style == "tglc" else 3.0
+    median_path_effects = [
+        pe.Stroke(linewidth=median_lw + 4.0, foreground="white"),
+        pe.Stroke(linewidth=median_lw + 2.0, foreground="black"),
+        pe.Normal(),
+    ]
 
     ax_t.scatter(
         tmag_s,
@@ -428,21 +434,19 @@ def plot_precision(
         rasterized=True,
         label=label,
     )
-    path_effects = []
-    if stroke_width > 0:
-        path_effects = [pe.Stroke(linewidth=stroke_width, foreground="k"), pe.Normal()]
     ax_t.plot(
         tmag_s,
         rmed,
         "-",
         color=line_color,
         lw=median_lw,
-        path_effects=path_effects,
+        path_effects=median_path_effects,
+        zorder=8,
     )
     if noisemodel is not None:
         ax_t.plot(noisemodel[0], noisemodel[1], "k-", lw=baseline_lw, label=r"$\sigma_{\rm base}(T)$")
     ax_t.set_yscale("log")
-    ylabel = "Estimated Photometric Precision"
+    ylabel = "30-min precision" if style == "tglc" else "Estimated Photometric Precision"
     if style != "tglc":
         ylabel += f"\n(frac, {int(bin_minutes)}-min bin)"
     ax_t.set_ylabel(ylabel)
@@ -470,30 +474,26 @@ def plot_precision(
             "-",
             color=line_color,
             lw=median_lw,
-            path_effects=path_effects,
+            path_effects=median_path_effects,
             label=label,
+            zorder=8,
         )
         ax_b.axhline(1.0, color="k", lw=baseline_lw, label=r"$\sigma_{\rm base}(T)$")
-        if style == "tglc":
-            ax_b.set_ylim(0.5, 2.5)
-            ax_b.set_yticks([0.5, 1, 1.5, 2])
-            ax_b.set_yticklabels(["0.5", "1", "1.5", "2"])
+        ax_b.set_yscale("log")
+        ratio_floor = float(np.nanpercentile(ratio[finite_ratio], 0.5)) if finite_ratio.any() else 0.5
+        ymin = max(0.05, min(0.5, 0.8 * ratio_floor))
+        ax_b.set_ylim(ymin, 5.0)
+        if ymin < 0.15:
+            tick_values = [0.1, 0.2, 0.5, 1, 2, 5]
+        elif ymin < 0.35:
+            tick_values = [0.2, 0.5, 1, 2, 5]
         else:
-            ax_b.set_yscale("log")
-            ratio_floor = float(np.nanpercentile(ratio[finite_ratio], 0.5)) if finite_ratio.any() else 0.5
-            ymin = max(0.05, min(0.5, 0.8 * ratio_floor))
-            ax_b.set_ylim(ymin, 5.0)
-            if ymin < 0.15:
-                tick_values = [0.1, 0.2, 0.5, 1, 2, 5]
-            elif ymin < 0.35:
-                tick_values = [0.2, 0.5, 1, 2, 5]
-            else:
-                tick_values = [0.5, 1, 2, 5]
-            ax_b.set_yticks(tick_values)
-            ax_b.set_yticklabels([f"{v:g}" for v in tick_values])
+            tick_values = [0.5, 1, 2, 5]
+        ax_b.set_yticks(tick_values)
+        ax_b.set_yticklabels([f"{v:g}" for v in tick_values])
         ax_b.legend(loc="lower right" if style == "tglc" else "upper left", ncol=2 if style == "tglc" else 1)
     ax_b.set_xlabel("TESS magnitude")
-    ax_b.set_ylabel("Precision Ratio" if style == "tglc" else r"Precision / $\sigma_{\rm base}(T)$")
+    ax_b.set_ylabel("Precision ratio" if style == "tglc" else r"Precision / $\sigma_{\rm base}(T)$")
     for ax in axes:
         for spine in ax.spines.values():
             spine.set_linewidth(1.4 if style == "tglc" else 0.8)

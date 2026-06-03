@@ -22,6 +22,14 @@ reports/stage2_search/wd1856_bls_s56_top30/
 reports/stage5_validation/leo_vetter_s56_*/vet_reports/
 reports/stage1_lightcurves/tglc_vs_qlp_s94plus/
 reports/stage1_lightcurves/qc_pdf/
+reports/stage1_lightcurves/qc_precision/
+
+# Local presentation editing buffers and Keynote recovery copies. Final talk
+# deliverables are archived under reports/exploratory/talks/ when needed.
+outputs/current_keynote_edit/
+outputs/keynote_recovery/
+outputs/TWIRL_current_edited_*.key
+outputs/TWIRL_final.key
 
 # Claude Code state
 .claude/
