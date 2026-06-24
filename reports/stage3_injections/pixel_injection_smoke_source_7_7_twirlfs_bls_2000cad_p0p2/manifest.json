@@ -1,0 +1,80 @@
+{
+  "a_over_rwd": 93.3743519495738,
+  "bls_summary": {
+    "apertures": [
+      "DET_FLUX_ADP",
+      "DET_FLUX"
+    ],
+    "best_aperture": "DET_FLUX",
+    "best_sde": 7.302361880848697,
+    "best_status": "ok",
+    "hlsp_path": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_2000cad_p0p2/twirlfs_injected/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+    "per_aperture": {
+      "DET_FLUX": {
+        "depth": 0.14345607530944374,
+        "depth_snr": 1.0353874336998923,
+        "duration_min": 30.0,
+        "peak_rank": 1,
+        "period_d": 0.6253071618360997,
+        "period_rel_err": 2.1265358091804982,
+        "recovered": false,
+        "sde": 7.302361880848697,
+        "status": "ok",
+        "t0_bjd": 2459825.6415118,
+        "t0_phase_err_min": -8.602517142891667
+      },
+      "DET_FLUX_ADP": {
+        "depth": 0.13078880483556218,
+        "depth_snr": 0.9688413323443751,
+        "duration_min": 21.0,
+        "peak_rank": 1,
+        "period_d": 0.374702714579991,
+        "period_rel_err": 0.8735135728999549,
+        "recovered": false,
+        "sde": 6.470658576092218,
+        "status": "ok",
+        "t0_bjd": 2459825.5217201333,
+        "t0_phase_err_min": 106.89748308062576
+      }
+    },
+    "recovered_any": false,
+    "recovered_apertures": [],
+    "truth_duration_min": 2.0,
+    "truth_period_d": 0.2,
+    "truth_t0_bjd": 2459826.84748577
+  },
+  "created_utc": "2026-06-22T19:13:09.971601+00:00",
+  "duration_min": 2.0,
+  "epsf": "/pdo/users/tehan/tglc-gpu-production/orbit-119/ffi/cam4/ccd1/epsf/epsf_7_7.npy",
+  "impact_b": 0.2,
+  "injected_h5": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_2000cad_p0p2/389963197_pixel_injected.h5",
+  "injection_model": "pixel_level_batman_quadratic",
+  "model_depth": 0.2586466112090108,
+  "n_cadences": 2000,
+  "n_good_in_transit": 11,
+  "n_in_transit": 14,
+  "original_h5": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_2000cad_p0p2/389963197_original.h5",
+  "out_dir": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_2000cad_p0p2",
+  "period_d": 0.2,
+  "primary_delta_in_transit_median": -122.71970448656066,
+  "primary_delta_oot_median": 6.7959205134393414,
+  "radius_rearth": 1.4179879999999998,
+  "radius_rwd": 1.0,
+  "refit_epsf": false,
+  "source_pickle": "/pdo/users/tehan/tglc-gpu-production/orbit-119/ffi/cam4/ccd1/source/source_7_7.pkl",
+  "t0_tjd": 2826.847485769815,
+  "target": {
+    "edge_margin_pix": 51.956213420172844,
+    "gaia3": 2157463266507817600,
+    "gaia_index": 2504,
+    "tess_mag": 17.50067083924594,
+    "tic": 389963197,
+    "x": 51.956213420172844,
+    "y": 61.094494755410324
+  },
+  "target_model_sum_in_transit_median": 497.8387451171875,
+  "target_model_sum_median": 498.135009765625,
+  "twirlfs_injected": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_2000cad_p0p2/twirlfs_injected/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+  "twirlfs_original": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_2000cad_p0p2/twirlfs_original/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+  "used_gpu_for_refit": false
+}

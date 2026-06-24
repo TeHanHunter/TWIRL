@@ -1,0 +1,8 @@
+snr_bin,bls_peak_mismatch,bls_top1_recovered,bls_topn_harmonic_match,bls_topn_recovered
+<1,0,0,0,0
+1-3,1,0,0,0
+3-5,3,1,0,1
+5-7,2,1,2,0
+7-10,6,36,0,1
+10-20,5,27,0,0
+>20,0,8,0,0

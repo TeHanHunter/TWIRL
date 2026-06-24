@@ -1,0 +1,6 @@
+failure_class,count
+low_snr_unmatched,904
+matched_top1,32
+snr_qualified_bls_ranking_loss,28
+matched_harmonic_topn,25
+matched_exact_topn,11

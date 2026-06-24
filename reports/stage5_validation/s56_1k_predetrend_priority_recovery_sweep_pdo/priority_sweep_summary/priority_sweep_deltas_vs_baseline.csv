@@ -1,0 +1,7 @@
+name,baseline_sweep,new_matches_vs_baseline,lost_matches_vs_baseline,net_match_gain_vs_baseline
+adp_sml_priority_5k,adp_priority_5k,60,2,58
+det_sml_priority_5k,adp_priority_5k,52,4,48
+adp_priority_5k,adp_priority_5k,0,0,0
+adp_lag_priority_5k,adp_priority_5k,3,6,-3
+small_pair_priority_5k,adp_priority_5k,61,2,59
+small_pair_priority_200k,adp_priority_5k,72,2,70

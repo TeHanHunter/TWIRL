@@ -1,0 +1,27 @@
+{
+  "aperture_csv": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_pdo/aperture_survival_summary/best_aperture_per_injection.csv",
+  "created_utc": "2026-06-23T09:55:05.970360+00:00",
+  "failure_csv": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_topn5000_pdo/bls_failure_diagnostics/bls_recovery_failure_joined.csv",
+  "min_best_snr": 7.0,
+  "n_failure_rows": 1000,
+  "n_newly_recoverable_by_best_aperture": 66,
+  "n_priority_unique": 94,
+  "n_snr_qualified_bls_ranking_loss": 28,
+  "outputs": {
+    "newly_recoverable_by_best_aperture_queue": "reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/newly_recoverable_by_best_aperture_queue.csv",
+    "priority_debug_queue": "reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/priority_debug_queue.csv",
+    "priority_injection_ids": "reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/priority_injection_ids.txt",
+    "priority_tics": "reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/priority_tics.txt",
+    "snr_qualified_bls_ranking_loss_queue": "reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/snr_qualified_bls_ranking_loss_queue.csv"
+  },
+  "priority_reason_counts": {
+    "newly_recoverable_by_best_aperture": 66,
+    "search_ranking_loss": 28
+  },
+  "recommended_aperture_counts": {
+    "DET_FLUX_ADP": 2,
+    "DET_FLUX_ADP_LAG": 12,
+    "DET_FLUX_ADP_SML": 58,
+    "DET_FLUX_SML": 22
+  }
+}

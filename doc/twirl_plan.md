@@ -25,8 +25,10 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-05-19`: **TWIRL-FS v1 failed S57 dim-target QA; v2 is the active candidate.** The bad case TIC `1400694779` exposed that v1 fit one spline across the multi-day orbit gap, hit an `LSQUnivariateSpline` knot-condition failure, then silently fell back to a low-order polynomial. S57-S63 relight was stopped and normal S64+ finalize remains paused by `qc_pause.flag`. The candidate fix is `twirl-fs-v2`: independent cotrend fits across gaps larger than `0.5 d`, still using robust-auto subtractive scaling. See [methods](twirl_fs_methods.md) and progress log §2.6.
 - `2026-05-22`: **S56 TWIRL-FS v2 rebuilt for collaboration handoff.** Full S56 was rebuilt on `pdogpu6` at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2` using the current `twirl-fs-v2` code path. The initial run wrote `19,070` products and logged two transient I/O write failures; both failed TICs were retried successfully and reopen with `METHOD=twirl-fs-v2`, `GAPSPLIT=0.5`, and cotrend diagnostics. This is the current Franklin/Michelle handoff candidate while full product QA remains pending.
 - `2026-05-22`: **S56 compare-column product built for Franklin/Michelle.** The handoff tree `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare` keeps canonical `DET_FLUX` as `twirl-fs-v2` and adds experimental `DET_FLUX_ADP` columns using `twirl-fs-v2-adp03q` (`0.3 d` quantile-knot spline, `0.2 d` adaptive gap split). Full corrected rebuild wrote `19,072 / 19,072` FITS; the 100-target QA sample has all adaptive fits in spline mode and includes all 16 CCDs. Use canonical `DET_FLUX` by default and treat adaptive columns as opt-in comparison inputs.
-- `2026-06-02`: **S72-S93 prep is in its final tail, not complete.** On `pdogpu1`, S72-S90 have cutout-done markers and orbits 179-188 are complete. Latest reachable status (`2026-06-01 15:08 EDT`) had S91 orbit 189 still slowly writing (`2649/3136`) and S92 orbit 191 active but still at `0/3136`; S93 was pending. `qc_pause.flag` remains in place, so normal GPU finalize is still intentionally paused while TWIRL-FS v2 product QA remains the gate.
+- `2026-06-18`: **S56-S93 cutout prep/recovery is complete and size/count QA passed.** On `pdogpu1`, the refreshed S56-S93 completion map shows `38/38` sectors with cutout prep complete; the full source-pickle metadata sweep checked `1,216` orbit/camera/CCD source directories with `0` size/count issues. `qc_pause.flag` remains in place, so normal GPU finalize is still intentionally paused while TWIRL-FS v2 product QA remains the gate.
 - `2026-06-03`: **Current-stage talk and QA visuals wrapped for the post-talk checkpoint.** The clean local Keynote/PPTX deck is preserved in `outputs/` and the ignored `reports/exploratory/talks/2026-06-02-current-stage/` archive; the tracked repo now keeps only the reusable scripts and compact report artifacts. New presentation-facing QA products are the S56-S93 production-status map and the rebuilt WD 1856 S56 pixel-map diagnostic. The precision-plot work remains exploratory and should not be used as a final product-QA claim until the normalization/plotting choice is re-run and signed off.
+- `2026-06-10`: **ORCD 8xH200 downstream-compute path scoped.** The runnable Slurm partition is `pg_mki_aryeh` even though the administrative access wording from Paul was `orcd_ug_pg_mki_aryeh_all`; the first probe saw CPU nodes `node4701`/`node4702`, H200 node `node4900` (`gpu:h200:8`), and writable 200 TB project storage at `/orcd/data/mki_aryeh/001`. PDO remains the Stage 1 TGLC/ePSF production home; ORCD is for compact downstream exports, Stage 3 injection-recovery, Stage 4 GPU search, feature extraction, and later ML triage. Operational details live in [ORCD guide](orcd_h200_usage.md).
+- `2026-06-17`: **Julien joins the active collaboration/follow-up planning.** Meeting notes are recorded in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership). Immediate implications: compare S56 TWIRL-FS search/vetting results against Julien's SPOC Stage-1 candidate funnel, define what signal classes the current products are sensitive to before first-paper claims, and verify follow-up/funding routes before treating SPECULOOS, MISCOT, LCO 1m, EPRV, or proto-Lightspeed as executable paths.
 - `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
 ### Stage 2 note (2026-05-01)
@@ -115,7 +117,21 @@ Two parallel work streams; we own the LC-side comparison angle, Schwamb group ow
 
 ## Collaboration & Ownership (2026-05-13)
 
-This section captures the division of labor and the ownership-protection steps agreed at the Schwamb-group kickoff meeting on `2026-05-13`. Treat as live — update at every meeting with Michelle. Companion meeting note in progress log [§2.5](twirl_progress_log.md).
+This section captures the division of labor and the ownership-protection steps agreed at the Schwamb-group kickoff meeting on `2026-05-13`. Treat as live — update at every substantive collaboration meeting with Michelle, Julien, or other formal collaborators. Companion meeting notes live in progress log [§2.5](twirl_progress_log.md).
+
+### Julien collaboration note (2026-06-17)
+
+Julien is now part of the active TWIRL collaboration/follow-up planning. Treat this as a collaboration-scope change, not just a one-off consultation. The detailed meeting record is in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership).
+
+Near-term shared work:
+
+1. Compare validated S56 TWIRL-FS search/vetting outputs against Julien's SPOC Stage-1 candidate funnel.
+2. Use Julien's prior vetting experience to stress-test the candidate taxonomy: contaminating blends, SB2 / stellar-companion systems, WD+M-dwarf eclipsers, and planet-like occultation candidates should stay separate.
+3. Define what signal classes the current S56 products are actually sensitive to before making first-paper sensitivity or yield claims.
+4. Clarify follow-up funding/proposal routes, including whether a GI proposal is realistic and whether "Spitzer" is shorthand for a historical validation model, archival context, or a current JWST-style thermal-IR path.
+5. Verify instrument access before committing to any path: SPECULOOS, MISCOT/Avi four-band photometry, LCO 1m, EPRV, and proto-Lightspeed via Kevin Burdge are candidate options, not accepted project infrastructure yet.
+
+First-paper collaboration with Julien is in scope, but paper roles and authorship should be confirmed explicitly before writing or validation commitments depend on them.
 
 ### Who owns what
 
@@ -123,6 +139,7 @@ This section captures the division of labor and the ownership-protection steps a
 |---|---|---|
 | **TGLC light-curve production** (v3 flux-space-detrended HLSPs at scale) | Te Han (this repo) | Unambiguously ours. Includes the [twirl/preserve-negative-flux](https://github.com/TeHanHunter/TESS_Gaia_Light_Curve/tree/twirl/preserve-negative-flux) TGLC patch and the [flux_space_detrend](../src/twirl/lightcurves/flux_detrend.py) cotrend. Foundation of every downstream result. |
 | **Data steward for the survey LCs** | Te Han | Versioned tree, sidecar manifests, public release decisions. |
+| **Julien comparison / follow-up planning** | Te Han + Julien | Compare TWIRL S56 outputs against Julien's SPOC Stage-1 funnel, carry over useful vetting lessons, and jointly evaluate follow-up options. Instrument and funding paths are not accepted until access/proposal details are verified. |
 | **BLS (production search)** | Michelle's group | Their well-tuned implementation is the primary tool. Our [src/twirl/search/bls.py](../src/twirl/search/bls.py) becomes a comparison reference — useful as a sanity-check and for the v2-vs-v3 talk slide, not the headline. |
 | **LEO-Vetter tuning for WDs** | Joint experiment: Michelle's student + Franklin Chen one tuning; our [wd-host-tuning](https://github.com/TeHanHunter/LEO-Vetter/tree/wd-host-tuning) fork the other | Two independent tunings produce more learning than one. Talk presents both side-by-side. |
 | **Heuristic vetter** | Te Han (this repo) | [src/twirl/vetting/heuristic.py](../src/twirl/vetting/heuristic.py) — physics-motivated, non-rejecting, classifies into `vet_class`. Complementary to LEO. |
@@ -597,12 +614,339 @@ If a classifier is added, the training pipeline should include:
 - calibration of classifier scores
 - explicit evaluation versus magnitude, period, depth, and number of sectors
 
+#### S56 semi-supervised vetting layer (...)
+
+After the `2026-06-17` Julien meeting, the near-term TWIRL-owned ML path is a
+candidate-level semi-supervised **self-training / pseudo-labeling** layer, not
+a raw-light-curve discovery engine. The first teacher model is trained on
+human-vetted S56 candidates plus injection labels. It then assigns
+high-confidence pseudo-labels to the larger S56 candidate pool, and a student
+model is trained on the union of human/injection labels and explicitly
+provenanced pseudo-labels. Pseudo-labels are never treated as ground truth:
+they carry confidence, margin, source model, and iteration metadata, and the
+pipeline also emits a human-review queue of uncertain or high-value examples.
+
+Initial implementation lives in [module](../src/twirl/vetting/self_training.py),
+[driver](../scripts/stage5_validation/run_self_training_triage.py), and
+[config](../configs/detection/self_training_s56.yaml). It intentionally uses
+engineered BLS/vetter features so it can run on the existing S56 candidate
+tables without blocking on deep-learning infrastructure. Deep models can
+replace the estimator later once the labeled sample, injection products, and
+ORCD/PDO runtime are stable. The deep-learning target should be an
+AstroNet-like multi-aperture raw-light-curve branch combined with ExoMiner-like
+diagnostic inputs, not a drop-in stock AstroNet model trained on main-sequence
+host priors.
+
+Status (`2026-06-18`): the initial S56 v2 human-vetting template is ready in
+[CSV](../reports/stage5_validation/self_training_s56_v2/human_labels_template.csv)
+with a companion [guide](../reports/stage5_validation/self_training_s56_v2/labeling_guide.md),
+but it is now treated as a bootstrap sheet, not the final review substrate. The
+preferred review unit is an end-to-end candidate/recovery object with explicit
+provenance: TWIRL-FS v2 canonical `DET_FLUX` light curve, injection truth when
+present, BLS recovery columns, WD-tuned LEO-Vetter diagnostics, and then a human
+label. The browser vetter ([module](../src/twirl/vetting/lightcurve_label_app.py),
+[runner](../scripts/stage5_validation/run_lightcurve_vetting_app.py)) now
+presents pre-rendered LEO-Vetter reports first; the plain TWIRL light curve is
+collapsed fallback/debug context. Existing LEO outputs cover `51 / 300`
+bootstrap-template rows, so that sheet remains only a bootstrap/debug aid. The
+active pre-human-triage product is a `pdogpu6` full-S56, multi-aperture run
+that injects the same signal into `DET_FLUX_SML`, `DET_FLUX`, and
+`DET_FLUX_LAG`, runs BLS recovery across all three apertures, and renders
+WD-tuned LEO reports using each row's representative aperture. The final
+`100` real + `900` injected review queue passed the pre-label verifier on PDO:
+`1,000` rows, `1,000` referenced LEO report files, `0` LEO metric errors, WD
+1856 exactly once as `PC`, and finite per-aperture injected-row SDE/recovery
+columns. The queue lives under
+`reports/stage5_validation/s56_pretriage_review_queue_pdo/`, and the PDO
+browser app is live in tmux session `twirl-pretriage-vetting-app`, writing
+labels to `human_labels_vetted.csv` beside the queue.
+
+Status (`2026-06-22`): the `1,000`-row queue remains the pilot for confirming
+that injected signals are visually recoverable. The next production review
+sample is a blinded `10,000`-row S56 queue: `9,000` stratified real BLS/vetter
+candidates plus `1,000` LC-level injections. The injected subset now spans
+small bodies through giant-planet/brown-dwarf-size occulters using finite-
+exposure `batman` models, not box dips. The active sampling default is a
+balanced period-depth grid with truth metadata for target depth, finite-
+exposure model depth, cadence-sampled model depth, radius, impact parameter,
+`a/Rs`, inclination, and grid cell. LEO rendering now uses a plot-only
+sanitized copy of each metrics object so pathological fitted models no longer
+force fallback sheets. PDO entrypoints are the pure-injection [1k launcher](../scripts/stage5_validation/run_s56_1k_batman_review_pdo.sh)
+and the mixed [10k launcher](../scripts/stage5_validation/run_s56_10k_blind_review_pdo.sh).
+
+Status (`2026-06-22`, update): the post-detrend queues above are now treated as
+UI and plumbing tests only. The active scientifically useful review pilot is
+the raw-flux pre-detrend `1,000`-row queue built by [pre-detrend launcher](../scripts/stage5_validation/run_s56_1k_predetrend_review_pdo.sh):
+BATMAN signals are injected into raw TGLC `RawFlux`, canonical and ADP
+TWIRL-FS detrending are rerun, then BLS and WD-tuned LEO are applied. The
+completed two-column comparison queue has `1000/1000` LEO PDFs and `0` LEO
+metric/plot errors, but the human-facing pilot has been rebuilt as ADP-only:
+`DET_FLUX_ADP` BLS/LEO for all `1,000` rows, `0` LEO errors, and
+`32/1000` BLS recoveries. It is served locally on `127.0.0.1:5005`.
+Pixel-level injections now have a working source-pickle/ePSF smoke prototype
+on PDO, including an ePSF-refit test and a full pixel -> TGLC HDF5 ->
+TWIRL-FS -> BLS smoke path, but should be a calibration subset rather than
+the immediate human-vetting queue. The full-chain smokes reproduce the current
+search weakness: broad wrong-period BLS peaks outrank injected 2-3 minute WD
+signals. See [feasibility report](../reports/stage3_injections/s56_pixel_vs_predetrend_feasibility.md).
+
+Status (`2026-06-22`, diagnostic update): the ADP-only pre-detrend pilot is
+now a **detrending/search failure diagnostic**, not a completeness sample.
+PDO signal-survival measurements show raw aperture injections retain most of
+the BATMAN depth at the truth ephemeris (median retention `0.82`), but
+`DET_FLUX_ADP` retains only `0.28` at the median and only `0.23` for
+`Tmag >= 19`. Strict BLS recovery is strongly magnitude/period dependent:
+`22/97` for `Tmag < 18`, `4/684` for `Tmag >= 19`, and `0/400` for
+`P >= 2 d`. Re-running BLS with WD-short duration grids improves only
+`32/1000 -> 38/1000`. The sharper SNR diagnostic is that `929/1000`
+ADP rows have empirical multi-transit SNR `< 7`; BLS recovery rises to
+`14/17` only once SNR exceeds `20`, while high-SNR misses are
+`bls_peak_mismatch` cases where harmonics or broad long-period structure
+outrank the injected period. An `inferred_aperture` baseline smoke did not
+materially change recovery (`7/200`), so the next gate is preserving injected
+depth through detrending, using the new exact/top-N/harmonic recovery columns
+to isolate BLS ranking failures, and suppressing broad systematics peaks before
+scaling the 10k human-vetting or recovery sample. A PDO rebuild with the new
+columns showed that the old `32/1000` strict ADP recovery at `n_periods=5000`
+contains `11` exact top-N recoveries and `25` harmonic top-N matches; increasing
+to `n_periods=200000` raises strict top-1 recovery to `50/1000` and recovers
+all empirical-SNR `>20` cases, but still leaves `923/1000` unmatched rows.
+Thus the search needs both a denser/refined BLS branch for high-SNR aliases and
+a detrending/SNR-preservation branch for the dominant faint low-SNR failures.
+Signal-survival diagnostics also show the small ADP aperture is the most
+promising next search input (`DET_FLUX_ADP_SML` median empirical multi-SNR
+`1.58`, `124` rows above SNR 7) relative to medium ADP (`0.89`, `71` above
+SNR 7). The next PDO recovery-mode sweep should therefore compare small,
+medium, and large ADP apertures before freezing the human-vetting evidence
+aperture.
+
+Until that sweep completes, the immediate human-check queue is the SNR-
+stratified subset built from the existing ADP-only 1k product:
+[queue](../reports/stage5_validation/s56_1k_predetrend_batman_adp_only_snr_stratified_review_queue/review_queue.csv).
+It keeps all `32` strict recoveries, all `11` exact top-N-only cases, all
+`25` harmonic top-N cases, and a controlled set of unmatched low/mid/high-SNR
+rows, with all `300` rows linked to already-rendered LEO PDFs. Use this queue
+for near-term human visual checks; use the full 1k for completeness accounting.
+Start the local app with
+[launcher](../scripts/stage5_validation/run_s56_snr_stratified_vetting_app_local.sh),
+which defaults to `127.0.0.1:5006` and writes labels beside the queue.
+
+Status (`2026-06-23`, diagnostic update): a reusable BLS-failure diagnostic
+[script](../scripts/stage5_validation/diagnose_bls_recovery_failures.py) now
+confirms the current losses are structured, not random. In the ADP-only
+pre-detrend 1k queue, any exact-or-harmonic period match is `10/11` for
+`Tmag < 16`, `17/68` for `17 <= Tmag < 18`, only `15/659` for
+`19 <= Tmag < 20`, and `0/25` for `Tmag >= 20`. Empirical post-detrend
+signal SNR explains the trend more directly: any period match is `6/527` for
+SNR `<1`, `11/24` for SNR `7-10`, `15/30` for SNR `10-20`, and `17/17` for
+SNR `>20`. Therefore the immediate priority remains signal preservation and
+aperture/search comparison, not simply scaling the same ADP setup to more
+rows. With a recoverable-SNR gate at `7`, the current decomposition is
+`904/1000` low-SNR unmatched rows, `68/1000` exact-or-harmonic matches, and
+only `28/1000` SNR-qualified BLS-ranking losses. Treat those `28` as the
+near-term search-statistic debugging set; treat the `904` as evidence that the
+detrender/aperture product is not preserving enough signal for the faint
+injected population.
+
+Status (`2026-06-23`, aperture update): all-aperture signal-survival summary
+shows the small detrended apertures are the clear next search inputs. The best
+single product is `DET_FLUX_ADP_SML` with `124/1000` rows above empirical SNR
+`7`, compared with `71/1000` for current medium `DET_FLUX_ADP`; canonical
+`DET_FLUX_SML` is close at `117/1000`. Best-of-all detrended apertures reaches
+only `137/1000`, so aperture selection roughly doubles the SNR-qualified set
+but does not solve the dominant faint low-SNR problem. The next PDO sweep
+should prioritize `DET_FLUX_ADP_SML` and `DET_FLUX_SML`; any `10k` scale-up
+should wait until this is confirmed through BLS/LEO, not only truth-window
+survival.
+
+Status (`2026-06-23`, priority queue update): the next PDO debug run now has a
+compact target list in
+[queue dir](../reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/).
+It contains `94` unique injected rows: `28` SNR-qualified BLS-ranking failures
+and `66` rows newly above empirical SNR `7` under their best aperture. This is
+the correct targeted set for search-statistic and aperture experiments before
+rerendering a larger human-vetting queue. Recommended apertures in this set are
+dominated by `DET_FLUX_ADP_SML` and `DET_FLUX_SML`.
+
+Status (`2026-06-23`, targeted sweep update): the recovery-mode sweep driver
+now supports `--injection-id-file`, and
+[priority PDO launcher](../scripts/stage5_validation/run_s56_predetrend_priority_recovery_sweep_pdo.sh)
+uses the `94`-row priority list by default. Run this targeted sweep before the
+full 1k sweep when PDO SSH returns; it should answer whether small-aperture BLS
+actually recovers the rows that the truth-window survival diagnostic says are
+now SNR-qualified.
+
+Status (`2026-06-23`, sweep-decision update): the priority PDO launcher now
+runs a post-sweep verifier
+[script](../scripts/stage5_validation/summarize_priority_recovery_sweep.py).
+Use its `priority_sweep_summary/summary.json` and delta table to decide the
+next branch: if small apertures add many matches relative to `adp_priority_5k`,
+run the full 1k small-aperture sweep and rebuild the human queue on that
+evidence; if not, the limiting step is not aperture choice and the next work
+should focus on detrending/search-statistic changes.
+
+Status (`2026-06-23`, targeted sweep result): the `94`-row priority sweep now
+confirms the small-aperture branch. Medium ADP recovered only `7/94`
+exact-or-harmonic matches (`2` top-1). `DET_FLUX_ADP_SML` recovered `65/94`,
+canonical `DET_FLUX_SML` recovered `55/94`, and the small-aperture pair reached
+`77/94` with the dense `200k` period grid (`73/94` top-1). The full `1k`
+recovery-mode sweep should therefore prioritize `DET_FLUX_ADP_SML +
+DET_FLUX_SML` before any larger `10k` queue is built.
+
+Status (`2026-06-23`, detrending-method update): a direct method sweep over
+stored original/injected raw TGLC `RawFlux` arrays finds that detrending is
+still a sensitivity bottleneck in the full faint-heavy pilot, but no tested
+alternate detrending family preserves most injected signals while also removing
+most long-timescale trends. On the full `1,000` injection set, the current ADP
+small-aperture product reaches `124/1000` rows above empirical SNR `7`, median
+depth retention `0.496`, and trend reduction `0.933`. A fine-grid follow-up
+finds the best cheap non-oracle branch is a short rolling median:
+`median015_gap05` gives `128/1000` rows above empirical SNR `7`, retention
+`0.489`, and trend reduction `0.982`; `0.20-0.30 d` median windows are nearly
+tied and preserve slightly more depth with more residual trend. This is useful
+for a future BLS/LEO comparison, but it is not a completeness-changing
+improvement. Percentile/envelope filters, coarser splines, polynomials,
+Savitzky-Golay filters, and constant baselines do not improve usable SNR; an
+oracle transit-masked ADP spline reaches only `126/1000`, adding just `2` rows
+over current ADP. The practical decision remains to prioritize small apertures
+and the search grid first, not to replace the detrending method as the main
+fix.
+Audit: [report](../reports/stage5_validation/s56_1k_predetrend_detrending_method_audit.md).
+
+Status (`2026-06-23`, active 1k queue): the interrupted dense full-`1k`
+small-pair sweep has been replaced by a restartable chunked PDO run and is now
+complete. The current best injected-recovery table uses `DET_FLUX_ADP_SML +
+DET_FLUX_SML` with a `200k` BLS period grid: `137/1000` strict top-rank
+recoveries, `177/1000` exact/top-N/harmonic recoveries, and the expected
+high-SNR behavior (`35/35` top-rank recoveries above empirical SNR `20`). A
+new LEO-only local review queue has been built from this table with `1,000`
+rows, `1,000` full WD-tuned LEO reports, `0` LEO metric/plot errors, shuffled
+blinded metadata, and class counts `FA=923`, `PC=72`, `FP=5`. Use this queue
+for the immediate visual check; it replaces the older medium-ADP and
+SNR-stratified pilot queues. It is still not the final `10k` mixed
+real+injected sample.
+
+Status (`2026-06-23`, dense sensitivity map result): the dense pre-detrend
+BATMAN period-depth grid completed on `pdogpu6` and was synced locally. The run
+uses `10,000` raw-flux injections over a `50 x 50` period-depth grid, reruns
+TWIRL-FS detrending, then applies the same `DET_FLUX_ADP_SML + DET_FLUX_SML`,
+`200k`-period BLS recovery path used by the current 1k queue. The merged table
+has `10000/10000` rows across `100` chunks: `1273/10000` strict top-rank BLS
+recoveries and `1683/10000` exact/top-N/harmonic period matches. Recovery is
+strongly Tmag-conditioned: exact/top-N/harmonic match fractions are `83%` for
+`Tmag < 16`, `57%` for `17 <= Tmag < 18`, `27%` for `18 <= Tmag < 19`, and
+`9%` for `19 <= Tmag < 20`. The global recovery rate is therefore dominated by
+the S56 faint-target distribution and should not be quoted without a Tmag slice.
+Artifacts live under [parameter-space plots](../reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/parameter_space/):
+the dense point cloud, raw binned recovery fractions, Tmag-sliced fractions,
+and a kernel-smoothed 50% BLS sensitivity boundary. The smoothed boundary gives
+the clean visual trend requested for methods inspection; the raw binned plots
+remain the audit trail.
+
+Status (`2026-06-24`, duration/radius visualization): the dense map now has a
+duration-aware companion visualization that plots the 50% BLS recovery cutoff
+as companion radius, not transit depth. The adopted visual model is physically
+constrained to the BLS signal proxy `R_p^2 sqrt(duration / period)` plus Tmag,
+which avoids over-fitting the correlated period-duration-radius sampling. The
+recommended artifacts are now the period-radius 50% boundary split by fixed
+duration and the empirical period-radius recovery-fraction map split by
+duration and Tmag in
+[duration-aware plots](../reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/).
+These views replace the literal 3D plane as the presentation path: planet
+radius is directly readable, duration is handled by panels, and the raw binned
+map remains the audit trail. For bright WDs the 50% boundary lies inside the
+injected planet/brown-dwarf radius range; by the faint end the cutoff is often
+beyond the injected radius range. The LEO comparison on the `1,000`
+LEO-rendered injected rows shows LEO is **not** yet a near-complete proxy for
+BLS recovery: LEO `PC/FP` has `98.7%` precision relative to BLS exact/top-N/
+harmonic matches, but only `42.9%` recall. The metric split shows those
+BLS-recovered LEO-FA cases are lower-MES, fewer-cadence, higher-SHP events
+relative to the LEO PC/FP subset, so the next LEO step is targeted WD retuning
+and an explicit review/recovered-but-not-clean class, not blind threshold
+loosening. The defensible methods wording remains: BLS recovery says whether
+the search tracks the injected signal; LEO recovery is a stricter
+high-confidence vetting subset.
+
+Status (`2026-06-24` EOD): wrap checkpoint keeps the S56 raw-flux
+pre-detrend injection-recovery path as the active methods branch. The best
+current search input is still `DET_FLUX_ADP_SML + DET_FLUX_SML` with the
+dense `200k` BLS grid; the dense `10k` period/radius maps are the sensitivity
+visuals; and the `1k` LEO-only injection queue is the immediate human
+visual-check substrate. Next work should keep three labels separate:
+BLS-tracked injection recovery, LEO class, and human object-type label. LEO
+tuning should be calibrated against that split with a review/recovered-but-not-
+clean bucket rather than by blindly loosening PC thresholds.
+
+Status (`2026-06-23`, `10k` mixed queue result): the mixed scientific queue is
+now built from a matching real-candidate search, not the older medium/
+large-aperture S56 table. The PDO runner
+[script](../scripts/stage5_validation/run_s56_small_pair_stage2_10k_pdo.sh)
+searched the S56 TWIRL-FS v2 compare tree using `DET_FLUX_ADP_SML +
+DET_FLUX_SML`, then applied the heuristic vetter, centroid enrichment, and a
+blinded `9,000` real + `1,000` pre-detrend BATMAN injection LEO queue build.
+The strict verifier passed on PDO: `10,000` review rows, `10,000` LEO reports,
+`0` LEO metric errors, `0` LEO plot fallbacks, source counts `9000` real +
+`1000` injection-recovery, and LEO classes `FA=9905`, `PC=82`, `FP=13`.
+Local metadata is synced in
+[queue dir](../reports/stage5_validation/s56_10k_predetrend_small_pair_200k_review_queue_pdo/);
+the full PDF directory remains on PDO because it is `4.5 GB`.
+
+Pre-human-labeling path:
+
+1. Use the accepted S56 pilot light-curve product:
+   `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare`.
+   The canonical product remains TWIRL-FS v2 `DET_FLUX`; model/training
+   inputs must preserve all three aperture channels (`DET_FLUX_SML`,
+   `DET_FLUX`, `DET_FLUX_LAG`) because aperture behavior is evidence, not a
+   nuisance column.
+2. Build a compact full-S56 HDF5 export on PDO from the HLSP FITS tree. This is
+   the transfer/training boundary; do not move raw TGLC cutouts or FFI products
+   for this step.
+3. Generate LC-level injected positives with finite-exposure `batman` transit
+   models, injecting the same model into all three apertures for each selected
+   target. Store injection truth, split, source target, aperture baselines, and
+   original/injected arrays.
+4. Run the transparent search/vetting stack before human labels: BLS recovery
+   across all three apertures, per-aperture recovery status, representative
+   aperture selection, WD-tuned LEO-Vetter metrics/reports, and real-candidate
+   provenance from the S56 BLS/vetter table.
+5. Produce the browser-ready review queue only after the above steps are
+   complete. The active pilot queue is the `1,000`-row raw-flux pre-detrend
+   injected sample rendered through the small-aperture pair
+   `DET_FLUX_ADP_SML + DET_FLUX_SML` with dense `200k` BLS recovery and
+   LEO-only reports. The next queue should not scale to `10k` until this
+   small-aperture evidence path passes human visual spot checks; after that,
+   use a blinded mixed sample of real candidates plus injected recovery rows.
+   Human labels attach to these queues, not to raw light curves or the old
+   `300`-row bootstrap sheet.
+6. Gate before labeling a mixed real+injected training queue: WD 1856 must be
+   present once in the real-candidate subset and render as `PC` under the
+   WD-tuned LEO path using its representative aperture. For injection-only
+   signal-visibility queues, the gate is instead full LEO coverage with zero
+   plot fallbacks and verified hidden truth metadata. In all cases, the queue
+   must contain LEO report filenames for the rows attempted; injected rows must
+   expose per-aperture `sde_*` and `recovery_status_*` columns; and the browser
+   vetter must load the queue with LEO reports as the primary evidence panel.
+7. Run [verifier](../scripts/stage5_validation/verify_s56_pretriage_queue.py)
+   on the PDO queue before labeling. Only launch the labeling app if the
+   verifier passes. The PDO app entrypoint is
+   [launcher](../scripts/stage5_validation/run_s56_pretriage_vetting_app_pdo.sh),
+   which writes labels to `human_labels_vetted.csv` beside the review queue.
+
+Only after those gates pass should the teacher/student self-training run use
+human labels. The interim table model may use engineered BLS, LEO, centroid,
+and aperture features, but stock AstroNet is not the accepted model path.
+Future deep learning should use an AstroNet-like multi-aperture folded-light-
+curve branch combined with diagnostic features, trained/evaluated on the
+TWIRL-specific WD injection and human-label distribution.
+
 ### Stage 2 Deliverables
 
 - reproducible periodic-search baseline
 - reproducible dip-search baseline
 - reproducible training set definition
 - trained detector checkpoint(s), if justified
+- pseudo-label table and human-review queue for semi-supervised vetting
 - evaluation report
 - inference script that scores the full TWIRL archive
 
@@ -615,6 +959,26 @@ Stage 3 should explicitly keep two injection levels separate:
 - **LC-level injections**: inject signal models into existing raw or detrended light-curve products before the relevant downstream step. This is the correct fast path for the S56 talk, v2-vs-TWIRL-FS comparisons, detrend signal-preservation tests, and dense grids over period, duration, depth, Tmag, and sector count. It does **not** measure failures in extraction, deblending, aperture selection, or pixel-level contamination.
 - **Pixel-level injections**: inject synthetic occultation signals into the cutout/FFI pixel data before ePSF fitting and aperture extraction, then run the real TGLC/TWIRL light-curve builder and search stack. This is slower and should be run on a calibration subset, but it is the completeness layer needed for publication-grade occurrence rates because it includes extraction systematics, crowding, aperture disagreements, and centroid/on-target behavior.
 - **Adopt a two-stage protocol**: use LC-level injections for iteration and first-order completeness surfaces; use pixel-level injections to calibrate where the LC-level approximation breaks, especially near the faint limit, in crowded fields, and for candidates where centroid or aperture behavior drives classification.
+
+The ORCD/H200 path should start from compact S56 TWIRL-FS v2 exports, not raw
+TGLC or TICA trees. The current transfer scaffold is [export script](../scripts/stage3_injections/export_s56_lc_training_set.py)
+plus [injection builder](../scripts/stage3_injections/make_s56_lc_injection_training_set.py)
+and [config](../configs/injections/s56_lc_training_export.yaml): export the
+`~19k` S56 HLSP-derived light curves on PDO or another spacious working disk,
+build injected positive examples in the WD1856-like, short-deep, and
+Roche-boundary regimes, move the HDF5/manifest/candidate tables to
+`/orcd/data/mki_aryeh/001/twirl/exports/`, and use H200 jobs for LC-level
+injection-recovery, GPU search equivalence, and later raw-LC model experiments.
+
+For detrending validation, the current PDO path is [pre-detrend builder](../scripts/stage3_injections/make_s56_predetrend_injection_set.py):
+inject into raw TGLC `RawFlux`, rerun canonical/ADP TWIRL-FS detrending, and
+feed the resulting injection HDF5 into the existing BLS/LEO review builder.
+This is the default path for the next S56 human-vetting sample until the
+pixel-level calibration subset is scaled beyond the current [smoke wrapper](../scripts/stage3_injections/run_s56_pixel_injection_smoke.py).
+The smoke wrapper can now write TWIRL-FS FITS and BLS summaries, and its first
+full-chain tests show non-recovery caused by broad wrong-period BLS peaks. Fix
+that search/detrending failure before expanding either raw-aperture or
+pixel-level injection counts.
 
 ### 3.1 Injection design
 
@@ -731,6 +1095,7 @@ Current planning assumption for MIT-affiliated follow-up:
 - identify which MIT-access high-speed photometric instrument is actually schedulable for WD transit windows
 - build a rapid-response workflow around short predicted windows and sub-minute cadence requirements
 - **WINTER + SPRING (MIT-GO, 2026B call ~mid-May)**: primary near-IR follow-up channel. Y/J/Hs (`0.9–1.7 µm`) gives the depth-vs-band lever arm for planet vs BD vs EB-FP discrimination (cool companions add NIR flux that a giant planet does not). Reach: WINTER `J~18.5` in `960 s` (1°×1° survey FOV); SPRING `J~19.5` in `960 s` (9'×7' precision FOV with 0.4″ pixels). Operationally easy: automated reduction+differencing pipeline, Python queue API. Two-tier plan — WINTER for transit-window re-observation, SPRING for ingress/egress shape on high-priority candidates. The 2026B proposal is a forward-looking commitment for the 40-sector cohort (TWIRL's first candidates land post-Stage-4); pre-deadline TODOs: (a) compute J-band reachability of `twirl_wd_master_catalog_v0_tesscoverage.fits` to quote concrete reachable-target counts, (b) anchor proposal narrative on WD 1856 + a faint S100 candidate.
+- **Julien meeting additions (2026-06-17; not yet verified):** evaluate SPECULOOS, MISCOT/Avi four-band photometry, LCO 1m, EPRV, and proto-Lightspeed/Kevin Burdge as possible follow-up channels. Clarify follow-up funding and whether a GI proposal around TWIRL targets is realistic. Treat Spitzer as a meeting-note keyword to disambiguate, not a current observing option, unless the intended meaning is archival or a JWST successor program.
 
 Follow-up readiness criteria should be satisfied before requesting telescope time for a periodic candidate:
 
@@ -802,4 +1167,6 @@ A publishable null result still requires:
 6. Define the consolidated HDF5-to-TWIRL index format and attach QA metrics.
 7. Audit Gaia-first target support and decide what MIT fork changes are needed for targets without TIC IDs.
 8. Build the transparent periodic and dip-search baselines before committing to an ML-heavy workflow.
-9. Lock down follow-up readiness and coordination only after the candidate-validation criteria are stable.
+9. Build the S56 self-training vetting loop on top of transparent candidate tables: human-label template, injection labels, teacher pseudo-labels, student scores, and review queue.
+10. Stage compact TWIRL-FS exports for ORCD and run S56 equivalence tests before scaling H200 injection-recovery or search jobs.
+11. Lock down follow-up readiness and coordination only after the candidate-validation criteria are stable.

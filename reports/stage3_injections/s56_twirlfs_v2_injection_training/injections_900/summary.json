@@ -1,0 +1,25 @@
+{
+  "aperture": "DET_FLUX",
+  "created_utc": "2026-06-18T04:40:04.560246+00:00",
+  "labels_csv": "/pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_injection_training/injections_900/injection_labels.csv",
+  "manifest_csv": "/pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_injection_training/injections_900/injection_manifest.csv",
+  "n_injections": 900,
+  "out_h5": "/pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_injection_training/injections_900/injected_lightcurves.h5",
+  "signal_family_counts": {
+    "roche_boundary": 300,
+    "short_deep": 300,
+    "wd1856_like": 300
+  },
+  "skipped": {
+    "epoch_placement_failed": 0,
+    "missing_aperture": 0,
+    "no_good_flux": 0
+  },
+  "source_export_h5": "/pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_lc_export_1000.h5",
+  "split_counts": {
+    "test": 164,
+    "train": 619,
+    "validation": 117
+  },
+  "total_attempts": 900
+}

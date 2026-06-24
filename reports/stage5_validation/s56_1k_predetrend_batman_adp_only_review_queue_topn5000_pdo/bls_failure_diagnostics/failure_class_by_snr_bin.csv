@@ -1,0 +1,8 @@
+snr_bin,low_snr_unmatched,matched_exact_topn,matched_harmonic_topn,matched_top1,snr_qualified_bls_ranking_loss
+<1,521,0,6,0,0
+1-3,269,1,6,1,0
+3-5,88,3,4,1,0
+5-7,26,1,1,1,0
+7-10,0,3,3,5,13
+10-20,0,2,3,10,15
+>20,0,1,2,14,0

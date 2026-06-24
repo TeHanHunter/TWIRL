@@ -1,0 +1,43 @@
+# Compact S56 TWIRL-FS v2 light-curve export for ORCD/H200 training and
+# injection-recovery pilots. Raw TGLC/TICA products stay on PDO.
+
+sector: 56
+product: twirlfs_v2
+
+local_hlsp_root: data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare
+pdo_hlsp_root: /pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2
+
+local_smoke_out_h5: data_local/stage3_injections/s56_twirlfs_v2_lc_export/smoke_s56_twirlfs_v2_lc_export.h5
+pdo_export_out_h5: /pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_lc_export.h5
+pdo_pilot_1000_out_h5: /pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_lc_export_1000.h5
+orcd_export_dir: /orcd/data/mki_aryeh/001/twirl/exports/s56_twirlfs_v2
+
+injection_training:
+  local_smoke_out_dir: data_local/stage3_injections/s56_twirlfs_v2_injection_training_smoke
+  pdo_pilot_900_out_dir: /pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_injection_training/injections_900
+  pdo_full_out_dir: /pdo/users/tehan/twirl_stage3/s56_twirlfs_v2_injection_training
+  default_aperture: DET_FLUX
+  default_signal_families:
+    - wd1856_like
+    - short_deep
+    - roche_boundary
+  default_n_injections: 3000
+
+flux_columns:
+  - DET_FLUX_SML
+  - DET_FLUX
+  - DET_FLUX_LAG
+
+candidate_tables:
+  local_v2_centroid: data_local/stage2/bls_first_pass_v2/sector_0056/vetted_per_tic_centroid.parquet
+  pdo_v2_centroid: /pdo/users/tehan/twirl_stage2/bls_first_pass_v2/sector_0056/vetted_per_tic_centroid.parquet
+
+training_labels:
+  human_template: reports/stage5_validation/self_training_s56_v2/human_labels_template.csv
+  label_guide: reports/stage5_validation/self_training_s56_v2/labeling_guide.md
+
+acceptance_checks:
+  - exported TIC count matches the selected S56 HLSP input count
+  - representative cadence counts match source FITS files
+  - WD 1856 is present and has the expected S56 cadence count
+  - manifest records source paths, target metadata, and skipped-file counts

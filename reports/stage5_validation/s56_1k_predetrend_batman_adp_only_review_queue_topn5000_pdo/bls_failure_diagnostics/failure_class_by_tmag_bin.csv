@@ -1,0 +1,7 @@
+tmag_bin,low_snr_unmatched,matched_exact_topn,matched_harmonic_topn,matched_top1,snr_qualified_bls_ranking_loss
+<16,1,1,0,9,0
+16-17,5,1,5,4,3
+17-18,41,2,6,9,10
+18-19,193,6,4,6,10
+19-20,639,1,10,4,5
+>20,25,0,0,0,0

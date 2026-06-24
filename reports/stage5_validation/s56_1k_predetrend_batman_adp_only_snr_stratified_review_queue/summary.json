@@ -1,0 +1,30 @@
+{
+  "aperture": "DET_FLUX_ADP",
+  "base_queue_csv": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_pdo/review_queue.csv",
+  "created_utc": "2026-06-23T02:53:41.350536+00:00",
+  "min_per_stratum": 20,
+  "n_base_rows": 1000,
+  "n_selected_rows": 300,
+  "random_state": 5606,
+  "rare_cap": 80,
+  "reports_path": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_snr_stratified_review_queue/vet_reports",
+  "selected_recovery_modes": {
+    "bls_peak_mismatch": 232,
+    "bls_top1_recovered": 32,
+    "bls_topn_harmonic_match": 25,
+    "bls_topn_recovered": 11
+  },
+  "selected_strata": {
+    "bls_peak_mismatch_snr_10_20": 15,
+    "bls_peak_mismatch_snr_1_3": 69,
+    "bls_peak_mismatch_snr_3_5": 30,
+    "bls_peak_mismatch_snr_5_7": 23,
+    "bls_peak_mismatch_snr_7_10": 13,
+    "bls_peak_mismatch_snr_lt1": 82,
+    "bls_top1_recovered": 32,
+    "bls_topn_harmonic_match": 25,
+    "bls_topn_recovered": 11
+  },
+  "survival_csv": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_pdo/predet_signal_survival_snr_diagnostics.csv",
+  "topn_queue_csv": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_topn5000_pdo/review_queue.csv"
+}

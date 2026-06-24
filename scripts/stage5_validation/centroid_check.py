@@ -37,23 +37,27 @@ if str(SRC_ROOT) not in sys.path:
 
 from twirl.io.hlsp import read_hlsp  # noqa: E402
 from twirl.vetting.centroid_offset import centroid_in_out_shift  # noqa: E402
+from twirl.vetting.lightcurve_label_app import find_hlsp_path  # noqa: E402
 
 WD_1856_TIC = 267574918
 
 
-def _hlsp_path(root: Path, tic: int, sector: int) -> Path:
+def _hlsp_path(root: Path, tic: int, sector: int) -> Path | None:
     s = f"{tic:016d}"
-    return (
+    legacy = (
         root / s[0:4] / s[4:8] / s[8:12] / s[12:16]
         / f"hlsp_qlp_tess_ffi_s{sector:04d}-{s}_tess_v01_llc.fits"
     )
+    if legacy.exists():
+        return legacy
+    return find_hlsp_path(root, tic, sector)
 
 
 def _check_one(args: tuple) -> dict:
     tic, sector, P, T0, dur, hlsp_root_str = args
     hlsp_root = Path(hlsp_root_str)
     p = _hlsp_path(hlsp_root, tic, sector)
-    if not p.exists():
+    if p is None or not p.exists():
         return {"tic": int(tic), "centroid_status": "no_hlsp", "centroid_pass": False}
     try:
         lc = read_hlsp(p, columns=("SAP_FLUX",))
@@ -150,7 +154,10 @@ def main() -> int:
         print(f"[centroid] reclassified {n_off} candidates as off_target_suspect")
 
     merged.to_parquet(out_parquet, compression="zstd")
+    out_csv = out_parquet.with_suffix(".csv")
+    merged.to_csv(out_csv, index=False)
     print(f"[centroid] wrote {out_parquet}  ({len(merged):,} rows)")
+    print(f"[centroid] wrote {out_csv}  ({len(merged):,} rows)")
 
     status_counts = merged["centroid_status"].value_counts()
     print(f"\n[centroid] status distribution:")

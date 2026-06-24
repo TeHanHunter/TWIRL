@@ -118,6 +118,11 @@ Main false positives for WD transit searches differ from FGK surveys:
 - What cadence and timing precision are required before a periodic candidate is follow-up ready?
 - What is the confirmation path for irregular or non-repeatable events?
 - How should apparently irregular or aperiodic events be handled scientifically?
+- Julien meeting follow-up thread (`2026-06-17`): what funding/proposal path supports candidate follow-up, and is a GI proposal around TWIRL targets realistic?
+- Disambiguate "Spitzer" from the Julien meeting: archival/legacy comparison, historical funding model, or current JWST-style thermal-IR validation path?
+- Verify concrete access, cadence, depth, filters, and lead time for SPECULOOS, MISCOT/Avi four-band photometry, LCO 1m, EPRV, and proto-Lightspeed/Kevin Burdge before any becomes an accepted follow-up route.
+- Use Julien's SPOC Stage-1 funnel as a vetting stress test: starting from `~37,000`, a few hundred raw candidates, `~40` after contaminant/SB2 vetting, and `~10` WD+transiting-M-dwarf-like systems with low-resolution RV support. Which cuts and diagnostics transfer cleanly to TWIRL?
+- What signal classes is S56 TWIRL-FS v2 sensitive to today, and how should that be compared against Julien's SPOC-stage result set?
 
 ---
 

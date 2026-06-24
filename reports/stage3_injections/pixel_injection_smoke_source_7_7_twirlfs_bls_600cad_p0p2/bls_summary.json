@@ -1,0 +1,43 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP",
+    "DET_FLUX"
+  ],
+  "best_aperture": "DET_FLUX_ADP",
+  "best_sde": 3.865696344299384,
+  "best_status": "ok",
+  "hlsp_path": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_600cad_p0p2/twirlfs_injected/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+  "per_aperture": {
+    "DET_FLUX": {
+      "depth": 0.2553029662905325,
+      "depth_snr": 1.037621527949327,
+      "duration_min": 15.0,
+      "peak_rank": 1,
+      "period_d": 0.3627715974007435,
+      "period_rel_err": 0.8138579870037174,
+      "recovered": false,
+      "sde": 3.865696344299384,
+      "status": "ok",
+      "t0_bjd": 2459825.509220133,
+      "t0_phase_err_min": -31.48825769126414
+    },
+    "DET_FLUX_ADP": {
+      "depth": 0.2553029662905325,
+      "depth_snr": 1.037621527949327,
+      "duration_min": 15.0,
+      "peak_rank": 1,
+      "period_d": 0.3627715974007435,
+      "period_rel_err": 0.8138579870037174,
+      "recovered": false,
+      "sde": 3.865696344299384,
+      "status": "ok",
+      "t0_bjd": 2459825.509220133,
+      "t0_phase_err_min": -31.48825769126414
+    }
+  },
+  "recovered_any": false,
+  "recovered_apertures": [],
+  "truth_duration_min": 2.0,
+  "truth_period_d": 0.2,
+  "truth_t0_bjd": 2459825.7310869787
+}

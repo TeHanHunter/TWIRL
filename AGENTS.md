@@ -11,9 +11,11 @@ Before making substantive changes, read:
 - `doc/mit_tglc_usage_guide.md`
 - `doc/ideas.md`
 - `doc/local_data.md`
+- `doc/orcd_h200_usage.md` before planning or running ORCD/H200 jobs
 - `doc/plotting_style.md` before making or revising publication-facing figures
 
 Use `doc/twirl_plan.md` as the single forward-looking project plan, `doc/twirl_progress_log.md` for dated execution history and benchmark notes, `doc/ideas.md` for unresolved questions and brainstorming, `doc/local_data.md` for local-only data conventions, and `doc/plotting_style.md` for figure styling.
+Use `doc/orcd_h200_usage.md` for ORCD/Engaging partition names, storage, Slurm snippets, and the PDO-vs-ORCD boundary.
 
 Follow the Stage 1-5 pipeline structure defined in `doc/twirl_plan.md`.
 
@@ -51,14 +53,15 @@ If this file and those docs disagree, treat the docs as authoritative and update
   - `plotting/style.py` is the plotting style authority.
   - `search/` contains BLS/search tooling and candidate consolidation.
   - `vetting/` contains heuristic vetting, LEO-Vetter adapters, and centroid checks.
-- `scripts/stage{1_lightcurves,2_search,5_validation}/` should stay as thin CLI drivers over `src/twirl/`.
-- `stage3_injections/` and `stage4_search/` are planned but not yet built.
+- `scripts/stage{1_lightcurves,2_search,3_injections,5_validation}/` should stay as thin CLI drivers over `src/twirl/`.
+- `stage4_search/` is planned but not yet built.
 - Existing scripts add `src/` to `sys.path` directly rather than requiring an editable install; follow that local pattern unless the package setup changes.
 
 ## Local Data Policy
 
 - Large external inputs belong under `data_local/` or another user-configured local path, not in the git-managed repo root.
 - Do not commit raw FITS catalogs or staged survey data.
+- On ORCD, compact TWIRL exports and downstream results belong under `/orcd/data/mki_aryeh/001/twirl/`; use ORCD scratch only for active job-local temporary data.
 - If code depends on a local catalog or local TGLC staging area, document the path convention and record provenance in outputs.
 - Prefer concise, stable filenames for accepted master-catalog states, but do not duplicate large integrated FITS products solely to create cleaner names when the existing file already represents the accepted state.
 
@@ -100,6 +103,7 @@ If this file and those docs disagree, treat the docs as authoritative and update
 ## MIT TGLC Operating Assumptions
 
 - Stage 1 uses the MIT-adapted TGLC fork on MIT PDO machines.
+- ORCD/H200 is downstream compute for compact exports, injection-recovery, GPU search, feature extraction, and later ML triage; do not move primary Stage 1 TGLC/ePSF production there by default.
 - Treat the MIT fork as an orbit/camera/CCD production pipeline, not a `quick_lc.py` replacement.
 - Assume:
   - TICA FFIs are pre-staged on disk
@@ -144,7 +148,7 @@ GaiaEDR3_WD_main.fits (external seed, data_local/)
   -> TWIRL-FS HLSP FITS (hlsp_twirlfs_*)
 ```
 
-Current faint-end LC work should focus on the labeled TWIRL-FS v1 product: robust-auto subtractive residuals with `bkspace_d=0.8`, `sigma_clip=5`, and `hlsp_twirlfs_tess_ffi_*` FITS outputs. The key behavior is preserving legitimate negative and near-zero background-subtracted flux cadences while avoiding a fragile `flux / spline` ratio.
+Current faint-end LC work should focus on the labeled TWIRL-FS v2 product: robust-auto subtractive residuals with `bkspace_d=0.8`, `sigma_clip=5`, gap-split cotrending, and `hlsp_twirlfs_tess_ffi_*` FITS outputs. The key behavior is preserving legitimate negative and near-zero background-subtracted flux cadences while avoiding a fragile `flux / spline` ratio.
 
 ## Safety And Boundaries
 
@@ -206,20 +210,25 @@ Current faint-end LC work should focus on the labeled TWIRL-FS v1 product: robus
 
 When choosing what to implement next, prefer this order:
 
-1. Run BLS/heuristic/LEO checks on the S56 TWIRL-FS v1 tree and compare against prior QLP/TWIRL S56 products.
-2. Complete full-product QA for TWIRL-FS v1, including cadence retention, RMS/MAD, quality-flag behavior, WD 1856 timing, and injected short-event preservation.
-3. Decide whether TWIRL-FS v1 replaces the normal QLP detrending path for production sectors.
+1. Run BLS/heuristic/LEO checks on the S56 TWIRL-FS v2 tree and compare against prior QLP/TWIRL S56 products.
+2. Complete full-product QA for TWIRL-FS v2, including cadence retention, RMS/MAD, quality-flag behavior, WD 1856 timing, and injected short-event preservation.
+3. Decide whether TWIRL-FS v2 replaces the normal QLP detrending path for production sectors.
 4. Build v2/v3/TWIRL-FS comparison tables only after the light-curve product is clearly validated.
 5. Consolidate the HDF5-to-TWIRL index format and QA reports for the production sectors.
 6. Continue Gaia-first target-support audit and no-TIC bridge characterization.
 7. Build transparent periodic and dip-search baselines before committing to ML-heavy triage.
-8. Develop follow-up coordination support after candidate validation criteria are stable.
+8. Use the S56 raw-flux pre-detrend injection path, currently human-facing through an ADP-only `1,000`-row LEO queue, to diagnose the low BLS recovery before scaling to `10k`.
+9. Run pixel-level source-pickle/ePSF injections only as a calibration subset for extraction, crowding, aperture, and centroid effects; keep dense recovery grids on raw-aperture pre-detrend injections until the calibration delta is known.
+10. Build the S56 semi-supervised self-training vetting loop on top of transparent candidate tables, with human labels, injection labels, pseudo-label provenance, and a human-review queue.
+11. Export compact S56 TWIRL-FS v2 light curves to ORCD/H200-scale storage for LC-level injection-recovery and raw-light-curve training experiments; do not move raw TGLC/TICA trees.
+12. Develop follow-up coordination support after candidate validation criteria are stable.
 
 ## Follow-Up Planning Assumptions
 
 - Current default planning assumption is:
   - Magellan is the primary MIT-affiliated follow-up path
   - MMT is backup or collaborator-driven
+- Julien is now part of TWIRL collaboration/follow-up planning; track details in `doc/twirl_plan.md` and `doc/twirl_progress_log.md`, and do not treat meeting-note instrument ideas as verified until access/proposal details are checked.
 - Favor high-cadence follow-up planning for short predicted transit windows.
 - If a task depends on a specific instrument or access policy, verify it before writing it into the repo as fact.
 - Do not assume aperiodic events can be confirmed the same way as periodic candidates.

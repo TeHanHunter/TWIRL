@@ -19,7 +19,14 @@ reports/stage2_search/wd1856_bls/**/targets/*/periodograms/
 # scripts/stage2_search/filter_wd_candidates.py + sector_run --include-tics.
 reports/stage2_search/wd1856_bls_s56_top30/
 # LEO-Vetter and TGLC-vs-QLP comparison outputs — regenerable; keep MANIFEST/parquet only
+reports/stage5_validation/**/vet_reports/
+reports/stage5_validation/**/vet_reports
 reports/stage5_validation/leo_vetter_s56_*/vet_reports/
+reports/stage5_validation/**/chunks/
+reports/stage5_validation/**/chunk_ids/
+reports/stage3_injections/**/*.h5
+reports/stage3_injections/**/*.fits
+reports/stage3_injections/**/*.npy
 reports/stage1_lightcurves/tglc_vs_qlp_s94plus/
 reports/stage1_lightcurves/qc_pdf/
 reports/stage1_lightcurves/qc_precision/

@@ -1,0 +1,21 @@
+{
+  "contains_wd1856": true,
+  "mode": "balanced",
+  "rows": 300,
+  "source_bucket_counts": {
+    "faint_planet_candidate": 21,
+    "high_sde_all_classes": 30,
+    "pceb_grid_ceiling": 45,
+    "planet_candidate_top": 66,
+    "planet_centroid_pass": 17,
+    "planet_centroid_review": 30,
+    "random_background": 36,
+    "sub_roche_pceb_suspect": 54,
+    "wd1856_benchmark": 1
+  },
+  "vet_class_counts": {
+    "pceb_grid_ceiling": 97,
+    "planet_candidate": 146,
+    "sub_roche_pceb_suspect": 57
+  }
+}

@@ -1,0 +1,10 @@
+review_stratum,count
+bls_peak_mismatch_snr_10_20,15
+bls_peak_mismatch_snr_1_3,69
+bls_peak_mismatch_snr_3_5,30
+bls_peak_mismatch_snr_5_7,23
+bls_peak_mismatch_snr_7_10,13
+bls_peak_mismatch_snr_lt1,82
+bls_top1_recovered,32
+bls_topn_harmonic_match,25
+bls_topn_recovered,11

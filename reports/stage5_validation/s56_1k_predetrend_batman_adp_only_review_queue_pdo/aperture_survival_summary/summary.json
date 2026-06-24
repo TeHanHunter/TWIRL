@@ -1,0 +1,145 @@
+{
+  "best_aperture_counts": {
+    "DET_FLUX": 11,
+    "DET_FLUX_ADP": 106,
+    "DET_FLUX_ADP_LAG": 68,
+    "DET_FLUX_ADP_SML": 525,
+    "DET_FLUX_LAG": 2,
+    "DET_FLUX_SML": 288
+  },
+  "best_group": "detrended_all",
+  "best_group_median_snr": 1.6673238125500771,
+  "best_group_n_snr_ge_threshold": 137,
+  "best_single_aperture": {
+    "aperture": "DET_FLUX_ADP_SML",
+    "frac_snr_ge_threshold": "0.124",
+    "median_depth_retention": "0.4960764836293689",
+    "median_snr": "1.5829018956743455",
+    "median_tmag": "19.439149815278636",
+    "n": "1000",
+    "n_snr_ge_threshold": "124",
+    "p90_snr": "8.091664424975512"
+  },
+  "bin_tables": {
+    "best_aperture": {
+      "DET_FLUX": {
+        "not_recoverable_best": 11,
+        "recoverable_best": 0
+      },
+      "DET_FLUX_ADP": {
+        "not_recoverable_best": 100,
+        "recoverable_best": 6
+      },
+      "DET_FLUX_ADP_LAG": {
+        "not_recoverable_best": 52,
+        "recoverable_best": 16
+      },
+      "DET_FLUX_ADP_SML": {
+        "not_recoverable_best": 437,
+        "recoverable_best": 88
+      },
+      "DET_FLUX_LAG": {
+        "not_recoverable_best": 2,
+        "recoverable_best": 0
+      },
+      "DET_FLUX_SML": {
+        "not_recoverable_best": 261,
+        "recoverable_best": 27
+      }
+    },
+    "depth_bin": {
+      "1-3%": {
+        "not_recoverable_best": 56,
+        "recoverable_best": 1
+      },
+      "10-30%": {
+        "not_recoverable_best": 283,
+        "recoverable_best": 25
+      },
+      "3-10%": {
+        "not_recoverable_best": 116,
+        "recoverable_best": 1
+      },
+      "30-100%": {
+        "not_recoverable_best": 379,
+        "recoverable_best": 110
+      },
+      "<1%": {
+        "not_recoverable_best": 29,
+        "recoverable_best": 0
+      },
+      ">100%": {
+        "not_recoverable_best": 0,
+        "recoverable_best": 0
+      }
+    },
+    "period_bin": {
+      "0.25-0.5": {
+        "not_recoverable_best": 117,
+        "recoverable_best": 37
+      },
+      "0.5-1": {
+        "not_recoverable_best": 131,
+        "recoverable_best": 20
+      },
+      "1-2": {
+        "not_recoverable_best": 122,
+        "recoverable_best": 20
+      },
+      "2-5": {
+        "not_recoverable_best": 179,
+        "recoverable_best": 19
+      },
+      "5-10": {
+        "not_recoverable_best": 143,
+        "recoverable_best": 8
+      },
+      "<0.25": {
+        "not_recoverable_best": 121,
+        "recoverable_best": 32
+      },
+      ">10": {
+        "not_recoverable_best": 50,
+        "recoverable_best": 1
+      }
+    },
+    "tmag_bin": {
+      "16-17": {
+        "not_recoverable_best": 5,
+        "recoverable_best": 13
+      },
+      "17-18": {
+        "not_recoverable_best": 37,
+        "recoverable_best": 31
+      },
+      "18-19": {
+        "not_recoverable_best": 169,
+        "recoverable_best": 50
+      },
+      "19-20": {
+        "not_recoverable_best": 626,
+        "recoverable_best": 33
+      },
+      "<16": {
+        "not_recoverable_best": 1,
+        "recoverable_best": 10
+      },
+      ">20": {
+        "not_recoverable_best": 25,
+        "recoverable_best": 0
+      }
+    }
+  },
+  "created_utc": "2026-06-23T09:43:57.073866+00:00",
+  "current_aperture": "DET_FLUX_ADP",
+  "current_median_snr": 0.8914986950021038,
+  "current_n_snr_ge_threshold": 71,
+  "n_injections": 1000,
+  "newly_recoverable_by_best_group": 66,
+  "plot_paths": {
+    "best_recoverable_fraction_by_tmag": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_pdo/aperture_survival_summary/best_recoverable_fraction_by_tmag.png",
+    "recoverable_count_by_aperture": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_pdo/aperture_survival_summary/recoverable_count_by_aperture.png"
+  },
+  "recoverable_snr": 7.0,
+  "survival_csv": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_pdo/predet_signal_survival_snr_diagnostics.csv"
+}

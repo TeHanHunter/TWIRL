@@ -1,0 +1,362 @@
+{
+  "apertures": {
+    "DET_FLUX": {
+      "aperture": "DET_FLUX",
+      "best": {
+        "depth": 0.26907132721302296,
+        "depth_snr": 1.1243189759040724,
+        "duration_min": 4.0,
+        "period_d": 0.0941850520336924,
+        "sde": 5.079709130049489,
+        "t0_bjd": 2459825.2602617997,
+        "t0_phase_err_min": 177.28204974532125
+      },
+      "config": {
+        "apertures": [
+          "DET_FLUX"
+        ],
+        "durations_min": [
+          1.0,
+          1.5,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          8.0,
+          10.0,
+          13.0,
+          16.0,
+          20.0,
+          30.0
+        ],
+        "max_period_fraction": 0.45,
+        "min_cadences": 200,
+        "n_peaks": 10,
+        "n_periods": 20000,
+        "orbit_edge_trim_d": 0.0,
+        "p_max_cap_d": 15.0,
+        "p_min_d": 0.08,
+        "period_mask_frac": 0.005,
+        "sigma_clip": 5.0
+      },
+      "hlsp_path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_600cad/twirlfs_injected/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+      "injected_minus_original_window": {
+        "n_good": 600,
+        "n_good_truth_in_transit": 2,
+        "n_good_truth_oot": 586,
+        "n_truth_in_transit": 2,
+        "truth_in_median": -0.056546688079833984,
+        "truth_oot_mad_sigma": 0.0009140976905822754,
+        "truth_oot_median": -0.00011670589447021484,
+        "truth_window_depth": -483.5229826353422,
+        "truth_window_snr_estimate": 87.30362952801997
+      },
+      "n_after_clip": 600,
+      "n_periods_actual": 20001,
+      "status": "ok",
+      "top_peaks": [
+        {
+          "depth": 0.26907132721302296,
+          "depth_snr": 1.1243189759040724,
+          "duration_min": 4.0,
+          "period_d": 0.0941850520336924,
+          "sde": 5.079709130049489,
+          "t0_bjd": 2459825.2602617997,
+          "t0_phase_err_min": 177.28204974532125
+        },
+        {
+          "depth": 0.26907132721302296,
+          "depth_snr": 1.1243189759040724,
+          "duration_min": 4.0,
+          "period_d": 0.09418021863534981,
+          "sde": 5.079709130049489,
+          "t0_bjd": 2459825.2602617997,
+          "t0_phase_err_min": 177.28204974532125
+        },
+        {
+          "depth": 0.5652293491883565,
+          "depth_snr": 1.126684201367299,
+          "duration_min": 2.0,
+          "period_d": 0.2443284032104557,
+          "sde": 4.908624512545111,
+          "t0_bjd": 2459825.3755395776,
+          "t0_phase_err_min": 343.28204990923393
+        },
+        {
+          "depth": 0.3539312571792279,
+          "depth_snr": 1.1098628108689572,
+          "duration_min": 2.0,
+          "period_d": 0.08761148200440583,
+          "sde": 4.737461540429511,
+          "t0_bjd": 2459825.3165117996,
+          "t0_phase_err_min": 258.28204961121077
+        },
+        {
+          "depth": 0.3539312571792279,
+          "depth_snr": 1.1098628108689572,
+          "duration_min": 2.0,
+          "period_d": 0.08760729973279663,
+          "sde": 4.737461540429511,
+          "t0_bjd": 2459825.3165117996,
+          "t0_phase_err_min": 258.28204961121077
+        },
+        {
+          "depth": 0.4961703203305477,
+          "depth_snr": 1.10483809949794,
+          "duration_min": 1.0,
+          "period_d": 0.08764914042572713,
+          "sde": 4.590113779017673,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.4961703203305477,
+          "depth_snr": 1.10483809949794,
+          "duration_min": 1.0,
+          "period_d": 0.08764076909019029,
+          "sde": 4.590113779017673,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.4961703203305477,
+          "depth_snr": 1.10483809949794,
+          "duration_min": 1.0,
+          "period_d": 0.0876449545580634,
+          "sde": 4.590113779017673,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.44451212230756226,
+          "depth_snr": 1.083370065885862,
+          "duration_min": 1.0,
+          "period_d": 0.08765332669323873,
+          "sde": 4.28266788899448,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.44451212230756226,
+          "depth_snr": 1.083370065885862,
+          "duration_min": 1.0,
+          "period_d": 0.08765751336065551,
+          "sde": 4.28266788899448,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        }
+      ],
+      "truth_period": {
+        "depth": 0.22683681583486473,
+        "depth_snr": 0.9478413739524308,
+        "duration_min": 30.000000000000004,
+        "nearest_period_d": 0.6,
+        "rank": 526,
+        "sde": 2.5254958094465345,
+        "t0_bjd": 2459825.6345673553,
+        "t0_phase_err_min": -147.71795019507408
+      },
+      "truth_window": {
+        "n_good": 600,
+        "n_good_truth_in_transit": 2,
+        "n_good_truth_oot": 586,
+        "n_truth_in_transit": 2,
+        "truth_in_median": 1.0568051934242249,
+        "truth_oot_mad_sigma": 0.2518422647058964,
+        "truth_oot_median": 0.9992150664329529,
+        "truth_window_depth": -0.05763536692542081,
+        "truth_window_snr_estimate": -0.3233958316923395
+      }
+    },
+    "DET_FLUX_ADP": {
+      "aperture": "DET_FLUX_ADP",
+      "best": {
+        "depth": 0.26907132721302296,
+        "depth_snr": 1.1243189759040724,
+        "duration_min": 4.0,
+        "period_d": 0.0941850520336924,
+        "sde": 5.079709130049489,
+        "t0_bjd": 2459825.2602617997,
+        "t0_phase_err_min": 177.28204974532125
+      },
+      "config": {
+        "apertures": [
+          "DET_FLUX_ADP"
+        ],
+        "durations_min": [
+          1.0,
+          1.5,
+          2.0,
+          3.0,
+          4.0,
+          5.0,
+          6.0,
+          8.0,
+          10.0,
+          13.0,
+          16.0,
+          20.0,
+          30.0
+        ],
+        "max_period_fraction": 0.45,
+        "min_cadences": 200,
+        "n_peaks": 10,
+        "n_periods": 20000,
+        "orbit_edge_trim_d": 0.0,
+        "p_max_cap_d": 15.0,
+        "p_min_d": 0.08,
+        "period_mask_frac": 0.005,
+        "sigma_clip": 5.0
+      },
+      "hlsp_path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_600cad/twirlfs_injected/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+      "injected_minus_original_window": {
+        "n_good": 600,
+        "n_good_truth_in_transit": 2,
+        "n_good_truth_oot": 586,
+        "n_truth_in_transit": 2,
+        "truth_in_median": -0.056546688079833984,
+        "truth_oot_mad_sigma": 0.0009140976905822754,
+        "truth_oot_median": -0.00011670589447021484,
+        "truth_window_depth": -483.5229826353422,
+        "truth_window_snr_estimate": 87.30362952801997
+      },
+      "n_after_clip": 600,
+      "n_periods_actual": 20001,
+      "status": "ok",
+      "top_peaks": [
+        {
+          "depth": 0.26907132721302296,
+          "depth_snr": 1.1243189759040724,
+          "duration_min": 4.0,
+          "period_d": 0.0941850520336924,
+          "sde": 5.079709130049489,
+          "t0_bjd": 2459825.2602617997,
+          "t0_phase_err_min": 177.28204974532125
+        },
+        {
+          "depth": 0.26907132721302296,
+          "depth_snr": 1.1243189759040724,
+          "duration_min": 4.0,
+          "period_d": 0.09418021863534981,
+          "sde": 5.079709130049489,
+          "t0_bjd": 2459825.2602617997,
+          "t0_phase_err_min": 177.28204974532125
+        },
+        {
+          "depth": 0.5652293491883565,
+          "depth_snr": 1.126684201367299,
+          "duration_min": 2.0,
+          "period_d": 0.2443284032104557,
+          "sde": 4.908624512545111,
+          "t0_bjd": 2459825.3755395776,
+          "t0_phase_err_min": 343.28204990923393
+        },
+        {
+          "depth": 0.3539312571792279,
+          "depth_snr": 1.1098628108689572,
+          "duration_min": 2.0,
+          "period_d": 0.08761148200440583,
+          "sde": 4.737461540429511,
+          "t0_bjd": 2459825.3165117996,
+          "t0_phase_err_min": 258.28204961121077
+        },
+        {
+          "depth": 0.3539312571792279,
+          "depth_snr": 1.1098628108689572,
+          "duration_min": 2.0,
+          "period_d": 0.08760729973279663,
+          "sde": 4.737461540429511,
+          "t0_bjd": 2459825.3165117996,
+          "t0_phase_err_min": 258.28204961121077
+        },
+        {
+          "depth": 0.4961703203305477,
+          "depth_snr": 1.10483809949794,
+          "duration_min": 1.0,
+          "period_d": 0.08764914042572713,
+          "sde": 4.590113779017673,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.4961703203305477,
+          "depth_snr": 1.10483809949794,
+          "duration_min": 1.0,
+          "period_d": 0.08764076909019029,
+          "sde": 4.590113779017673,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.4961703203305477,
+          "depth_snr": 1.10483809949794,
+          "duration_min": 1.0,
+          "period_d": 0.0876449545580634,
+          "sde": 4.590113779017673,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.44451212230756226,
+          "depth_snr": 1.083370065885862,
+          "duration_min": 1.0,
+          "period_d": 0.08765332669323873,
+          "sde": 4.28266788899448,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        },
+        {
+          "depth": 0.44451212230756226,
+          "depth_snr": 1.083370065885862,
+          "duration_min": 1.0,
+          "period_d": 0.08765751336065551,
+          "sde": 4.28266788899448,
+          "t0_bjd": 2459825.3161645774,
+          "t0_phase_err_min": 257.7820496410131
+        }
+      ],
+      "truth_period": {
+        "depth": 0.22683681583486473,
+        "depth_snr": 0.9478413739524308,
+        "duration_min": 30.000000000000004,
+        "nearest_period_d": 0.6,
+        "rank": 526,
+        "sde": 2.5254958094465345,
+        "t0_bjd": 2459825.6345673553,
+        "t0_phase_err_min": -147.71795019507408
+      },
+      "truth_window": {
+        "n_good": 600,
+        "n_good_truth_in_transit": 2,
+        "n_good_truth_oot": 586,
+        "n_truth_in_transit": 2,
+        "truth_in_median": 1.0568051934242249,
+        "truth_oot_mad_sigma": 0.2518422647058964,
+        "truth_oot_median": 0.9992150664329529,
+        "truth_window_depth": -0.05763536692542081,
+        "truth_window_snr_estimate": -0.3233958316923395
+      }
+    }
+  },
+  "created_utc": "2026-06-22T19:19:06.142778+00:00",
+  "hlsp": "/Users/tehan/PycharmProjects/TWIRL/reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_600cad/twirlfs_injected/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+  "manifest": "reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_600cad/manifest.json",
+  "original_hlsp": "/Users/tehan/PycharmProjects/TWIRL/reports/stage3_injections/pixel_injection_smoke_source_7_7_twirlfs_bls_600cad/twirlfs_original/0000/0003/8996/3197/hlsp_twirlfs_tess_ffi_s0056-0000000389963197_tess_v01_llc.fits",
+  "truth": {
+    "duration_min": 2.8177536796248392,
+    "model_depth": 0.37350079248469115,
+    "n_good_in_transit_manifest": 2,
+    "period_d": 0.6,
+    "t0_bjd": 2459825.737149265,
+    "target": {
+      "edge_margin_pix": 51.956213420172844,
+      "gaia3": 2157463266507817600,
+      "gaia_index": 2504,
+      "tess_mag": 17.50067083924594,
+      "tic": 389963197,
+      "x": 51.956213420172844,
+      "y": 61.094494755410324
+    }
+  }
+}

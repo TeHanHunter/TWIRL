@@ -366,6 +366,110 @@ def running_median(y: np.ndarray, window: int) -> np.ndarray:
     return out
 
 
+def binned_median_curve(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    x_min: float,
+    x_max: float,
+    bin_width: float,
+    min_count: int,
+    smooth_bins: int,
+    edge_trim_bins: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return a median trend in fixed magnitude bins.
+
+    A count-based running median is misleading at the sparse bright end because
+    the first window reaches far into fainter stars.  Fixed magnitude bins make
+    the support of each median explicit, and the count cutoff avoids drawing a
+    bright-end tail where the sample is too thin.
+    """
+    finite = np.isfinite(x) & np.isfinite(y)
+    x = np.asarray(x[finite], dtype=float)
+    y = np.asarray(y[finite], dtype=float)
+    if x.size == 0:
+        empty = np.array([], dtype=float)
+        return empty, empty, empty.astype(int)
+
+    width = float(bin_width)
+    if not np.isfinite(width) or width <= 0:
+        raise ValueError("bin_width must be positive")
+    edges = np.arange(x_min, x_max + width, width)
+    if edges.size < 2 or edges[-1] < x_max:
+        edges = np.append(edges, x_max)
+
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    med = np.full(centers.size, np.nan, dtype=float)
+    counts = np.zeros(centers.size, dtype=int)
+    for i, (lo, hi) in enumerate(zip(edges[:-1], edges[1:])):
+        in_bin = (x >= lo) & (x < hi if i < centers.size - 1 else x <= hi)
+        counts[i] = int(np.count_nonzero(in_bin))
+        if counts[i] >= min_count:
+            med[i] = float(np.nanmedian(y[in_bin]))
+
+    valid = np.isfinite(med)
+    if not valid.any():
+        empty = np.array([], dtype=float)
+        return empty, empty, empty.astype(int)
+    trend_x = centers[valid]
+    trend_y = med[valid]
+    trend_counts = counts[valid]
+    if smooth_bins > 1 and trend_y.size > 2:
+        half = max(1, int(smooth_bins) // 2)
+        smoothed = running_median(trend_y, smooth_bins)
+        if smoothed.size > 2 * half:
+            trend_x = trend_x[half:-half]
+            trend_y = smoothed[half:-half]
+            trend_counts = trend_counts[half:-half]
+        else:
+            trend_y = smoothed
+    trim = max(0, int(edge_trim_bins))
+    if trim > 0 and trend_y.size > 2 * trim:
+        trend_x = trend_x[trim:-trim]
+        trend_y = trend_y[trim:-trim]
+        trend_counts = trend_counts[trim:-trim]
+    return trend_x, trend_y, trend_counts
+
+
+def adaptive_star_count_median_curve(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    mag_lo: float,
+    window_lo: int,
+    mag_hi: float,
+    window_hi: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return a magnitude-sorted running median with a magnitude-dependent window."""
+    finite = np.isfinite(x) & np.isfinite(y)
+    x = np.asarray(x[finite], dtype=float)
+    y = np.asarray(y[finite], dtype=float)
+    if x.size == 0:
+        empty = np.array([], dtype=float)
+        return empty, empty
+
+    order = np.argsort(x)
+    x_s = x[order]
+    y_s = y[order]
+    windows = np.interp(
+        x_s,
+        [mag_lo, mag_hi],
+        [window_lo, window_hi],
+        left=window_lo,
+        right=window_hi,
+    )
+    windows = np.maximum(1, np.rint(windows).astype(int))
+    out = np.empty_like(y_s, dtype=float)
+    for i, win in enumerate(windows):
+        half = max(1, int(win) // 2)
+        lo = max(0, i - half)
+        hi = min(y_s.size, i + half + 1)
+        segment = y_s[lo:hi]
+        finite_segment = np.isfinite(segment)
+        out[i] = np.nanmedian(segment[finite_segment]) if finite_segment.any() else np.nan
+    return x_s, out
+
+
 def finite_interp(x: np.ndarray, xp: np.ndarray, fp: np.ndarray) -> np.ndarray:
     out = np.interp(x, xp, fp)
     out[(x < np.nanmin(xp)) | (x > np.nanmax(xp))] = np.nan
@@ -392,14 +496,40 @@ def plot_precision(
     tmag_min: float,
     tmag_max: float,
     running_median_window: int,
+    median_bin_width: float = 0.25,
+    median_min_count: int = 100,
+    median_edge_trim_bins: int = 1,
+    median_method: str = "adaptive-star-count",
+    median_window_mag_lo: float = 8.0,
+    median_window_lo: int = 20,
+    median_window_mag_hi: float = 18.0,
+    median_window_hi: int = 2000,
 ) -> None:
     template_name = "tglc_precision" if style == "tglc" else "full_page"
     template = apply_twirl_style(template_name)
     order = np.argsort(tmag)
     tmag_s = tmag[order]
     precision_s = precision[order]
-    win = max(1, int(running_median_window))
-    rmed = running_median(precision_s, win)
+    if median_method == "adaptive-star-count":
+        trend_x, trend_y = adaptive_star_count_median_curve(
+            tmag_s,
+            precision_s,
+            mag_lo=median_window_mag_lo,
+            window_lo=median_window_lo,
+            mag_hi=median_window_mag_hi,
+            window_hi=median_window_hi,
+        )
+    else:
+        trend_x, trend_y, _ = binned_median_curve(
+            tmag_s,
+            precision_s,
+            x_min=tmag_min,
+            x_max=tmag_max,
+            bin_width=median_bin_width,
+            min_count=median_min_count,
+            smooth_bins=max(1, int(running_median_window)),
+            edge_trim_bins=median_edge_trim_bins,
+        )
 
     sigma_base = None
     if noisemodel is not None:
@@ -415,7 +545,7 @@ def plot_precision(
     ax_t, ax_b = axes
     scatter_color = "#d95f02"
     line_color = "#d95f02" if style == "tglc" else "#9b3f13"
-    alpha = 0.22 if style == "tglc" else 0.16
+    alpha = 0.01 if style == "tglc" else 0.08
     marker_size = max(template["dense_marker_size"], 4.0 if style == "tglc" else 3.0)
     median_lw = 2.8 if style == "tglc" else 1.8
     baseline_lw = 2.0 if style == "tglc" else 1.3
@@ -435,8 +565,8 @@ def plot_precision(
         label=label,
     )
     ax_t.plot(
-        tmag_s,
-        rmed,
+        trend_x,
+        trend_y,
         "-",
         color=line_color,
         lw=median_lw,
@@ -467,10 +597,29 @@ def plot_precision(
                 color=scatter_color,
                 rasterized=True,
             )
-        rmed_r = running_median(ratio, win)
+        if median_method == "adaptive-star-count":
+            ratio_x, ratio_y = adaptive_star_count_median_curve(
+                tmag_s,
+                ratio,
+                mag_lo=median_window_mag_lo,
+                window_lo=median_window_lo,
+                mag_hi=median_window_mag_hi,
+                window_hi=median_window_hi,
+            )
+        else:
+            ratio_x, ratio_y, _ = binned_median_curve(
+                tmag_s,
+                ratio,
+                x_min=tmag_min,
+                x_max=tmag_max,
+                bin_width=median_bin_width,
+                min_count=median_min_count,
+                smooth_bins=max(1, int(running_median_window)),
+                edge_trim_bins=median_edge_trim_bins,
+            )
         ax_b.plot(
-            tmag_s,
-            rmed_r,
+            ratio_x,
+            ratio_y,
             "-",
             color=line_color,
             lw=median_lw,
@@ -536,8 +685,36 @@ def main() -> int:
         "--running-median-window",
         type=int,
         default=5,
-        help="Number of magnitude-sorted light curves in the running-median center line.",
+        help="Number of populated magnitude bins to smooth the median center line.",
     )
+    ap.add_argument(
+        "--median-bin-width",
+        type=float,
+        default=0.25,
+        help="TESS-magnitude bin width for the median center line.",
+    )
+    ap.add_argument(
+        "--median-min-count",
+        type=int,
+        default=100,
+        help="Minimum light curves required to draw a median bin.",
+    )
+    ap.add_argument(
+        "--median-edge-trim-bins",
+        type=int,
+        default=1,
+        help="Number of populated median bins to trim from each edge after smoothing.",
+    )
+    ap.add_argument(
+        "--median-method",
+        choices=["adaptive-star-count", "magnitude-bin"],
+        default="adaptive-star-count",
+        help="Method used for the median center line.",
+    )
+    ap.add_argument("--median-window-mag-lo", type=float, default=8.0)
+    ap.add_argument("--median-window-lo", type=int, default=20)
+    ap.add_argument("--median-window-mag-hi", type=float, default=18.0)
+    ap.add_argument("--median-window-hi", type=int, default=2000)
     ap.add_argument("--noisemodel", type=Path, default=Path("data_local/refs/noisemodel.dat"))
     ap.add_argument("--tmag-min", type=float, default=7.0)
     ap.add_argument("--tmag-max", type=float, default=20.5)
@@ -630,6 +807,14 @@ def main() -> int:
         tmag_min=args.tmag_min,
         tmag_max=args.tmag_max,
         running_median_window=args.running_median_window,
+        median_bin_width=args.median_bin_width,
+        median_min_count=args.median_min_count,
+        median_edge_trim_bins=args.median_edge_trim_bins,
+        median_method=args.median_method,
+        median_window_mag_lo=args.median_window_mag_lo,
+        median_window_lo=args.median_window_lo,
+        median_window_mag_hi=args.median_window_mag_hi,
+        median_window_hi=args.median_window_hi,
     )
     np.savez_compressed(
         args.output.with_suffix(".npz"),
@@ -642,6 +827,14 @@ def main() -> int:
         h5_normalization="inferred_aperture_fraction_from_raw_magnitude",
         bin_minutes=args.bin_minutes,
         running_median_window=args.running_median_window,
+        median_bin_width=args.median_bin_width,
+        median_min_count=args.median_min_count,
+        median_edge_trim_bins=args.median_edge_trim_bins,
+        median_method=args.median_method,
+        median_window_mag_lo=args.median_window_mag_lo,
+        median_window_lo=args.median_window_lo,
+        median_window_mag_hi=args.median_window_mag_hi,
+        median_window_hi=args.median_window_hi,
         n_total_hlsp=len(paths),
         n_total_h5_groups=(len(h5_groups) if h5_groups is not None else 0),
         n_sampled=len(sample),

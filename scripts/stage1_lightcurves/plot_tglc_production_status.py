@@ -108,8 +108,9 @@ def add_cell_labels(ax, rows: list[dict[str, str]], matrix: np.ndarray) -> None:
             color = "white"
             ax.text(j, 3, label, ha="center", va="center", fontsize=6.5, color=color)
         note = row.get("note", "")
-        if sector in (66, 67, 91, 92):
-            marker = "*" if "stale" in note.lower() else "+"
+        note_lower = note.lower()
+        if "active" in note_lower or "stale" in note_lower:
+            marker = "*" if "stale" in note_lower else "+"
             ax.text(j, -0.43, marker, ha="center", va="center", fontsize=8, color="0.15")
 
 

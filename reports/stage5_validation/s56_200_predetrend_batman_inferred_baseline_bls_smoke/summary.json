@@ -1,0 +1,54 @@
+{
+  "aperture": "DET_FLUX_ADP",
+  "apertures": [
+    "DET_FLUX_ADP"
+  ],
+  "blind_review_metadata": false,
+  "bls_config": {
+    "apertures": [
+      "DET_FLUX_ADP"
+    ],
+    "durations_min": [
+      3.0,
+      4.0,
+      5.0,
+      6.0,
+      8.0,
+      10.0,
+      13.0,
+      16.0,
+      20.0,
+      30.0
+    ],
+    "max_period_fraction": 0.45,
+    "min_cadences": 200,
+    "n_peaks": 5,
+    "n_periods": 5000,
+    "orbit_edge_trim_d": 0.0,
+    "p_max_cap_d": 15.0,
+    "p_min_d": 0.12,
+    "period_mask_frac": 0.005,
+    "sigma_clip": 5.0
+  },
+  "created_utc": "2026-06-22T19:53:45.602217+00:00",
+  "hlsp_root": "/pdo/users/tehan/TWIRL/data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare",
+  "injection_h5": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_200_predetrend_batman_inferred_baseline_smoke/injected_lightcurves.h5",
+  "leo_timeout_s": 300,
+  "leo_workers": 1,
+  "light_curve_product": "S56 TWIRL-FS v2 compare",
+  "n_injections": 200,
+  "n_leo_errors": 0,
+  "n_leo_plot_errors": 0,
+  "n_leo_reports_attempted": 0,
+  "n_real": 0,
+  "n_review_rows": 200,
+  "outputs": {
+    "leo_metrics": "reports/stage5_validation/s56_200_predetrend_batman_inferred_baseline_bls_smoke/leo_metrics.parquet",
+    "pre_leo_csv": "reports/stage5_validation/s56_200_predetrend_batman_inferred_baseline_bls_smoke/review_queue_pre_leo.csv",
+    "review_queue_csv": "reports/stage5_validation/s56_200_predetrend_batman_inferred_baseline_bls_smoke/review_queue.csv",
+    "vet_reports": "reports/stage5_validation/s56_200_predetrend_batman_inferred_baseline_bls_smoke/vet_reports"
+  },
+  "real_candidates": "/pdo/users/tehan/TWIRL/data_local/stage2/bls_first_pass_v2/sector_0056/vetted_per_tic_centroid.parquet",
+  "real_selection": "legacy",
+  "shuffle_review_rows": false
+}

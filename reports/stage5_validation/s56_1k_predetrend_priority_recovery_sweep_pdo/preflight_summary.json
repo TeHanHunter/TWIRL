@@ -1,0 +1,77 @@
+{
+  "created_utc": "2026-06-23T14:09:12.973641+00:00",
+  "errors": [],
+  "expected_id_count": 94,
+  "h5": {
+    "available_aperture_counts": {
+      "DET_FLUX": 94,
+      "DET_FLUX_ADP": 94,
+      "DET_FLUX_ADP_LAG": 94,
+      "DET_FLUX_ADP_SML": 94,
+      "DET_FLUX_LAG": 94,
+      "DET_FLUX_SML": 94,
+      "RAW_FLUX_Large": 94,
+      "RAW_FLUX_Primary": 94,
+      "RAW_FLUX_Small": 94,
+      "flux": 94
+    },
+    "exists": true,
+    "length_mismatch_ids": [],
+    "missing_ids": [],
+    "missing_required_apertures": {},
+    "missing_required_datasets": {},
+    "n_groups": 1000,
+    "n_requested_ids": 94,
+    "path": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_1k_predetrend_batman_depthgrid_adp_compare/injected_lightcurves.h5"
+  },
+  "id_count_matches_expected": true,
+  "injection_id_file": "reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/priority_injection_ids.txt",
+  "n_injection_ids": 94,
+  "ok": true,
+  "priority_csv": {
+    "exists": true,
+    "extra_ids_in_csv": [],
+    "ids_missing_from_csv": [],
+    "missing_columns": [],
+    "n_rows": 94,
+    "n_unique_ids": 94,
+    "path": "reports/stage5_validation/s56_1k_predetrend_debug_priority_queues/priority_debug_queue.csv",
+    "priority_reason_counts": {
+      "newly_recoverable_by_best_aperture": 66,
+      "search_ranking_loss": 28
+    },
+    "recommended_aperture_counts": {
+      "DET_FLUX_ADP": 2,
+      "DET_FLUX_ADP_LAG": 12,
+      "DET_FLUX_ADP_SML": 58,
+      "DET_FLUX_SML": 22
+    }
+  },
+  "required_apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_SML",
+    "DET_FLUX_ADP",
+    "DET_FLUX_ADP_LAG"
+  ],
+  "survival_csv": {
+    "aperture_counts_for_priority_ids": {
+      "DET_FLUX": 94,
+      "DET_FLUX_ADP": 94,
+      "DET_FLUX_ADP_LAG": 94,
+      "DET_FLUX_ADP_SML": 94,
+      "DET_FLUX_LAG": 94,
+      "DET_FLUX_SML": 94,
+      "RAW_FLUX_Large": 94,
+      "RAW_FLUX_Primary": 94,
+      "RAW_FLUX_Small": 94
+    },
+    "exists": true,
+    "ids_missing_from_survival": [],
+    "missing_columns": [],
+    "missing_survival_by_aperture": {},
+    "n_priority_ids": 94,
+    "n_priority_rows": 846,
+    "n_rows": 9000,
+    "path": "reports/stage5_validation/s56_1k_predetrend_batman_adp_only_review_queue_pdo/predet_signal_survival_snr_diagnostics.csv"
+  }
+}

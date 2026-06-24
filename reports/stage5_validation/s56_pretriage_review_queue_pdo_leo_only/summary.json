@@ -1,0 +1,8 @@
+{
+  "dropped_non_leo_plot_rows": 83,
+  "missing_reports": [],
+  "rows_in": 1000,
+  "rows_out": 917,
+  "source_queue": "reports/stage5_validation/s56_pretriage_review_queue_pdo/review_queue.csv",
+  "source_vet_reports": "reports/stage5_validation/s56_pretriage_review_queue_pdo/vet_reports"
+}
