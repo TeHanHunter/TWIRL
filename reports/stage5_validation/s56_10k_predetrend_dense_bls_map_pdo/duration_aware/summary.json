@@ -1,13 +1,19 @@
 {
   "bls_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
-  "created_utc": "2026-06-24T04:54:09.364193+00:00",
+  "created_utc": "2026-06-24T13:35:03.769518+00:00",
   "leo_metric_summary": {
     "MES": {
       "BLS missed, LEO FA": {
-        "median": 5.95055976046467,
-        "n": 823,
-        "p16": 5.41953901765577,
-        "p84": 7.336362215851788
+        "median": 5.950151164046963,
+        "n": 822,
+        "p16": 5.419025587555861,
+        "p84": 7.348245769967684
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 6.756706766213889,
+        "n": 1,
+        "p16": 6.756706766213889,
+        "p84": 6.756706766213889
       },
       "BLS recovered, LEO FA": {
         "median": 6.465828044779577,
@@ -25,9 +31,15 @@
     "N_transit": {
       "BLS missed, LEO FA": {
         "median": 4.0,
-        "n": 823,
+        "n": 822,
         "p16": 2.0,
         "p84": 28.0
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 13.0,
+        "n": 1,
+        "p16": 13.0,
+        "p84": 13.0
       },
       "BLS recovered, LEO FA": {
         "median": 14.0,
@@ -44,10 +56,16 @@
     },
     "SHP": {
       "BLS missed, LEO FA": {
-        "median": 0.3860961533651115,
-        "n": 823,
-        "p16": 0.3169129247707992,
-        "p84": 0.45974477178703127
+        "median": 0.38611802843727416,
+        "n": 822,
+        "p16": 0.3168462018774041,
+        "p84": 0.4598633169231167
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 0.3574842012221941,
+        "n": 1,
+        "p16": 0.3574842012221941,
+        "p84": 0.3574842012221941
       },
       "BLS recovered, LEO FA": {
         "median": 0.3441229667325073,
@@ -63,16 +81,23 @@
       }
     },
     "group_counts": {
-      "BLS missed, LEO FA": 823,
+      "BLS missed, LEO FA": 822,
+      "BLS missed, LEO PC/FP": 1,
       "BLS recovered, LEO FA": 101,
       "BLS recovered, LEO PC/FP": 76
     },
     "n_in": {
       "BLS missed, LEO FA": {
         "median": 33.0,
-        "n": 823,
+        "n": 822,
         "p16": 9.0,
         "p84": 171.0
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 49.0,
+        "n": 1,
+        "p16": 49.0,
+        "p84": 49.0
       },
       "BLS recovered, LEO FA": {
         "median": 39.0,
@@ -89,10 +114,16 @@
     },
     "new_MES": {
       "BLS missed, LEO FA": {
-        "median": 5.72173550292941,
-        "n": 823,
-        "p16": 2.3786694612331085,
-        "p84": 6.870859267721635
+        "median": 5.721562824457234,
+        "n": 822,
+        "p16": 2.377980620267533,
+        "p84": 6.869046745901159
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 7.178766688006465,
+        "n": 1,
+        "p16": 7.178766688006465,
+        "p84": 7.178766688006465
       },
       "BLS recovered, LEO FA": {
         "median": 5.941298075255739,
@@ -182,6 +213,9 @@
     "leo_metric_summary_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_summary.csv",
     "period_radius_boundary_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.pdf",
     "period_radius_boundary_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.png",
+    "period_radius_empirical_publication_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication_grid.csv",
+    "period_radius_empirical_publication_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.pdf",
+    "period_radius_empirical_publication_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.png",
     "period_radius_recovery_map_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.csv",
     "period_radius_recovery_map_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.pdf",
     "period_radius_recovery_map_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.png",

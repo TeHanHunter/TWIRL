@@ -258,6 +258,62 @@ def _smoothed_fraction(hit: np.ndarray, count: np.ndarray, *, min_effective_coun
     return fraction
 
 
+def _kernel_recovery_surface_logxy(
+    df: pd.DataFrame,
+    *,
+    x_col: str,
+    y_col: str,
+    recovered_col: str,
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    sigma_x_dex: float,
+    sigma_y_dex: float,
+    batch_size: int = 512,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Kernel-smoothed empirical recovery fraction on log-log axes.
+
+    The returned ``effective_n`` is the Kish effective sample size of the
+    local kernel weights. It is a support diagnostic, not an integer count.
+    """
+
+    x = np.log10(df[x_col].to_numpy(dtype=float))
+    y = np.log10(df[y_col].to_numpy(dtype=float))
+    recovered = df[recovered_col].fillna(False).astype(bool).to_numpy(dtype=float)
+    duration = np.log10(df["truth_duration_min"].to_numpy(dtype=float))
+    finite = np.isfinite(x) & np.isfinite(y) & np.isfinite(recovered) & np.isfinite(duration)
+    x = x[finite]
+    y = y[finite]
+    recovered = recovered[finite]
+    duration = duration[finite]
+    shape = (len(x_grid), len(y_grid))
+    if x.size == 0:
+        return np.full(shape, np.nan), np.zeros(shape), np.full(shape, np.nan)
+
+    gx, gy = np.meshgrid(np.log10(x_grid), np.log10(y_grid), indexing="ij")
+    points = np.column_stack([gx.ravel(), gy.ravel()])
+    fraction = np.full(points.shape[0], np.nan)
+    effective_n = np.zeros(points.shape[0])
+    mean_duration = np.full(points.shape[0], np.nan)
+    inv_x = 1.0 / max(float(sigma_x_dex), 1.0e-6)
+    inv_y = 1.0 / max(float(sigma_y_dex), 1.0e-6)
+
+    for start in range(0, len(points), batch_size):
+        stop = min(start + batch_size, len(points))
+        dx = (points[start:stop, 0, None] - x[None, :]) * inv_x
+        dy = (points[start:stop, 1, None] - y[None, :]) * inv_y
+        weights = np.exp(-0.5 * (dx * dx + dy * dy))
+        denom = weights.sum(axis=1)
+        numerator = weights @ recovered
+        duration_num = weights @ duration
+        weight_sq = np.square(weights).sum(axis=1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            fraction[start:stop] = numerator / denom
+            effective_n[start:stop] = denom * denom / weight_sq
+            mean_duration[start:stop] = np.power(10.0, duration_num / denom)
+
+    return fraction.reshape(shape), effective_n.reshape(shape), mean_duration.reshape(shape)
+
+
 def plot_period_radius_boundary_lines(df: pd.DataFrame, model: dict[str, Any], out_dir: Path) -> dict[str, str]:
     import matplotlib
 
@@ -410,7 +466,7 @@ def plot_period_radius_recovery_maps(df: pd.DataFrame, out_dir: Path) -> dict[st
             )
             support = np.isfinite(smooth_fraction)
             if np.any(support) and np.nanmin(smooth_fraction) <= 0.5 <= np.nanmax(smooth_fraction):
-                ax.contour(
+                contour = ax.contour(
                     period_centers,
                     radius_centers,
                     smooth_fraction.T,
@@ -418,6 +474,7 @@ def plot_period_radius_recovery_maps(df: pd.DataFrame, out_dir: Path) -> dict[st
                     colors=["white"],
                     linewidths=1.3,
                 )
+                ax.clabel(contour, fmt={0.5: "50%"}, fontsize=7, inline=True)
             if len(subset):
                 sample = subset.sample(n=min(500, len(subset)), random_state=1000 + row_idx * 10 + col_idx)
                 sample_recovered = sample["any_exact_or_harmonic_recovered"].fillna(False).astype(bool)
@@ -488,7 +545,7 @@ def plot_period_radius_recovery_maps(df: pd.DataFrame, out_dir: Path) -> dict[st
     fig.text(
         0.5,
         0.02,
-        "White contours mark 50% empirical recovery after light count-weighted smoothing; blank cells have little local injection support.",
+        "White 50% contours mark empirical BLS recovery after local count-weighted smoothing; grey cells have little injection support.",
         ha="center",
         va="bottom",
         fontsize=8,
@@ -505,6 +562,205 @@ def plot_period_radius_recovery_maps(df: pd.DataFrame, out_dir: Path) -> dict[st
         "period_radius_recovery_map_png": str(png),
         "period_radius_recovery_map_pdf": str(pdf),
         "period_radius_recovery_map_csv": str(csv),
+    }
+
+
+def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path) -> dict[str, str]:
+    """Write a compact empirical period-radius map for publication drafts.
+
+    The duration-split audit plot is useful for debugging, but it makes the
+    bright rows look artificially empty because the physically generated
+    injection grid couples duration, period, and radius. This figure keeps the
+    empirical recovery surface, marginalizes over duration inside each Tmag
+    slice, and marks the support boundary explicitly.
+    """
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patheffects as pe
+
+    apply_twirl_style("full_page")
+    tmag_bins = [
+        ("Tmag < 18", df["tmag"] < 18.0),
+        ("18 <= Tmag < 19", (df["tmag"] >= 18.0) & (df["tmag"] < 19.0)),
+        ("19 <= Tmag < 20", (df["tmag"] >= 19.0) & (df["tmag"] < 20.0)),
+    ]
+    period_edges = np.geomspace(0.12, 13.0, 92)
+    radius_edges = np.geomspace(0.18, 18.0, 86)
+    period_centers = np.sqrt(period_edges[:-1] * period_edges[1:])
+    radius_centers = np.sqrt(radius_edges[:-1] * radius_edges[1:])
+    sigma_period_dex = 0.16
+    sigma_radius_dex = 0.18
+
+    cmap = plt.get_cmap("magma").copy()
+    cmap.set_bad("#e8ebef")
+    fig, axes = plt.subplots(1, 3, figsize=(12.0, 4.2), sharex=True, sharey=True)
+    mesh = None
+    rows: list[dict[str, Any]] = []
+    for idx, (label, mask) in enumerate(tmag_bins):
+        ax = axes[idx]
+        sub = df[mask].copy()
+        min_effective_n = 3.5 if len(sub) < 1200 else 5.0 if len(sub) < 2500 else 8.0
+        ax.set_title(f"{label}; n={len(sub):,}")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlim(period_edges[0], period_edges[-1])
+        ax.set_ylim(radius_edges[0], radius_edges[-1])
+        ax.axvline(0.216, color="white", linestyle=":", linewidth=1.1, alpha=0.95)
+        if sub.empty:
+            continue
+        surface, effective_n, mean_duration = _kernel_recovery_surface_logxy(
+            sub,
+            x_col="truth_period_d",
+            y_col="plot_radius_rearth",
+            recovered_col="any_exact_or_harmonic_recovered",
+            x_grid=period_centers,
+            y_grid=radius_centers,
+            sigma_x_dex=sigma_period_dex,
+            sigma_y_dex=sigma_radius_dex,
+        )
+        masked = np.where(effective_n >= min_effective_n, surface, np.nan)
+        mesh = ax.pcolormesh(
+            period_edges,
+            radius_edges,
+            masked.T,
+            cmap=cmap,
+            vmin=0.0,
+            vmax=1.0,
+            shading="auto",
+        )
+        sample = sub.sample(n=min(900, len(sub)), random_state=560 + idx)
+        recovered = sample["any_exact_or_harmonic_recovered"].fillna(False).astype(bool)
+        ax.scatter(
+            sample.loc[~recovered, "truth_period_d"],
+            sample.loc[~recovered, "plot_radius_rearth"],
+            s=2.0,
+            c="white",
+            alpha=0.10,
+            linewidths=0,
+            rasterized=True,
+        )
+        ax.scatter(
+            sample.loc[recovered, "truth_period_d"],
+            sample.loc[recovered, "plot_radius_rearth"],
+            s=3.0,
+            c="white",
+            alpha=0.34,
+            linewidths=0,
+            rasterized=True,
+        )
+        if np.nanmin(masked) <= 0.5 <= np.nanmax(masked):
+            contour = ax.contour(
+                period_centers,
+                radius_centers,
+                masked.T,
+                levels=[0.5],
+                colors=["black"],
+                linewidths=1.25,
+            )
+            halo = [pe.Stroke(linewidth=2.4, foreground="white"), pe.Normal()]
+            if hasattr(contour, "collections"):
+                for collection in contour.collections:
+                    collection.set_path_effects(halo)
+            elif hasattr(contour, "set_path_effects"):
+                contour.set_path_effects(halo)
+            ax.clabel(contour, fmt={0.5: "50%"}, fontsize=7, inline=True)
+        if np.nanmax(effective_n) >= min_effective_n:
+            ax.contour(
+                period_centers,
+                radius_centers,
+                effective_n.T,
+                levels=[min_effective_n],
+                colors=["0.25"],
+                linewidths=0.7,
+                linestyles=["--"],
+                alpha=0.9,
+            )
+        if np.nanmin(mean_duration) <= 8.0 <= np.nanmax(mean_duration):
+            dcont = ax.contour(
+                period_centers,
+                radius_centers,
+                mean_duration.T,
+                levels=[4.0, 8.0, 16.0],
+                colors=["white"],
+                linewidths=0.55,
+                linestyles=["-"],
+                alpha=0.45,
+            )
+            ax.clabel(dcont, fmt=lambda value: f"{value:g} min", fontsize=6, inline=True)
+        ax.text(
+            0.04,
+            0.06,
+            f"support >= {min_effective_n:g}",
+            transform=ax.transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=7,
+            color="white",
+            bbox={"facecolor": "black", "edgecolor": "none", "alpha": 0.42, "boxstyle": "round,pad=0.18"},
+        )
+        for p_idx, period_d in enumerate(period_centers):
+            for r_idx, radius_rearth in enumerate(radius_centers):
+                rows.append(
+                    {
+                        "tmag_bin": label,
+                        "period_d": float(period_d),
+                        "radius_rearth": float(radius_rearth),
+                        "kernel_recovery_fraction": (
+                            float(surface[p_idx, r_idx]) if np.isfinite(surface[p_idx, r_idx]) else np.nan
+                        ),
+                        "kernel_effective_n": float(effective_n[p_idx, r_idx]),
+                        "mean_duration_min": (
+                            float(mean_duration[p_idx, r_idx]) if np.isfinite(mean_duration[p_idx, r_idx]) else np.nan
+                        ),
+                        "masked_for_low_support": bool(effective_n[p_idx, r_idx] < min_effective_n),
+                        "min_effective_n": float(min_effective_n),
+                    }
+                )
+
+    for ax in axes:
+        ax.set_xlabel("Injected period [days]")
+        ax.grid(False)
+    axes[0].set_ylabel("Injected companion radius [R_earth]")
+    axes[0].text(
+        0.219,
+        0.22,
+        "Roche limit",
+        rotation=90,
+        ha="left",
+        va="bottom",
+        color="white",
+        fontsize=7,
+    )
+    if mesh is not None:
+        cbar = fig.colorbar(mesh, ax=axes.ravel().tolist(), fraction=0.030, pad=0.018)
+        cbar.set_label("Kernel-smoothed BLS recovery fraction")
+    fig.subplots_adjust(left=0.075, right=0.89, top=0.90, bottom=0.21, wspace=0.08)
+    fig.text(
+        0.5,
+        0.04,
+        (
+            "Black contour: 50% empirical recovery. Dashed boundary: local injection-support limit. "
+            "Light duration contours show the period-radius-duration coupling of the BATMAN grid."
+        ),
+        ha="center",
+        va="bottom",
+        fontsize=8,
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    png = out_dir / "period_radius_empirical_recovery_publication.png"
+    pdf = out_dir / "period_radius_empirical_recovery_publication.pdf"
+    csv = out_dir / "period_radius_empirical_recovery_publication_grid.csv"
+    pd.DataFrame(rows).to_csv(csv, index=False)
+    fig.savefig(png, dpi=260, bbox_inches="tight")
+    fig.savefig(pdf, bbox_inches="tight")
+    plt.close(fig)
+    return {
+        "period_radius_empirical_publication_png": str(png),
+        "period_radius_empirical_publication_pdf": str(pdf),
+        "period_radius_empirical_publication_csv": str(csv),
     }
 
 
@@ -863,6 +1119,9 @@ def merged_leo_metric_frame(queue_csv: Path, metrics_csv: Path) -> pd.DataFrame:
     merged["bls_recovered"] = merged["any_exact_or_harmonic_recovered"].fillna(False).astype(bool)
     merged["leo_recovered_pc_or_fp"] = merged["leo_class_effective"].isin(["PC", "FP"])
     merged["leo_diagnostic_group"] = "BLS missed, LEO FA"
+    merged.loc[~merged["bls_recovered"] & merged["leo_recovered_pc_or_fp"], "leo_diagnostic_group"] = (
+        "BLS missed, LEO PC/FP"
+    )
     merged.loc[merged["bls_recovered"] & ~merged["leo_recovered_pc_or_fp"], "leo_diagnostic_group"] = (
         "BLS recovered, LEO FA"
     )
@@ -909,8 +1168,18 @@ def plot_leo_metric_diagnostics(queue_csv: Path, metrics_csv: Path, out_dir: Pat
     summary_csv = out_dir / "leo_bls_metric_summary.csv"
     summary.to_csv(summary_csv, index=False)
 
-    groups = ["BLS missed, LEO FA", "BLS recovered, LEO FA", "BLS recovered, LEO PC/FP"]
-    labels = ["BLS missed\nLEO FA", "BLS recovered\nLEO FA", "BLS recovered\nLEO PC/FP"]
+    groups = [
+        "BLS missed, LEO FA",
+        "BLS missed, LEO PC/FP",
+        "BLS recovered, LEO FA",
+        "BLS recovered, LEO PC/FP",
+    ]
+    labels = [
+        "BLS missed\nLEO FA",
+        "BLS missed\nLEO PC/FP",
+        "BLS recovered\nLEO FA",
+        "BLS recovered\nLEO PC/FP",
+    ]
     metrics = [
         ("MES", "MES"),
         ("new_MES", "new MES"),
@@ -958,8 +1227,9 @@ def plot_leo_metric_diagnostics(queue_csv: Path, metrics_csv: Path, out_dir: Pat
         0.5,
         0.04,
         (
-            f"Group counts: missed/FA={int(counts.iloc[0])}, recovered/FA={int(counts.iloc[1])}, "
-            f"recovered/PC-FP={int(counts.iloc[2])}. LEO misses are mostly lower-MES, fewer-point, higher-SHP cases."
+            f"Group counts: missed/FA={int(counts.iloc[0])}, missed/PC-FP={int(counts.iloc[1])}, "
+            f"recovered/FA={int(counts.iloc[2])}, recovered/PC-FP={int(counts.iloc[3])}. "
+            "LEO misses are mostly lower-MES, fewer-point, higher-SHP cases."
         ),
         ha="center",
         va="bottom",
@@ -1030,6 +1300,8 @@ def write_summary(
             "",
             "The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.",
             "",
+            "The empirical publication map marginalizes over duration within each Tmag slice to avoid artificially empty panels from the period-duration-radius coupling in the injected BATMAN grid. Grey cells mean the kernel has too little local injection support; the black 50% contour is the empirical recovery boundary. The duration-split audit map is retained as a diagnostic, but the marginalized map is the cleaner publication-facing view.",
+            "",
             "## BLS vs LEO",
             "",
             f"- Injected rows in LEO queue: `{leo_summary['n']}`",
@@ -1089,6 +1361,7 @@ def main(argv: list[str] | None = None) -> int:
     paths: dict[str, str] = {}
     paths.update(plot_period_radius_boundary_lines(df, model, args.out_dir))
     paths.update(plot_period_radius_recovery_maps(df, args.out_dir))
+    paths.update(plot_publication_period_radius_recovery_map(df, args.out_dir))
     paths.update(plot_snr_proxy_recovery_map(df, args.out_dir))
     paths.update(plot_boundary_floor_maps(df, model, args.out_dir))
     if args.write_3d:

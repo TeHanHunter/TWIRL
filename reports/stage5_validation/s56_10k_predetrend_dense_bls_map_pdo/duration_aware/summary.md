@@ -18,6 +18,8 @@ LEO comparison input: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validat
 
 The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.
 
+The empirical publication map marginalizes over duration within each Tmag slice to avoid artificially empty panels from the period-duration-radius coupling in the injected BATMAN grid. Grey cells mean the kernel has too little local injection support; the black 50% contour is the empirical recovery boundary. The duration-split audit map is retained as a diagnostic, but the marginalized map is the cleaner publication-facing view.
+
 ## BLS vs LEO
 
 - Injected rows in LEO queue: `1000`
@@ -36,6 +38,9 @@ The metric diagnostic supports targeted WD retuning, not a blind loosening of ev
 - `period_radius_recovery_map_png`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.png`
 - `period_radius_recovery_map_pdf`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.pdf`
 - `period_radius_recovery_map_csv`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.csv`
+- `period_radius_empirical_publication_png`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.png`
+- `period_radius_empirical_publication_pdf`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.pdf`
+- `period_radius_empirical_publication_csv`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication_grid.csv`
 - `radius_snr_proxy_png`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.png`
 - `radius_snr_proxy_pdf`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.pdf`
 - `duration_radius_floor_png`: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/duration_radius_50pct_boundary_floor_maps.png`

@@ -37,3 +37,23 @@ Several LEO tests remain intentionally inherited from the stock thresholds
 `offset`). They are not all independently validated for WD transits yet, so
 the current WD tuning is best treated as a permissive first-pass vetter for
 human triage rather than a final automated decision rule.
+
+## 2026-06-24 Threshold Smoke Result
+
+The S56 injected-row smoke test in
+[summary](s56_10k_predetrend_dense_bls_map_pdo/leo_wd_tuning_smoke/summary.md)
+compares possible WD review pass-through presets against BLS exact/top-N/
+harmonic recovery on the `1,000` injection rows with LEO metrics.
+
+- Current LEO `PC/FP`: precision `98.7%`, recall `42.9%`.
+- `wd_review_high_purity`: precision `91.8%`, recall `50.3%`, adds `13`
+  BLS-recovered rows and `7` BLS-missed rows to review.
+- `wd_review_balanced`: precision `86.0%`, recall `55.4%`.
+- `wd_review_aggressive`: precision `64.9%`, recall `61.6%`.
+
+Interpretation: the physical guard that matters most is primary-event
+dominance over secondary/tertiary/positive events. Loosening shape/MES cuts is
+reasonable for under-resolved 200 s WD transits, but dropping the primary-
+dominance guard quickly admits wrong-ephemeris BLS misses. Implement the first
+tune as an explicit `WD_REVIEW` / recovered-but-not-clean class, not as direct
+promotion to `PC`.

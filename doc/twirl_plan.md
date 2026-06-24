@@ -867,6 +867,20 @@ loosening. The defensible methods wording remains: BLS recovery says whether
 the search tracks the injected signal; LEO recovery is a stricter
 high-confidence vetting subset.
 
+Status (`2026-06-24`, publication-map and LEO-tuning pass): the publication-
+facing sensitivity figure is now the marginalized empirical period-radius map
+in
+[duration-aware plots](../reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/),
+not the duration-split audit grid. It uses only local injected support within
+each Tmag bin, labels the 50% recovery contour directly, and marks unsupported
+parameter space with a dashed support boundary so white/grey areas are not
+misread as zero recovery. The LEO smoke test now supports a conservative
+`WD_REVIEW` route: `wd_review_high_purity` raises LEO-vs-BLS recall from
+`42.9%` to `50.3%` while keeping `91.8%` precision on the injected 1k smoke
+set. Balanced/aggressive relaxations increase recall but lose purity quickly,
+so the next implementation should add a review/recovered-but-not-clean class
+rather than promote those rows directly to PC.
+
 Status (`2026-06-24` EOD): wrap checkpoint keeps the S56 raw-flux
 pre-detrend injection-recovery path as the active methods branch. The best
 current search input is still `DET_FLUX_ADP_SML + DET_FLUX_SML` with the

@@ -35,6 +35,7 @@ DEFAULT_DEPTH_BINS = 50
 DEFAULT_SMOOTH_GRID_SIZE = 90
 DEFAULT_SMOOTH_SIGMA_LOGP = 0.13
 DEFAULT_SMOOTH_SIGMA_DEPTH_PCT = 7.0
+DEFAULT_SMOOTH_MIN_EFFECTIVE_N = 3.5
 
 
 def _json_default(value: Any) -> Any:
@@ -553,6 +554,7 @@ def plot_smoothed_tmag_recovery(
     grid_size: int = DEFAULT_SMOOTH_GRID_SIZE,
     sigma_logp: float = DEFAULT_SMOOTH_SIGMA_LOGP,
     sigma_depth_pct: float = DEFAULT_SMOOTH_SIGMA_DEPTH_PCT,
+    min_effective_n_floor: float = DEFAULT_SMOOTH_MIN_EFFECTIVE_N,
 ) -> dict[str, str]:
     import matplotlib
 
@@ -567,6 +569,8 @@ def plot_smoothed_tmag_recovery(
     mesh = None
     boundary_rows: list[dict[str, Any]] = []
     colors = {0.5: "white", 0.8: "cyan"}
+    cmap = plt.get_cmap("magma").copy()
+    cmap.set_bad("#e8ebef")
 
     for ax, (title, mask) in zip(axes.ravel(), slices):
         sub = df[mask].copy()
@@ -586,9 +590,19 @@ def plot_smoothed_tmag_recovery(
             sigma_logp=sigma_logp,
             sigma_depth_pct=sigma_depth_pct,
         )
-        min_effective_n = 8.0 if len(sub) >= 800 else 5.0
+        min_effective_n = max(float(min_effective_n_floor), min(8.0, 0.004 * len(sub)))
         masked = np.where(effective_n >= min_effective_n, surface, np.nan)
-        mesh = ax.pcolormesh(period_grid, depth_grid, masked.T, vmin=0.0, vmax=1.0, cmap="magma", shading="auto")
+        mesh = ax.pcolormesh(period_grid, depth_grid, masked.T, vmin=0.0, vmax=1.0, cmap=cmap, shading="auto")
+        if np.nanmax(effective_n) >= min_effective_n:
+            ax.contour(
+                period_grid,
+                depth_grid,
+                effective_n.T,
+                levels=[min_effective_n],
+                colors=["0.75"],
+                linewidths=0.6,
+                linestyles=["--"],
+            )
         for threshold in (0.5, 0.8):
             boundary_rows.extend(
                 _smoothed_boundary_rows(
@@ -615,7 +629,7 @@ def plot_smoothed_tmag_recovery(
         ax.text(
             0.98,
             0.04,
-            f"kernel: {sigma_logp:.2f} dex, {sigma_depth_pct:.0f}%",
+            f"kernel: {sigma_logp:.2f} dex, {sigma_depth_pct:.0f}%; support >= {min_effective_n:.1f}",
             transform=ax.transAxes,
             ha="right",
             va="bottom",
@@ -631,11 +645,10 @@ def plot_smoothed_tmag_recovery(
     if mesh is not None:
         cbar = fig.colorbar(mesh, ax=axes.ravel().tolist(), fraction=0.032, pad=0.02)
         cbar.set_label("Kernel-smoothed recovered fraction")
-    fig.suptitle("Smoothed exact/top-N/harmonic BLS recovery by TESS magnitude", y=0.995)
     fig.text(
         0.5,
         0.005,
-        "Gaussian-kernel smoothing is for visualizing the sensitivity boundary; raw binned fractions remain in the companion plots.",
+        "Gaussian-kernel smoothing is for visualizing the sensitivity boundary; dashed grey contours mark the local support cutoff.",
         ha="center",
         va="bottom",
         fontsize=8,
@@ -979,6 +992,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--smooth-grid-size", type=int, default=DEFAULT_SMOOTH_GRID_SIZE)
     parser.add_argument("--smooth-sigma-logp", type=float, default=DEFAULT_SMOOTH_SIGMA_LOGP)
     parser.add_argument("--smooth-sigma-depth-pct", type=float, default=DEFAULT_SMOOTH_SIGMA_DEPTH_PCT)
+    parser.add_argument("--smooth-min-effective-n", type=float, default=DEFAULT_SMOOTH_MIN_EFFECTIVE_N)
     return parser
 
 
@@ -1015,6 +1029,7 @@ def main(argv: list[str] | None = None) -> int:
             grid_size=args.smooth_grid_size,
             sigma_logp=args.smooth_sigma_logp,
             sigma_depth_pct=args.smooth_sigma_depth_pct,
+            min_effective_n_floor=args.smooth_min_effective_n,
         )
     )
     paths.update(plot_radius_map(df, args.out_dir))

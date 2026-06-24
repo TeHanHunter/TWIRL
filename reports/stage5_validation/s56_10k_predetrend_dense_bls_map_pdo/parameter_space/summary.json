@@ -1,7 +1,7 @@
 {
   "any_exact_or_harmonic_frac": 0.1683,
   "any_exact_or_harmonic_n": 1683,
-  "created_utc": "2026-06-23T22:30:27.707430+00:00",
+  "created_utc": "2026-06-24T13:36:39.807433+00:00",
   "input_csv": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
   "n": 10000,
   "paths": {
