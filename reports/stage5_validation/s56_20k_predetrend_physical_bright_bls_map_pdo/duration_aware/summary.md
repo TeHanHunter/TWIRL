@@ -18,7 +18,11 @@ LEO comparison input: `reports/stage5_validation/s56_10k_predetrend_small_pair_2
 
 The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.
 
-The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the dotted vertical line marks the Roche-limit period; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.
+The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the cyan dotted curve is an illustrative fluid Roche limit; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.
+
+The Roche curve is model-dependent because companion radius does not uniquely define companion density. The plotted curve uses a simple bulk-density envelope: rocky bodies at small radii, lower-density gas giants near Jupiter radius, and a mild density increase into the brown-dwarf-radius regime. It should be read as physical context, not a hard vetting threshold.
+
+The earlier small grey point overlay was only a random subsample of injected examples (`faint = missed`, `brighter = recovered`) drawn on top of the smoothed surface. It is removed from the publication-facing map because the support boundary and grid CSV carry the sample-support information more cleanly.
 
 Counts in the paper-style Tmag panels show whether the map is target-distribution-limited or bright-balanced:
 

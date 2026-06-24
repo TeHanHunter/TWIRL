@@ -40,6 +40,8 @@ DEFAULT_OUT_DIR = (
     / "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/"
     / "duration_aware"
 )
+G_SI = 6.67430e-11
+FLUID_ROCHE_COEFFICIENT = 2.44
 
 
 def _json_default(value: Any) -> Any:
@@ -264,6 +266,58 @@ def _finite_minmax(values: np.ndarray) -> tuple[float, float] | None:
     if finite.size == 0:
         return None
     return float(np.nanmin(finite)), float(np.nanmax(finite))
+
+
+def _plain_log_tick(value: float, _pos: int | None = None) -> str:
+    if value <= 0 or not np.isfinite(value):
+        return ""
+    log_value = np.log10(value)
+    if not np.isclose(log_value, round(log_value), atol=1.0e-8):
+        return ""
+    if value < 1.0:
+        return f"{value:g}"
+    return f"{int(round(value))}"
+
+
+def _style_log_panel_ticks(ax: Any) -> None:
+    from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
+
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_major_locator(LogLocator(base=10.0, subs=(1.0,), numticks=4))
+        axis.set_major_formatter(FuncFormatter(_plain_log_tick))
+        axis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=32))
+        axis.set_minor_formatter(NullFormatter())
+    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
+    ax.tick_params(axis="both", which="major", length=5.0, width=0.8)
+    ax.tick_params(axis="both", which="minor", length=2.8, width=0.6)
+
+
+def _approx_companion_density_g_cm3(radius_rearth: np.ndarray) -> np.ndarray:
+    """Illustrative density envelope used only for plotting a Roche curve.
+
+    Radius alone does not define a Roche limit. This envelope keeps small
+    bodies rocky, lowers the density toward Jupiter-like radii, and lets it
+    rise mildly into the brown-dwarf-radius regime.
+    """
+
+    radius = np.asarray(radius_rearth, dtype=float)
+    density = np.empty_like(radius)
+    rocky = radius <= 1.0
+    giant = (radius > 1.0) & (radius <= 11.2)
+    brown_dwarf = radius > 11.2
+
+    density[rocky] = 5.5 * np.clip(radius[rocky], 0.2, None) ** 0.2
+    density[giant] = 5.5 * radius[giant] ** (np.log(1.33 / 5.5) / np.log(11.2))
+    density[brown_dwarf] = 1.33 * (radius[brown_dwarf] / 11.2) ** (
+        np.log(5.0 / 1.33) / np.log(18.0 / 11.2)
+    )
+    return density
+
+
+def _fluid_roche_period_d(radius_rearth: np.ndarray) -> np.ndarray:
+    density_kg_m3 = _approx_companion_density_g_cm3(radius_rearth) * 1000.0
+    period_s = np.sqrt(3.0 * np.pi * FLUID_ROCHE_COEFFICIENT**3 / (G_SI * density_kg_m3))
+    return period_s / 86400.0
 
 
 def _kernel_recovery_surface_logxy(
@@ -588,6 +642,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.patheffects as pe
+    from matplotlib.colors import LinearSegmentedColormap
 
     apply_twirl_style("full_page")
     tmag_bins = [
@@ -603,11 +658,17 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     sigma_period_dex = 0.16
     sigma_radius_dex = 0.18
 
-    cmap = plt.get_cmap("magma").copy()
+    cmap = LinearSegmentedColormap.from_list(
+        "twirl_recovery",
+        ["#151515", "#42236f", "#2f6f8f", "#33a978", "#f3e76b"],
+        N=256,
+    )
     cmap.set_bad("#e8ebef")
     fig, axes = plt.subplots(2, 2, figsize=(10.4, 8.1), sharex=True, sharey=True)
     mesh = None
     rows: list[dict[str, Any]] = []
+    roche_radius = np.geomspace(radius_edges[0], radius_edges[-1], 320)
+    roche_period = _fluid_roche_period_d(roche_radius)
     for idx, (label, mask) in enumerate(tmag_bins):
         ax = axes.ravel()[idx]
         sub = df[mask].copy()
@@ -618,7 +679,17 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         ax.set_yscale("log")
         ax.set_xlim(period_edges[0], period_edges[-1])
         ax.set_ylim(radius_edges[0], radius_edges[-1])
-        ax.axvline(0.216, color="white", linestyle=":", linewidth=1.1, alpha=0.90)
+        _style_log_panel_ticks(ax)
+        roche_line = ax.plot(
+            roche_period,
+            roche_radius,
+            color="#72d6e8",
+            linestyle=":",
+            linewidth=1.25,
+            alpha=0.95,
+            zorder=5,
+        )[0]
+        roche_line.set_path_effects([pe.Stroke(linewidth=2.2, foreground="black", alpha=0.45), pe.Normal()])
         if sub.empty:
             continue
         surface, effective_n, mean_duration = _kernel_recovery_surface_logxy(
@@ -641,26 +712,6 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             vmin=0.0,
             vmax=1.0,
             shading="auto",
-        )
-        sample = sub.sample(n=min(900, len(sub)), random_state=560 + idx)
-        recovered = sample["any_exact_or_harmonic_recovered"].fillna(False).astype(bool)
-        ax.scatter(
-            sample.loc[~recovered, "truth_period_d"],
-            sample.loc[~recovered, "plot_radius_rearth"],
-            s=2.0,
-            c="white",
-            alpha=0.10,
-            linewidths=0,
-            rasterized=True,
-        )
-        ax.scatter(
-            sample.loc[recovered, "truth_period_d"],
-            sample.loc[recovered, "plot_radius_rearth"],
-            s=3.0,
-            c="white",
-            alpha=0.34,
-            linewidths=0,
-            rasterized=True,
         )
         if finite_masked is not None and finite_masked[0] <= 0.5 <= finite_masked[1]:
             contour = ax.contour(
@@ -728,26 +779,28 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     for ax in axes[:, 0]:
         ax.set_ylabel("Injected companion radius [R_earth]")
     roche_label = axes[0, 0].text(
-        0.219,
-        0.22,
-        "Roche limit",
-        rotation=90,
+        0.36,
+        0.42,
+        "fluid Roche curve",
+        rotation=15,
         ha="left",
         va="bottom",
-        color="white",
+        color="#72d6e8",
         fontsize=7,
     )
     roche_label.set_path_effects([pe.Stroke(linewidth=1.6, foreground="black", alpha=0.55), pe.Normal()])
     if mesh is not None:
-        cbar = fig.colorbar(mesh, ax=axes.ravel().tolist(), fraction=0.032, pad=0.018)
+        cax = fig.add_axes([0.935, 0.205, 0.022, 0.64])
+        cbar = fig.colorbar(mesh, cax=cax)
         cbar.set_label("Kernel-smoothed BLS recovery fraction")
-    fig.subplots_adjust(left=0.09, right=0.88, top=0.92, bottom=0.16, wspace=0.08, hspace=0.18)
+        cbar.ax.tick_params(direction="in", which="both")
+    fig.subplots_adjust(left=0.09, right=0.855, top=0.92, bottom=0.16, wspace=0.08, hspace=0.18)
     fig.text(
         0.5,
         0.035,
         (
             "Black contour: 50% empirical recovery. Grey dashed boundary: local injection-support limit. "
-            "Dotted vertical line: Roche-limit period. Thin white contours: local mean total transit duration."
+            "Cyan dotted curve: illustrative fluid Roche limit. Thin white contours: local mean total transit duration."
         ),
         ha="center",
         va="bottom",
@@ -1329,7 +1382,11 @@ def write_summary(
             "",
             "The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.",
             "",
-            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the dotted vertical line marks the Roche-limit period; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.",
+            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the cyan dotted curve is an illustrative fluid Roche limit; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.",
+            "",
+            "The Roche curve is model-dependent because companion radius does not uniquely define companion density. The plotted curve uses a simple bulk-density envelope: rocky bodies at small radii, lower-density gas giants near Jupiter radius, and a mild density increase into the brown-dwarf-radius regime. It should be read as physical context, not a hard vetting threshold.",
+            "",
+            "The earlier small grey point overlay was only a random subsample of injected examples (`faint = missed`, `brighter = recovered`) drawn on top of the smoothed surface. It is removed from the publication-facing map because the support boundary and grid CSV carry the sample-support information more cleanly.",
             "",
             "Counts in the paper-style Tmag panels show whether the map is target-distribution-limited or bright-balanced:",
             "",
