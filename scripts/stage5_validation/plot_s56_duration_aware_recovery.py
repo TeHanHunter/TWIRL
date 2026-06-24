@@ -42,6 +42,7 @@ DEFAULT_OUT_DIR = (
 )
 G_SI = 6.67430e-11
 FLUID_ROCHE_COEFFICIENT = 2.44
+REFERENCE_SECTOR_BASELINE_D = 27.0
 
 
 def _json_default(value: Any) -> Any:
@@ -99,6 +100,7 @@ def prepare_bls_frame(path: Path) -> pd.DataFrame:
     df["plot_depth_frac"] = depth.clip(lower=1e-6, upper=1.0)
     df["plot_depth_pct"] = 100.0 * df["plot_depth_frac"]
     df["plot_radius_rearth"] = df["truth_radius_rearth"]
+    df["plot_total_transit_min"] = REFERENCE_SECTOR_BASELINE_D * df["truth_duration_min"] / df["truth_period_d"]
     good = (
         np.isfinite(df["truth_period_d"])
         & (df["truth_period_d"] > 0)
@@ -108,6 +110,8 @@ def prepare_bls_frame(path: Path) -> pd.DataFrame:
         & (df["plot_depth_pct"] > 0)
         & np.isfinite(df["plot_radius_rearth"])
         & (df["plot_radius_rearth"] > 0)
+        & np.isfinite(df["plot_total_transit_min"])
+        & (df["plot_total_transit_min"] > 0)
         & np.isfinite(df["tmag"])
     )
     return df[good].copy()
@@ -287,37 +291,85 @@ def _style_log_panel_ticks(ax: Any) -> None:
         axis.set_major_formatter(FuncFormatter(_plain_log_tick))
         axis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=32))
         axis.set_minor_formatter(NullFormatter())
-    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
-    ax.tick_params(axis="both", which="major", length=5.0, width=0.8)
-    ax.tick_params(axis="both", which="minor", length=2.8, width=0.6)
+    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True, color="0.95", labelcolor="0.2")
+    ax.tick_params(axis="both", which="major", length=8.0, width=1.15)
+    ax.tick_params(axis="both", which="minor", length=4.5, width=0.85)
+    ticks = [
+        *ax.xaxis.get_major_ticks(),
+        *ax.xaxis.get_minor_ticks(),
+        *ax.yaxis.get_major_ticks(),
+        *ax.yaxis.get_minor_ticks(),
+    ]
+    for tick in ticks:
+        tick.tick1line.set_zorder(20)
+        tick.tick2line.set_zorder(20)
 
 
 def _approx_companion_density_g_cm3(radius_rearth: np.ndarray) -> np.ndarray:
-    """Illustrative density envelope used only for plotting a Roche curve.
+    """Reference density envelope used only for plotting a Roche curve.
 
-    Radius alone does not define a Roche limit. This envelope keeps small
-    bodies rocky, lowers the density toward Jupiter-like radii, and lets it
-    rise mildly into the brown-dwarf-radius regime.
+    Radius alone does not define a Roche limit. This curve is a conservative
+    low-density planet/gas-giant context line: it anchors the density to
+    Earth-, Neptune-, and Jupiter-like values, then extrapolates to inflated
+    super-Jovian radii. Dense brown dwarfs near Jupiter radius have much
+    shorter Roche periods and should be treated with a mass/density model.
     """
 
     radius = np.asarray(radius_rearth, dtype=float)
-    density = np.empty_like(radius)
-    rocky = radius <= 1.0
-    giant = (radius > 1.0) & (radius <= 11.2)
-    brown_dwarf = radius > 11.2
-
-    density[rocky] = 5.5 * np.clip(radius[rocky], 0.2, None) ** 0.2
-    density[giant] = 5.5 * radius[giant] ** (np.log(1.33 / 5.5) / np.log(11.2))
-    density[brown_dwarf] = 1.33 * (radius[brown_dwarf] / 11.2) ** (
-        np.log(5.0 / 1.33) / np.log(18.0 / 11.2)
+    anchor_radius = np.array([0.18, 1.0, 3.88, 11.21, 18.0], dtype=float)
+    anchor_density = np.array([3.0, 5.51, 1.64, 1.33, 0.60], dtype=float)
+    log_density = np.interp(
+        np.log10(np.clip(radius, anchor_radius[0], anchor_radius[-1])),
+        np.log10(anchor_radius),
+        np.log10(anchor_density),
     )
-    return density
+    return np.power(10.0, log_density)
 
 
 def _fluid_roche_period_d(radius_rearth: np.ndarray) -> np.ndarray:
     density_kg_m3 = _approx_companion_density_g_cm3(radius_rearth) * 1000.0
     period_s = np.sqrt(3.0 * np.pi * FLUID_ROCHE_COEFFICIENT**3 / (G_SI * density_kg_m3))
     return period_s / 86400.0
+
+
+def _label_curve_along_path(
+    ax: Any,
+    x: np.ndarray,
+    y: np.ndarray,
+    text: str,
+    *,
+    y_anchor: float,
+    color: str,
+    fontsize: float,
+) -> None:
+    finite = np.isfinite(x) & np.isfinite(y) & (x > 0) & (y > 0)
+    if finite.sum() < 3:
+        return
+    x = np.asarray(x[finite], dtype=float)
+    y = np.asarray(y[finite], dtype=float)
+    order = np.argsort(y)
+    x = x[order]
+    y = y[order]
+    y_anchor = float(np.clip(y_anchor, y[1], y[-2]))
+    x_anchor = float(np.power(10.0, np.interp(np.log10(y_anchor), np.log10(y), np.log10(x))))
+    near = int(np.argmin(np.abs(np.log10(y) - np.log10(y_anchor))))
+    left = max(0, near - 10)
+    right = min(len(y) - 1, near + 10)
+    p0 = ax.transData.transform((x[left], y[left]))
+    p1 = ax.transData.transform((x[right], y[right]))
+    angle = float(np.degrees(np.arctan2(p1[1] - p0[1], p1[0] - p0[0])))
+    ax.text(
+        x_anchor,
+        y_anchor,
+        text,
+        color=color,
+        fontsize=fontsize,
+        rotation=angle,
+        rotation_mode="anchor",
+        ha="center",
+        va="center",
+        zorder=10,
+    )
 
 
 def _kernel_recovery_surface_logxy(
@@ -341,12 +393,12 @@ def _kernel_recovery_surface_logxy(
     x = np.log10(df[x_col].to_numpy(dtype=float))
     y = np.log10(df[y_col].to_numpy(dtype=float))
     recovered = df[recovered_col].fillna(False).astype(bool).to_numpy(dtype=float)
-    duration = np.log10(df["truth_duration_min"].to_numpy(dtype=float))
-    finite = np.isfinite(x) & np.isfinite(y) & np.isfinite(recovered) & np.isfinite(duration)
+    mean_value = np.log10(df["plot_total_transit_min"].to_numpy(dtype=float))
+    finite = np.isfinite(x) & np.isfinite(y) & np.isfinite(recovered) & np.isfinite(mean_value)
     x = x[finite]
     y = y[finite]
     recovered = recovered[finite]
-    duration = duration[finite]
+    mean_value = mean_value[finite]
     shape = (len(x_grid), len(y_grid))
     if x.size == 0:
         return np.full(shape, np.nan), np.zeros(shape), np.full(shape, np.nan)
@@ -355,7 +407,7 @@ def _kernel_recovery_surface_logxy(
     points = np.column_stack([gx.ravel(), gy.ravel()])
     fraction = np.full(points.shape[0], np.nan)
     effective_n = np.zeros(points.shape[0])
-    mean_duration = np.full(points.shape[0], np.nan)
+    mean_value_grid = np.full(points.shape[0], np.nan)
     inv_x = 1.0 / max(float(sigma_x_dex), 1.0e-6)
     inv_y = 1.0 / max(float(sigma_y_dex), 1.0e-6)
 
@@ -366,14 +418,14 @@ def _kernel_recovery_surface_logxy(
         weights = np.exp(-0.5 * (dx * dx + dy * dy))
         denom = weights.sum(axis=1)
         numerator = weights @ recovered
-        duration_num = weights @ duration
+        mean_value_num = weights @ mean_value
         weight_sq = np.square(weights).sum(axis=1)
         with np.errstate(invalid="ignore", divide="ignore"):
             fraction[start:stop] = numerator / denom
             effective_n[start:stop] = denom * denom / weight_sq
-            mean_duration[start:stop] = np.power(10.0, duration_num / denom)
+            mean_value_grid[start:stop] = np.power(10.0, mean_value_num / denom)
 
-    return fraction.reshape(shape), effective_n.reshape(shape), mean_duration.reshape(shape)
+    return fraction.reshape(shape), effective_n.reshape(shape), mean_value_grid.reshape(shape)
 
 
 def plot_period_radius_boundary_lines(df: pd.DataFrame, model: dict[str, Any], out_dir: Path) -> dict[str, str]:
@@ -641,8 +693,6 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    import matplotlib.patheffects as pe
-    from matplotlib.colors import LinearSegmentedColormap
 
     apply_twirl_style("full_page")
     tmag_bins = [
@@ -658,11 +708,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     sigma_period_dex = 0.16
     sigma_radius_dex = 0.18
 
-    cmap = LinearSegmentedColormap.from_list(
-        "twirl_recovery",
-        ["#151515", "#42236f", "#2f6f8f", "#33a978", "#f3e76b"],
-        N=256,
-    )
+    cmap = plt.get_cmap("magma").copy()
     cmap.set_bad("#e8ebef")
     fig, axes = plt.subplots(2, 2, figsize=(10.4, 8.1), sharex=True, sharey=True)
     mesh = None
@@ -674,7 +720,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         sub = df[mask].copy()
         min_effective_n = max(2.0, min(8.0, 0.004 * len(sub)))
         rec_n = int(sub["any_exact_or_harmonic_recovered"].fillna(False).astype(bool).sum()) if len(sub) else 0
-        ax.set_title(f"{label}; n={len(sub):,}, recovered={rec_n:,}")
+        ax.set_title(f"{label}: {rec_n}/{len(sub)} recovered")
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlim(period_edges[0], period_edges[-1])
@@ -683,16 +729,15 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         roche_line = ax.plot(
             roche_period,
             roche_radius,
-            color="#72d6e8",
+            color="#00a6c8",
             linestyle=":",
-            linewidth=1.25,
+            linewidth=1.35,
             alpha=0.95,
             zorder=5,
         )[0]
-        roche_line.set_path_effects([pe.Stroke(linewidth=2.2, foreground="black", alpha=0.45), pe.Normal()])
         if sub.empty:
             continue
-        surface, effective_n, mean_duration = _kernel_recovery_surface_logxy(
+        surface, effective_n, mean_total_transit_min = _kernel_recovery_surface_logxy(
             sub,
             x_col="truth_period_d",
             y_col="plot_radius_rearth",
@@ -720,14 +765,8 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 masked.T,
                 levels=[0.5],
                 colors=["black"],
-                linewidths=1.25,
+                linewidths=1.35,
             )
-            halo = [pe.Stroke(linewidth=2.4, foreground="white"), pe.Normal()]
-            if hasattr(contour, "collections"):
-                for collection in contour.collections:
-                    collection.set_path_effects(halo)
-            elif hasattr(contour, "set_path_effects"):
-                contour.set_path_effects(halo)
             ax.clabel(contour, fmt={0.5: "50%"}, fontsize=7, inline=True)
         finite_effective_n = _finite_minmax(effective_n)
         if finite_effective_n is not None and finite_effective_n[1] >= min_effective_n:
@@ -741,19 +780,25 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 linestyles=["--"],
                 alpha=0.85,
             )
-        finite_duration = _finite_minmax(mean_duration)
-        if finite_duration is not None and finite_duration[0] <= 8.0 <= finite_duration[1]:
+        finite_total_time = _finite_minmax(mean_total_transit_min)
+        if finite_total_time is not None and finite_total_time[0] <= 100.0 <= finite_total_time[1]:
             dcont = ax.contour(
                 period_centers,
                 radius_centers,
-                mean_duration.T,
-                levels=[4.0, 8.0, 16.0],
-                colors=["white"],
-                linewidths=0.50,
+                mean_total_transit_min.T,
+                levels=[30.0, 100.0, 300.0],
+                colors=["#f5f5f5", "#343434", "#343434"],
+                linewidths=[0.60, 0.66, 0.66],
                 linestyles=["-"],
-                alpha=0.42,
+                alpha=0.82,
             )
-            ax.clabel(dcont, fmt=lambda value: f"{value:g} min", fontsize=6, inline=True)
+            ax.clabel(
+                dcont,
+                fmt=lambda value: f"{value:g} min",
+                fontsize=6,
+                inline=True,
+                colors=["#f5f5f5", "#343434", "#343434"],
+            )
         for p_idx, period_d in enumerate(period_centers):
             for r_idx, radius_rearth in enumerate(radius_centers):
                 rows.append(
@@ -765,8 +810,10 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                             float(surface[p_idx, r_idx]) if np.isfinite(surface[p_idx, r_idx]) else np.nan
                         ),
                         "kernel_effective_n": float(effective_n[p_idx, r_idx]),
-                        "mean_duration_min": (
-                            float(mean_duration[p_idx, r_idx]) if np.isfinite(mean_duration[p_idx, r_idx]) else np.nan
+                        "mean_total_transit_min_per_27d": (
+                            float(mean_total_transit_min[p_idx, r_idx])
+                            if np.isfinite(mean_total_transit_min[p_idx, r_idx])
+                            else np.nan
                         ),
                         "masked_for_low_support": bool(effective_n[p_idx, r_idx] < min_effective_n),
                         "min_effective_n": float(min_effective_n),
@@ -774,38 +821,25 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 )
 
     for ax in axes.ravel():
-        ax.set_xlabel("Injected period [days]")
+        ax.set_xlabel(r"Injected orbital period, $P$ [days]")
         ax.grid(False)
     for ax in axes[:, 0]:
-        ax.set_ylabel("Injected companion radius [R_earth]")
-    roche_label = axes[0, 0].text(
-        0.36,
-        0.42,
-        "fluid Roche curve",
-        rotation=15,
-        ha="left",
-        va="bottom",
-        color="#72d6e8",
+        ax.set_ylabel(r"Injected companion radius, $R_p$ [$R_\oplus$]")
+    _label_curve_along_path(
+        axes[0, 0],
+        roche_period,
+        roche_radius,
+        "Roche limit",
+        y_anchor=0.75,
+        color="#00a6c8",
         fontsize=7,
     )
-    roche_label.set_path_effects([pe.Stroke(linewidth=1.6, foreground="black", alpha=0.55), pe.Normal()])
     if mesh is not None:
         cax = fig.add_axes([0.935, 0.205, 0.022, 0.64])
         cbar = fig.colorbar(mesh, cax=cax)
         cbar.set_label("Kernel-smoothed BLS recovery fraction")
         cbar.ax.tick_params(direction="in", which="both")
-    fig.subplots_adjust(left=0.09, right=0.855, top=0.92, bottom=0.16, wspace=0.08, hspace=0.18)
-    fig.text(
-        0.5,
-        0.035,
-        (
-            "Black contour: 50% empirical recovery. Grey dashed boundary: local injection-support limit. "
-            "Cyan dotted curve: illustrative fluid Roche limit. Thin white contours: local mean total transit duration."
-        ),
-        ha="center",
-        va="bottom",
-        fontsize=8,
-    )
+    fig.subplots_adjust(left=0.09, right=0.855, top=0.92, bottom=0.10, wspace=0.08, hspace=0.20)
     out_dir.mkdir(parents=True, exist_ok=True)
     png = out_dir / "period_radius_empirical_recovery_publication.png"
     pdf = out_dir / "period_radius_empirical_recovery_publication.pdf"
@@ -1382,9 +1416,9 @@ def write_summary(
             "",
             "The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.",
             "",
-            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the cyan dotted curve is an illustrative fluid Roche limit; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.",
+            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Panel titles report `BLS recovered / injected`. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the cyan dotted curve is a fluid Roche estimate; the black 50% contour is the empirical recovery boundary. Thin contours are local mean total in-transit time over a reference 27 d TESS sector, computed as `duration * 27 d / period`, so short-period injections naturally have more accumulated transit time.",
             "",
-            "The Roche curve is model-dependent because companion radius does not uniquely define companion density. The plotted curve uses a simple bulk-density envelope: rocky bodies at small radii, lower-density gas giants near Jupiter radius, and a mild density increase into the brown-dwarf-radius regime. It should be read as physical context, not a hard vetting threshold.",
+            "The Roche curve is model-dependent because companion radius does not uniquely define companion density. The plotted reference uses the classical fluid Roche coefficient (`2.44`) and the period-density scaling discussed by Rappaport et al. (2013, 2021), with a low-density planet/gas-giant radius-density envelope anchored to Earth-, Neptune-, and Jupiter-like bulk densities. Dense brown dwarfs near Jupiter radius have much shorter Roche periods than this low-density reference and should be modeled with mass or mean density, not radius alone. Read the curve as physical context, not a hard vetting threshold.",
             "",
             "The earlier small grey point overlay was only a random subsample of injected examples (`faint = missed`, `brighter = recovered`) drawn on top of the smoothed surface. It is removed from the publication-facing map because the support boundary and grid CSV carry the sample-support information more cleanly.",
             "",
