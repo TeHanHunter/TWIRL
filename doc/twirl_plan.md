@@ -881,6 +881,20 @@ set. Balanced/aggressive relaxations increase recall but lose purity quickly,
 so the next implementation should add a review/recovered-but-not-clean class
 rather than promote those rows directly to PC.
 
+Status (`2026-06-24`, bright-balanced physical map in progress): the current
+`10k` paper-style period-radius map is now a `2 x 2` Tmag split (`<17`,
+`17-18`, `18-19`, `>=19`) and explicitly labels the thin white contours as
+local mean total transit duration for accepted BATMAN injections. The bright
+panels are still target-distribution limited (`275` rows at `Tmag < 17` and
+`589` at `17-18`), so the publication-grade map should come from the new
+PDO run launched in tmux `twirl-s56-physical-bright-0624`: `20k`
+pre-detrend BATMAN injections, period-radius grid, transit-conditioned random
+impact parameters/inclinations, equal target sampling across the four Tmag
+bins, and the same `DET_FLUX_ADP_SML + DET_FLUX_SML`, `200k`-period BLS
+recovery path. Interpret the resulting `P, R_p` map as BLS recovery
+marginalized over physically allowed duration/depth scatter at fixed period
+and radius.
+
 Status (`2026-06-24` EOD): wrap checkpoint keeps the S56 raw-flux
 pre-detrend injection-recovery path as the active methods branch. The best
 current search input is still `DET_FLUX_ADP_SML + DET_FLUX_SML` with the

@@ -11,6 +11,10 @@ SWEEP_NAME="${SWEEP_NAME:-small_pair_200k}"
 PERIOD_BINS="${PERIOD_BINS:-36}"
 DEPTH_BINS="${DEPTH_BINS:-40}"
 PYTHON_BIN="${PYTHON_BIN:-.venv/bin/python}"
+PLOT_PARAMETER_SPACE="${PLOT_PARAMETER_SPACE:-1}"
+PLOT_DURATION_AWARE="${PLOT_DURATION_AWARE:-1}"
+LEO_QUEUE_CSV="${LEO_QUEUE_CSV:-reports/stage5_validation/s56_10k_predetrend_small_pair_200k_review_queue_pdo/review_queue.csv}"
+LEO_METRICS_CSV="${LEO_METRICS_CSV:-reports/stage5_validation/s56_10k_predetrend_small_pair_200k_review_queue_pdo/leo_metrics.csv}"
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
   echo "[sync-dense-map] missing Python executable: ${PYTHON_BIN}" >&2
@@ -27,10 +31,22 @@ if [[ ! -s "${input_csv}" ]]; then
   exit 3
 fi
 
-echo "[sync-dense-map] plotting ${input_csv}"
-MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp/twirl_mpl}" PYTHONPATH=src "${PYTHON_BIN}" \
-  scripts/stage5_validation/plot_s56_injection_recovery_parameter_space.py \
-  --input-csv "${input_csv}" \
-  --out-dir "${LOCAL_DIR}/parameter_space" \
-  --period-bins "${PERIOD_BINS}" \
-  --depth-bins "${DEPTH_BINS}"
+if [[ "${PLOT_PARAMETER_SPACE}" == "1" ]]; then
+  echo "[sync-dense-map] plotting parameter-space maps from ${input_csv}"
+  MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp/twirl_mpl}" PYTHONPATH=src "${PYTHON_BIN}" \
+    scripts/stage5_validation/plot_s56_injection_recovery_parameter_space.py \
+    --input-csv "${input_csv}" \
+    --out-dir "${LOCAL_DIR}/parameter_space" \
+    --period-bins "${PERIOD_BINS}" \
+    --depth-bins "${DEPTH_BINS}"
+fi
+
+if [[ "${PLOT_DURATION_AWARE}" == "1" ]]; then
+  echo "[sync-dense-map] plotting duration-aware period-radius maps from ${input_csv}"
+  MPLCONFIGDIR="${MPLCONFIGDIR:-/tmp/twirl_mpl}" PYTHONPATH=src "${PYTHON_BIN}" \
+    scripts/stage5_validation/plot_s56_duration_aware_recovery.py \
+    --bls-csv "${input_csv}" \
+    --leo-queue-csv "${LEO_QUEUE_CSV}" \
+    --leo-metrics-csv "${LEO_METRICS_CSV}" \
+    --out-dir "${LOCAL_DIR}/duration_aware"
+fi

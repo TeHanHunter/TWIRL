@@ -137,3 +137,44 @@ def test_infer_aperture_flux_baseline_uses_raw_magnitude_fraction() -> None:
 
     assert np.isclose(fraction, 0.4)
     assert np.isclose(baseline, 0.4 * module.tess_flux_per_cadence_from_tmag(18.5, cadence_s=200.0))
+
+
+def test_target_tmag_sampler_balances_nonempty_bins() -> None:
+    module = _load_predetrend_script()
+    sampler = module._build_target_tmag_sampler(
+        {
+            1: 16.2,
+            2: 17.5,
+            3: 18.4,
+            4: 19.2,
+            5: 19.8,
+        },
+        edges=(0.0, 17.0, 18.0, 19.0, 99.0),
+        weights=None,
+    )
+
+    assert sampler is not None
+    assert sampler["labels"] == (
+        "0 <= Tmag < 17",
+        "17 <= Tmag < 18",
+        "18 <= Tmag < 19",
+        "19 <= Tmag < 99",
+    )
+    assert sampler["n_targets_by_bin"] == (1, 1, 1, 2)
+    assert np.allclose(sampler["probabilities"], np.full(4, 0.25))
+
+
+def test_target_tmag_sampler_zeroes_empty_bins() -> None:
+    module = _load_predetrend_script()
+    sampler = module._build_target_tmag_sampler(
+        {
+            1: 16.2,
+            2: 19.2,
+        },
+        edges=(0.0, 17.0, 18.0, 19.0, 99.0),
+        weights=(1.0, 1.0, 1.0, 1.0),
+    )
+
+    assert sampler is not None
+    assert sampler["n_targets_by_bin"] == (1, 0, 0, 1)
+    assert np.allclose(sampler["probabilities"], [0.5, 0.0, 0.0, 0.5])

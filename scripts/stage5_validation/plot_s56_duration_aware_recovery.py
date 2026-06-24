@@ -258,6 +258,14 @@ def _smoothed_fraction(hit: np.ndarray, count: np.ndarray, *, min_effective_coun
     return fraction
 
 
+def _finite_minmax(values: np.ndarray) -> tuple[float, float] | None:
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return None
+    return float(np.nanmin(finite)), float(np.nanmax(finite))
+
+
 def _kernel_recovery_surface_logxy(
     df: pd.DataFrame,
     *,
@@ -569,10 +577,10 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     """Write a compact empirical period-radius map for publication drafts.
 
     The duration-split audit plot is useful for debugging, but it makes the
-    bright rows look artificially empty because the physically generated
-    injection grid couples duration, period, and radius. This figure keeps the
-    empirical recovery surface, marginalizes over duration inside each Tmag
-    slice, and marks the support boundary explicitly.
+    bright rows look artificially empty because the generated injection grid
+    couples duration, period, impact parameter, and radius. This figure keeps
+    the empirical recovery surface, marginalizes over duration/impact parameter
+    inside each Tmag slice, and marks the support boundary explicitly.
     """
 
     import matplotlib
@@ -583,9 +591,10 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
 
     apply_twirl_style("full_page")
     tmag_bins = [
-        ("Tmag < 18", df["tmag"] < 18.0),
+        ("Tmag < 17", df["tmag"] < 17.0),
+        ("17 <= Tmag < 18", (df["tmag"] >= 17.0) & (df["tmag"] < 18.0)),
         ("18 <= Tmag < 19", (df["tmag"] >= 18.0) & (df["tmag"] < 19.0)),
-        ("19 <= Tmag < 20", (df["tmag"] >= 19.0) & (df["tmag"] < 20.0)),
+        ("Tmag >= 19", df["tmag"] >= 19.0),
     ]
     period_edges = np.geomspace(0.12, 13.0, 92)
     radius_edges = np.geomspace(0.18, 18.0, 86)
@@ -596,14 +605,15 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
 
     cmap = plt.get_cmap("magma").copy()
     cmap.set_bad("#e8ebef")
-    fig, axes = plt.subplots(1, 3, figsize=(12.0, 4.2), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 2, figsize=(10.4, 8.1), sharex=True, sharey=True)
     mesh = None
     rows: list[dict[str, Any]] = []
     for idx, (label, mask) in enumerate(tmag_bins):
-        ax = axes[idx]
+        ax = axes.ravel()[idx]
         sub = df[mask].copy()
-        min_effective_n = 3.5 if len(sub) < 1200 else 5.0 if len(sub) < 2500 else 8.0
-        ax.set_title(f"{label}; n={len(sub):,}")
+        min_effective_n = max(2.0, min(8.0, 0.004 * len(sub)))
+        rec_n = int(sub["any_exact_or_harmonic_recovered"].fillna(False).astype(bool).sum()) if len(sub) else 0
+        ax.set_title(f"{label}; n={len(sub):,}, recovered={rec_n:,}")
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlim(period_edges[0], period_edges[-1])
@@ -622,6 +632,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             sigma_y_dex=sigma_radius_dex,
         )
         masked = np.where(effective_n >= min_effective_n, surface, np.nan)
+        finite_masked = _finite_minmax(masked)
         mesh = ax.pcolormesh(
             period_edges,
             radius_edges,
@@ -651,7 +662,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             linewidths=0,
             rasterized=True,
         )
-        if np.nanmin(masked) <= 0.5 <= np.nanmax(masked):
+        if finite_masked is not None and finite_masked[0] <= 0.5 <= finite_masked[1]:
             contour = ax.contour(
                 period_centers,
                 radius_centers,
@@ -667,7 +678,8 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             elif hasattr(contour, "set_path_effects"):
                 contour.set_path_effects(halo)
             ax.clabel(contour, fmt={0.5: "50%"}, fontsize=7, inline=True)
-        if np.nanmax(effective_n) >= min_effective_n:
+        finite_effective_n = _finite_minmax(effective_n)
+        if finite_effective_n is not None and finite_effective_n[1] >= min_effective_n:
             ax.contour(
                 period_centers,
                 radius_centers,
@@ -678,16 +690,17 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 linestyles=["--"],
                 alpha=0.9,
             )
-        if np.nanmin(mean_duration) <= 8.0 <= np.nanmax(mean_duration):
+        finite_duration = _finite_minmax(mean_duration)
+        if finite_duration is not None and finite_duration[0] <= 8.0 <= finite_duration[1]:
             dcont = ax.contour(
                 period_centers,
                 radius_centers,
                 mean_duration.T,
                 levels=[4.0, 8.0, 16.0],
                 colors=["white"],
-                linewidths=0.55,
+                linewidths=0.50,
                 linestyles=["-"],
-                alpha=0.45,
+                alpha=0.42,
             )
             ax.clabel(dcont, fmt=lambda value: f"{value:g} min", fontsize=6, inline=True)
         ax.text(
@@ -720,11 +733,12 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                     }
                 )
 
-    for ax in axes:
+    for ax in axes.ravel():
         ax.set_xlabel("Injected period [days]")
         ax.grid(False)
-    axes[0].set_ylabel("Injected companion radius [R_earth]")
-    axes[0].text(
+    for ax in axes[:, 0]:
+        ax.set_ylabel("Injected companion radius [R_earth]")
+    axes[0, 0].text(
         0.219,
         0.22,
         "Roche limit",
@@ -735,15 +749,15 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         fontsize=7,
     )
     if mesh is not None:
-        cbar = fig.colorbar(mesh, ax=axes.ravel().tolist(), fraction=0.030, pad=0.018)
+        cbar = fig.colorbar(mesh, ax=axes.ravel().tolist(), fraction=0.032, pad=0.018)
         cbar.set_label("Kernel-smoothed BLS recovery fraction")
-    fig.subplots_adjust(left=0.075, right=0.89, top=0.90, bottom=0.21, wspace=0.08)
+    fig.subplots_adjust(left=0.09, right=0.88, top=0.92, bottom=0.16, wspace=0.08, hspace=0.18)
     fig.text(
         0.5,
-        0.04,
+        0.035,
         (
             "Black contour: 50% empirical recovery. Dashed boundary: local injection-support limit. "
-            "Light duration contours show the period-radius-duration coupling of the BATMAN grid."
+            "Thin white contours: local mean total transit duration for the accepted BATMAN injections."
         ),
         ha="center",
         va="bottom",
@@ -823,6 +837,29 @@ def plot_snr_proxy_recovery_map(df: pd.DataFrame, out_dir: Path) -> dict[str, st
     fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)
     return {"radius_snr_proxy_png": str(png), "radius_snr_proxy_pdf": str(pdf)}
+
+
+def publication_tmag_bin_summary(df: pd.DataFrame) -> list[dict[str, Any]]:
+    bins = [
+        ("Tmag < 17", df["tmag"] < 17.0),
+        ("17 <= Tmag < 18", (df["tmag"] >= 17.0) & (df["tmag"] < 18.0)),
+        ("18 <= Tmag < 19", (df["tmag"] >= 18.0) & (df["tmag"] < 19.0)),
+        ("Tmag >= 19", df["tmag"] >= 19.0),
+    ]
+    recovered = df["any_exact_or_harmonic_recovered"].fillna(False).astype(bool)
+    rows: list[dict[str, Any]] = []
+    for label, mask in bins:
+        n = int(mask.sum())
+        rec = int((mask & recovered).sum())
+        rows.append(
+            {
+                "tmag_bin": label,
+                "n": n,
+                "recovered": rec,
+                "recovered_fraction": rec / n if n else float("nan"),
+            }
+        )
+    return rows
 
 
 def plot_boundary_floor_maps(df: pd.DataFrame, model: dict[str, Any], out_dir: Path) -> dict[str, str]:
@@ -1268,6 +1305,7 @@ def plot_leo_metric_diagnostics(queue_csv: Path, metrics_csv: Path, out_dir: Pat
 def write_summary(
     out_dir: Path,
     *,
+    df: pd.DataFrame,
     bls_csv: Path,
     leo_queue_csv: Path,
     model: dict[str, Any],
@@ -1277,6 +1315,7 @@ def write_summary(
 ) -> None:
     raw_coef = np.asarray(model["raw_coef"], dtype=float)
     feature_names = model["feature_names"]
+    tmag_rows = publication_tmag_bin_summary(df)
     lines = [
         "# S56 Duration-Aware Recovery Visualizations",
         "",
@@ -1300,7 +1339,22 @@ def write_summary(
             "",
             "The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.",
             "",
-            "The empirical publication map marginalizes over duration within each Tmag slice to avoid artificially empty panels from the period-duration-radius coupling in the injected BATMAN grid. Grey cells mean the kernel has too little local injection support; the black 50% contour is the empirical recovery boundary. The duration-split audit map is retained as a diagnostic, but the marginalized map is the cleaner publication-facing view.",
+            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>=19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.",
+            "",
+            "The current `10k` table remains target-distribution-limited at the bright end. Counts in the paper-style Tmag panels:",
+            "",
+            "| Tmag bin | injections | BLS recovered | fraction |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+    lines.extend(
+        f"| {row['tmag_bin']} | {row['n']} | {row['recovered']} | {row['recovered_fraction']:.1%} |"
+        for row in tmag_rows
+    )
+    lines.extend(
+        [
+            "",
+            "For the next publication-grade map, use the physical bright-balanced PDO launcher: it samples targets evenly in these four Tmag bins and uses a period-radius BATMAN grid with transit-conditioned random impact parameters. The resulting `P, R_p` recovery surface should be interpreted as recovery marginalized over the physically allowed duration/depth scatter at fixed period and radius.",
             "",
             "## BLS vs LEO",
             "",
@@ -1332,6 +1386,7 @@ def write_summary(
         },
         "leo_summary": leo_summary,
         "leo_metric_summary": leo_metric_summary,
+        "publication_tmag_bin_summary": tmag_rows,
         "paths": paths,
     }
     (out_dir / "summary.json").write_text(json.dumps(payload, indent=2, sort_keys=True, default=_json_default) + "\n")
@@ -1378,6 +1433,7 @@ def main(argv: list[str] | None = None) -> int:
         paths.update(metric_paths)
     write_summary(
         args.out_dir,
+        df=df,
         bls_csv=args.bls_csv,
         leo_queue_csv=args.leo_queue_csv,
         model=model,

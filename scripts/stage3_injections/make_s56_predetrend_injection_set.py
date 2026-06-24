@@ -203,6 +203,30 @@ def _read_tic_filter(path: Path | None, tic_column: str) -> set[int] | None:
     return {int(tic) for tic in table[tic_column].dropna().astype(int).tolist()}
 
 
+def _read_target_tmag_table(path: Path | None, tic_column: str, tmag_column: str) -> dict[int, float] | None:
+    if path is None:
+        return None
+    import pandas as pd
+
+    suffix = path.suffix.lower()
+    if suffix == ".parquet":
+        table = pd.read_parquet(path, columns=[tic_column, tmag_column])
+    elif suffix == ".csv":
+        table = pd.read_csv(path, usecols=[tic_column, tmag_column])
+    elif suffix in {".json", ".jsonl"}:
+        table = pd.read_json(path, lines=suffix == ".jsonl")
+    else:
+        raise ValueError(f"unsupported target Tmag table format: {path}")
+    missing = [col for col in (tic_column, tmag_column) if col not in table.columns]
+    if missing:
+        raise KeyError(f"missing column(s) in {path}: {missing}")
+    table = table[[tic_column, tmag_column]].dropna().drop_duplicates(tic_column)
+    return {
+        int(row[tic_column]): float(row[tmag_column])
+        for _, row in table.iterrows()
+    }
+
+
 def _read_path_list(path: Path | None) -> tuple[Path, ...]:
     if path is None:
         return ()
@@ -213,6 +237,120 @@ def _read_path_list(path: Path | None) -> tuple[Path, ...]:
             continue
         rows.append(Path(value))
     return tuple(rows)
+
+
+def _parse_float_list(raw: str | None) -> tuple[float, ...] | None:
+    if raw is None:
+        return None
+    values: list[float] = []
+    for piece in str(raw).split(","):
+        text = piece.strip().lower()
+        if not text:
+            continue
+        if text in {"inf", "+inf", "infinity", "+infinity"}:
+            values.append(float("inf"))
+        elif text in {"-inf", "-infinity"}:
+            values.append(float("-inf"))
+        else:
+            values.append(float(text))
+    return tuple(values)
+
+
+def _parse_tmag_bin_edges(raw: str | None) -> tuple[float, ...] | None:
+    edges = _parse_float_list(raw)
+    if edges is None:
+        return None
+    if len(edges) < 2:
+        raise argparse.ArgumentTypeError("--target-tmag-bin-edges needs at least two comma-separated edges")
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        if not hi > lo:
+            raise argparse.ArgumentTypeError("--target-tmag-bin-edges must be strictly increasing")
+    return edges
+
+
+def _target_tmag_bin_label(lo: float, hi: float) -> str:
+    if np.isneginf(lo):
+        return f"Tmag < {hi:g}"
+    if np.isposinf(hi):
+        return f"Tmag >= {lo:g}"
+    return f"{lo:g} <= Tmag < {hi:g}"
+
+
+def _read_target_tmag_map(target_paths: dict[int, list[Path]]) -> dict[int, float]:
+    import h5py
+
+    out: dict[int, float] = {}
+    for tic, paths in target_paths.items():
+        if not paths:
+            continue
+        try:
+            with h5py.File(paths[0], "r") as h5:
+                out[int(tic)] = float(h5.attrs.get("TessMag", np.nan))
+        except Exception:
+            out[int(tic)] = float("nan")
+    return out
+
+
+def _build_target_tmag_sampler(
+    target_tmag_by_tic: dict[int, float],
+    *,
+    edges: tuple[float, ...] | None,
+    weights: tuple[float, ...] | None,
+) -> dict[str, Any] | None:
+    if edges is None:
+        return None
+    n_bins = len(edges) - 1
+    if weights is None:
+        raw_weights = np.ones(n_bins, dtype=float)
+    else:
+        if len(weights) != n_bins:
+            raise ValueError(
+                f"target tmag weights length ({len(weights)}) must match "
+                f"number of bins ({n_bins})"
+            )
+        raw_weights = np.asarray(weights, dtype=float)
+        if np.any(~np.isfinite(raw_weights)) or np.any(raw_weights < 0):
+            raise ValueError("target tmag weights must be finite non-negative values")
+        if not np.any(raw_weights > 0):
+            raise ValueError("at least one target tmag weight must be positive")
+
+    bins: list[np.ndarray] = []
+    labels: list[str] = []
+    for idx, (lo, hi) in enumerate(zip(edges[:-1], edges[1:])):
+        tics = sorted(
+            tic
+            for tic, tmag in target_tmag_by_tic.items()
+            if np.isfinite(tmag) and tmag >= lo and tmag < hi
+        )
+        bins.append(np.asarray(tics, dtype=np.int64))
+        labels.append(_target_tmag_bin_label(float(lo), float(hi)))
+        if len(tics) == 0:
+            raw_weights[idx] = 0.0
+    if not np.any(raw_weights > 0):
+        raise ValueError("no targets fall inside the requested target Tmag bins")
+    probabilities = raw_weights / raw_weights.sum()
+    return {
+        "edges": tuple(float(edge) for edge in edges),
+        "labels": tuple(labels),
+        "bins": tuple(bins),
+        "probabilities": probabilities,
+        "n_targets_by_bin": tuple(int(len(tics)) for tics in bins),
+    }
+
+
+def _draw_target_tic(
+    rng: np.random.Generator,
+    target_tics: np.ndarray,
+    target_tmag_sampler: dict[str, Any] | None,
+) -> int:
+    if target_tmag_sampler is None:
+        return int(rng.choice(target_tics))
+    probabilities = np.asarray(target_tmag_sampler["probabilities"], dtype=float)
+    bin_index = int(rng.choice(np.arange(len(probabilities)), p=probabilities))
+    tics = np.asarray(target_tmag_sampler["bins"][bin_index], dtype=np.int64)
+    if tics.size == 0:
+        return int(rng.choice(target_tics))
+    return int(rng.choice(tics))
 
 
 def _discover_target_paths(
@@ -528,6 +666,9 @@ def make_predetrend_injections(
     adaptive_gap_split: float,
     baseline_source: str,
     cadence_s: float,
+    target_tmag_bin_edges: tuple[float, ...] | None,
+    target_tmag_bin_weights: tuple[float, ...] | None,
+    target_tmag_by_tic: dict[int, float] | None,
     target_h5_paths: tuple[Path, ...] | None,
     tic_filter: set[int] | None,
     limit_targets: int | None,
@@ -571,6 +712,27 @@ def make_predetrend_injections(
 
     rng = np.random.default_rng(random_state)
     target_tics = np.asarray(sorted(target_paths.keys()), dtype=np.int64)
+    target_tmag_sampler = None
+    if target_tmag_bin_edges is not None:
+        if target_tmag_by_tic is None:
+            target_tmag_by_tic = _read_target_tmag_map(target_paths)
+        target_tmag_sampler = _build_target_tmag_sampler(
+            target_tmag_by_tic,
+            edges=target_tmag_bin_edges,
+            weights=target_tmag_bin_weights,
+        )
+        print(
+            "[predetrend-injections] target Tmag sampler: "
+            + ", ".join(
+                f"{label}: {n_targets} targets, p={prob:.3f}"
+                for label, n_targets, prob in zip(
+                    target_tmag_sampler["labels"],
+                    target_tmag_sampler["n_targets_by_bin"],
+                    target_tmag_sampler["probabilities"],
+                )
+            ),
+            flush=True,
+        )
     rows: list[dict[str, Any]] = []
     skipped = {
         "read_failed": 0,
@@ -608,6 +770,14 @@ def make_predetrend_injections(
         out.attrs["adaptive_gap_split"] = float(adaptive_gap_split)
         out.attrs["baseline_source"] = str(baseline_source)
         out.attrs["cadence_s"] = float(cadence_s)
+        out.attrs["target_tmag_bin_edges"] = json.dumps(list(target_tmag_bin_edges or ()))
+        out.attrs["target_tmag_bin_weights"] = json.dumps(list(target_tmag_bin_weights or ()))
+        if target_tmag_sampler is not None:
+            out.attrs["target_tmag_bin_labels"] = json.dumps(list(target_tmag_sampler["labels"]))
+            out.attrs["target_tmag_bin_target_counts"] = json.dumps(list(target_tmag_sampler["n_targets_by_bin"]))
+            out.attrs["target_tmag_bin_probabilities"] = json.dumps(
+                [float(value) for value in target_tmag_sampler["probabilities"]]
+            )
         out.attrs["limb_dark_u1"] = float(_POSTDET.BATMAN_LIMB_DARKENING[0])
         out.attrs["limb_dark_u2"] = float(_POSTDET.BATMAN_LIMB_DARKENING[1])
         out.attrs["batman_supersample_factor"] = int(_POSTDET.BATMAN_SUPERSAMPLE_FACTOR)
@@ -615,7 +785,7 @@ def make_predetrend_injections(
 
         while len(rows) < n_injections and total_attempts < max_total_attempts:
             total_attempts += 1
-            tic = int(rng.choice(target_tics))
+            tic = _draw_target_tic(rng, target_tics, target_tmag_sampler)
             try:
                 lcs = [read_tglc_h5(path) for path in target_paths[tic]]
                 merged = _TWIRLFS.merge_orbits(lcs)
@@ -891,6 +1061,17 @@ def make_predetrend_injections(
         "adaptive_gap_split": float(adaptive_gap_split),
         "baseline_source": str(baseline_source),
         "cadence_s": float(cadence_s),
+        "target_tmag_bin_edges": list(target_tmag_bin_edges or ()),
+        "target_tmag_bin_weights": list(target_tmag_bin_weights or ()),
+        "target_tmag_sampler": (
+            {
+                "labels": list(target_tmag_sampler["labels"]),
+                "n_targets_by_bin": list(target_tmag_sampler["n_targets_by_bin"]),
+                "probabilities": [float(value) for value in target_tmag_sampler["probabilities"]],
+            }
+            if target_tmag_sampler is not None
+            else None
+        ),
         "random_state": int(random_state),
         "min_in_transit": int(min_in_transit),
         "total_attempts": int(total_attempts),
@@ -946,8 +1127,39 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     ap.add_argument("--cadence-s", type=float, default=DEFAULT_CADENCE_S)
+    ap.add_argument(
+        "--target-tmag-bin-edges",
+        type=_parse_tmag_bin_edges,
+        default=None,
+        help=(
+            "Optional comma-separated Tmag bin edges for target sampling, e.g. "
+            "'0,17,18,19,99'. When provided, targets are drawn by Tmag bin "
+            "instead of uniformly over all available S56 targets."
+        ),
+    )
+    ap.add_argument(
+        "--target-tmag-bin-weights",
+        type=_parse_float_list,
+        default=None,
+        help=(
+            "Optional comma-separated non-negative target-bin weights. Length "
+            "must be one fewer than --target-tmag-bin-edges. If omitted, "
+            "nonempty Tmag bins are sampled equally."
+        ),
+    )
     ap.add_argument("--candidate-table", type=Path, default=None)
     ap.add_argument("--tic-column", default="tic")
+    ap.add_argument(
+        "--target-tmag-table",
+        type=Path,
+        default=None,
+        help=(
+            "Optional table with TIC and Tmag columns used by --target-tmag-bin-edges. "
+            "This avoids opening every raw HDF5 file just to read TessMag."
+        ),
+    )
+    ap.add_argument("--target-tmag-tic-column", default="tic")
+    ap.add_argument("--target-tmag-column", default="tessmag")
     ap.add_argument(
         "--target-h5-paths",
         type=Path,
@@ -976,6 +1188,11 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
     compression = None if args.compression == "none" else args.compression
     tic_filter = _read_tic_filter(args.candidate_table, args.tic_column)
+    target_tmag_by_tic = _read_target_tmag_table(
+        args.target_tmag_table,
+        args.target_tmag_tic_column,
+        args.target_tmag_column,
+    )
     target_h5_paths = tuple(args.target_h5_paths or ()) + _read_path_list(args.target_h5_list)
     summary = make_predetrend_injections(
         orbit_roots=tuple(args.orbit_roots),
@@ -998,6 +1215,9 @@ def main(argv: list[str] | None = None) -> int:
         adaptive_gap_split=args.adaptive_gap_split,
         baseline_source=args.baseline_source,
         cadence_s=args.cadence_s,
+        target_tmag_bin_edges=args.target_tmag_bin_edges,
+        target_tmag_bin_weights=args.target_tmag_bin_weights,
+        target_tmag_by_tic=target_tmag_by_tic,
         target_h5_paths=target_h5_paths if target_h5_paths else None,
         tic_filter=tic_filter,
         limit_targets=args.limit_targets,

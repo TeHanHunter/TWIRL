@@ -23,9 +23,19 @@ ORBIT_ROOTS=(
 )
 N_INJECTIONS="${N_INJECTIONS:-10000}"
 RANDOM_STATE="${RANDOM_STATE:-5623}"
+SAMPLING_MODE="${SAMPLING_MODE:-period_depth_grid}"
+GRID_PERIOD_RANGE_D="${GRID_PERIOD_RANGE_D:-0.12,13.0}"
+GRID_RADIUS_RANGE_REARTH="${GRID_RADIUS_RANGE_REARTH:-0.18,18.0}"
 GRID_PERIOD_BINS="${GRID_PERIOD_BINS:-50}"
+GRID_RADIUS_BINS="${GRID_RADIUS_BINS:-50}"
 GRID_DEPTH_BINS="${GRID_DEPTH_BINS:-50}"
+GRID_DEPTH_RANGE="${GRID_DEPTH_RANGE:-0.003,0.995}"
 GRID_DEPTH_SPACING="${GRID_DEPTH_SPACING:-linear}"
+TARGET_TMAG_BIN_EDGES="${TARGET_TMAG_BIN_EDGES:-}"
+TARGET_TMAG_BIN_WEIGHTS="${TARGET_TMAG_BIN_WEIGHTS:-}"
+TARGET_TMAG_TABLE="${TARGET_TMAG_TABLE:-}"
+TARGET_TMAG_COLUMN="${TARGET_TMAG_COLUMN:-tessmag}"
+TARGET_H5_LIST="${TARGET_H5_LIST:-}"
 BASELINE_SOURCE="${BASELINE_SOURCE:-raw_median}"
 INJECTION_DIR="${INJECTION_DIR:-data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_10k_predetrend_batman_depthgrid_dense_bls_map}"
 OUT_DIR="${OUT_DIR:-reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo}"
@@ -42,29 +52,58 @@ log() { echo "[$(date -Is)] [dense-bls-map] $*"; }
 mkdir -p "${CHUNK_DIR}" "${RUN_CHUNK_DIR}" logs
 
 log "python=${PYTHON}"
-log "n_injections=${N_INJECTIONS} grid=${GRID_PERIOD_BINS}x${GRID_DEPTH_BINS} depth_spacing=${GRID_DEPTH_SPACING}"
+log "n_injections=${N_INJECTIONS} sampling=${SAMPLING_MODE}"
+log "period_grid=${GRID_PERIOD_BINS} range=${GRID_PERIOD_RANGE_D}"
+log "radius_grid=${GRID_RADIUS_BINS} range=${GRID_RADIUS_RANGE_REARTH}"
+log "depth_grid=${GRID_DEPTH_BINS} range=${GRID_DEPTH_RANGE} spacing=${GRID_DEPTH_SPACING}"
+if [[ -n "${TARGET_TMAG_BIN_EDGES}" ]]; then
+  log "target_tmag_bin_edges=${TARGET_TMAG_BIN_EDGES} weights=${TARGET_TMAG_BIN_WEIGHTS:-equal}"
+fi
+if [[ -n "${TARGET_TMAG_TABLE}" ]]; then
+  log "target_tmag_table=${TARGET_TMAG_TABLE} column=${TARGET_TMAG_COLUMN}"
+fi
+if [[ -n "${TARGET_H5_LIST}" ]]; then
+  log "target_h5_list=${TARGET_H5_LIST}"
+fi
 log "injection_dir=${INJECTION_DIR}"
 log "out_dir=${OUT_DIR}"
 
 if [[ "${REBUILD_INJECTIONS}" == "1" || ! -s "${INJECTION_DIR}/injected_lightcurves.h5" ]]; then
   log "building dense raw-flux pre-detrend BATMAN injections"
-  "${PYTHON}" scripts/stage3_injections/make_s56_predetrend_injection_set.py \
-    --orbit-roots "${ORBIT_ROOTS[@]}" \
-    --out-dir "${INJECTION_DIR}" \
-    --n-injections "${N_INJECTIONS}" \
-    --apertures DET_FLUX_ADP_SML DET_FLUX_SML \
-    --sampling-mode period_depth_grid \
-    --grid-period-range-d 0.12,13.0 \
-    --grid-depth-range 0.003,0.995 \
-    --grid-period-bins "${GRID_PERIOD_BINS}" \
-    --grid-depth-bins "${GRID_DEPTH_BINS}" \
-    --grid-depth-spacing "${GRID_DEPTH_SPACING}" \
-    --baseline-source "${BASELINE_SOURCE}" \
-    --random-state "${RANDOM_STATE}" \
-    --min-in-transit 2 \
-    --max-attempts-per-injection 100 \
-    --progress-every 100 \
+  INJECTION_ARGS=(
+    --orbit-roots "${ORBIT_ROOTS[@]}"
+    --out-dir "${INJECTION_DIR}"
+    --n-injections "${N_INJECTIONS}"
+    --apertures DET_FLUX_ADP_SML DET_FLUX_SML
+    --sampling-mode "${SAMPLING_MODE}"
+    --grid-period-range-d "${GRID_PERIOD_RANGE_D}"
+    --grid-radius-range-rearth "${GRID_RADIUS_RANGE_REARTH}"
+    --grid-depth-range "${GRID_DEPTH_RANGE}"
+    --grid-period-bins "${GRID_PERIOD_BINS}"
+    --grid-radius-bins "${GRID_RADIUS_BINS}"
+    --grid-depth-bins "${GRID_DEPTH_BINS}"
+    --grid-depth-spacing "${GRID_DEPTH_SPACING}"
+    --baseline-source "${BASELINE_SOURCE}"
+    --random-state "${RANDOM_STATE}"
+    --min-in-transit 2
+    --max-attempts-per-injection 100
+    --progress-every 100
     --overwrite
+  )
+  if [[ -n "${TARGET_TMAG_BIN_EDGES}" ]]; then
+    INJECTION_ARGS+=(--target-tmag-bin-edges "${TARGET_TMAG_BIN_EDGES}")
+  fi
+  if [[ -n "${TARGET_TMAG_BIN_WEIGHTS}" ]]; then
+    INJECTION_ARGS+=(--target-tmag-bin-weights "${TARGET_TMAG_BIN_WEIGHTS}")
+  fi
+  if [[ -n "${TARGET_TMAG_TABLE}" ]]; then
+    INJECTION_ARGS+=(--target-tmag-table "${TARGET_TMAG_TABLE}" --target-tmag-column "${TARGET_TMAG_COLUMN}")
+  fi
+  if [[ -n "${TARGET_H5_LIST}" ]]; then
+    INJECTION_ARGS+=(--target-h5-list "${TARGET_H5_LIST}")
+  fi
+  "${PYTHON}" scripts/stage3_injections/make_s56_predetrend_injection_set.py \
+    "${INJECTION_ARGS[@]}"
 else
   log "reusing injections: ${INJECTION_DIR}/injected_lightcurves.h5"
 fi

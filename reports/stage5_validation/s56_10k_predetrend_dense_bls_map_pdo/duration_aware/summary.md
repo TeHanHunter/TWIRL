@@ -18,7 +18,18 @@ LEO comparison input: `/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validat
 
 The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.
 
-The empirical publication map marginalizes over duration within each Tmag slice to avoid artificially empty panels from the period-duration-radius coupling in the injected BATMAN grid. Grey cells mean the kernel has too little local injection support; the black 50% contour is the empirical recovery boundary. The duration-split audit map is retained as a diagnostic, but the marginalized map is the cleaner publication-facing view.
+The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>=19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.
+
+The current `10k` table remains target-distribution-limited at the bright end. Counts in the paper-style Tmag panels:
+
+| Tmag bin | injections | BLS recovered | fraction |
+| --- | ---: | ---: | ---: |
+| Tmag < 17 | 275 | 218 | 79.3% |
+| 17 <= Tmag < 18 | 589 | 337 | 57.2% |
+| 18 <= Tmag < 19 | 1796 | 485 | 27.0% |
+| Tmag >= 19 | 7340 | 643 | 8.8% |
+
+For the next publication-grade map, use the physical bright-balanced PDO launcher: it samples targets evenly in these four Tmag bins and uses a period-radius BATMAN grid with transit-conditioned random impact parameters. The resulting `P, R_p` recovery surface should be interpreted as recovery marginalized over the physically allowed duration/depth scatter at fixed period and radius.
 
 ## BLS vs LEO
 

@@ -1,6 +1,6 @@
 {
   "bls_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
-  "created_utc": "2026-06-24T13:35:03.769518+00:00",
+  "created_utc": "2026-06-24T14:41:50.683512+00:00",
   "leo_metric_summary": {
     "MES": {
       "BLS missed, LEO FA": {
@@ -221,5 +221,31 @@
     "period_radius_recovery_map_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.png",
     "radius_snr_proxy_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.pdf",
     "radius_snr_proxy_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.png"
-  }
+  },
+  "publication_tmag_bin_summary": [
+    {
+      "n": 275,
+      "recovered": 218,
+      "recovered_fraction": 0.7927272727272727,
+      "tmag_bin": "Tmag < 17"
+    },
+    {
+      "n": 589,
+      "recovered": 337,
+      "recovered_fraction": 0.5721561969439728,
+      "tmag_bin": "17 <= Tmag < 18"
+    },
+    {
+      "n": 1796,
+      "recovered": 485,
+      "recovered_fraction": 0.2700445434298441,
+      "tmag_bin": "18 <= Tmag < 19"
+    },
+    {
+      "n": 7340,
+      "recovered": 643,
+      "recovered_fraction": 0.08760217983651226,
+      "tmag_bin": "Tmag >= 19"
+    }
+  ]
 }

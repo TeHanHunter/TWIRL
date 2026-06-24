@@ -175,3 +175,33 @@ def test_depth_grid_cycles_evenly_over_period_depth_cells() -> None:
 
     assert len(counts) == 20
     assert set(counts.values()) == {2}
+
+
+def test_period_radius_grid_cycles_and_draws_transiting_impact_parameters() -> None:
+    module = _load_make_injections_script()
+    rng = np.random.default_rng(13)
+
+    rows = [
+        module._draw_grid_params(
+            idx,
+            rng=rng,
+            period_range=(0.1, 10.0),
+            radius_range_rearth=(0.2, 16.8),
+            period_bins=4,
+            radius_bins=5,
+        )
+        for idx in range(40)
+    ]
+    counts = {}
+    for row in rows:
+        counts[row["grid_cell_id"]] = counts.get(row["grid_cell_id"], 0) + 1
+        assert row["sampling_mode"] == "period_radius_grid"
+        assert 0.2 <= row["radius_rearth"] <= 16.8
+        assert row["period_d"] >= 0.1
+        assert row["impact_b"] < 1.0 + row["radius_rwd"]
+        assert row["a_over_rwd"] > row["impact_b"]
+        assert 0.0 < row["inclination_deg"] <= 90.0
+        assert row["injection_model"] == "batman_quadratic"
+
+    assert len(counts) == 20
+    assert set(counts.values()) == {2}
