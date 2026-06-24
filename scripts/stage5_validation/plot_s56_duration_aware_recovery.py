@@ -291,9 +291,20 @@ def _style_log_panel_ticks(ax: Any) -> None:
         axis.set_major_formatter(FuncFormatter(_plain_log_tick))
         axis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=32))
         axis.set_minor_formatter(NullFormatter())
-    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True, color="0.95", labelcolor="0.2")
-    ax.tick_params(axis="both", which="major", length=8.0, width=1.15)
-    ax.tick_params(axis="both", which="minor", length=4.5, width=0.85)
+    ax.tick_params(
+        axis="both",
+        which="both",
+        direction="in",
+        top=True,
+        right=True,
+        bottom=True,
+        left=True,
+        color="black",
+        labelcolor="0.15",
+        labelsize=8.5,
+    )
+    ax.tick_params(axis="both", which="major", length=7.2, width=0.95)
+    ax.tick_params(axis="both", which="minor", length=4.0, width=0.70)
     ticks = [
         *ax.xaxis.get_major_ticks(),
         *ax.xaxis.get_minor_ticks(),
@@ -316,6 +327,8 @@ def _raise_panel_ticks(ax: Any) -> None:
         tick.tick2line.set_zorder(100)
         tick.tick1line.set_clip_on(False)
         tick.tick2line.set_clip_on(False)
+        tick.tick1line.set_color("black")
+        tick.tick2line.set_color("black")
     for spine in ax.spines.values():
         spine.set_zorder(101)
 
@@ -685,17 +698,21 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
 
     cmap = plt.get_cmap("magma").copy()
     cmap.set_bad("#e8ebef")
-    fig, axes = plt.subplots(2, 2, figsize=(10.4, 8.1), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 2, figsize=(9.9, 8.1), sharex=True, sharey=True)
     mesh = None
     rows: list[dict[str, Any]] = []
     roche_radius = np.geomspace(radius_edges[0], radius_edges[-1], 320)
     roche_period = _fluid_roche_period_d(roche_radius)
+    title_fs = 10.8
+    label_fs = 9.6
+    annotation_fs = 8.4
+    contour_fs = 7.2
     for idx, (label, mask) in enumerate(tmag_bins):
         ax = axes.ravel()[idx]
         sub = df[mask].copy()
         min_effective_n = max(2.0, min(8.0, 0.004 * len(sub)))
         rec_n = int(sub["any_exact_or_harmonic_recovered"].fillna(False).astype(bool).sum()) if len(sub) else 0
-        ax.set_title(f"{label}: {rec_n}/{len(sub)} recovered")
+        ax.set_title(f"{label}: {rec_n}/{len(sub)} recovered", fontsize=title_fs)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlim(period_edges[0], period_edges[-1])
@@ -732,8 +749,8 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             period_edges[0],
             roche_fill_period,
             where=roche_mask,
-            color="0.72",
-            alpha=0.36,
+            color="white",
+            alpha=0.24,
             linewidth=0,
             zorder=1,
         )
@@ -746,7 +763,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 colors=["black"],
                 linewidths=1.35,
             )
-            ax.clabel(contour, fmt={0.5: "50%"}, fontsize=7, inline=True)
+            ax.clabel(contour, fmt={0.5: "50%"}, fontsize=annotation_fs, inline=True)
         finite_effective_n = _finite_minmax(effective_n)
         if finite_effective_n is not None and finite_effective_n[1] >= min_effective_n:
             ax.contour(
@@ -774,7 +791,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             ax.clabel(
                 dcont,
                 fmt=lambda value: f"{value:g} min",
-                fontsize=6,
+                fontsize=contour_fs,
                 inline=True,
                 colors=["white"],
             )
@@ -800,18 +817,18 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 )
 
     for ax in axes.ravel():
-        ax.set_xlabel(r"Injected orbital period, $P$ [days]")
+        ax.set_xlabel(r"Injected orbital period, $P$ [days]", fontsize=label_fs)
         ax.grid(False)
     for ax in axes[:, 0]:
-        ax.set_ylabel(r"Injected companion radius, $R_p$ [$R_\oplus$]")
+        ax.set_ylabel(r"Injected companion radius, $R_p$ [$R_\oplus$]", fontsize=label_fs)
     axes[0, 0].text(
         0.145,
-        2.2,
+        11.8,
         "Roche limit\nprevented",
         color="0.18",
-        fontsize=7,
+        fontsize=annotation_fs,
         ha="left",
-        va="center",
+        va="top",
         zorder=8,
     )
     for ax in axes.ravel():
@@ -819,8 +836,8 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     if mesh is not None:
         cax = fig.add_axes([0.935, 0.205, 0.022, 0.64])
         cbar = fig.colorbar(mesh, cax=cax)
-        cbar.set_label("Kernel-smoothed BLS recovery fraction")
-        cbar.ax.tick_params(direction="in", which="both")
+        cbar.set_label("Kernel-smoothed BLS recovery fraction", fontsize=label_fs)
+        cbar.ax.tick_params(direction="in", which="both", labelsize=8.5)
     fig.subplots_adjust(left=0.09, right=0.855, top=0.92, bottom=0.10, wspace=0.08, hspace=0.20)
     out_dir.mkdir(parents=True, exist_ok=True)
     png = out_dir / "period_radius_empirical_recovery_publication.png"
@@ -1398,7 +1415,7 @@ def write_summary(
             "",
             "The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.",
             "",
-            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Panel titles report `BLS recovered / injected`. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the grey shaded region marks the low-density fluid-Roche-prevented side of the reference estimate; the black 50% contour is the empirical recovery boundary. White contours are local mean total in-transit time over a reference 27 d TESS sector, computed as `duration * 27 d / period`, so short-period injections naturally have more accumulated transit time.",
+            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Panel titles report `BLS recovered / injected`. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the low-alpha Roche-prevented overlay marks the left side of the reference fluid-Roche estimate; the black 50% contour is the empirical recovery boundary. White contours are local mean total in-transit time over a reference 27 d TESS sector, computed as `duration * 27 d / period`, so short-period injections naturally have more accumulated transit time.",
             "",
             "The Roche curve is model-dependent because companion radius does not uniquely define companion density. The plotted reference uses the classical fluid Roche coefficient (`2.44`) and the period-density scaling discussed by Rappaport et al. (2013, 2021), with a low-density planet/gas-giant radius-density envelope anchored to Earth-, Neptune-, and Jupiter-like bulk densities. Dense brown dwarfs near Jupiter radius have much shorter Roche periods than this low-density reference and should be modeled with mass or mean density, not radius alone. Read the curve as physical context, not a hard vetting threshold.",
             "",
