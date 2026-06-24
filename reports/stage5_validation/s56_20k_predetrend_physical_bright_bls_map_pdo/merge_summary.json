@@ -1,0 +1,45 @@
+{
+  "chunk_root": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/chunks",
+  "created_utc": "2026-06-24T19:12:12.828321+00:00",
+  "expect_n": 20000,
+  "merged_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
+  "n_chunks": 200,
+  "n_rows": 20000,
+  "out_dir": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo",
+  "queue_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/review_queue.csv",
+  "summary": {
+    "aperture": "DET_FLUX_ADP_SML",
+    "created_utc": "2026-06-24T19:12:12.694648+00:00",
+    "n_apertures_agree_counts": {
+      "0": 12773,
+      "1": 492,
+      "2": 6735
+    },
+    "n_harmonic_apertures_agree_counts": {
+      "0": 13551,
+      "1": 785,
+      "2": 5664
+    },
+    "n_rows": 20000,
+    "n_topn_apertures_agree_counts": {
+      "0": 12477,
+      "1": 477,
+      "2": 7046
+    },
+    "queue_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/review_queue.csv",
+    "recovery_mode_counts": {
+      "bls_peak_mismatch": 12089,
+      "bls_too_few_cadences": 1,
+      "bls_top1_recovered": 7227,
+      "bls_topn_harmonic_match": 387,
+      "bls_topn_recovered": 296
+    },
+    "strict_recovery_status_counts": {
+      "bls_peak_mismatch": 12772,
+      "bls_recovered": 7227,
+      "bls_too_few_cadences": 1
+    },
+    "survival_csv": ""
+  },
+  "sweep_name": "small_pair_200k"
+}

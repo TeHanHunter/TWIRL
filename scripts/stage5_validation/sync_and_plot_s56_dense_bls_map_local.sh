@@ -23,7 +23,11 @@ fi
 
 mkdir -p "${LOCAL_DIR}"
 echo "[sync-dense-map] syncing ${REMOTE_HOST}:${REMOTE_DIR}/ -> ${LOCAL_DIR}/"
-rsync -avhu --progress "${REMOTE_HOST}:${REMOTE_DIR}/" "${LOCAL_DIR}/"
+rsync -avhu --progress \
+  --exclude '/chunks/' \
+  --exclude '/chunk_ids/' \
+  --exclude '/pending_chunk_files.txt' \
+  "${REMOTE_HOST}:${REMOTE_DIR}/" "${LOCAL_DIR}/"
 
 input_csv="${LOCAL_DIR}/${SWEEP_NAME}/injection_bls_recoveries.csv"
 if [[ ! -s "${input_csv}" ]]; then

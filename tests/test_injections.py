@@ -147,6 +147,8 @@ def test_physical_wd_injection_families_store_radius_metadata() -> None:
     assert params["duration_model"] == "wd_density_batman"
     assert params["injection_model"] == "batman_quadratic"
     assert 0 < params["depth"] <= 0.995
+    assert np.isclose(params["depth"], module._circle_overlap_depth(params["radius_rwd"], params["impact_b"]))
+    assert np.isclose(params["geometric_depth"], params["depth"])
 
 
 def test_depth_grid_cycles_evenly_over_period_depth_cells() -> None:
@@ -202,6 +204,10 @@ def test_period_radius_grid_cycles_and_draws_transiting_impact_parameters() -> N
         assert row["a_over_rwd"] > row["impact_b"]
         assert 0.0 < row["inclination_deg"] <= 90.0
         assert row["injection_model"] == "batman_quadratic"
+        central_depth = module._circle_overlap_depth(row["radius_rwd"], 0.0)
+        assert np.isclose(row["geometric_depth"], module._circle_overlap_depth(row["radius_rwd"], row["impact_b"]))
+        assert np.isclose(row["depth"], row["geometric_depth"])
+        assert row["depth"] <= central_depth
 
     assert len(counts) == 20
     assert set(counts.values()) == {2}

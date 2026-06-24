@@ -272,7 +272,7 @@ def _target_tmag_bin_label(lo: float, hi: float) -> str:
     if np.isneginf(lo):
         return f"Tmag < {hi:g}"
     if np.isposinf(hi):
-        return f"Tmag >= {lo:g}"
+        return f"Tmag > {lo:g}"
     return f"{lo:g} <= Tmag < {hi:g}"
 
 

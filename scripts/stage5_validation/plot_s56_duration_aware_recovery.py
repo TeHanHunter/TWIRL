@@ -594,7 +594,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         ("Tmag < 17", df["tmag"] < 17.0),
         ("17 <= Tmag < 18", (df["tmag"] >= 17.0) & (df["tmag"] < 18.0)),
         ("18 <= Tmag < 19", (df["tmag"] >= 18.0) & (df["tmag"] < 19.0)),
-        ("Tmag >= 19", df["tmag"] >= 19.0),
+        ("Tmag > 19", df["tmag"] >= 19.0),
     ]
     period_edges = np.geomspace(0.12, 13.0, 92)
     radius_edges = np.geomspace(0.18, 18.0, 86)
@@ -618,7 +618,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         ax.set_yscale("log")
         ax.set_xlim(period_edges[0], period_edges[-1])
         ax.set_ylim(radius_edges[0], radius_edges[-1])
-        ax.axvline(0.216, color="white", linestyle=":", linewidth=1.1, alpha=0.95)
+        ax.axvline(0.216, color="white", linestyle=":", linewidth=1.1, alpha=0.90)
         if sub.empty:
             continue
         surface, effective_n, mean_duration = _kernel_recovery_surface_logxy(
@@ -685,10 +685,10 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 radius_centers,
                 effective_n.T,
                 levels=[min_effective_n],
-                colors=["0.25"],
-                linewidths=0.7,
+                colors=["0.72"],
+                linewidths=0.8,
                 linestyles=["--"],
-                alpha=0.9,
+                alpha=0.85,
             )
         finite_duration = _finite_minmax(mean_duration)
         if finite_duration is not None and finite_duration[0] <= 8.0 <= finite_duration[1]:
@@ -703,17 +703,6 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 alpha=0.42,
             )
             ax.clabel(dcont, fmt=lambda value: f"{value:g} min", fontsize=6, inline=True)
-        ax.text(
-            0.04,
-            0.06,
-            f"support >= {min_effective_n:g}",
-            transform=ax.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize=7,
-            color="white",
-            bbox={"facecolor": "black", "edgecolor": "none", "alpha": 0.42, "boxstyle": "round,pad=0.18"},
-        )
         for p_idx, period_d in enumerate(period_centers):
             for r_idx, radius_rearth in enumerate(radius_centers):
                 rows.append(
@@ -738,7 +727,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         ax.grid(False)
     for ax in axes[:, 0]:
         ax.set_ylabel("Injected companion radius [R_earth]")
-    axes[0, 0].text(
+    roche_label = axes[0, 0].text(
         0.219,
         0.22,
         "Roche limit",
@@ -748,6 +737,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         color="white",
         fontsize=7,
     )
+    roche_label.set_path_effects([pe.Stroke(linewidth=1.6, foreground="black", alpha=0.55), pe.Normal()])
     if mesh is not None:
         cbar = fig.colorbar(mesh, ax=axes.ravel().tolist(), fraction=0.032, pad=0.018)
         cbar.set_label("Kernel-smoothed BLS recovery fraction")
@@ -756,8 +746,8 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         0.5,
         0.035,
         (
-            "Black contour: 50% empirical recovery. Dashed boundary: local injection-support limit. "
-            "Thin white contours: local mean total transit duration for the accepted BATMAN injections."
+            "Black contour: 50% empirical recovery. Grey dashed boundary: local injection-support limit. "
+            "Dotted vertical line: Roche-limit period. Thin white contours: local mean total transit duration."
         ),
         ha="center",
         va="bottom",
@@ -844,7 +834,7 @@ def publication_tmag_bin_summary(df: pd.DataFrame) -> list[dict[str, Any]]:
         ("Tmag < 17", df["tmag"] < 17.0),
         ("17 <= Tmag < 18", (df["tmag"] >= 17.0) & (df["tmag"] < 18.0)),
         ("18 <= Tmag < 19", (df["tmag"] >= 18.0) & (df["tmag"] < 19.0)),
-        ("Tmag >= 19", df["tmag"] >= 19.0),
+        ("Tmag > 19", df["tmag"] >= 19.0),
     ]
     recovered = df["any_exact_or_harmonic_recovered"].fillna(False).astype(bool)
     rows: list[dict[str, Any]] = []
@@ -1339,9 +1329,9 @@ def write_summary(
             "",
             "The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.",
             "",
-            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>=19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.",
+            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the dotted vertical line marks the Roche-limit period; the black 50% contour is the empirical recovery boundary. Thin white contours are the local mean total transit duration in minutes for the accepted BATMAN injections, not an independent analytic edge-on duration curve.",
             "",
-            "The current `10k` table remains target-distribution-limited at the bright end. Counts in the paper-style Tmag panels:",
+            "Counts in the paper-style Tmag panels show whether the map is target-distribution-limited or bright-balanced:",
             "",
             "| Tmag bin | injections | BLS recovered | fraction |",
             "| --- | ---: | ---: | ---: |",
@@ -1354,7 +1344,7 @@ def write_summary(
     lines.extend(
         [
             "",
-            "For the next publication-grade map, use the physical bright-balanced PDO launcher: it samples targets evenly in these four Tmag bins and uses a period-radius BATMAN grid with transit-conditioned random impact parameters. The resulting `P, R_p` recovery surface should be interpreted as recovery marginalized over the physically allowed duration/depth scatter at fixed period and radius.",
+            "For bright-balanced physical runs, the `P, R_p` recovery surface should be interpreted as recovery marginalized over the physically allowed duration/depth scatter at fixed period and radius.",
             "",
             "## BLS vs LEO",
             "",

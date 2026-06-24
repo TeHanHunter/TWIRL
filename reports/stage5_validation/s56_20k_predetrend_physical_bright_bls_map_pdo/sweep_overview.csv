@@ -1,0 +1,2 @@
+name,apertures,n_periods,durations_min,injection_id_filter_n,n_chunks,n_rows,strict_recovered,top1_recovered,exact_topn,harmonic_topn,unmatched,queue_csv,summary_json
+small_pair_200k,DET_FLUX_ADP_SML+DET_FLUX_SML,200000,3+4+5+6+8+10+13+16+20+30,0,200,20000,7227,7227,296,387,12089,reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/review_queue.csv,reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/recovery_mode_summary/summary.json

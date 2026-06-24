@@ -1,6 +1,6 @@
 {
-  "bls_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
-  "created_utc": "2026-06-24T14:41:50.683512+00:00",
+  "bls_csv": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
+  "created_utc": "2026-06-24T19:17:11.806765+00:00",
   "leo_metric_summary": {
     "MES": {
       "BLS missed, LEO FA": {
@@ -138,9 +138,9 @@
         "p84": 25.325925073199237
       }
     },
-    "summary_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_summary.csv"
+    "summary_csv": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_summary.csv"
   },
-  "leo_queue_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_small_pair_200k_review_queue_pdo/review_queue.csv",
+  "leo_queue_csv": "reports/stage5_validation/s56_10k_predetrend_small_pair_200k_review_queue_pdo/review_queue.csv",
   "leo_summary": {
     "bls_any_recovered_frac": 0.177,
     "bls_any_recovered_n": 177,
@@ -204,23 +204,23 @@
     ]
   },
   "paths": {
-    "bls_vs_leo_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/bls_vs_leo_recovery_contingency.pdf",
-    "bls_vs_leo_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/bls_vs_leo_recovery_contingency.png",
-    "duration_radius_floor_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/duration_radius_50pct_boundary_floor_maps.pdf",
-    "duration_radius_floor_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/duration_radius_50pct_boundary_floor_maps.png",
-    "leo_metric_diagnostics_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_diagnostics.pdf",
-    "leo_metric_diagnostics_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_diagnostics.png",
-    "leo_metric_summary_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_summary.csv",
-    "period_radius_boundary_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.pdf",
-    "period_radius_boundary_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.png",
-    "period_radius_empirical_publication_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication_grid.csv",
-    "period_radius_empirical_publication_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.pdf",
-    "period_radius_empirical_publication_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.png",
-    "period_radius_recovery_map_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.csv",
-    "period_radius_recovery_map_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.pdf",
-    "period_radius_recovery_map_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.png",
-    "radius_snr_proxy_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.pdf",
-    "radius_snr_proxy_png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.png"
+    "bls_vs_leo_pdf": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/bls_vs_leo_recovery_contingency.pdf",
+    "bls_vs_leo_png": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/bls_vs_leo_recovery_contingency.png",
+    "duration_radius_floor_pdf": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/duration_radius_50pct_boundary_floor_maps.pdf",
+    "duration_radius_floor_png": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/duration_radius_50pct_boundary_floor_maps.png",
+    "leo_metric_diagnostics_pdf": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_diagnostics.pdf",
+    "leo_metric_diagnostics_png": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_diagnostics.png",
+    "leo_metric_summary_csv": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/leo_bls_metric_summary.csv",
+    "period_radius_boundary_pdf": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.pdf",
+    "period_radius_boundary_png": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.png",
+    "period_radius_empirical_publication_csv": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication_grid.csv",
+    "period_radius_empirical_publication_pdf": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.pdf",
+    "period_radius_empirical_publication_png": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.png",
+    "period_radius_recovery_map_csv": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.csv",
+    "period_radius_recovery_map_pdf": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.pdf",
+    "period_radius_recovery_map_png": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.png",
+    "radius_snr_proxy_pdf": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.pdf",
+    "radius_snr_proxy_png": "reports/stage5_validation/s56_10k_predetrend_dense_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.png"
   },
   "publication_tmag_bin_summary": [
     {
@@ -245,7 +245,7 @@
       "n": 7340,
       "recovered": 643,
       "recovered_fraction": 0.08760217983651226,
-      "tmag_bin": "Tmag >= 19"
+      "tmag_bin": "Tmag > 19"
     }
   ]
 }

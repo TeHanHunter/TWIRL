@@ -43,6 +43,7 @@ CHUNK_DIR="${OUT_DIR}/chunk_ids"
 RUN_CHUNK_DIR="${OUT_DIR}/chunks"
 CHUNK_SIZE="${TWIRL_CHUNK_SIZE:-100}"
 WORKERS="${TWIRL_CHUNK_WORKERS:-16}"
+CHUNK_JOBS="${TWIRL_CHUNK_JOBS:-1}"
 SWEEP_NAME="${SWEEP_NAME:-small_pair_200k}"
 SWEEP_SPEC="${SWEEP_NAME}:DET_FLUX_ADP_SML+DET_FLUX_SML:200000"
 REBUILD_INJECTIONS="${REBUILD_INJECTIONS:-0}"
@@ -67,6 +68,7 @@ if [[ -n "${TARGET_H5_LIST}" ]]; then
 fi
 log "injection_dir=${INJECTION_DIR}"
 log "out_dir=${OUT_DIR}"
+log "chunk_size=${CHUNK_SIZE} chunk_jobs=${CHUNK_JOBS} chunk_workers=${WORKERS}"
 
 if [[ "${REBUILD_INJECTIONS}" == "1" || ! -s "${INJECTION_DIR}/injected_lightcurves.h5" ]]; then
   log "building dense raw-flux pre-detrend BATMAN injections"
@@ -137,23 +139,63 @@ for start in range(0, len(keys), chunk_size):
 print((chunk_dir / "manifest.txt").read_text(), end="")
 PY
 
-for id_file in "${CHUNK_DIR}"/chunk_*.txt; do
-  chunk_name="$(basename "${id_file}" .txt)"
-  chunk_out="${RUN_CHUNK_DIR}/${chunk_name}"
-  summary_path="${chunk_out}/${SWEEP_NAME}/recovery_mode_summary/summary.json"
-  if [[ -f "${summary_path}" ]]; then
-    log "skip ${chunk_name}: ${summary_path} exists"
-    continue
+if [[ "${CHUNK_JOBS}" -le 1 ]]; then
+  for id_file in "${CHUNK_DIR}"/chunk_*.txt; do
+    chunk_name="$(basename "${id_file}" .txt)"
+    chunk_out="${RUN_CHUNK_DIR}/${chunk_name}"
+    summary_path="${chunk_out}/${SWEEP_NAME}/recovery_mode_summary/summary.json"
+    if [[ -f "${summary_path}" ]]; then
+      log "skip ${chunk_name}: ${summary_path} exists"
+      continue
+    fi
+    log "run ${chunk_name} with ${WORKERS} workers"
+    "${PYTHON}" scripts/stage5_validation/run_injection_recovery_mode_sweep.py \
+      --injection-h5 "${INJECTION_DIR}/injected_lightcurves.h5" \
+      --out-dir "${chunk_out}" \
+      --n-injections 0 \
+      --workers "${WORKERS}" \
+      --injection-id-file "${id_file}" \
+      --sweep "${SWEEP_SPEC}"
+  done
+else
+  pending_chunks="${OUT_DIR}/pending_chunk_files.txt"
+  : > "${pending_chunks}"
+  for id_file in "${CHUNK_DIR}"/chunk_*.txt; do
+    chunk_name="$(basename "${id_file}" .txt)"
+    chunk_out="${RUN_CHUNK_DIR}/${chunk_name}"
+    summary_path="${chunk_out}/${SWEEP_NAME}/recovery_mode_summary/summary.json"
+    if [[ -f "${summary_path}" ]]; then
+      log "skip ${chunk_name}: ${summary_path} exists"
+      continue
+    fi
+    printf '%s\n' "${id_file}" >> "${pending_chunks}"
+  done
+
+  n_pending="$(wc -l < "${pending_chunks}" | tr -d ' ')"
+  log "run ${n_pending} pending chunks with ${CHUNK_JOBS} concurrent jobs and ${WORKERS} workers each"
+  if [[ "${n_pending}" -gt 0 ]]; then
+    export PYTHON INJECTION_DIR RUN_CHUNK_DIR SWEEP_NAME SWEEP_SPEC WORKERS
+    xargs -n 1 -P "${CHUNK_JOBS}" bash -c '
+      set -euo pipefail
+      id_file="$1"
+      chunk_name="$(basename "${id_file}" .txt)"
+      chunk_out="${RUN_CHUNK_DIR}/${chunk_name}"
+      summary_path="${chunk_out}/${SWEEP_NAME}/recovery_mode_summary/summary.json"
+      if [[ -f "${summary_path}" ]]; then
+        echo "[$(date -Is)] [dense-bls-map] skip ${chunk_name}: ${summary_path} exists"
+        exit 0
+      fi
+      echo "[$(date -Is)] [dense-bls-map] run ${chunk_name} with ${WORKERS} workers"
+      "${PYTHON}" scripts/stage5_validation/run_injection_recovery_mode_sweep.py \
+        --injection-h5 "${INJECTION_DIR}/injected_lightcurves.h5" \
+        --out-dir "${chunk_out}" \
+        --n-injections 0 \
+        --workers "${WORKERS}" \
+        --injection-id-file "${id_file}" \
+        --sweep "${SWEEP_SPEC}"
+    ' _ < "${pending_chunks}"
   fi
-  log "run ${chunk_name} with ${WORKERS} workers"
-  "${PYTHON}" scripts/stage5_validation/run_injection_recovery_mode_sweep.py \
-    --injection-h5 "${INJECTION_DIR}/injected_lightcurves.h5" \
-    --out-dir "${chunk_out}" \
-    --n-injections 0 \
-    --workers "${WORKERS}" \
-    --injection-id-file "${id_file}" \
-    --sweep "${SWEEP_SPEC}"
-done
+fi
 
 log "merging BLS chunks"
 "${PYTHON}" scripts/stage5_validation/merge_recovery_sweep_chunks.py \

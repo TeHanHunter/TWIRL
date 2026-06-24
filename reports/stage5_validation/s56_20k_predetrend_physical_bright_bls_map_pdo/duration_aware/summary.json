@@ -1,0 +1,251 @@
+{
+  "bls_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
+  "created_utc": "2026-06-24T19:16:54.921719+00:00",
+  "leo_metric_summary": {
+    "MES": {
+      "BLS missed, LEO FA": {
+        "median": 5.950151164046963,
+        "n": 822,
+        "p16": 5.419025587555861,
+        "p84": 7.348245769967684
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 6.756706766213889,
+        "n": 1,
+        "p16": 6.756706766213889,
+        "p84": 6.756706766213889
+      },
+      "BLS recovered, LEO FA": {
+        "median": 6.465828044779577,
+        "n": 101,
+        "p16": 5.735705531133242,
+        "p84": 8.255214646014307
+      },
+      "BLS recovered, LEO PC/FP": {
+        "median": 15.936869161829982,
+        "n": 76,
+        "p16": 9.67509817166562,
+        "p84": 37.27676773290351
+      }
+    },
+    "N_transit": {
+      "BLS missed, LEO FA": {
+        "median": 4.0,
+        "n": 822,
+        "p16": 2.0,
+        "p84": 28.0
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 13.0,
+        "n": 1,
+        "p16": 13.0,
+        "p84": 13.0
+      },
+      "BLS recovered, LEO FA": {
+        "median": 14.0,
+        "n": 101,
+        "p16": 4.0,
+        "p84": 78.0
+      },
+      "BLS recovered, LEO PC/FP": {
+        "median": 56.5,
+        "n": 76,
+        "p16": 15.0,
+        "p84": 139.0
+      }
+    },
+    "SHP": {
+      "BLS missed, LEO FA": {
+        "median": 0.38611802843727416,
+        "n": 822,
+        "p16": 0.3168462018774041,
+        "p84": 0.4598633169231167
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 0.3574842012221941,
+        "n": 1,
+        "p16": 0.3574842012221941,
+        "p84": 0.3574842012221941
+      },
+      "BLS recovered, LEO FA": {
+        "median": 0.3441229667325073,
+        "n": 101,
+        "p16": 0.2688258800197131,
+        "p84": 0.410543112642967
+      },
+      "BLS recovered, LEO PC/FP": {
+        "median": 0.1737707512911273,
+        "n": 76,
+        "p16": 0.080744983282478,
+        "p84": 0.2536080886285731
+      }
+    },
+    "group_counts": {
+      "BLS missed, LEO FA": 822,
+      "BLS missed, LEO PC/FP": 1,
+      "BLS recovered, LEO FA": 101,
+      "BLS recovered, LEO PC/FP": 76
+    },
+    "n_in": {
+      "BLS missed, LEO FA": {
+        "median": 33.0,
+        "n": 822,
+        "p16": 9.0,
+        "p84": 171.0
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 49.0,
+        "n": 1,
+        "p16": 49.0,
+        "p84": 49.0
+      },
+      "BLS recovered, LEO FA": {
+        "median": 39.0,
+        "n": 101,
+        "p16": 11.0,
+        "p84": 180.0
+      },
+      "BLS recovered, LEO PC/FP": {
+        "median": 82.0,
+        "n": 76,
+        "p16": 28.0,
+        "p84": 185.0
+      }
+    },
+    "new_MES": {
+      "BLS missed, LEO FA": {
+        "median": 5.721562824457234,
+        "n": 822,
+        "p16": 2.377980620267533,
+        "p84": 6.869046745901159
+      },
+      "BLS missed, LEO PC/FP": {
+        "median": 7.178766688006465,
+        "n": 1,
+        "p16": 7.178766688006465,
+        "p84": 7.178766688006465
+      },
+      "BLS recovered, LEO FA": {
+        "median": 5.941298075255739,
+        "n": 101,
+        "p16": 3.8351460193582847,
+        "p84": 8.709279755975809
+      },
+      "BLS recovered, LEO PC/FP": {
+        "median": 12.549301556348146,
+        "n": 76,
+        "p16": 7.292139901052525,
+        "p84": 25.325925073199237
+      }
+    },
+    "summary_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/leo_bls_metric_summary.csv"
+  },
+  "leo_queue_csv": "reports/stage5_validation/s56_10k_predetrend_small_pair_200k_review_queue_pdo/review_queue.csv",
+  "leo_summary": {
+    "bls_any_recovered_frac": 0.177,
+    "bls_any_recovered_n": 177,
+    "leo_class_counts": {
+      "FA": 923,
+      "FP": 5,
+      "PC": 72
+    },
+    "leo_pc": {
+      "fn": 106,
+      "fp": 1,
+      "precision_vs_bls": 0.9861111111111112,
+      "recall_vs_bls": 0.4011299435028249,
+      "specificity_vs_bls": 0.9987849331713244,
+      "tn": 822,
+      "tp": 71
+    },
+    "leo_pc_or_fp": {
+      "fn": 101,
+      "fp": 1,
+      "precision_vs_bls": 0.987012987012987,
+      "recall_vs_bls": 0.4293785310734463,
+      "specificity_vs_bls": 0.9987849331713244,
+      "tn": 822,
+      "tp": 76
+    },
+    "n": 1000
+  },
+  "model": {
+    "auc": 0.9307457344254375,
+    "converged": true,
+    "feature_names": [
+      "log10_radius2_sqrt_duration_over_period",
+      "tmag"
+    ],
+    "iterations": 7,
+    "logloss": 0.32918573050279476,
+    "model_type": "physical_radius_proxy",
+    "n_recovered": 7910,
+    "n_rows": 20000,
+    "raw_intercept": 18.67434619651668,
+    "ridge": 1.0
+  },
+  "model_arrays": {
+    "beta_standardized": [
+      -0.9389453241390687,
+      2.51045026105075,
+      -1.6377498312090275
+    ],
+    "center": [
+      0.78385158843538,
+      17.965761606261424
+    ],
+    "raw_coef": [
+      1.9181024935387068,
+      -1.1753912619901572
+    ],
+    "scale": [
+      1.308819663968645,
+      1.393365668242259
+    ]
+  },
+  "paths": {
+    "bls_vs_leo_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/bls_vs_leo_recovery_contingency.pdf",
+    "bls_vs_leo_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/bls_vs_leo_recovery_contingency.png",
+    "duration_radius_floor_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/duration_radius_50pct_boundary_floor_maps.pdf",
+    "duration_radius_floor_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/duration_radius_50pct_boundary_floor_maps.png",
+    "leo_metric_diagnostics_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/leo_bls_metric_diagnostics.pdf",
+    "leo_metric_diagnostics_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/leo_bls_metric_diagnostics.png",
+    "leo_metric_summary_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/leo_bls_metric_summary.csv",
+    "period_radius_boundary_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.pdf",
+    "period_radius_boundary_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_50pct_boundary_by_duration.png",
+    "period_radius_empirical_publication_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication_grid.csv",
+    "period_radius_empirical_publication_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.pdf",
+    "period_radius_empirical_publication_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_empirical_recovery_publication.png",
+    "period_radius_recovery_map_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.csv",
+    "period_radius_recovery_map_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.pdf",
+    "period_radius_recovery_map_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.png",
+    "radius_snr_proxy_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.pdf",
+    "radius_snr_proxy_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.png"
+  },
+  "publication_tmag_bin_summary": [
+    {
+      "n": 5020,
+      "recovered": 3154,
+      "recovered_fraction": 0.6282868525896415,
+      "tmag_bin": "Tmag < 17"
+    },
+    {
+      "n": 4994,
+      "recovered": 2273,
+      "recovered_fraction": 0.45514617541049257,
+      "tmag_bin": "17 <= Tmag < 18"
+    },
+    {
+      "n": 5026,
+      "recovered": 1625,
+      "recovered_fraction": 0.3233187425387983,
+      "tmag_bin": "18 <= Tmag < 19"
+    },
+    {
+      "n": 4960,
+      "recovered": 858,
+      "recovered_fraction": 0.17298387096774193,
+      "tmag_bin": "Tmag > 19"
+    }
+  ]
+}

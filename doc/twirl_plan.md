@@ -27,7 +27,7 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-05-22`: **S56 compare-column product built for Franklin/Michelle.** The handoff tree `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare` keeps canonical `DET_FLUX` as `twirl-fs-v2` and adds experimental `DET_FLUX_ADP` columns using `twirl-fs-v2-adp03q` (`0.3 d` quantile-knot spline, `0.2 d` adaptive gap split). Full corrected rebuild wrote `19,072 / 19,072` FITS; the 100-target QA sample has all adaptive fits in spline mode and includes all 16 CCDs. Use canonical `DET_FLUX` by default and treat adaptive columns as opt-in comparison inputs.
 - `2026-06-18`: **S56-S93 cutout prep/recovery is complete and size/count QA passed.** On `pdogpu1`, the refreshed S56-S93 completion map shows `38/38` sectors with cutout prep complete; the full source-pickle metadata sweep checked `1,216` orbit/camera/CCD source directories with `0` size/count issues. `qc_pause.flag` remains in place, so normal GPU finalize is still intentionally paused while TWIRL-FS v2 product QA remains the gate.
 - `2026-06-03`: **Current-stage talk and QA visuals wrapped for the post-talk checkpoint.** The clean local Keynote/PPTX deck is preserved in `outputs/` and the ignored `reports/exploratory/talks/2026-06-02-current-stage/` archive; the tracked repo now keeps only the reusable scripts and compact report artifacts. New presentation-facing QA products are the S56-S93 production-status map and the rebuilt WD 1856 S56 pixel-map diagnostic. The precision-plot work remains exploratory and should not be used as a final product-QA claim until the normalization/plotting choice is re-run and signed off.
-- `2026-06-10`: **ORCD 8xH200 downstream-compute path scoped.** The runnable Slurm partition is `pg_mki_aryeh` even though the administrative access wording from Paul was `orcd_ug_pg_mki_aryeh_all`; the first probe saw CPU nodes `node4701`/`node4702`, H200 node `node4900` (`gpu:h200:8`), and writable 200 TB project storage at `/orcd/data/mki_aryeh/001`. PDO remains the Stage 1 TGLC/ePSF production home; ORCD is for compact downstream exports, Stage 3 injection-recovery, Stage 4 GPU search, feature extraction, and later ML triage. Operational details live in [ORCD guide](orcd_h200_usage.md).
+- `2026-06-24`: **ORCD 8xH200 downstream-compute path is usable for TWIRL once compact S56 exports are staged.** The runnable Slurm partition is `pg_mki_aryeh`; the current control-socket probe reaches login host `login007` and sees the H200 node `node4900` with `gpu:h200:8`. PDO remains the Stage 1 TGLC/ePSF production home; the first ORCD pilot should move compact S56 TWIRL-FS v2 light-curve exports, manifests, candidate tables, and recovery outputs to `/orcd/data/mki_aryeh/001/twirl/exports/s56_twirlfs_v2/`, then run CPU/1xH200 smoke tests before larger Stage 3/4 sweeps. Operational details live in [ORCD guide](orcd_h200_usage.md).
 - `2026-06-17`: **Julien joins the active collaboration/follow-up planning.** Meeting notes are recorded in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership). Immediate implications: compare S56 TWIRL-FS search/vetting results against Julien's SPOC Stage-1 candidate funnel, define what signal classes the current products are sensitive to before first-paper claims, and verify follow-up/funding routes before treating SPECULOOS, MISCOT, LCO 1m, EPRV, or proto-Lightspeed as executable paths.
 - `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
@@ -881,25 +881,30 @@ set. Balanced/aggressive relaxations increase recall but lose purity quickly,
 so the next implementation should add a review/recovered-but-not-clean class
 rather than promote those rows directly to PC.
 
-Status (`2026-06-24`, bright-balanced physical map in progress): the current
-`10k` paper-style period-radius map is now a `2 x 2` Tmag split (`<17`,
-`17-18`, `18-19`, `>=19`) and explicitly labels the thin white contours as
-local mean total transit duration for accepted BATMAN injections. The bright
-panels are still target-distribution limited (`275` rows at `Tmag < 17` and
-`589` at `17-18`), so the publication-grade map should come from the new
-PDO run launched in tmux `twirl-s56-physical-bright-0624`: `20k`
-pre-detrend BATMAN injections, period-radius grid, transit-conditioned random
-impact parameters/inclinations, equal target sampling across the four Tmag
-bins, and the same `DET_FLUX_ADP_SML + DET_FLUX_SML`, `200k`-period BLS
-recovery path. Interpret the resulting `P, R_p` map as BLS recovery
-marginalized over physically allowed duration/depth scatter at fixed period
-and radius.
+Status (`2026-06-24`, bright-balanced physical map complete): the publication-
+facing period-radius map is now the `20k` pre-detrend BATMAN run on a
+period-radius grid with transit-conditioned random impact
+parameters/inclinations, equal target sampling across `<17`, `17-18`, `18-19`,
+and `>19`, and the same `DET_FLUX_ADP_SML + DET_FLUX_SML`, `200k`-period BLS
+recovery path. The final table has `20,000` rows, with panel counts
+`5,020`, `4,994`, `5,026`, and `4,960`; exact/top-N/harmonic BLS recovery is
+`62.8%`, `45.5%`, `32.3%`, and `17.3%` across those bins. The plot explicitly
+labels the 50% empirical recovery contour, the Roche-limit period, the local
+injection-support boundary, and local mean total transit duration contours.
+Interpret the `P, R_p` surface as BLS recovery marginalized over physically
+allowed duration/depth scatter at fixed period and radius. Final report:
+[summary](../reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/summary.md).
+
+Operational note (`2026-06-24`): the current `20k` bright-balanced recovery
+run stays on `pdogpu1` because it is already chunking against data staged on
+PDO. The next scale-up should use the ORCD/H200 path after the compact S56
+export is built and copied to project storage.
 
 Status (`2026-06-24` EOD): wrap checkpoint keeps the S56 raw-flux
 pre-detrend injection-recovery path as the active methods branch. The best
 current search input is still `DET_FLUX_ADP_SML + DET_FLUX_SML` with the
-dense `200k` BLS grid; the dense `10k` period/radius maps are the sensitivity
-visuals; and the `1k` LEO-only injection queue is the immediate human
+dense `200k` BLS grid; the bright-balanced `20k` period/radius map is the
+current sensitivity visual; and the `1k` LEO-only injection queue is the immediate human
 visual-check substrate. Next work should keep three labels separate:
 BLS-tracked injection recovery, LEO class, and human object-type label. LEO
 tuning should be calibrated against that split with a review/recovered-but-not-

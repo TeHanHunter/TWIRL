@@ -3,7 +3,7 @@
 #
 # - period-radius grid, not period-depth grid
 # - transit-conditioned random impact parameters / inclinations
-# - equal target sampling in Tmag < 17, 17-18, 18-19, and >= 19
+# - equal target sampling in Tmag < 17, 17-18, 18-19, and > 19
 #
 # This keeps the y-axis physical (companion radius) while marginalizing the
 # recovery fraction over the physically allowed chord-length/depth scatter at

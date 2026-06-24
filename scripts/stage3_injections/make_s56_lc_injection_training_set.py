@@ -121,12 +121,14 @@ def _draw_physical_wd_params(
         radius_rearth=radius_rearth,
         rng=rng,
     )
-    depth = float(min(radius_rwd**2, 0.995))
+    geometric_depth = _circle_overlap_depth(radius_rwd, impact_b)
     return {
         "signal_family": family,
         "period_d": period_d,
         "duration_min": duration_min,
-        "depth": depth,
+        "depth": geometric_depth,
+        "target_depth": geometric_depth,
+        "geometric_depth": geometric_depth,
         "radius_rearth": radius_rearth,
         "radius_rwd": radius_rwd,
         "impact_b": impact_b,
@@ -300,7 +302,7 @@ def _draw_grid_params(
         radius_rearth=radius_rearth,
         rng=rng,
     )
-    depth = float(min(radius_rwd**2, 0.995))
+    geometric_depth = _circle_overlap_depth(radius_rwd, impact_b)
     family = _grid_family(period_d, radius_rearth)
     return {
         "signal_family": family,
@@ -314,14 +316,14 @@ def _draw_grid_params(
         "radius_bin_hi_rearth": float(radius_edges[radius_bin + 1]),
         "period_d": period_d,
         "duration_min": duration_min,
-        "depth": depth,
+        "depth": geometric_depth,
         "radius_rearth": radius_rearth,
         "radius_rwd": radius_rwd,
         "impact_b": impact_b,
         "a_over_rwd": a_over_rwd,
         "inclination_deg": float(np.degrees(np.arccos(np.clip(impact_b / a_over_rwd, 0.0, 1.0)))),
-        "geometric_depth": depth,
-        "target_depth": depth,
+        "geometric_depth": geometric_depth,
+        "target_depth": geometric_depth,
         "duration_model": "wd_density_batman",
         "injection_model": "batman_quadratic",
     }

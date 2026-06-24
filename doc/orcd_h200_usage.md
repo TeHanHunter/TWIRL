@@ -4,7 +4,7 @@ This note records the initial ORCD/Engaging reconnaissance for the MKI Aryeh
 CPU/GPU nodes and how TWIRL should use them. It is operational guidance, not a
 scientific pipeline decision.
 
-Last verified: `2026-06-10`.
+Last verified: `2026-06-24`.
 
 ## Access And Scheduler Names
 
@@ -17,6 +17,36 @@ ssh tehan@orcd-login.mit.edu
 Login requires the account password plus Duo. Do not put passwords in scripts.
 For repeated local probes, use an SSH control socket that you authenticate once
 from your own terminal.
+
+Recommended shared control-socket setup:
+
+```bash
+mkdir -p ~/.ssh/cm
+
+ssh -MNf \
+  -o ControlMaster=yes \
+  -o ControlPath=~/.ssh/cm/%r@%h:%p \
+  -o ControlPersist=8h \
+  tehan@orcd-login.mit.edu
+```
+
+Enter the password and approve Duo in that terminal. After the master
+connection is open, agents can run non-interactive ORCD commands through the
+same socket with `BatchMode=yes`, which fails cleanly instead of prompting for
+credentials:
+
+```bash
+ssh \
+  -o BatchMode=yes \
+  -o ControlMaster=auto \
+  -o ControlPath=~/.ssh/cm/%r@%h:%p \
+  tehan@orcd-login.mit.edu \
+  'hostname; whoami; sinfo -h -p pg_mki_aryeh -o "%P %D %t" | head -5'
+```
+
+If that probe returns `Permission denied (publickey,keyboard-interactive)`, the
+control socket is missing or expired. Re-open it from a user terminal rather
+than putting a password or Duo code into Codex, scripts, logs, or config files.
 
 The administrative wording from Paul was:
 
@@ -68,6 +98,12 @@ At probe time, `node4900` was also visible through `mit_preemptable`, and all
 8 GPUs were allocated by other users. Treat `pg_mki_aryeh` as the correct
 partition, but do not assume the nodes are idle or reserved exclusively for
 TWIRL.
+
+The current `2026-06-24` control-socket probe succeeds non-interactively from
+Codex and shows `pg_mki_aryeh` with two CPU-node states plus one allocated
+`gpu:h200:8` node. That means TWIRL can now use ORCD operationally once the
+compact S56 light-curve exports are staged there; do not move raw PDO TGLC,
+TICA, ePSF, or source-pickle trees as the first step.
 
 The private partition has:
 
@@ -231,7 +267,8 @@ sbatch --test-only -p pg_mki_aryeh -t 00:05:00 -c 1 --mem=1G --wrap="hostname"
 
 1. Build compact S56 TWIRL-FS v2 export shards on PDO or locally from synced
    products.
-2. Transfer those shards to `/orcd/data/mki_aryeh/001/twirl/exports/`.
+2. Transfer those shards to
+   `/orcd/data/mki_aryeh/001/twirl/exports/s56_twirlfs_v2/`.
 3. Run CPU and 1xH200 smoke tests.
 4. Run S56 GPU search equivalence against the existing CPU BLS results.
 5. Confirm WD 1856 recovery before expanding to multi-sector or injection
