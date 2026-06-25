@@ -795,9 +795,19 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 masked.T,
                 levels=[0.5],
                 colors=["black"],
-                linewidths=1.35,
+                linewidths=2.15,
+                zorder=6,
             )
-            ax.clabel(contour, fmt={0.5: "50%"}, fontsize=annotation_fs, inline=True)
+            contour_labels = ax.clabel(
+                contour,
+                fmt={0.5: "50%"},
+                fontsize=annotation_fs + 1.2,
+                inline=True,
+                inline_spacing=5,
+                colors=["black"],
+            )
+            for text in contour_labels:
+                text.set_fontweight("bold")
         finite_effective_n = _finite_minmax(effective_n)
         if finite_effective_n is not None and finite_effective_n[1] >= min_effective_n:
             ax.contour(
@@ -811,35 +821,37 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 alpha=0.85,
             )
         finite_total_time = _finite_minmax(mean_total_transit_min)
-        if finite_total_time is not None and finite_total_time[0] <= 100.0 <= finite_total_time[1]:
-            dcont = ax.contour(
-                period_centers,
-                radius_centers,
-                mean_total_transit_min.T,
-                levels=[30.0, 100.0, 300.0],
-                colors=["white"],
-                linewidths=[0.60, 0.66, 0.66],
-                linestyles=["--"],
-                alpha=0.86,
-            )
-            duration_label_positions = {
-                30.0: (4.2, 1.05, 50.0),
-                100.0: (1.2, 0.66, 42.0),
-                300.0: (0.18, 0.48, 88.0),
-            }
-            for level, (text_x, text_y, rotation) in duration_label_positions.items():
-                if finite_total_time[0] <= level <= finite_total_time[1]:
-                    ax.text(
-                        text_x,
-                        text_y,
-                        f"{level:g} min",
-                        color="white",
-                        fontsize=contour_fs,
-                        rotation=rotation,
-                        ha="center",
-                        va="center",
-                        zorder=7,
-                    )
+        duration_label_positions = {
+            30.0: (4.6, 0.92),
+            100.0: (1.05, 0.52),
+            300.0: (0.18, 0.34),
+        }
+        if finite_total_time is not None:
+            for level, label_position in duration_label_positions.items():
+                if not (finite_total_time[0] <= level <= finite_total_time[1]):
+                    continue
+                dcont = ax.contour(
+                    period_centers,
+                    radius_centers,
+                    mean_total_transit_min.T,
+                    levels=[level],
+                    colors=["white"],
+                    linewidths=0.68,
+                    linestyles=["--"],
+                    alpha=0.88,
+                    zorder=5,
+                )
+                labels = ax.clabel(
+                    dcont,
+                    fmt={level: f"{level:g} min"},
+                    fontsize=contour_fs,
+                    inline=True,
+                    inline_spacing=4,
+                    colors=["white"],
+                    manual=[label_position],
+                )
+                for text in labels:
+                    text.set_zorder(7)
         for p_idx, period_d in enumerate(period_centers):
             for r_idx, radius_rearth in enumerate(radius_centers):
                 rows.append(
