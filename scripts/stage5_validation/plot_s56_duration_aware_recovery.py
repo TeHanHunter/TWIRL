@@ -826,6 +826,12 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             100.0: (1.2, 0.66),
             300.0: (0.18, 0.48),
         }
+        if idx == 0:
+            duration_label_positions = {
+                30.0: (3.1, 0.62),
+                100.0: (0.72, 0.44),
+                300.0: (0.17, 0.36),
+            }
         if finite_total_time is not None:
             for level, label_position in duration_label_positions.items():
                 if not (finite_total_time[0] <= level <= finite_total_time[1]):
@@ -891,7 +897,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     for ax in axes.ravel():
         _raise_panel_ticks(ax)
     if mesh is not None:
-        cax = fig.add_axes([0.935, 0.205, 0.022, 0.64])
+        cax = fig.add_axes([0.885, 0.10, 0.022, 0.82])
         cbar = fig.colorbar(mesh, cax=cax)
         cbar.set_label("Kernel-smoothed BLS recovery fraction", fontsize=label_fs)
         cbar.ax.tick_params(direction="in", which="both", labelsize=8.5)
