@@ -798,14 +798,16 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 linewidths=2.15,
                 zorder=6,
             )
-            contour_labels = ax.clabel(
-                contour,
-                fmt={0.5: "50%"},
-                fontsize=annotation_fs + 1.2,
-                inline=True,
-                inline_spacing=5,
-                colors=["black"],
-            )
+            contour_label_kwargs = {
+                "fmt": {0.5: "50%"},
+                "fontsize": annotation_fs + 1.2,
+                "inline": True,
+                "inline_spacing": 5,
+                "colors": ["black"],
+            }
+            if idx == 0:
+                contour_label_kwargs["manual"] = [(1.05, 0.83)]
+            contour_labels = ax.clabel(contour, **contour_label_kwargs)
             for text in contour_labels:
                 text.set_fontweight("bold")
         finite_effective_n = _finite_minmax(effective_n)
@@ -858,6 +860,8 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 )
                 for text in labels:
                     text.set_zorder(7)
+                    if level == 300.0 and idx in {0, 2}:
+                        text.set_rotation(text.get_rotation() + 180.0)
         for p_idx, period_d in enumerate(period_centers):
             for r_idx, radius_rearth in enumerate(radius_centers):
                 rows.append(
