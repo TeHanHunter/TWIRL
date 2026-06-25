@@ -822,9 +822,9 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             )
         finite_total_time = _finite_minmax(mean_total_transit_min)
         duration_label_positions = {
-            30.0: (4.6, 0.92),
-            100.0: (1.05, 0.52),
-            300.0: (0.18, 0.34),
+            30.0: (4.2, 1.05),
+            100.0: (1.2, 0.66),
+            300.0: (0.18, 0.48),
         }
         if finite_total_time is not None:
             for level, label_position in duration_label_positions.items():
