@@ -360,6 +360,39 @@ def _fluid_roche_period_d(radius_rearth: np.ndarray) -> np.ndarray:
     return period_s / 86400.0
 
 
+def _plot_roche_break_boundary(ax: Any, period_d: np.ndarray, radius_rearth: np.ndarray) -> None:
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    finite = (
+        np.isfinite(period_d)
+        & np.isfinite(radius_rearth)
+        & (period_d > xmin)
+        & (period_d < xmax)
+        & (radius_rearth > ymin)
+        & (radius_rearth < ymax)
+    )
+    if finite.sum() < 8:
+        return
+    radius = np.asarray(radius_rearth[finite], dtype=float)
+    period = np.asarray(period_d[finite], dtype=float)
+    order = np.argsort(radius)
+    radius = radius[order]
+    period = period[order]
+    radius_s = np.geomspace(radius[0], radius[-1], 96)
+    log_period_s = np.interp(np.log10(radius_s), np.log10(radius), np.log10(period))
+    zigzag = np.where(np.arange(radius_s.size) % 2 == 0, -1.0, 1.0)
+    period_s = np.power(10.0, log_period_s + 0.010 * zigzag)
+    ax.plot(
+        period_s,
+        radius_s,
+        color="black",
+        linewidth=0.7,
+        alpha=0.55,
+        zorder=3,
+        solid_capstyle="butt",
+    )
+
+
 def _kernel_recovery_surface_logxy(
     df: pd.DataFrame,
     *,
@@ -754,6 +787,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             linewidth=0,
             zorder=1,
         )
+        _plot_roche_break_boundary(ax, roche_period, roche_radius)
         if finite_masked is not None and finite_masked[0] <= 0.5 <= finite_masked[1]:
             contour = ax.contour(
                 period_centers,
@@ -785,16 +819,27 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
                 levels=[30.0, 100.0, 300.0],
                 colors=["white"],
                 linewidths=[0.60, 0.66, 0.66],
-                linestyles=["-"],
+                linestyles=["--"],
                 alpha=0.86,
             )
-            ax.clabel(
-                dcont,
-                fmt=lambda value: f"{value:g} min",
-                fontsize=contour_fs,
-                inline=True,
-                colors=["white"],
-            )
+            duration_label_positions = {
+                30.0: (4.2, 1.05, 50.0),
+                100.0: (1.2, 0.66, 42.0),
+                300.0: (0.18, 0.48, 88.0),
+            }
+            for level, (text_x, text_y, rotation) in duration_label_positions.items():
+                if finite_total_time[0] <= level <= finite_total_time[1]:
+                    ax.text(
+                        text_x,
+                        text_y,
+                        f"{level:g} min",
+                        color="white",
+                        fontsize=contour_fs,
+                        rotation=rotation,
+                        ha="center",
+                        va="center",
+                        zorder=7,
+                    )
         for p_idx, period_d in enumerate(period_centers):
             for r_idx, radius_rearth in enumerate(radius_centers):
                 rows.append(
