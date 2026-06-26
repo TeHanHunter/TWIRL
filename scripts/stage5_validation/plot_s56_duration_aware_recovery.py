@@ -410,8 +410,8 @@ def _plot_roche_break_boundary(ax: Any, period_d: np.ndarray, radius_rearth: np.
         period_s,
         radius_s,
         color="black",
-        linewidth=0.7,
-        alpha=0.55,
+        linewidth=0.55,
+        alpha=0.22,
         zorder=3,
         solid_capstyle="butt",
     )
@@ -809,8 +809,8 @@ def plot_publication_period_radius_recovery_map(
             period_edges[0],
             roche_fill_period,
             where=roche_mask,
-            color="white",
-            alpha=0.36,
+            color="black",
+            alpha=0.10,
             linewidth=0,
             zorder=1,
         )
