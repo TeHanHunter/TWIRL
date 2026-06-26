@@ -314,23 +314,46 @@ def _style_log_panel_ticks(ax: Any) -> None:
     _raise_panel_ticks(ax)
 
 
-def _raise_panel_ticks(ax: Any) -> None:
+def _raise_panel_ticks(ax: Any, *, bottom_x_color: str = "black") -> None:
     ax.set_axisbelow(False)
-    ticks = [
-        *ax.xaxis.get_major_ticks(),
-        *ax.xaxis.get_minor_ticks(),
-        *ax.yaxis.get_major_ticks(),
-        *ax.yaxis.get_minor_ticks(),
-    ]
-    for tick in ticks:
+    x_ticks = [*ax.xaxis.get_major_ticks(), *ax.xaxis.get_minor_ticks()]
+    y_ticks = [*ax.yaxis.get_major_ticks(), *ax.yaxis.get_minor_ticks()]
+    for tick in [*x_ticks, *y_ticks]:
         tick.tick1line.set_zorder(100)
         tick.tick2line.set_zorder(100)
         tick.tick1line.set_clip_on(False)
         tick.tick2line.set_clip_on(False)
+    for tick in x_ticks:
+        tick.tick1line.set_color(bottom_x_color)
+        tick.tick2line.set_color("black")
+    for tick in y_ticks:
         tick.tick1line.set_color("black")
         tick.tick2line.set_color("black")
     for spine in ax.spines.values():
         spine.set_zorder(101)
+
+
+def _draw_bottom_tick_overlays(ax: Any, *, color: str = "white") -> None:
+    xmin, xmax = ax.get_xlim()
+    transform = ax.get_xaxis_transform()
+    for locs, height, width in [
+        (ax.xaxis.get_minorticklocs(), 0.020, 0.70),
+        (ax.xaxis.get_majorticklocs(), 0.035, 0.95),
+    ]:
+        tick_locs = np.asarray(locs, dtype=float)
+        tick_locs = tick_locs[np.isfinite(tick_locs) & (tick_locs >= xmin) & (tick_locs <= xmax)]
+        if tick_locs.size == 0:
+            continue
+        ax.vlines(
+            tick_locs,
+            0.0,
+            height,
+            transform=transform,
+            color=color,
+            linewidth=width,
+            zorder=102,
+            clip_on=True,
+        )
 
 
 def _approx_companion_density_g_cm3(radius_rearth: np.ndarray) -> np.ndarray:
@@ -899,7 +922,8 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
         zorder=8,
     )
     for ax in axes.ravel():
-        _raise_panel_ticks(ax)
+        _raise_panel_ticks(ax, bottom_x_color="white")
+        _draw_bottom_tick_overlays(ax, color="white")
     if mesh is not None:
         cax = fig.add_axes([0.885, 0.10, 0.022, 0.82])
         cbar = fig.colorbar(mesh, cax=cax)
