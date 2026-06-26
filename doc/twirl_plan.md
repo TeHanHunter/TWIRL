@@ -961,9 +961,10 @@ Pre-human-labeling path:
    expose per-aperture `sde_*` and `recovery_status_*` columns; and the browser
    vetter must load the queue with LEO reports as the primary evidence panel.
 7. Run [verifier](../scripts/stage5_validation/verify_s56_pretriage_queue.py)
-   on the PDO queue before labeling. Only launch the labeling app if the
-   verifier passes. The PDO app entrypoint is
-   [launcher](../scripts/stage5_validation/run_s56_pretriage_vetting_app_pdo.sh),
+   on any PDO-built queue before labeling. Only launch the labeling app if the
+   verifier passes. The current active local entrypoint for the 1k small-pair
+   injection pilot is
+   [launcher](../scripts/stage5_validation/run_s56_1k_small_pair_vetting_app_local.sh),
    which writes labels to `human_labels_vetted.csv` beside the review queue.
 
 Only after those gates pass should the teacher/student self-training run use
