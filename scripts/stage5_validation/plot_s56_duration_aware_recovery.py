@@ -767,6 +767,12 @@ def plot_publication_period_radius_recovery_map(
     label_fs = 9.6
     annotation_fs = 8.4
     contour_fs = 7.2
+    fifty_label_positions = {
+        0: [(1.45, 0.98)],
+        1: [(2.35, 2.10)],
+        2: [(0.72, 2.85)],
+        3: [(1.35, 11.0)],
+    }
     for idx, (label, mask) in enumerate(tmag_bins):
         ax = axes.ravel()[idx]
         sub = df[mask].copy()
@@ -810,7 +816,7 @@ def plot_publication_period_radius_recovery_map(
             roche_fill_period,
             where=roche_mask,
             color="black",
-            alpha=0.16,
+            alpha=0.30,
             linewidth=0,
             zorder=1,
         )
@@ -832,8 +838,8 @@ def plot_publication_period_radius_recovery_map(
                 "inline_spacing": 5,
                 "colors": ["black"],
             }
-            if idx == 0:
-                contour_label_kwargs["manual"] = [(1.05, 0.83)]
+            if idx in fifty_label_positions:
+                contour_label_kwargs["manual"] = fifty_label_positions[idx]
             contour_labels = ax.clabel(contour, **contour_label_kwargs)
             for text in contour_labels:
                 text.set_fontweight("bold")

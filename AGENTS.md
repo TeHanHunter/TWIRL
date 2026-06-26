@@ -199,6 +199,7 @@ Current faint-end LC work should focus on the labeled TWIRL-FS v2 product: robus
 - When progress is made against a milestone or deliverable, record it in the same turn if practical.
 - Keep `doc/twirl_plan.md` as the forward-looking plan plus compact milestone status summaries only; do not let it accumulate command-level run logs.
 - Record detailed dated execution history in `doc/twirl_progress_log.md` under the most relevant stage subsection.
+- Do not add progress-log entries for purely aesthetic figure tweaks such as label nudges, tick colors, colorbar placement, or overlay opacity; record only scientifically meaningful figure changes such as changed inputs, model definitions, plotted quantities, smoothing assumptions, sample sizes, or recovery metrics.
 - In `doc/twirl_plan.md`, keep only 1-3 milestone-level status bullets per active subsection and link to the relevant `doc/twirl_progress_log.md` section.
 - Keep the prose part of each progress bullet readable; do not stuff raw long paths into the sentence.
 - Keep file references inline when helpful, using short clickable Markdown link labels such as `[script]`, `[PNG]`, `[PDF]`, `[FITS]`, or `[CSV]` rather than raw long paths.
