@@ -28,6 +28,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from astropy.io import fits
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
@@ -57,6 +58,9 @@ DEFAULT_INJECTION_H5 = (
     / "data_local/stage3_injections/s56_twirlfs_v2_injection_training/injections_900/injected_lightcurves.h5"
 )
 DEFAULT_OUT_DIR = REPO_ROOT / "reports/stage5_validation/s56_pretriage_review_queue"
+DEFAULT_STAR_CATALOG = (
+    REPO_ROOT / "data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_ticmatched.fits"
+)
 
 LABEL_COLUMNS = ("label", "label_source", "labeler", "notes")
 KNOWN_APERTURES = (
@@ -181,6 +185,19 @@ REVIEW_COLUMNS = (
     "topn_apertures_agree",
     "n_harmonic_apertures_agree",
     "harmonic_apertures_agree",
+    "star_source",
+    "star_source_id",
+    "star_atmosphere",
+    "star_rad_rsun",
+    "star_e_rad_rsun",
+    "star_mass_msun",
+    "star_e_mass_msun",
+    "star_teff_k",
+    "star_e_teff_k",
+    "star_logg_cgs",
+    "star_e_logg_cgs",
+    "star_rho_g_cm3",
+    "star_radius_source",
     "leo_class",
     "leo_report_name",
 )
@@ -881,6 +898,9 @@ def select_real_candidates_stratified(path: Path, n_real: int, random_state: int
 
 
 _RHO_WD_G_CM3 = 3.85e5
+_G_CGS = 6.67430e-8
+_MSUN_G = 1.98847e33
+_RSUN_CM = 6.957e10
 _CANONICAL_WD_STAR = {
     "rad": 0.013,
     "e_rad": 0.002,
@@ -895,10 +915,249 @@ _CANONICAL_WD_STAR = {
 }
 
 
-def _wd_star_for(tic: int) -> dict[str, Any]:
+def _as_finite_float(value: Any, default: float = float("nan")) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return default
+    return out if np.isfinite(out) else default
+
+
+def _radius_rsun_from_mass_logg(mass_msun: float, logg_cgs: float) -> float:
+    mass = _as_finite_float(mass_msun)
+    logg = _as_finite_float(logg_cgs)
+    if not np.isfinite(mass) or not np.isfinite(logg) or mass <= 0:
+        return float("nan")
+    return float(np.sqrt(_G_CGS * mass * _MSUN_G / (10.0 ** logg)) / _RSUN_CM)
+
+
+def _radius_uncertainty_rsun(
+    radius_rsun: float,
+    mass_msun: float,
+    e_mass_msun: float,
+    e_logg_cgs: float,
+) -> float:
+    radius = _as_finite_float(radius_rsun)
+    mass = _as_finite_float(mass_msun)
+    e_mass = _as_finite_float(e_mass_msun)
+    e_logg = _as_finite_float(e_logg_cgs)
+    if radius <= 0 or mass <= 0 or not np.isfinite(radius):
+        return float("nan")
+    terms = []
+    if np.isfinite(e_mass) and e_mass > 0:
+        terms.append((e_mass / mass) ** 2)
+    if np.isfinite(e_logg) and e_logg > 0:
+        terms.append((np.log(10.0) * e_logg) ** 2)
+    if not terms:
+        return float("nan")
+    return float(0.5 * radius * np.sqrt(sum(terms)))
+
+
+def _density_g_cm3(mass_msun: float, radius_rsun: float) -> float:
+    mass = _as_finite_float(mass_msun)
+    radius = _as_finite_float(radius_rsun)
+    if mass <= 0 or radius <= 0 or not np.isfinite(mass) or not np.isfinite(radius):
+        return float("nan")
+    volume = 4.0 / 3.0 * np.pi * (radius * _RSUN_CM) ** 3
+    return float(mass * _MSUN_G / volume)
+
+
+def _valid_wd_star_record(record: dict[str, Any]) -> bool:
+    radius = _as_finite_float(record.get("star_rad_rsun"))
+    mass = _as_finite_float(record.get("star_mass_msun"))
+    teff = _as_finite_float(record.get("star_teff_k"))
+    logg = _as_finite_float(record.get("star_logg_cgs"))
+    return (
+        0.002 <= radius <= 0.08
+        and 0.15 <= mass <= 1.4
+        and 2_000.0 <= teff <= 120_000.0
+        and 6.0 <= logg <= 10.0
+    )
+
+
+def _canonical_star_record(tic: int, *, source_id: Any = "") -> dict[str, Any]:
+    return {
+        "star_source": "canonical_fallback",
+        "star_source_id": str(_clean(source_id)) if _clean(source_id) != "" else "",
+        "star_atmosphere": "",
+        "star_rad_rsun": _CANONICAL_WD_STAR["rad"],
+        "star_e_rad_rsun": _CANONICAL_WD_STAR["e_rad"],
+        "star_mass_msun": _CANONICAL_WD_STAR["mass"],
+        "star_e_mass_msun": _CANONICAL_WD_STAR["e_mass"],
+        "star_teff_k": _CANONICAL_WD_STAR["Teff"],
+        "star_e_teff_k": _CANONICAL_WD_STAR["e_Teff"],
+        "star_logg_cgs": "",
+        "star_e_logg_cgs": "",
+        "star_rho_g_cm3": _CANONICAL_WD_STAR["rho"],
+        "star_radius_source": "canonical",
+    }
+
+
+def _star_record_from_catalog_row(
+    row: Any,
+    *,
+    tic: int,
+    source_id: Any,
+    atmosphere: str,
+) -> dict[str, Any] | None:
+    suffix = str(atmosphere)
+    mass = _as_finite_float(row[f"mass_{suffix}"])
+    e_mass = _as_finite_float(row[f"emass_{suffix}"])
+    teff = _as_finite_float(row[f"teff_{suffix}"])
+    e_teff = _as_finite_float(row[f"eteff_{suffix}"])
+    logg = _as_finite_float(row[f"logg_{suffix}"])
+    e_logg = _as_finite_float(row[f"elogg_{suffix}"])
+    radius = _radius_rsun_from_mass_logg(mass, logg)
+    e_radius = _radius_uncertainty_rsun(radius, mass, e_mass, e_logg)
+    if not np.isfinite(e_radius) or e_radius <= 0:
+        e_radius = 0.2 * radius if np.isfinite(radius) and radius > 0 else float("nan")
+    try:
+        clean_source_id = str(int(source_id))
+    except (TypeError, ValueError, OverflowError):
+        clean_source_id = str(_clean(source_id)) if _clean(source_id) != "" else ""
+    record = {
+        "star_source": f"GF21_{suffix}",
+        "star_source_id": clean_source_id,
+        "star_atmosphere": suffix,
+        "star_rad_rsun": radius,
+        "star_e_rad_rsun": e_radius,
+        "star_mass_msun": mass,
+        "star_e_mass_msun": e_mass if np.isfinite(e_mass) else 0.1 * mass,
+        "star_teff_k": teff,
+        "star_e_teff_k": e_teff if np.isfinite(e_teff) else 1000.0,
+        "star_logg_cgs": logg,
+        "star_e_logg_cgs": e_logg if np.isfinite(e_logg) else "",
+        "star_rho_g_cm3": _density_g_cm3(mass, radius),
+        "star_radius_source": "sqrt_GM_over_g",
+    }
+    return record if _valid_wd_star_record(record) else None
+
+
+def load_wd_star_catalog(
+    catalog_path: Path | None,
+    *,
+    tics: set[int],
+    tic_column: str = "tic_id",
+    atmosphere_priority: tuple[str, ...] = ("H", "He", "mixed"),
+) -> dict[int, dict[str, Any]]:
+    """Load TIC-keyed WD host parameters from the local GF21/TWIRL catalog.
+
+    The Gentile-Fusillo catalog stores atmosphere-fit mass and logg, but not a
+    direct radius column. Radius is derived from ``g = GM/R^2`` and the chosen
+    atmosphere solution. Rows without a valid atmosphere solution are left for
+    canonical fallback during annotation.
+    """
+
+    if catalog_path is None:
+        return {}
+    catalog_path = Path(catalog_path)
+    if not catalog_path.exists():
+        raise FileNotFoundError(f"missing WD star catalog: {catalog_path}")
+    wanted = {int(tic) for tic in tics if np.isfinite(float(tic))}
+    if not wanted:
+        return {}
+
+    required = {"source_id", tic_column}
+    for suffix in atmosphere_priority:
+        required.update(
+            {
+                f"teff_{suffix}",
+                f"eteff_{suffix}",
+                f"logg_{suffix}",
+                f"elogg_{suffix}",
+                f"mass_{suffix}",
+                f"emass_{suffix}",
+            }
+        )
+
+    records: dict[int, dict[str, Any]] = {}
+    with fits.open(catalog_path, memmap=True) as hdul:
+        data = hdul[1].data
+        names = set(data.columns.names)
+        missing = sorted(required - names)
+        if missing:
+            raise KeyError(f"WD star catalog missing columns: {missing}")
+        tic_values = np.asarray(data[tic_column], dtype=np.int64)
+        idx = np.flatnonzero(np.isin(tic_values, list(wanted)))
+        for row_idx in idx:
+            tic = int(tic_values[row_idx])
+            if tic in records:
+                continue
+            row = data[row_idx]
+            source_id = row["source_id"]
+            for suffix in atmosphere_priority:
+                record = _star_record_from_catalog_row(
+                    row,
+                    tic=tic,
+                    source_id=source_id,
+                    atmosphere=suffix,
+                )
+                if record is not None:
+                    records[tic] = record
+                    break
+    return records
+
+
+def annotate_star_parameters(
+    queue: pd.DataFrame,
+    *,
+    star_records: dict[int, dict[str, Any]],
+) -> pd.DataFrame:
+    if queue.empty:
+        return queue
+    out = queue.copy()
+    for col in REVIEW_COLUMNS:
+        if col.startswith("star_") and col not in out:
+            out[col] = ""
+    for idx, row in out.iterrows():
+        tic = int(row["tic"])
+        record = star_records.get(tic, _canonical_star_record(tic))
+        for key, value in record.items():
+            out.loc[idx, key] = _clean(value)
+    return out
+
+
+def star_source_counts(queue: pd.DataFrame) -> dict[str, int]:
+    if "star_source" not in queue:
+        return {}
+    return {
+        str(key): int(value)
+        for key, value in queue["star_source"].fillna("").astype(str).value_counts().sort_index().items()
+    }
+
+
+def _wd_star_for(row_or_tic: Any) -> dict[str, Any]:
+    if isinstance(row_or_tic, pd.Series):
+        tic = int(row_or_tic.get("tic", -1))
+        radius = _as_finite_float(row_or_tic.get("star_rad_rsun"))
+        mass = _as_finite_float(row_or_tic.get("star_mass_msun"))
+        teff = _as_finite_float(row_or_tic.get("star_teff_k"))
+        if np.isfinite(radius) and radius > 0 and np.isfinite(mass) and mass > 0 and np.isfinite(teff):
+            star = {
+                "rad": radius,
+                "e_rad": max(_as_finite_float(row_or_tic.get("star_e_rad_rsun"), 0.2 * radius), 1.0e-5),
+                "mass": mass,
+                "e_mass": max(_as_finite_float(row_or_tic.get("star_e_mass_msun"), 0.1 * mass), 1.0e-5),
+                "Teff": teff,
+                "e_Teff": max(_as_finite_float(row_or_tic.get("star_e_teff_k"), 1000.0), 1.0),
+                "rho": _as_finite_float(row_or_tic.get("star_rho_g_cm3"), _density_g_cm3(mass, radius)),
+                "u1": _CANONICAL_WD_STAR["u1"],
+                "u2": _CANONICAL_WD_STAR["u2"],
+                "Rs": radius,
+                "id": tic,
+                "tic": tic,
+                "source_id": _clean(row_or_tic.get("star_source_id", "")),
+                "star_source": _clean(row_or_tic.get("star_source", "")),
+                "logg": _clean(row_or_tic.get("star_logg_cgs", "")),
+                "e_logg": _clean(row_or_tic.get("star_e_logg_cgs", "")),
+            }
+            return star
+    else:
+        tic = int(row_or_tic)
     star = dict(_CANONICAL_WD_STAR)
     star["id"] = int(tic)
     star["tic"] = int(tic)
+    star["star_source"] = "canonical_fallback"
     return star
 
 
@@ -1257,12 +1516,12 @@ def _render_one_leo_report(payload: tuple[int, dict[str, Any], str, str, str, st
                 raise ValueError(f"too few LEO cadences: {len(time)}")
             tic = int(row["tic"])
             tlc = TCELightCurve(tic, time, raw, flux, err, period, t0, duration_d)
-            star = _wd_star_for(tic)
+            star = _wd_star_for(row)
             sink = io.StringIO()
             with warnings.catch_warnings(), contextlib.redirect_stdout(sink):
                 warnings.simplefilter("ignore", RuntimeWarning)
                 tlc.compute_flux_metrics(star, cap_b=False)
-                tlc.metrics["Rs"] = _CANONICAL_WD_STAR["Rs"]
+                tlc.metrics["Rs"] = float(star["Rs"])
                 fa = bool(check_thresholds_wd(tlc.metrics, "FA"))
                 fp = bool(check_thresholds_wd(tlc.metrics, "FP"))
                 label = _leo_label(fa, fp)
@@ -1296,6 +1555,12 @@ def _render_one_leo_report(payload: tuple[int, dict[str, Any], str, str, str, st
                     "leo_class": label,
                     "leo_report_name": report_name,
                     "leo_report_path": str(report_path),
+                    "star_source": star.get("star_source", ""),
+                    "star_source_id": star.get("source_id", ""),
+                    "star_rad_rsun": star.get("rad", ""),
+                    "star_mass_msun": star.get("mass", ""),
+                    "star_teff_k": star.get("Teff", ""),
+                    "star_rho_g_cm3": star.get("rho", ""),
                 }
             )
             queue_updates = {"leo_class": label, "leo_report_name": report_name}
@@ -1414,6 +1679,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--hlsp-root", type=Path, default=DEFAULT_HLSP_ROOT)
     ap.add_argument("--injection-h5", type=Path, default=DEFAULT_INJECTION_H5)
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    ap.add_argument(
+        "--star-catalog",
+        type=Path,
+        default=None,
+        help=(
+            "Optional TWIRL/GF21 WD catalog with TIC matches and atmosphere-fit "
+            "mass/logg/Teff columns. When provided, LEO receives per-target "
+            "WD parameters with canonical fallback."
+        ),
+    )
+    ap.add_argument(
+        "--star-atmosphere-priority",
+        default="H,He,mixed",
+        help="Comma-separated atmosphere-fit priority for --star-catalog.",
+    )
     ap.add_argument("--n-real", type=int, default=100)
     ap.add_argument("--n-injections", type=int, default=900)
     ap.add_argument(
@@ -1495,6 +1775,26 @@ def main(argv: list[str] | None = None) -> int:
     queue = _finalize_queue(real, injected)
     if args.shuffle_review_rows and len(queue) > 1:
         queue = queue.sample(frac=1.0, random_state=args.random_state).reset_index(drop=True)
+
+    star_records: dict[int, dict[str, Any]] = {}
+    atmosphere_priority = tuple(
+        part.strip() for part in str(args.star_atmosphere_priority).split(",") if part.strip()
+    )
+    if args.star_catalog is not None:
+        tics = {int(tic) for tic in queue["tic"].dropna().astype(int).tolist()}
+        star_records = load_wd_star_catalog(
+            args.star_catalog,
+            tics=tics,
+            atmosphere_priority=atmosphere_priority,
+        )
+        queue = annotate_star_parameters(queue, star_records=star_records)
+        print(
+            "[review] star catalog annotations: "
+            f"{sum(1 for row in queue['star_source'].astype(str) if row != 'canonical_fallback'):,} "
+            f"catalog-backed / {len(queue):,} rows",
+            flush=True,
+        )
+
     pre_leo_csv = args.out_dir / "review_queue_pre_leo.csv"
     queue.to_csv(pre_leo_csv, index=False)
 
@@ -1538,6 +1838,9 @@ def main(argv: list[str] | None = None) -> int:
         "n_leo_plot_errors": int(metrics["plot_error"].astype(str).ne("").sum()) if "plot_error" in metrics else 0,
         "leo_timeout_s": int(args.leo_timeout_s),
         "leo_workers": int(args.leo_workers),
+        "star_catalog": str(args.star_catalog) if args.star_catalog is not None else "",
+        "star_atmosphere_priority": list(atmosphere_priority),
+        "star_source_counts": star_source_counts(queue),
         "bls_config": asdict(BLSConfig(apertures=apertures, n_periods=args.n_periods, n_peaks=5)),
         "outputs": {
             "review_queue_csv": str(queue_csv),

@@ -175,6 +175,45 @@ def test_blind_review_metadata_preserves_truth_columns() -> None:
     assert blinded.loc[0, "truth_radius_rearth"] == 9.0
 
 
+def test_catalog_star_annotation_and_leo_star_dict() -> None:
+    module = _load_queue_builder()
+    row = {
+        "source_id": 2146576589564898688,
+        "teff_H": 4738.07,
+        "eteff_H": 54.0,
+        "logg_H": 7.87774,
+        "elogg_H": 0.03,
+        "mass_H": 0.506161,
+        "emass_H": 0.02,
+    }
+    record = module._star_record_from_catalog_row(
+        row,
+        tic=267574918,
+        source_id=row["source_id"],
+        atmosphere="H",
+    )
+    assert record is not None
+    assert record["star_source"] == "GF21_H"
+    assert np.isclose(record["star_rad_rsun"], 0.01356, rtol=5.0e-3)
+
+    queue = pd.DataFrame({"tic": [267574918, 123], "period_d": [1.0, 2.0]})
+    annotated = module.annotate_star_parameters(
+        queue,
+        star_records={267574918: record},
+    )
+
+    assert annotated.loc[0, "star_source"] == "GF21_H"
+    assert annotated.loc[1, "star_source"] == "canonical_fallback"
+    assert module.star_source_counts(annotated) == {"GF21_H": 1, "canonical_fallback": 1}
+
+    star = module._wd_star_for(annotated.loc[0])
+    assert star["source_id"] == str(row["source_id"])
+    assert np.isclose(star["Rs"], annotated.loc[0, "star_rad_rsun"])
+    fallback = module._wd_star_for(annotated.loc[1])
+    assert fallback["star_source"] == "canonical_fallback"
+    assert fallback["Rs"] == module._CANONICAL_WD_STAR["Rs"]
+
+
 def test_injection_transit_counts_fall_back_to_mask_dataset(tmp_path) -> None:
     module = _load_queue_builder()
     path = tmp_path / "injections.h5"

@@ -1,0 +1,88 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_SML"
+  ],
+  "failures": [],
+  "leo_class_counts": {
+    "FA": 923,
+    "FP": 5,
+    "PC": 72
+  },
+  "min_reports": 1000,
+  "n_rows": 1000,
+  "passed": true,
+  "queue": "reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_realparam_pdo/review_queue.csv",
+  "reports_dir": "reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_realparam_pdo/vet_reports",
+  "require_wd1856": false,
+  "run_summary": {
+    "aperture": "DET_FLUX_ADP_SML",
+    "apertures": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_SML"
+    ],
+    "blind_review_metadata": true,
+    "bls_config": {
+      "apertures": [
+        "DET_FLUX_ADP_SML",
+        "DET_FLUX_SML"
+      ],
+      "durations_min": [
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        8.0,
+        10.0,
+        13.0,
+        16.0,
+        20.0,
+        30.0
+      ],
+      "max_period_fraction": 0.45,
+      "min_cadences": 200,
+      "n_peaks": 5,
+      "n_periods": 200000,
+      "orbit_edge_trim_d": 0.0,
+      "p_max_cap_d": 15.0,
+      "p_min_d": 0.12,
+      "period_mask_frac": 0.005,
+      "sigma_clip": 5.0
+    },
+    "created_utc": "2026-06-26T18:09:31.416654+00:00",
+    "hlsp_root": "/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare",
+    "injection_h5": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_1k_predetrend_batman_depthgrid_adp_compare/injected_lightcurves.h5",
+    "leo_timeout_s": 300,
+    "leo_workers": 8,
+    "light_curve_product": "S56 TWIRL-FS v2 compare",
+    "n_injections": 1000,
+    "n_leo_errors": 0,
+    "n_leo_plot_errors": 0,
+    "n_leo_reports_attempted": 1000,
+    "n_real": 0,
+    "n_review_rows": 1000,
+    "outputs": {
+      "leo_metrics": "reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_realparam_pdo/leo_metrics.csv",
+      "pre_leo_csv": "reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_realparam_pdo/review_queue_pre_leo.csv",
+      "review_queue_csv": "reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_realparam_pdo/review_queue.csv",
+      "vet_reports": "reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_realparam_pdo/vet_reports"
+    },
+    "real_candidates": "/pdo/users/tehan/TWIRL/data_local/stage2/bls_first_pass_v2/sector_0056/vetted_per_tic_centroid.parquet",
+    "real_selection": "legacy",
+    "shuffle_review_rows": true,
+    "star_atmosphere_priority": [
+      "H",
+      "He",
+      "mixed"
+    ],
+    "star_catalog": "data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_ticmatched.fits",
+    "star_source_counts": {
+      "GF21_H": 656,
+      "GF21_He": 2,
+      "canonical_fallback": 342
+    }
+  },
+  "source_kind_counts": {
+    "injection_recovery": 1000
+  }
+}

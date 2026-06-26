@@ -1,0 +1,34 @@
+{
+  "canonical_class_counts": {
+    "FA": 923,
+    "FP": 5,
+    "PC": 72
+  },
+  "n_class_changed": 0,
+  "n_rows": 1000,
+  "radius_rsun_by_source_max": {
+    "GF21_H": 0.0521282060744584,
+    "GF21_He": 0.0177952072801841,
+    "canonical_fallback": 0.013
+  },
+  "radius_rsun_by_source_median": {
+    "GF21_H": 0.01287547577661935,
+    "GF21_He": 0.01735854926096845,
+    "canonical_fallback": 0.013
+  },
+  "radius_rsun_by_source_min": {
+    "GF21_H": 0.0032133458331876,
+    "GF21_He": 0.0169218912417528,
+    "canonical_fallback": 0.013
+  },
+  "realparam_class_counts": {
+    "FA": 923,
+    "FP": 5,
+    "PC": 72
+  },
+  "star_source_counts": {
+    "GF21_H": 656,
+    "GF21_He": 2,
+    "canonical_fallback": 342
+  }
+}
