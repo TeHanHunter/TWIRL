@@ -1,6 +1,6 @@
 {
   "bls_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
-  "created_utc": "2026-06-26T13:59:46.072727+00:00",
+  "created_utc": "2026-06-26T14:53:42.282349+00:00",
   "leo_metric_summary": {
     "MES": {
       "BLS missed, LEO FA": {
@@ -221,6 +221,10 @@
     "period_radius_recovery_map_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/period_radius_recovery_fraction_by_duration_tmag.png",
     "radius_snr_proxy_pdf": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.pdf",
     "radius_snr_proxy_png": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/radius_snr_proxy_recovery_by_tmag.png"
+  },
+  "publication_kernel_sigmas_dex": {
+    "period": 0.09691001300805642,
+    "radius": 0.09691001300805642
   },
   "publication_tmag_bin_summary": [
     {

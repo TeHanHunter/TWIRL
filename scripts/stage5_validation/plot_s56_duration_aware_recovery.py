@@ -43,6 +43,7 @@ DEFAULT_OUT_DIR = (
 G_SI = 6.67430e-11
 FLUID_ROCHE_COEFFICIENT = 2.44
 REFERENCE_SECTOR_BASELINE_D = 27.0
+DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX = float(np.log10(1.25))
 
 
 def _json_default(value: Any) -> Any:
@@ -723,7 +724,13 @@ def plot_period_radius_recovery_maps(df: pd.DataFrame, out_dir: Path) -> dict[st
     }
 
 
-def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path) -> dict[str, str]:
+def plot_publication_period_radius_recovery_map(
+    df: pd.DataFrame,
+    out_dir: Path,
+    *,
+    sigma_period_dex: float = DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX,
+    sigma_radius_dex: float = DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX,
+) -> dict[str, str]:
     """Write a compact empirical period-radius map for publication drafts.
 
     The duration-split audit plot is useful for debugging, but it makes the
@@ -749,9 +756,6 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
     radius_edges = np.geomspace(0.18, 18.0, 86)
     period_centers = np.sqrt(period_edges[:-1] * period_edges[1:])
     radius_centers = np.sqrt(radius_edges[:-1] * radius_edges[1:])
-    sigma_period_dex = 0.16
-    sigma_radius_dex = 0.18
-
     cmap = plt.get_cmap("magma").copy()
     cmap.set_bad("#e8ebef")
     fig, axes = plt.subplots(2, 2, figsize=(9.9, 8.1), sharex=True, sharey=True)
@@ -806,7 +810,7 @@ def plot_publication_period_radius_recovery_map(df: pd.DataFrame, out_dir: Path)
             roche_fill_period,
             where=roche_mask,
             color="white",
-            alpha=0.24,
+            alpha=0.36,
             linewidth=0,
             zorder=1,
         )
@@ -1476,6 +1480,7 @@ def write_summary(
     bls_csv: Path,
     leo_queue_csv: Path,
     model: dict[str, Any],
+    publication_kernel_sigmas_dex: dict[str, float],
     leo_summary: dict[str, Any],
     leo_metric_summary: dict[str, Any] | None,
     paths: dict[str, str],
@@ -1557,6 +1562,7 @@ def write_summary(
         },
         "leo_summary": leo_summary,
         "leo_metric_summary": leo_metric_summary,
+        "publication_kernel_sigmas_dex": publication_kernel_sigmas_dex,
         "publication_tmag_bin_summary": tmag_rows,
         "paths": paths,
     }
@@ -1570,6 +1576,18 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--leo-metrics-csv", type=Path, default=DEFAULT_LEO_METRICS_CSV)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--ridge", type=float, default=1.0)
+    parser.add_argument(
+        "--publication-sigma-period-dex",
+        type=float,
+        default=DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX,
+        help="Log-period kernel width for the publication period-radius recovery map.",
+    )
+    parser.add_argument(
+        "--publication-sigma-radius-dex",
+        type=float,
+        default=DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX,
+        help="Log-radius kernel width for the publication period-radius recovery map.",
+    )
     parser.add_argument(
         "--write-3d",
         action="store_true",
@@ -1587,7 +1605,14 @@ def main(argv: list[str] | None = None) -> int:
     paths: dict[str, str] = {}
     paths.update(plot_period_radius_boundary_lines(df, model, args.out_dir))
     paths.update(plot_period_radius_recovery_maps(df, args.out_dir))
-    paths.update(plot_publication_period_radius_recovery_map(df, args.out_dir))
+    paths.update(
+        plot_publication_period_radius_recovery_map(
+            df,
+            args.out_dir,
+            sigma_period_dex=args.publication_sigma_period_dex,
+            sigma_radius_dex=args.publication_sigma_radius_dex,
+        )
+    )
     paths.update(plot_snr_proxy_recovery_map(df, args.out_dir))
     paths.update(plot_boundary_floor_maps(df, model, args.out_dir))
     if args.write_3d:
@@ -1608,6 +1633,10 @@ def main(argv: list[str] | None = None) -> int:
         bls_csv=args.bls_csv,
         leo_queue_csv=args.leo_queue_csv,
         model=model,
+        publication_kernel_sigmas_dex={
+            "period": float(args.publication_sigma_period_dex),
+            "radius": float(args.publication_sigma_radius_dex),
+        },
         leo_summary=leo_summary,
         leo_metric_summary=leo_metric_summary,
         paths=paths,
