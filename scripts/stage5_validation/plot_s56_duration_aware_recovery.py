@@ -810,7 +810,7 @@ def plot_publication_period_radius_recovery_map(
             roche_fill_period,
             where=roche_mask,
             color="black",
-            alpha=0.10,
+            alpha=0.16,
             linewidth=0,
             zorder=1,
         )
