@@ -225,9 +225,9 @@ When choosing what to implement next, prefer this order:
 5. Consolidate the HDF5-to-TWIRL index format and QA reports for the production sectors.
 6. Continue Gaia-first target-support audit and no-TIC bridge characterization.
 7. Build transparent periodic and dip-search baselines before committing to ML-heavy triage.
-8. Use the S56 raw-flux pre-detrend injection path, currently human-facing through an ADP-only `1,000`-row LEO queue, to diagnose the low BLS recovery before scaling to `10k`.
+8. Build and human-label the S56 mixed teacher queue: a blinded `10,000`-row pool with `9,000` stratified real S56 BLS/vetter candidates plus `1,000` pre-detrend BATMAN injection-recovery rows, exposed first as a random `1,000`-row queue (`900` real, `100` injected) with WD-tuned LEO reports.
 9. Run pixel-level source-pickle/ePSF injections only as a calibration subset for extraction, crowding, aperture, and centroid effects; keep dense recovery grids on raw-aperture pre-detrend injections until the calibration delta is known.
-10. Build the S56 semi-supervised self-training vetting loop on top of transparent candidate tables, with human labels, injection labels, pseudo-label provenance, and a human-review queue.
+10. Build the S56 semi-supervised self-training vetting loop on top of transparent candidate tables, with human labels from the mixed teacher queue, injection truth, pseudo-label provenance, and targeted follow-up review queues.
 11. Export compact S56 TWIRL-FS v2 light curves to ORCD/H200-scale storage for LC-level injection-recovery and raw-light-curve training experiments; do not move raw TGLC/TICA trees.
 12. Develop follow-up coordination support after candidate validation criteria are stable.
 

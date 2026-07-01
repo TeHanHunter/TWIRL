@@ -32,6 +32,7 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-06-30`: **ORCD smoke gate passed and the full S56 peak/ranker chain is running CPU-only.** The `100`-injection CPU smoke passed with top-20 signal recall `45/100`; the H200 visibility smoke used exactly `1` H200. The full `20k` injected peak-table build and dependent ranker/apply jobs are now submitted with no GPU/GRES requests, and the ORCD helper refuses routine submissions requesting more than `2` H200s without an explicit override.
 - `2026-06-30`: **Coverage-first all-host S56 injection generation is complete on PDO.** The all-host pre-detrend BATMAN run produced `19,072` injections across `77` TIC-grouped shards and covers `19,071 / 19,072` unique exported S56 TICs; the lone missed host is documented as a nonpositive-baseline skip. The sharded robust-BLS peak-table pass is now running on PDO with bounded CPU concurrency.
 - `2026-07-01`: **Human triage is ready for the all-host ranker-selected real-candidate queue.** The all-host injected peak table and injected-truth ranker selected `57,204` real S56 ephemerides across `19,068` targets; a shuffled `1,000`-target LEO-backed queue now verifies with `1,000` PDFs, `0` LEO metric errors, and `0` LEO plot errors. The PDO app is live on `pdogpu1:5007`; labels write beside the queue for later teacher-model training.
+- `2026-07-01`: **Teacher-queue selection has moved off the peak ranker.** The active human-labeling path is now a blinded `10,000`-row mixed teacher pool: `9,000` stratified real S56 BLS/vetter rows plus `1,000` pre-detrend BATMAN injection-recovery rows, with a random `1,000`-row first-pass queue (`900` real, `100` injected). The builder and PDO/local wrappers are in [script](../scripts/stage5_validation/build_s56_mixed_teacher_queue.py); a local no-LEO dry run verifies row counts, source blinding, hidden truth columns, bucket balance, and finite ephemerides. PDO LEO rendering/sync is the remaining operational step before labeling this queue.
 - `2026-06-17`: **Julien joins the active collaboration/follow-up planning.** Meeting notes are recorded in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership). Immediate implications: compare S56 TWIRL-FS search/vetting results against Julien's SPOC Stage-1 candidate funnel, define what signal classes the current products are sensitive to before first-paper claims, and verify follow-up/funding routes before treating SPECULOOS, MISCOT, LCO 1m, EPRV, or proto-Lightspeed as executable paths.
 - `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
@@ -940,6 +941,24 @@ Local metadata is synced in
 [queue dir](../reports/stage5_validation/s56_10k_predetrend_small_pair_200k_review_queue_pdo/);
 the full PDF directory remains on PDO because it is `4.5 GB`.
 
+Status (`2026-07-01`, mixed teacher queue reset): the ranker-selected real
+queue is now diagnostic only and is excluded from the teacher-label sampling
+loop. The actionable queue is built by
+[builder](../scripts/stage5_validation/build_s56_mixed_teacher_queue.py):
+`9,000` real rows from the S56 TWIRL-FS v2 BLS/vetter table, stratified across
+planet-candidate-like, EB/PCEB-like, broad-duration/variability-like,
+single-aperture, cadence-alias/systematic, and control buckets, plus `1,000`
+pre-detrend BATMAN injection-recovery rows from the balanced period-radius
+grid. The first-pass review queue is a random `1,000` rows with exactly `900`
+real and `100` injected rows; browser-visible `source_bucket` and `vet_class`
+are blinded as `review_candidate`, while `truth_source_kind`,
+`truth_source_bucket`, `truth_vet_class`, injection truth, recovery status,
+`selection_bucket`, and `selection_weight` remain in the CSV for audit and
+training joins. A local no-LEO dry run passed verification. The injected source
+grid currently covers `0.120-13 d`, not the requested `0.08-13 d`; treat the
+shortest-period gap as a targeted second-batch item if the first-pass audit
+needs it.
+
 Pre-human-labeling path:
 
 1. Use the accepted S56 pilot light-curve product:
@@ -960,28 +979,26 @@ Pre-human-labeling path:
    aperture selection, WD-tuned LEO-Vetter metrics/reports, and real-candidate
    provenance from the S56 BLS/vetter table.
 5. Produce the browser-ready review queue only after the above steps are
-   complete. The active pilot queue is the `1,000`-row raw-flux pre-detrend
-   injected sample rendered through the small-aperture pair
-   `DET_FLUX_ADP_SML + DET_FLUX_SML` with dense `200k` BLS recovery and
-   LEO-only reports. The next queue should not scale to `10k` until this
-   small-aperture evidence path passes human visual spot checks; after that,
-   use a blinded mixed sample of real candidates plus injected recovery rows.
-   Human labels attach to these queues, not to raw light curves or the old
-   `300`-row bootstrap sheet.
-6. Gate before labeling a mixed real+injected training queue: WD 1856 must be
-   present once in the real-candidate subset and render as `PC` under the
-   WD-tuned LEO path using its representative aperture. For injection-only
-   signal-visibility queues, the gate is instead full LEO coverage with zero
-   plot fallbacks and verified hidden truth metadata. In all cases, the queue
-   must contain LEO report filenames for the rows attempted; injected rows must
-   expose per-aperture `sde_*` and `recovery_status_*` columns; and the browser
-   vetter must load the queue with LEO reports as the primary evidence panel.
-7. Run [verifier](../scripts/stage5_validation/verify_s56_pretriage_queue.py)
-   on any PDO-built queue before labeling. Only launch the labeling app if the
-   verifier passes. The current active local entrypoint for the 1k small-pair
-   injection pilot is
-   [launcher](../scripts/stage5_validation/run_s56_1k_small_pair_vetting_app_local.sh),
-   which writes labels to `human_labels_vetted.csv` beside the review queue.
+   complete. The active first-pass teacher queue is the mixed
+   `10,000`-row pool with a random `1,000`-row review subset built by
+   [builder](../scripts/stage5_validation/build_s56_mixed_teacher_queue.py)
+   and PDO [runner](../scripts/stage5_validation/run_s56_mixed_teacher_queue_pdo.sh).
+   Human labels attach to this queue, not to raw light curves, the old
+   `300`-row bootstrap sheet, the injection-only pilot, or ranker-selected
+   diagnostic queues.
+6. Gate before labeling the mixed real+injected training queue: the pool must
+   verify as exactly `9,000` real plus `1,000` injected rows; the first-pass
+   queue must verify as exactly `900` real plus `100` injected rows; browser
+   visible source fields must be blinded; hidden truth/provenance columns must
+   remain present; all rows need finite period, epoch, duration, and
+   representative aperture; and every browser-served row must have a referenced
+   WD-tuned LEO report. The current builder writes its own `verification.json`.
+7. Launch the app only after that verifier passes. The active local entrypoint
+   after syncing PDO outputs is
+   [launcher](../scripts/stage5_validation/run_s56_mixed_teacher_vetting_app_local.sh),
+   which writes labels to `human_labels_vetted.csv` beside the queue. After the
+   first `1,000` labels, run the mixed-label audit wrapper to decide whether to
+   continue randomly or draw a targeted second batch from deficit buckets.
 
 Only after those gates pass should the teacher/student self-training run use
 human labels. The interim table model may use engineered BLS, LEO, centroid,
@@ -1221,6 +1238,6 @@ A publishable null result still requires:
 6. Define the consolidated HDF5-to-TWIRL index format and attach QA metrics.
 7. Audit Gaia-first target support and decide what MIT fork changes are needed for targets without TIC IDs.
 8. Build the transparent periodic and dip-search baselines before committing to an ML-heavy workflow.
-9. Build the S56 self-training vetting loop on top of transparent candidate tables: human-label template, injection labels, teacher pseudo-labels, student scores, and review queue.
+9. Build the S56 self-training vetting loop on top of the verified mixed teacher pool: human labels, injection truth, teacher pseudo-labels, student scores, and targeted follow-up review queues.
 10. Stage compact TWIRL-FS exports for ORCD and run S56 equivalence tests before scaling H200 injection-recovery or search jobs.
 11. Lock down follow-up readiness and coordination only after the candidate-validation criteria are stable.
