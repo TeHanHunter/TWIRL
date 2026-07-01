@@ -62,6 +62,10 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Large external inputs belong under `data_local/` or another user-configured local path, not in the git-managed repo root.
 - Do not commit raw FITS catalogs or staged survey data.
 - On ORCD, compact TWIRL exports and downstream results belong under `/orcd/data/mki_aryeh/001/twirl/`; use ORCD scratch only for active job-local temporary data.
+- Never initiate Duo, password, or keyboard-interactive authentication from
+  Codex, scripts, or automated probes. Use only non-interactive SSH checks; if
+  ORCD access is unavailable, stop and ask the user to open the authenticated
+  control socket from their own terminal.
 - If code depends on a local catalog or local TGLC staging area, document the path convention and record provenance in outputs.
 - Prefer concise, stable filenames for accepted master-catalog states, but do not duplicate large integrated FITS products solely to create cleaner names when the existing file already represents the accepted state.
 
@@ -104,6 +108,9 @@ If this file and those docs disagree, treat the docs as authoritative and update
 
 - Stage 1 uses the MIT-adapted TGLC fork on MIT PDO machines.
 - ORCD/H200 is downstream compute for compact exports, injection-recovery, GPU search, feature extraction, and later ML triage; do not move primary Stage 1 TGLC/ePSF production there by default.
+- On ORCD, default GPU jobs to `1` H200 and use at most `2` H200s unless the
+  user explicitly approves a larger request for a specific run. Do not occupy
+  the full H200 node for routine smokes, BLS/ranker jobs, or exploratory tests.
 - Treat the MIT fork as an orbit/camera/CCD production pipeline, not a `quick_lc.py` replacement.
 - Assume:
   - TICA FFIs are pre-staged on disk

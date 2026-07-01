@@ -1,0 +1,103 @@
+{
+  "aperture_counts": {
+    "DET_FLUX": 18499,
+    "DET_FLUX_LAG": 17831,
+    "DET_FLUX_SML": 20874
+  },
+  "created_utc": "2026-07-01T17:18:14.378339+00:00",
+  "duration_bin_counts": {
+    "10-20": 14732,
+    "20-30": 8892,
+    "3-6": 16365,
+    "6-10": 8523,
+    "<3": 8692
+  },
+  "n_review_rows": 0,
+  "n_review_targets": 0,
+  "n_selected_rows": 57204,
+  "n_selected_targets": 19068,
+  "numeric_summary": {
+    "depth": {
+      "max": 2.520394179246172,
+      "median": 0.31638822414814,
+      "min": 0.0004221295193696,
+      "p10": 0.16861068239673663,
+      "p90": 0.5794420160727046
+    },
+    "depth_snr": {
+      "max": 27.302809526600168,
+      "median": 3.214562317173781,
+      "min": 0.0038557873815515,
+      "p10": 2.185578661064038,
+      "p90": 4.359162501501697
+    },
+    "duration_min": {
+      "max": 30.0,
+      "median": 9.0,
+      "min": 3.0,
+      "p10": 3.0,
+      "p90": 21.0
+    },
+    "period_d": {
+      "max": 12.518473422159694,
+      "median": 0.23911561306155338,
+      "min": 0.12,
+      "p10": 0.127316876391384,
+      "p90": 3.0270254568881247
+    },
+    "sde": {
+      "max": 2482.1917892295014,
+      "median": 7.974149327850189,
+      "min": 5.567527241430957,
+      "p10": 6.646848750293656,
+      "p90": 26.607911500531717
+    },
+    "tmag": {
+      "max": 19.9999,
+      "median": 19.523249999999997,
+      "min": 9.9974,
+      "p10": 18.17108,
+      "p90": 19.9242
+    }
+  },
+  "out_dir": "reports/stage5_validation/s56_ranker_selected_real_candidates_orcd/ranker_selection_summary",
+  "period_bin_counts": {
+    "0.12-0.25": 29513,
+    "0.25-0.5": 11158,
+    "0.5-1": 6664,
+    "1-2": 3232,
+    "2-5": 1920,
+    "5-10": 3425,
+    "<0.12": 1,
+    ">10": 1291
+  },
+  "review_queue": "reports/stage5_validation/s56_ranker_selected_real_candidates_orcd/missing_review_queue.csv",
+  "rows_per_target": {
+    "3": 19068
+  },
+  "score_column": "ranker_p_signal_peak",
+  "score_summary": {
+    "_ranker_score": {
+      "max": 0.991248855121296,
+      "median": 0.8624932836812214,
+      "min": 0.2379983634332808,
+      "p10": 0.6808613996309213,
+      "p90": 0.9406681242459481
+    }
+  },
+  "selected_ephemerides": "reports/stage5_validation/s56_ranker_selected_real_candidates_orcd/selected_ephemerides.csv",
+  "selection_rank_counts": {
+    "1": 19068,
+    "2": 19068,
+    "3": 19068
+  },
+  "tmag_bin_counts": {
+    "17-18": 3042,
+    "18-19": 10116,
+    "<17": 1617,
+    ">19": 42429
+  },
+  "verification_failures": [],
+  "verification_json": "reports/stage5_validation/s56_ranker_selected_real_candidates_orcd/selected_ephemerides_verification.json",
+  "verification_passed": true
+}

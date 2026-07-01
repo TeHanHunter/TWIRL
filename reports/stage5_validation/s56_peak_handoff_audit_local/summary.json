@@ -1,0 +1,81 @@
+{
+  "chunk_status": {
+    "chunk_root": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/peak_training/chunks",
+    "expected_chunks": null,
+    "incomplete_chunks_preview": [],
+    "n_chunk_dirs": 0,
+    "n_completed_chunks": 0,
+    "n_incomplete_chunks": 0
+  },
+  "created_utc": "2026-06-27T00:38:11.579158+00:00",
+  "next_step": {
+    "name": "standard_injected_peak_table",
+    "next_action_if_missing": "Wait for the active chunked build to merge and self-verify.",
+    "note": "Merged 20k injected BLS peak table exists and passed strict schema verification.",
+    "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/peak_training/s56_20k_injection_bls_peaks_chunked_verification.json",
+    "ready": false
+  },
+  "ready_for_branch_comparison": false,
+  "ready_for_leo_human_queue": false,
+  "ready_for_skip_leo_human_queue": false,
+  "repo_root": "/Users/tehan/PycharmProjects/TWIRL",
+  "root": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo",
+  "steps": [
+    {
+      "name": "standard_injected_peak_table",
+      "next_action_if_missing": "Wait for the active chunked build to merge and self-verify.",
+      "note": "Merged 20k injected BLS peak table exists and passed strict schema verification.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/peak_training/s56_20k_injection_bls_peaks_chunked_verification.json",
+      "ready": false
+    },
+    {
+      "name": "post_bls_peak_gate",
+      "next_action_if_missing": "Run summarize_injection_peak_gate.py on the verified peak table.",
+      "note": "Recall@K / ranker-fixable / not-in-top-N gate exists.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/peak_training_gate_pdo/summary.json",
+      "ready": false
+    },
+    {
+      "name": "failure_mode_audit",
+      "next_action_if_missing": "Run audit_injection_bls_failure_modes.py before changing BLS branches.",
+      "note": "Failure-mode audit separates ranker-fixable and search-miss injections.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/peak_training_gate_pdo/failure_modes/summary.json",
+      "ready": false
+    },
+    {
+      "name": "injected_truth_peak_ranker",
+      "next_action_if_missing": "Run run_s56_peak_ranker_review_pdo.sh or ORCD ranker Slurm wrapper.",
+      "note": "Injected-truth peak ranker trained after peak-table verification.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/peak_ranker_pdo/summary.json",
+      "ready": false
+    },
+    {
+      "name": "real_bls_peak_table_verified",
+      "next_action_if_missing": "Run verify_real_bls_peak_table.py on the staged real candidate table.",
+      "note": "Real S56 multi-peak BLS table passed verifier before ranker application.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_ranker_selected_real_candidates_pdo/real_peak_table_verification.json",
+      "ready": false
+    },
+    {
+      "name": "ranker_selected_real_ephemerides",
+      "next_action_if_missing": "Run apply_injection_peak_ranker.py on the real S56 BLS table.",
+      "note": "Peak ranker has selected real-candidate ephemerides.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_ranker_selected_real_candidates_pdo/selected_ephemerides.csv",
+      "ready": false
+    },
+    {
+      "name": "skip_leo_review_queue_verified",
+      "next_action_if_missing": "Build and verify a skip-LEO queue before expensive LEO rendering.",
+      "note": "Ranker-selected real queue exists and passed pre-LEO verifier.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_ranker_selected_real_review_queue_pdo/verification.json",
+      "ready": false
+    },
+    {
+      "name": "leo_review_queue_verified",
+      "next_action_if_missing": "Run run_s56_ranker_selected_real_leo_pdo.sh after the skip-LEO queue passes.",
+      "note": "Ranker-selected real queue has LEO reports and passed verifier.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_ranker_selected_real_leo_queue_pdo/verification.json",
+      "ready": false
+    }
+  ]
+}

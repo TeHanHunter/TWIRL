@@ -67,8 +67,11 @@ def _with_row_ids(queue: pd.DataFrame) -> pd.DataFrame:
 
 def _merge_labels(queue_csv: Path, labels_csv: Path) -> pd.DataFrame:
     queue = _with_row_ids(pd.read_csv(queue_csv))
+    for col in ("label", "label_source", "labeler", "notes", "updated_utc"):
+        if col in queue:
+            queue = queue.rename(columns={col: f"queue_{col}"})
     labels = _latest_labels(labels_csv)
-    merged = queue.merge(labels, on="row_id", how="left", suffixes=("", "_human"))
+    merged = queue.merge(labels, on="row_id", how="left", validate="one_to_one")
     for col in ("label", "label_source", "labeler", "notes", "updated_utc"):
         if col not in merged:
             merged[col] = ""
@@ -84,7 +87,9 @@ def _write_crosstab(df: pd.DataFrame, index_col: str, out_path: Path) -> dict[st
     if labeled.empty:
         table = pd.DataFrame()
     else:
-        table = pd.crosstab(labeled[index_col].fillna("").astype(str), labeled["label"].fillna("").astype(str))
+        index_values = labeled[index_col].astype(object).where(labeled[index_col].notna(), "").astype(str)
+        label_values = labeled["label"].astype(object).where(labeled["label"].notna(), "").astype(str)
+        table = pd.crosstab(index_values, label_values)
     table.to_csv(out_path)
     return {
         str(idx): {str(col): int(value) for col, value in row.items()}

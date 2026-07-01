@@ -40,6 +40,16 @@ def _read_table(path: Path):
     raise ValueError(f"unsupported table format: {path}")
 
 
+def _write_table(df, path: Path) -> Path:
+    try:
+        df.to_parquet(path, compression="zstd")
+        return path
+    except (ImportError, ValueError, ModuleNotFoundError):
+        csv_path = path.with_suffix(".csv")
+        df.to_csv(csv_path, index=False)
+        return csv_path
+
+
 def _load_config(path: Path | None):
     from twirl.vetting.self_training import config_from_mapping
 
@@ -333,8 +343,8 @@ def main(argv: list[str] | None = None) -> int:
     result = train_teacher_student(candidates, labels, cfg)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    result.scored.to_parquet(args.out_dir / "scored_candidates.parquet", compression="zstd")
-    result.pseudo_labels.to_parquet(args.out_dir / "pseudo_labels.parquet", compression="zstd")
+    scored_path = _write_table(result.scored, args.out_dir / "scored_candidates.parquet")
+    pseudo_path = _write_table(result.pseudo_labels, args.out_dir / "pseudo_labels.parquet")
     result.review_queue.to_csv(args.out_dir / "human_review_queue.csv", index=False)
     save_model(result.teacher, args.out_dir / "teacher_model.npz")
     save_model(result.student, args.out_dir / "student_model.npz")
@@ -345,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
             "labels": str(args.labels),
             "config": str(args.config),
             "out_dir": str(args.out_dir),
+            "scored_candidates": str(scored_path),
+            "pseudo_labels": str(pseudo_path),
         },
         args.out_dir / "summary.json",
     )
@@ -354,6 +366,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  pseudo labels: {result.summary['n_pseudo']:,}")
     print(f"  scored candidates: {len(result.scored):,}")
     print(f"  review queue: {len(result.review_queue):,}")
+    print(f"  scored path: {scored_path}")
+    print(f"  pseudo path: {pseudo_path}")
     print(f"  out: {args.out_dir}")
     return 0
 

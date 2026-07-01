@@ -1,0 +1,46 @@
+{
+  "apertures": [
+    "DET_FLUX_SML",
+    "DET_FLUX",
+    "DET_FLUX_LAG"
+  ],
+  "candidate_table": "reports/stage5_validation/s56_allhost_ranker_selected_real_leo_queue_pdo/review_queue.csv",
+  "created_utc": "2026-07-01T16:13:44.623194+00:00",
+  "finite_fraction": 0.3652419747081712,
+  "lc_h5": "data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_lc_export_pdo.h5",
+  "missing_apertures": {
+    "DET_FLUX": 0,
+    "DET_FLUX_LAG": 0,
+    "DET_FLUX_SML": 0
+  },
+  "n_input_rows": 128,
+  "n_points": 257,
+  "n_tensor_rows": 128,
+  "observed_fraction": 0.3652419747081712,
+  "out_npz": "reports/stage5_validation/s56_candidate_tensor_smoke_h200_torch/candidate_tensor_smoke.npz",
+  "outputs": {
+    "npz": "reports/stage5_validation/s56_candidate_tensor_smoke_h200_torch/candidate_tensor_smoke.npz",
+    "rows": "reports/stage5_validation/s56_candidate_tensor_smoke_h200_torch/candidate_tensor_smoke_rows.csv",
+    "summary": "reports/stage5_validation/s56_candidate_tensor_smoke_h200_torch/summary.json"
+  },
+  "shape": [
+    128,
+    3,
+    257
+  ],
+  "skipped": {
+    "invalid_ephemeris": 0,
+    "missing_aperture": 0,
+    "missing_lc": 0
+  },
+  "torch": {
+    "available": true,
+    "cuda_available": true,
+    "device": "cuda:0",
+    "device_count": 1,
+    "requested": true,
+    "rms": 0.05620808154344559,
+    "version": "2.11.0+cu128"
+  },
+  "window_durations": 8.0
+}

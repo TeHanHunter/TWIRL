@@ -357,6 +357,13 @@ def _draw_bottom_tick_overlays(ax: Any, *, color: str = "white") -> None:
         )
 
 
+def _counterclockwise_contour_labels(labels: list[Any]) -> None:
+    for text in labels:
+        angle = float(text.get_rotation()) % 180.0
+        text.set_rotation(angle)
+        text.set_rotation_mode("anchor")
+
+
 def _approx_companion_density_g_cm3(radius_rearth: np.ndarray) -> np.ndarray:
     """Reference density envelope used only for plotting a Roche curve.
 
@@ -382,39 +389,6 @@ def _fluid_roche_period_d(radius_rearth: np.ndarray) -> np.ndarray:
     density_kg_m3 = _approx_companion_density_g_cm3(radius_rearth) * 1000.0
     period_s = np.sqrt(3.0 * np.pi * FLUID_ROCHE_COEFFICIENT**3 / (G_SI * density_kg_m3))
     return period_s / 86400.0
-
-
-def _plot_roche_break_boundary(ax: Any, period_d: np.ndarray, radius_rearth: np.ndarray) -> None:
-    xmin, xmax = ax.get_xlim()
-    ymin, ymax = ax.get_ylim()
-    finite = (
-        np.isfinite(period_d)
-        & np.isfinite(radius_rearth)
-        & (period_d > xmin)
-        & (period_d < xmax)
-        & (radius_rearth > ymin)
-        & (radius_rearth < ymax)
-    )
-    if finite.sum() < 8:
-        return
-    radius = np.asarray(radius_rearth[finite], dtype=float)
-    period = np.asarray(period_d[finite], dtype=float)
-    order = np.argsort(radius)
-    radius = radius[order]
-    period = period[order]
-    radius_s = np.geomspace(radius[0], radius[-1], 96)
-    log_period_s = np.interp(np.log10(radius_s), np.log10(radius), np.log10(period))
-    zigzag = np.where(np.arange(radius_s.size) % 2 == 0, -1.0, 1.0)
-    period_s = np.power(10.0, log_period_s + 0.010 * zigzag)
-    ax.plot(
-        period_s,
-        radius_s,
-        color="black",
-        linewidth=0.55,
-        alpha=0.22,
-        zorder=3,
-        solid_capstyle="butt",
-    )
 
 
 def _kernel_recovery_surface_logxy(
@@ -820,7 +794,6 @@ def plot_publication_period_radius_recovery_map(
             linewidth=0,
             zorder=1,
         )
-        _plot_roche_break_boundary(ax, roche_period, roche_radius)
         if finite_masked is not None and finite_masked[0] <= 0.5 <= finite_masked[1]:
             contour = ax.contour(
                 period_centers,
@@ -893,8 +866,7 @@ def plot_publication_period_radius_recovery_map(
                 )
                 for text in labels:
                     text.set_zorder(7)
-                    if level == 300.0 and idx in {0, 2}:
-                        text.set_rotation(text.get_rotation() + 180.0)
+                _counterclockwise_contour_labels(labels)
         for p_idx, period_d in enumerate(period_centers):
             for r_idx, radius_rearth in enumerate(radius_centers):
                 rows.append(
@@ -922,9 +894,9 @@ def plot_publication_period_radius_recovery_map(
     for ax in axes[:, 0]:
         ax.set_ylabel(r"Injected companion radius, $R_p$ [$R_\oplus$]", fontsize=label_fs)
     axes[0, 0].text(
-        0.145,
+        0.17,
         11.8,
-        "Roche limit\nprevented",
+        "Reference\nsub-Roche\nregion",
         color="0.18",
         fontsize=annotation_fs,
         ha="left",
@@ -1517,7 +1489,7 @@ def write_summary(
             "",
             "The fitted 50% boundary uses a physically constrained BLS proxy, `R_p^2 * sqrt(duration / period)`, plus `Tmag`. This gives a monotonic radius cutoff in period-duration space and avoids over-interpreting the correlated period-duration-radius sampling as independent physics.",
             "",
-            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Panel titles report `BLS recovered / injected`. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the low-alpha Roche-prevented overlay marks the left side of the reference fluid-Roche estimate; the black 50% contour is the empirical recovery boundary. White contours are local mean total in-transit time over a reference 27 d TESS sector, computed as `duration * 27 d / period`, so short-period injections naturally have more accumulated transit time.",
+            "The empirical publication map now uses four Tmag panels (`<17`, `17-18`, `18-19`, `>19`) and marginalizes over duration/impact parameter within each slice. Panel titles report `BLS recovered / injected`. Grey cells mean the kernel has too little local injection support; the grey dashed curve is the support boundary; the low-alpha sub-Roche overlay marks the left side of the reference fluid-Roche estimate; the black 50% contour is the empirical recovery boundary. White contours are local mean total in-transit time over a reference 27 d TESS sector, computed as `duration * 27 d / period`, so short-period injections naturally have more accumulated transit time.",
             "",
             "The Roche curve is model-dependent because companion radius does not uniquely define companion density. The plotted reference uses the classical fluid Roche coefficient (`2.44`) and the period-density scaling discussed by Rappaport et al. (2013, 2021), with a low-density planet/gas-giant radius-density envelope anchored to Earth-, Neptune-, and Jupiter-like bulk densities. Dense brown dwarfs near Jupiter radius have much shorter Roche periods than this low-density reference and should be modeled with mass or mean density, not radius alone. Read the curve as physical context, not a hard vetting threshold.",
             "",

@@ -28,6 +28,10 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-06-18`: **S56-S93 cutout prep/recovery is complete and size/count QA passed.** On `pdogpu1`, the refreshed S56-S93 completion map shows `38/38` sectors with cutout prep complete; the full source-pickle metadata sweep checked `1,216` orbit/camera/CCD source directories with `0` size/count issues. `qc_pause.flag` remains in place, so normal GPU finalize is still intentionally paused while TWIRL-FS v2 product QA remains the gate.
 - `2026-06-03`: **Current-stage talk and QA visuals wrapped for the post-talk checkpoint.** The clean local Keynote/PPTX deck is preserved in `outputs/` and the ignored `reports/exploratory/talks/2026-06-02-current-stage/` archive; the tracked repo now keeps only the reusable scripts and compact report artifacts. New presentation-facing QA products are the S56-S93 production-status map and the rebuilt WD 1856 S56 pixel-map diagnostic. The precision-plot work remains exploratory and should not be used as a final product-QA claim until the normalization/plotting choice is re-run and signed off.
 - `2026-06-24`: **ORCD 8xH200 downstream-compute path is usable for TWIRL once compact S56 exports are staged.** The runnable Slurm partition is `pg_mki_aryeh`; the current control-socket probe reaches login host `login007` and sees the H200 node `node4900` with `gpu:h200:8`. PDO remains the Stage 1 TGLC/ePSF production home; the first ORCD pilot should move compact S56 TWIRL-FS v2 light-curve exports, manifests, candidate tables, and recovery outputs to `/orcd/data/mki_aryeh/001/twirl/exports/s56_twirlfs_v2/`, then run CPU/1xH200 smoke tests before larger Stage 3/4 sweeps. Operational details live in [ORCD guide](orcd_h200_usage.md).
+- `2026-06-30`: **ORCD S56 staging and baseline environment are now in place.** The `20k` raw-flux pre-detrend BATMAN injection HDF5 plus manifest/labels are staged under the ORCD checkout's `data_local/` tree, and the reusable `twirl-s56` Python environment exists under `/orcd/data/mki_aryeh/001/twirl/envs/`. Next ORCD gate is a `100`-injection peak-table smoke plus H200 visibility smoke before scaling the full peak-table/ranker sequence.
+- `2026-06-30`: **ORCD smoke gate passed and the full S56 peak/ranker chain is running CPU-only.** The `100`-injection CPU smoke passed with top-20 signal recall `45/100`; the H200 visibility smoke used exactly `1` H200. The full `20k` injected peak-table build and dependent ranker/apply jobs are now submitted with no GPU/GRES requests, and the ORCD helper refuses routine submissions requesting more than `2` H200s without an explicit override.
+- `2026-06-30`: **Coverage-first all-host S56 injection generation is complete on PDO.** The all-host pre-detrend BATMAN run produced `19,072` injections across `77` TIC-grouped shards and covers `19,071 / 19,072` unique exported S56 TICs; the lone missed host is documented as a nonpositive-baseline skip. The sharded robust-BLS peak-table pass is now running on PDO with bounded CPU concurrency.
+- `2026-07-01`: **Human triage is ready for the all-host ranker-selected real-candidate queue.** The all-host injected peak table and injected-truth ranker selected `57,204` real S56 ephemerides across `19,068` targets; a shuffled `1,000`-target LEO-backed queue now verifies with `1,000` PDFs, `0` LEO metric errors, and `0` LEO plot errors. The PDO app is live on `pdogpu1:5007`; labels write beside the queue for later teacher-model training.
 - `2026-06-17`: **Julien joins the active collaboration/follow-up planning.** Meeting notes are recorded in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership). Immediate implications: compare S56 TWIRL-FS search/vetting results against Julien's SPOC Stage-1 candidate funnel, define what signal classes the current products are sensitive to before first-paper claims, and verify follow-up/funding routes before treating SPECULOOS, MISCOT, LCO 1m, EPRV, or proto-Lightspeed as executable paths.
 - `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
@@ -900,6 +904,18 @@ run stays on `pdogpu1` because it is already chunking against data staged on
 PDO. The next scale-up should use the ORCD/H200 path after the compact S56
 export is built and copied to project storage.
 
+Operational update (`2026-06-30`): the staged ORCD `20k` injection product is
+now explicitly treated as a balanced period-radius recovery/ranker grid, not an
+all-host sample (`5,323 / 19,072` unique S56 hosts represented). The companion
+all-host path is the coverage-first PDO launcher
+[script](../scripts/stage5_validation/run_s56_predetrend_all_host_grid_pdo.sh),
+which uses `--target-selection-mode shuffled_cycle` to attempt every discovered
+raw S56 TIC before repeats, then runs the host-coverage audit before staging to
+ORCD. The full all-host injection product is now built; the sharded robust-BLS
+peak table is the active gate, and the all-host handoff wrapper will run the
+post-BLS gate, injected-truth peak ranker, and ranker-selected real review queue
+after the merged peak table verifies.
+
 Status (`2026-06-24` EOD): wrap checkpoint keeps the S56 raw-flux
 pre-detrend injection-recovery path as the active methods branch. The best
 current search input is still `DET_FLUX_ADP_SML + DET_FLUX_SML` with the
@@ -1009,6 +1025,10 @@ inject into raw TGLC `RawFlux`, rerun canonical/ADP TWIRL-FS detrending, and
 feed the resulting injection HDF5 into the existing BLS/LEO review builder.
 This is the default path for the next S56 human-vetting sample until the
 pixel-level calibration subset is scaled beyond the current [smoke wrapper](../scripts/stage3_injections/run_s56_pixel_injection_smoke.py).
+For host-distribution coverage, use the all-host launcher
+[script](../scripts/stage5_validation/run_s56_predetrend_all_host_grid_pdo.sh)
+and require the host-coverage audit before calling the sample representative of
+S56.
 The smoke wrapper can now write TWIRL-FS FITS and BLS summaries, and its first
 full-chain tests show non-recovery caused by broad wrong-period BLS peaks. Fix
 that search/detrending failure before expanding either raw-aperture or

@@ -1,0 +1,23 @@
+{
+  "aperture_counts": {
+    "DET_FLUX": 18499,
+    "DET_FLUX_LAG": 17831,
+    "DET_FLUX_SML": 20874
+  },
+  "created_utc": "2026-07-01T17:18:14.042154+00:00",
+  "failures": [],
+  "id_column": "tic",
+  "max_rows_per_target": 3,
+  "n_rows": 57204,
+  "n_targets": 19068,
+  "passed": true,
+  "rank_counts": {
+    "1": 19068,
+    "2": 19068,
+    "3": 19068
+  },
+  "score_column": "ranker_p_signal_peak",
+  "score_prefix": "ranker",
+  "selected_ephemerides": "reports/stage5_validation/s56_ranker_selected_real_candidates_orcd/selected_ephemerides.csv",
+  "top_n": 3
+}

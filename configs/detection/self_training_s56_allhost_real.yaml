@@ -1,0 +1,38 @@
+# Candidate-level semi-supervised triage for the S56 all-host real-candidate
+# LEO queue. Labels should come from
+# run_s56_allhost_real_label_audit_pdo.sh, specifically
+# human_training_table/teacher_labeled_rows.csv.
+
+label_column: teacher_target
+source_column: human_label_source
+unlabeled_values:
+  - ""
+  - unknown
+  - unlabeled
+  - needs_review
+
+pseudo_min_confidence: 0.98
+pseudo_min_margin: 0.50
+pseudo_weight: 0.25
+max_pseudo_per_class: 5000
+review_queue_size: 250
+
+feature:
+  id_columns:
+    - review_id
+  categorical_columns:
+    - source_kind
+    - source_bucket
+    - vet_class
+    - rep_aperture
+    - recovery_status
+    - leo_class
+  max_categorical_levels: 16
+  clip_sigma: 8.0
+  feature_columns:
+
+trainer:
+  max_iter: 500
+  l2: 0.001
+  tol: 0.0000001
+  class_weight_balanced: true

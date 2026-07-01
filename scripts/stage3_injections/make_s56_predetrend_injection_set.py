@@ -353,6 +353,24 @@ def _draw_target_tic(
     return int(rng.choice(tics))
 
 
+def _build_target_attempt_sequence(
+    rng: np.random.Generator,
+    target_tics: np.ndarray,
+    *,
+    n_attempts: int,
+) -> np.ndarray:
+    """Return coverage-first target attempts, shuffled once per cycle."""
+    target_tics = np.asarray(target_tics, dtype=np.int64)
+    if target_tics.size == 0:
+        raise ValueError("target_tics must not be empty")
+    n_attempts = int(n_attempts)
+    if n_attempts <= 0:
+        return np.asarray([], dtype=np.int64)
+    cycles = int(np.ceil(n_attempts / target_tics.size))
+    pieces = [rng.permutation(target_tics) for _ in range(cycles)]
+    return np.concatenate(pieces)[:n_attempts].astype(np.int64, copy=False)
+
+
 def _discover_target_paths(
     orbit_roots: tuple[Path, ...],
     *,
@@ -660,6 +678,8 @@ def make_predetrend_injections(
     grid_depth_bins: int,
     grid_depth_spacing: str,
     random_state: int,
+    injection_index_offset: int,
+    injection_id_prefix: str,
     min_in_transit: int,
     max_attempts_per_injection: int,
     adaptive_bkspace: float,
@@ -669,6 +689,7 @@ def make_predetrend_injections(
     target_tmag_bin_edges: tuple[float, ...] | None,
     target_tmag_bin_weights: tuple[float, ...] | None,
     target_tmag_by_tic: dict[int, float] | None,
+    target_selection_mode: str,
     target_h5_paths: tuple[Path, ...] | None,
     tic_filter: set[int] | None,
     limit_targets: int | None,
@@ -688,6 +709,10 @@ def make_predetrend_injections(
         raise ValueError("at least one signal family is required")
     if baseline_source not in BASELINE_SOURCES:
         raise ValueError(f"unknown baseline source: {baseline_source!r}")
+    if target_selection_mode not in {"random", "shuffled_cycle"}:
+        raise ValueError(f"unknown target selection mode: {target_selection_mode!r}")
+    injection_index_offset = int(injection_index_offset)
+    injection_id_prefix = str(injection_id_prefix).strip() or "predet"
 
     target_paths = _discover_target_paths(
         tuple(Path(p) for p in orbit_roots),
@@ -733,6 +758,8 @@ def make_predetrend_injections(
             ),
             flush=True,
         )
+    if target_selection_mode == "shuffled_cycle" and target_tmag_sampler is not None:
+        raise ValueError("--target-selection-mode shuffled_cycle cannot be combined with target Tmag sampling")
     rows: list[dict[str, Any]] = []
     skipped = {
         "read_failed": 0,
@@ -745,6 +772,11 @@ def make_predetrend_injections(
     }
     total_attempts = 0
     max_total_attempts = max(int(n_injections) * int(max_attempts_per_injection), int(n_injections))
+    target_attempt_sequence = (
+        _build_target_attempt_sequence(rng, target_tics, n_attempts=max_total_attempts)
+        if target_selection_mode == "shuffled_cycle"
+        else None
+    )
     created_utc = datetime.now(timezone.utc).isoformat()
 
     with h5py.File(tmp_h5, "w") as out:
@@ -756,6 +788,8 @@ def make_predetrend_injections(
         out.attrs["aperture"] = apertures[0]
         out.attrs["apertures"] = json.dumps(list(apertures))
         out.attrs["random_state"] = int(random_state)
+        out.attrs["injection_index_offset"] = int(injection_index_offset)
+        out.attrs["injection_id_prefix"] = str(injection_id_prefix)
         out.attrs["time_unit"] = f"BJD - {BJDREFI}"
         out.attrs["families"] = json.dumps(list(families))
         out.attrs["sampling_mode"] = sampling_mode
@@ -770,6 +804,7 @@ def make_predetrend_injections(
         out.attrs["adaptive_gap_split"] = float(adaptive_gap_split)
         out.attrs["baseline_source"] = str(baseline_source)
         out.attrs["cadence_s"] = float(cadence_s)
+        out.attrs["target_selection_mode"] = str(target_selection_mode)
         out.attrs["target_tmag_bin_edges"] = json.dumps(list(target_tmag_bin_edges or ()))
         out.attrs["target_tmag_bin_weights"] = json.dumps(list(target_tmag_bin_weights or ()))
         if target_tmag_sampler is not None:
@@ -784,8 +819,12 @@ def make_predetrend_injections(
         inj_group = out.create_group("injections")
 
         while len(rows) < n_injections and total_attempts < max_total_attempts:
+            tic = (
+                int(target_attempt_sequence[total_attempts])
+                if target_attempt_sequence is not None
+                else _draw_target_tic(rng, target_tics, target_tmag_sampler)
+            )
             total_attempts += 1
-            tic = _draw_target_tic(rng, target_tics, target_tmag_sampler)
             try:
                 lcs = [read_tglc_h5(path) for path in target_paths[tic]]
                 merged = _TWIRLFS.merge_orbits(lcs)
@@ -799,8 +838,9 @@ def make_predetrend_injections(
                 skipped["missing_raw_aperture"] += 1
                 continue
 
+            global_injection_index = injection_index_offset + len(rows)
             params = _draw_params(
-                len(rows),
+                global_injection_index,
                 rng=rng,
                 sampling_mode=sampling_mode,
                 families=families,
@@ -926,9 +966,10 @@ def make_predetrend_injections(
                 skipped["detrend_failed"] += 1
                 continue
 
-            injection_id = f"predet_{len(rows):06d}"
+            injection_id = f"{injection_id_prefix}_{global_injection_index:06d}"
             group = inj_group.create_group(injection_id)
             group.attrs["injection_id"] = injection_id
+            group.attrs["injection_index"] = int(global_injection_index)
             group.attrs["injection_level"] = "raw_flux_pre_detrend"
             group.attrs["tic"] = int(merged.tic)
             group.attrs["sector"] = int(merged.sector)
@@ -1038,6 +1079,7 @@ def make_predetrend_injections(
     os.replace(tmp_h5, out_h5)
     _write_csv(manifest_csv, rows, MANIFEST_COLUMNS)
     _write_csv(labels_csv, rows, ("injection_id", "tic", "label", "label_source", "split", "signal_family"))
+    unique_injected_tics = {int(row["tic"]) for row in rows}
     summary = {
         "created_utc": created_utc,
         "injection_level": "raw_flux_pre_detrend",
@@ -1061,6 +1103,12 @@ def make_predetrend_injections(
         "adaptive_gap_split": float(adaptive_gap_split),
         "baseline_source": str(baseline_source),
         "cadence_s": float(cadence_s),
+        "target_selection_mode": str(target_selection_mode),
+        "n_unique_injected_tics": int(len(unique_injected_tics)),
+        "unique_injected_fraction_of_source_targets": (
+            float(len(unique_injected_tics) / len(target_paths)) if target_paths else None
+        ),
+        "all_source_targets_injected": bool(len(unique_injected_tics) >= len(target_paths)),
         "target_tmag_bin_edges": list(target_tmag_bin_edges or ()),
         "target_tmag_bin_weights": list(target_tmag_bin_weights or ()),
         "target_tmag_sampler": (
@@ -1073,6 +1121,8 @@ def make_predetrend_injections(
             else None
         ),
         "random_state": int(random_state),
+        "injection_index_offset": int(injection_index_offset),
+        "injection_id_prefix": str(injection_id_prefix),
         "min_in_transit": int(min_in_transit),
         "total_attempts": int(total_attempts),
         "skipped": skipped,
@@ -1111,6 +1161,17 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--grid-depth-bins", type=int, default=_POSTDET.DEFAULT_GRID_DEPTH_BINS)
     ap.add_argument("--grid-depth-spacing", choices=("linear", "log"), default="linear")
     ap.add_argument("--random-state", type=int, default=5605)
+    ap.add_argument(
+        "--injection-index-offset",
+        type=int,
+        default=0,
+        help="Global injection index offset used to preserve grid balance across sharded runs.",
+    )
+    ap.add_argument(
+        "--injection-id-prefix",
+        default="predet",
+        help="Prefix for generated injection_id values.",
+    )
     ap.add_argument("--min-in-transit", type=int, default=2)
     ap.add_argument("--max-attempts-per-injection", type=int, default=50)
     ap.add_argument("--adaptive-bkspace", type=float, default=0.3)
@@ -1135,6 +1196,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "Optional comma-separated Tmag bin edges for target sampling, e.g. "
             "'0,17,18,19,99'. When provided, targets are drawn by Tmag bin "
             "instead of uniformly over all available S56 targets."
+        ),
+    )
+    ap.add_argument(
+        "--target-selection-mode",
+        choices=("random", "shuffled_cycle"),
+        default="random",
+        help=(
+            "random draws hosts independently for each injection. shuffled_cycle "
+            "tries every discovered TIC once in shuffled order before any repeats; "
+            "use it for all-S56-host injection runs."
         ),
     )
     ap.add_argument(
@@ -1209,6 +1280,8 @@ def main(argv: list[str] | None = None) -> int:
         grid_depth_bins=args.grid_depth_bins,
         grid_depth_spacing=args.grid_depth_spacing,
         random_state=args.random_state,
+        injection_index_offset=args.injection_index_offset,
+        injection_id_prefix=args.injection_id_prefix,
         min_in_transit=args.min_in_transit,
         max_attempts_per_injection=args.max_attempts_per_injection,
         adaptive_bkspace=args.adaptive_bkspace,
@@ -1218,6 +1291,7 @@ def main(argv: list[str] | None = None) -> int:
         target_tmag_bin_edges=args.target_tmag_bin_edges,
         target_tmag_bin_weights=args.target_tmag_bin_weights,
         target_tmag_by_tic=target_tmag_by_tic,
+        target_selection_mode=args.target_selection_mode,
         target_h5_paths=target_h5_paths if target_h5_paths else None,
         tic_filter=tic_filter,
         limit_targets=args.limit_targets,

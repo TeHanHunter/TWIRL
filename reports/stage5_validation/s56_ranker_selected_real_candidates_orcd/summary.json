@@ -1,0 +1,15 @@
+{
+  "id_column": "tic",
+  "model": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/peak_ranker_orcd/peak_ranker_model.npz",
+  "n_input_rows": 1144023,
+  "n_scored_rows": 1144020,
+  "n_selected_rows": 57204,
+  "n_selected_targets": 19068,
+  "out_dir": "reports/stage5_validation/s56_ranker_selected_real_candidates_orcd",
+  "peak_table": "data_local/stage2/bls_first_pass_v2/sector_0056/candidates.csv",
+  "score_columns": [
+    "ranker_p_background_peak",
+    "ranker_p_signal_peak"
+  ],
+  "top_n": 3
+}

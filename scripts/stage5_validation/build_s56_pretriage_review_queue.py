@@ -771,6 +771,52 @@ def _attach_real_review_columns(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _attach_ranker_real_review_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize ranker-selected BLS peaks into browser review rows."""
+
+    out = df.copy()
+    out["tic"] = out["tic"].astype(int)
+    if "ranker_selection_rank" not in out:
+        out["ranker_selection_rank"] = 1
+    out["ranker_selection_rank"] = pd.to_numeric(
+        out["ranker_selection_rank"],
+        errors="coerce",
+    ).fillna(1).astype(int)
+    if "sde_max" not in out and "sde" in out:
+        out["sde_max"] = out["sde"]
+    if "rep_aperture" not in out and "aperture" in out:
+        out["rep_aperture"] = out["aperture"]
+    if "vet_class" not in out:
+        out["vet_class"] = "ranker_selected"
+    out["source_bucket"] = "real_ranker_selected"
+    if "class_rank" not in out:
+        out["class_rank"] = out["ranker_selection_rank"]
+    if "blind_rank" not in out:
+        out["blind_rank"] = np.arange(1, len(out) + 1)
+    if "n_apertures_agree" not in out:
+        out["n_apertures_agree"] = 1
+    if "apertures_agree" not in out:
+        out["apertures_agree"] = out.get("rep_aperture", "")
+    for col, value in (
+        ("centroid_status", "not_run"),
+        ("centroid_pass", ""),
+        ("centroid_delta_pix", ""),
+        ("centroid_z", ""),
+        ("n_in_transit", ""),
+        ("n_oot_band", ""),
+    ):
+        if col not in out:
+            out[col] = value
+    out = _attach_real_review_columns(out)
+    out["review_id"] = out.apply(
+        lambda row: f"real:{int(row['tic'])}:ranker:{int(row['ranker_selection_rank'])}",
+        axis=1,
+    )
+    out["recovery_status"] = "real_ranker_selected"
+    out["truth_source_bucket"] = out["source_bucket"]
+    return out
+
+
 def select_real_candidates(path: Path, n_real: int, random_state: int) -> pd.DataFrame:
     if n_real <= 0:
         return pd.DataFrame()
@@ -895,6 +941,44 @@ def select_real_candidates_stratified(path: Path, n_real: int, random_state: int
     order = rng.permutation(len(out))
     out = out.iloc[order].reset_index(drop=True)
     return _attach_real_review_columns(out)
+
+
+def select_ranker_real_candidates(path: Path, n_real: int, random_state: int) -> pd.DataFrame:
+    """Select ranker-chosen real ephemerides for LEO/human review."""
+
+    if n_real <= 0:
+        return pd.DataFrame()
+    df = _read_table(path).copy()
+    if df.empty:
+        return _attach_ranker_real_review_columns(df)
+    if "tic" not in df:
+        raise KeyError("ranker-selected real candidate table must include tic")
+    for required in ("period_d", "t0_bjd", "duration_min"):
+        if required not in df:
+            raise KeyError(f"ranker-selected real candidate table must include {required}")
+    score_cols = [col for col in df.columns if col.startswith("ranker_p_")]
+    if "ranker_p_signal_peak" in df.columns:
+        df["_ranker_sort_score"] = pd.to_numeric(df["ranker_p_signal_peak"], errors="coerce")
+    elif score_cols:
+        df["_ranker_sort_score"] = pd.to_numeric(df[score_cols[0]], errors="coerce")
+    elif "sde" in df:
+        df["_ranker_sort_score"] = pd.to_numeric(df["sde"], errors="coerce")
+    else:
+        df["_ranker_sort_score"] = np.nan
+    if "ranker_selection_rank" in df:
+        df["_ranker_selection_rank_sort"] = pd.to_numeric(df["ranker_selection_rank"], errors="coerce")
+    else:
+        df["_ranker_selection_rank_sort"] = 1
+    df = df.sort_values(
+        ["_ranker_selection_rank_sort", "_ranker_sort_score"],
+        ascending=[True, False],
+        kind="stable",
+    )
+    out = df.head(n_real).copy()
+    out = out.drop(columns=[c for c in ("_ranker_sort_score", "_ranker_selection_rank_sort") if c in out])
+    if len(out) > 1:
+        out = out.sample(frac=1.0, random_state=random_state).reset_index(drop=True)
+    return _attach_ranker_real_review_columns(out)
 
 
 _RHO_WD_G_CM3 = 3.85e5
@@ -1277,6 +1361,33 @@ def _model_grid_is_safe(period: float, duration: float, *, max_points: int = 50_
     return np.isfinite(points) and 10 <= points <= max_points
 
 
+def _leo_plot_window_has_finite_data(
+    time: np.ndarray,
+    flux: np.ndarray,
+    period: float,
+    epoch: float,
+    duration: float,
+) -> bool:
+    """Mirror LEO's individual-transit plot window preflight.
+
+    LEO's ``plot_summary`` prefers fitted transit/trapezoid ephemerides over
+    the BLS ephemeris when their AIC values are finite. At 200 s cadence a
+    fitted duration can become narrower than the sampled cadence grid, causing
+    the individual-transit panel to call ``nanmax`` on an empty in-window
+    array. Treat those fitted models as unsafe for plotting only.
+    """
+
+    if not all(np.isfinite([period, epoch, duration])) or period <= 0 or duration <= 0:
+        return False
+    time = np.asarray(time, dtype=np.float64)
+    flux = np.asarray(flux, dtype=np.float64)
+    phase = np.mod(time - epoch, period) / period
+    phase[phase > 0.5] -= 1.0
+    near_tran = np.abs(phase) < duration / period
+    finite = np.isfinite(phase) & np.isfinite(flux)
+    return bool(np.any(finite & near_tran) and np.any(finite & ~near_tran))
+
+
 def _leo_plot_copy(tlc: Any) -> tuple[Any, str]:
     """Return a LEO object copy whose metrics are safe for plot_summary only."""
     import copy
@@ -1371,12 +1482,26 @@ def _leo_plot_copy(tlc: Any) -> tuple[Any, str]:
 
     transit_safe = (
         _model_grid_is_safe(metrics["transit_per"], metrics["transit_dur"])
+        and _leo_plot_window_has_finite_data(
+            np.asarray(plot_tlc.time, dtype=np.float64),
+            np.asarray(plot_tlc.flux, dtype=np.float64),
+            metrics["transit_per"],
+            metrics["transit_epo"],
+            metrics["transit_dur"],
+        )
         and metrics["transit_RpRs"] > 0
         and metrics["transit_aRs"] > metrics["transit_b"]
         and metrics["transit_RpRs"] < 20
     )
     trap_safe = (
         _model_grid_is_safe(metrics["trap_per"], metrics["trap_dur"])
+        and _leo_plot_window_has_finite_data(
+            np.asarray(plot_tlc.time, dtype=np.float64),
+            np.asarray(plot_tlc.flux, dtype=np.float64),
+            metrics["trap_per"],
+            metrics["trap_epo"],
+            metrics["trap_dur"],
+        )
         and 0 < metrics["trap_qtran"] < 0.5
         and 0 <= metrics["trap_dep"] <= 1.0
     )
@@ -1698,9 +1823,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--n-injections", type=int, default=900)
     ap.add_argument(
         "--real-selection",
-        choices=("legacy", "stratified_blind"),
+        choices=("legacy", "stratified_blind", "ranker_selected"),
         default="legacy",
-        help="Real-candidate selection recipe. Use stratified_blind for the 10k mixed review set.",
+        help=(
+            "Real-candidate selection recipe. Use stratified_blind for the 10k mixed review set, "
+            "or ranker_selected for ephemerides selected by the injected-truth peak ranker."
+        ),
     )
     ap.add_argument(
         "--blind-review-metadata",
@@ -1748,7 +1876,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[review] missing real candidates: {args.real_candidates}", file=sys.stderr)
         return 2
 
-    if args.real_selection == "stratified_blind":
+    if args.real_selection == "ranker_selected":
+        real = select_ranker_real_candidates(args.real_candidates, args.n_real, args.random_state)
+    elif args.real_selection == "stratified_blind":
         real = select_real_candidates_stratified(args.real_candidates, args.n_real, args.random_state)
     else:
         real = select_real_candidates(args.real_candidates, args.n_real, args.random_state)

@@ -42,15 +42,18 @@ _WORKER_CFG: BLSConfig | None = None
 _WORKER_PERIODOGRAM_TICS: set[int] = set()
 _WORKER_SECTOR_OUT: Path | None = None
 _WORKER_RUN_ID: str = ""
+_WORKER_RUN_CONFIG: dict[str, Any] = {}
 
 
 def _init_worker(cfg: BLSConfig, periodogram_tics: set[int],
-                 sector_out: Path | None, run_id: str) -> None:
-    global _WORKER_CFG, _WORKER_PERIODOGRAM_TICS, _WORKER_SECTOR_OUT, _WORKER_RUN_ID
+                 sector_out: Path | None, run_id: str,
+                 run_config: dict[str, Any] | None = None) -> None:
+    global _WORKER_CFG, _WORKER_PERIODOGRAM_TICS, _WORKER_SECTOR_OUT, _WORKER_RUN_ID, _WORKER_RUN_CONFIG
     _WORKER_CFG = cfg
     _WORKER_PERIODOGRAM_TICS = set(periodogram_tics)
     _WORKER_SECTOR_OUT = sector_out
     _WORKER_RUN_ID = run_id
+    _WORKER_RUN_CONFIG = dict(run_config or {})
 
 
 def _emit_vet_sheets(sector_out: Path, tics: set[int],
@@ -228,7 +231,7 @@ def _process_one(path: Path) -> list[dict[str, Any]]:
             dropout_frac=0.0, n_orbits=0, baseline_d=0.0,
             status="read_fail", hlsp_path=str(path), peaks=[],
         )
-        return result_to_rows(res, _WORKER_RUN_ID)
+        return result_to_rows(res, _WORKER_RUN_ID, run_config=_WORKER_RUN_CONFIG)
 
     rows: list[dict[str, Any]] = []
     save_pg = lc.tic in _WORKER_PERIODOGRAM_TICS and _WORKER_SECTOR_OUT is not None
@@ -246,7 +249,7 @@ def _process_one(path: Path) -> list[dict[str, Any]]:
                 res = out
         else:
             res = out
-        rows.extend(result_to_rows(res, _WORKER_RUN_ID))
+        rows.extend(result_to_rows(res, _WORKER_RUN_ID, run_config=_WORKER_RUN_CONFIG))
     return rows
 
 
@@ -276,6 +279,7 @@ def run_sector(
     out_suffix: str = "",
     include_tics: set[int] | None = None,
     target_paths: list[Path] | None = None,
+    search_branch: str = "standard",
 ) -> Path:
     """Execute BLS over every HLSP target in `hlsp_root` for `sector`.
 
@@ -301,7 +305,9 @@ def run_sector(
     if pg_tics:
         (sector_out / "targets").mkdir(parents=True, exist_ok=True)
 
-    run_id = f"{_git_short_sha()}-{uuid.uuid4().hex[:8]}"
+    search_branch = str(search_branch or "standard")
+    run_id = f"{search_branch}:{_git_short_sha()}-{uuid.uuid4().hex[:8]}"
+    run_config = {"search_branch": search_branch, **asdict(cfg)}
     t_start = time.time()
     rows: list[dict[str, Any]] = []
     n_attempted = len(paths)
@@ -312,7 +318,7 @@ def run_sector(
           f" workers={workers} run_id={run_id}", flush=True)
 
     if workers <= 1:
-        _init_worker(cfg, pg_tics, sector_out if pg_tics else None, run_id)
+        _init_worker(cfg, pg_tics, sector_out if pg_tics else None, run_id, run_config)
         for i, p in enumerate(paths):
             try:
                 target_rows = _process_one(p)
@@ -330,7 +336,7 @@ def run_sector(
         with mp.Pool(
             processes=workers,
             initializer=_init_worker,
-            initargs=(cfg, pg_tics, sector_out if pg_tics else None, run_id),
+            initargs=(cfg, pg_tics, sector_out if pg_tics else None, run_id, run_config),
         ) as pool:
             for i, target_rows in enumerate(
                 pool.imap_unordered(_process_one, paths, chunksize=8)
@@ -382,6 +388,7 @@ def run_sector(
         "workers": int(workers),
         "wall_time_s": float(wall_time),
         "run_id": run_id,
+        "search_branch": search_branch,
         "git_sha": _git_short_sha(),
         "host": socket.gethostname(),
         "platform": platform.platform(),
@@ -423,6 +430,24 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                          "apertures (see WD 1856 S59 recovery: SML works, medium fails).")
     ap.add_argument("--n-periods", type=int, default=200_000)
     ap.add_argument("--n-peaks", type=int, default=20)
+    ap.add_argument(
+        "--search-branch",
+        type=str,
+        default="standard",
+        help="Human-readable BLS branch label recorded in candidate rows and meta.json.",
+    )
+    ap.add_argument(
+        "--period-bin-edges",
+        type=str,
+        default="",
+        help="Optional comma-separated period bin edges for peak-quota branches.",
+    )
+    ap.add_argument(
+        "--max-peaks-per-period-bin",
+        type=int,
+        default=0,
+        help="Optional maximum peaks from each period bin; 0 disables the quota.",
+    )
     ap.add_argument("--orbit-edge-trim-d", type=float, default=0.0,
                     help="Drop cadences within this many days of each orbit's "
                          "first/last cadence (default 0 = no trim).")
@@ -433,6 +458,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                     help="Comma-separated TIC IDs whose full periodograms to save. "
                          "WD 1856 (267574918) is added automatically.")
     return ap
+
+
+def _parse_float_tuple(raw: str) -> tuple[float, ...]:
+    return tuple(float(part.strip()) for part in str(raw).split(",") if part.strip())
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -447,6 +476,8 @@ def main(argv: list[str] | None = None) -> int:
         apertures=apertures,
         n_periods=int(args.n_periods),
         n_peaks=int(args.n_peaks),
+        period_bin_edges=_parse_float_tuple(args.period_bin_edges),
+        max_peaks_per_period_bin=int(args.max_peaks_per_period_bin),
         orbit_edge_trim_d=float(args.orbit_edge_trim_d),
     )
     hlsp_root = resolve_hlsp_root(args.sector, args.hlsp_root)
@@ -484,6 +515,7 @@ def main(argv: list[str] | None = None) -> int:
         out_suffix=args.out_suffix,
         include_tics=include_tics,
         target_paths=target_paths,
+        search_branch=args.search_branch,
     )
     return 0
 

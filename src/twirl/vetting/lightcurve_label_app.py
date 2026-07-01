@@ -17,6 +17,7 @@ import pandas as pd
 
 from twirl.io.hlsp import APERTURES, BJDREFI, read_hlsp
 from twirl.search.injections import box_transit_mask
+from twirl.vetting.label_schema import LABEL_BUTTONS, LABEL_KEY_ALIASES, LABEL_OPTIONS
 
 
 REVIEW_APERTURES: tuple[str, ...] = (
@@ -25,35 +26,6 @@ REVIEW_APERTURES: tuple[str, ...] = (
     "DET_FLUX_ADP_SML",
     "DET_FLUX_ADP_LAG",
 )
-
-LABEL_OPTIONS: tuple[str, ...] = (
-    "planet_like",
-    "eclipsing_binary_or_pceb",
-    "stellar_variability",
-    "instrumental_or_systematic",
-    "centroid_contaminant",
-    "uncertain",
-    "skip",
-)
-
-LABEL_BUTTONS: tuple[tuple[str, str, str], ...] = (
-    ("1", "planet_like", "Planet"),
-    ("2", "eclipsing_binary_or_pceb", "EB/PCEB"),
-    ("3", "stellar_variability", "Variable"),
-    ("4", "instrumental_or_systematic", "Systematic"),
-    ("5", "uncertain", "Uncertain"),
-    ("0", "skip", "Skip"),
-)
-
-LABEL_KEY_ALIASES: dict[str, str] = {
-    "p": "planet_like",
-    "e": "eclipsing_binary_or_pceb",
-    "v": "stellar_variability",
-    "i": "instrumental_or_systematic",
-    "u": "uncertain",
-    "s": "skip",
-    "x": "skip",
-}
 
 DEFAULT_DISPLAY_COLUMNS: tuple[str, ...] = (
     "tic",

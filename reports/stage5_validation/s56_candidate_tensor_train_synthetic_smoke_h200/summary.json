@@ -1,0 +1,45 @@
+{
+  "class_counts": {
+    "synthetic_bright": 64,
+    "synthetic_faint": 64
+  },
+  "classes": [
+    "synthetic_bright",
+    "synthetic_faint"
+  ],
+  "created_utc": "2026-07-01T16:22:43.060366+00:00",
+  "device": "cuda:0",
+  "final_metrics": {
+    "epoch": 8.0,
+    "test_accuracy": 0.5,
+    "test_n": 26.0,
+    "train_accuracy": 0.5,
+    "train_loss": 0.6935754292889645,
+    "train_n": 76.0,
+    "validation_accuracy": 0.5,
+    "validation_n": 26.0
+  },
+  "label_mode": "synthetic_label_smoke",
+  "labels": "reports/stage5_validation/s56_allhost_ranker_selected_real_leo_queue_pdo/human_training_table/teacher_labeled_rows.csv",
+  "n_tensor_rows": 128,
+  "n_training_rows": 128,
+  "out_dir": "reports/stage5_validation/s56_candidate_tensor_train_synthetic_smoke_h200",
+  "outputs": {
+    "history": "reports/stage5_validation/s56_candidate_tensor_train_synthetic_smoke_h200/training_history.csv",
+    "model": "reports/stage5_validation/s56_candidate_tensor_train_synthetic_smoke_h200/tensor_classifier_smoke.pt",
+    "predictions": "reports/stage5_validation/s56_candidate_tensor_train_synthetic_smoke_h200/predictions.csv",
+    "summary": "reports/stage5_validation/s56_candidate_tensor_train_synthetic_smoke_h200/summary.json"
+  },
+  "split_counts": {
+    "test": 26,
+    "train": 76,
+    "validation": 26
+  },
+  "synthetic_label_smoke": true,
+  "tensor_npz": "reports/stage5_validation/s56_candidate_tensor_smoke_h200_torch/candidate_tensor_smoke.npz",
+  "tensor_rows": "reports/stage5_validation/s56_candidate_tensor_smoke_h200_torch/candidate_tensor_smoke_rows.csv",
+  "torch_cuda_available": true,
+  "torch_cuda_built": "12.8",
+  "torch_device_count": 1,
+  "torch_version": "2.11.0+cu128"
+}

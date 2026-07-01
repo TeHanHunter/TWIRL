@@ -1,0 +1,57 @@
+{
+  "aperture_counts": {
+    "DET_FLUX": 381341,
+    "DET_FLUX_LAG": 381360,
+    "DET_FLUX_SML": 381322
+  },
+  "bls_provenance_columns": [],
+  "bls_provenance_numeric_summaries": {},
+  "bls_search_branch_counts": {},
+  "created_utc": "2026-07-01T17:18:09.642171+00:00",
+  "failures": [],
+  "max_rows_per_tic": 60,
+  "n_apertures": 3,
+  "n_positive_peak_ranks": 20,
+  "n_rankable_rows": 1144020,
+  "n_rows": 1144023,
+  "n_tics_with_min_peak_rows": 19068,
+  "n_tics_with_multiple_rows": 19068,
+  "n_unique_tic": 19068,
+  "passed": true,
+  "peak_rank_counts": {
+    "0": 3,
+    "1": 57201,
+    "10": 57201,
+    "11": 57201,
+    "12": 57201,
+    "13": 57201,
+    "14": 57201,
+    "15": 57201,
+    "16": 57201,
+    "17": 57201,
+    "18": 57201,
+    "19": 57201,
+    "2": 57201,
+    "20": 57201,
+    "3": 57201,
+    "4": 57201,
+    "5": 57201,
+    "6": 57201,
+    "7": 57201,
+    "8": 57201,
+    "9": 57201
+  },
+  "peak_table": "data_local/stage2/bls_first_pass_v2/sector_0056/candidates.csv",
+  "require_bls_provenance": false,
+  "rows_per_tic_summary": {
+    "max": 60.0,
+    "median": 60.0,
+    "min": 22.0,
+    "p10": 60.0,
+    "p90": 60.0
+  },
+  "status_counts": {
+    "ok": 1144020,
+    "too_few_cadences": 3
+  }
+}

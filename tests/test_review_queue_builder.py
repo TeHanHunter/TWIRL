@@ -87,6 +87,15 @@ def _load_priority_sweep_preflight():
     return module
 
 
+def _load_peak_training_builder():
+    path = REPO_ROOT / "scripts" / "stage5_validation" / "build_injection_peak_training_table.py"
+    spec = importlib.util.spec_from_file_location("build_injection_peak_training_table", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_detrending_method_sweep():
     path = REPO_ROOT / "scripts" / "stage5_validation" / "sweep_predetrend_detrending_methods.py"
     spec = importlib.util.spec_from_file_location("sweep_predetrend_detrending_methods", path)
@@ -139,6 +148,104 @@ def test_stratified_real_selector_tolerates_missing_aperture_agreement(tmp_path)
     assert selected["tic"].nunique() == 15
     assert set(selected["source_kind"]) == {"real_candidate"}
     assert selected["truth_source_bucket"].astype(str).str.startswith("real_").all()
+
+
+def test_select_ranker_real_candidates_keeps_peak_ephemerides(tmp_path) -> None:
+    module = _load_queue_builder()
+    path = tmp_path / "ranker_selected.csv"
+    pd.DataFrame(
+        [
+            {
+                "tic": 101,
+                "sector": 56,
+                "cam": 1,
+                "ccd": 2,
+                "tmag": 16.1,
+                "ranker_selection_rank": 1,
+                "aperture": "DET_FLUX_ADP",
+                "peak_rank": 3,
+                "period_d": 0.75,
+                "t0_bjd": 2459825.1,
+                "duration_min": 8.0,
+                "depth": 0.04,
+                "depth_snr": 9.0,
+                "sde": 12.0,
+                "ranker_p_background_peak": 0.09,
+                "ranker_p_signal_peak": 0.91,
+            },
+            {
+                "tic": 101,
+                "sector": 56,
+                "cam": 1,
+                "ccd": 2,
+                "tmag": 16.1,
+                "ranker_selection_rank": 2,
+                "aperture": "DET_FLUX",
+                "peak_rank": 1,
+                "period_d": 1.50,
+                "t0_bjd": 2459825.3,
+                "duration_min": 10.0,
+                "depth": 0.03,
+                "depth_snr": 8.0,
+                "sde": 11.0,
+                "ranker_p_background_peak": 0.35,
+                "ranker_p_signal_peak": 0.65,
+            },
+            {
+                "tic": 202,
+                "sector": 56,
+                "cam": 2,
+                "ccd": 1,
+                "tmag": 18.2,
+                "ranker_selection_rank": 1,
+                "aperture": "DET_FLUX_ADP",
+                "peak_rank": 2,
+                "period_d": 0.25,
+                "t0_bjd": 2459826.0,
+                "duration_min": 6.0,
+                "depth": 0.09,
+                "depth_snr": 7.0,
+                "sde": 10.0,
+                "ranker_p_background_peak": 0.18,
+                "ranker_p_signal_peak": 0.82,
+            },
+            {
+                "tic": 303,
+                "sector": 56,
+                "cam": 3,
+                "ccd": 1,
+                "tmag": 19.2,
+                "ranker_selection_rank": 1,
+                "aperture": "DET_FLUX_SML",
+                "peak_rank": 2,
+                "period_d": 0.35,
+                "t0_bjd": 2459826.2,
+                "duration_min": 7.0,
+                "depth": 0.08,
+                "depth_snr": 6.0,
+                "sde": 9.0,
+                "ranker_p_background_peak": 0.99,
+                "ranker_p_signal_peak": 0.70,
+            },
+        ]
+    ).to_csv(path, index=False)
+
+    top_rank1 = module.select_ranker_real_candidates(path, n_real=2, random_state=56)
+
+    assert set(top_rank1["tic"]) == {101, 202}
+    assert 303 not in set(top_rank1["tic"])
+
+    selected = module.select_ranker_real_candidates(path, n_real=4, random_state=56)
+
+    assert len(selected) == 4
+    assert set(selected["source_kind"]) == {"real_candidate"}
+    assert set(selected["recovery_status"]) == {"real_ranker_selected"}
+    assert selected["review_id"].nunique() == 4
+    assert selected["tic"].nunique() == 3
+    assert selected["review_id"].str.contains(":ranker:").all()
+    assert set(selected["rep_aperture"]) == {"DET_FLUX_ADP", "DET_FLUX", "DET_FLUX_SML"}
+    assert set(selected["sde_max"]) == {9.0, 10.0, 11.0, 12.0}
+    assert selected["truth_source_bucket"].eq("real_ranker_selected").all()
 
 
 def test_blind_review_metadata_preserves_truth_columns() -> None:
@@ -264,6 +371,67 @@ def test_topn_truth_match_summary_separates_exact_and_harmonic_peaks() -> None:
     assert summary["topn_harmonic_match"] is True
     assert summary["topn_harmonic_peak_rank"] == 1
     assert np.isclose(summary["topn_harmonic_factor"], 5.0)
+
+
+def test_peak_training_truth_labels_exact_harmonic_and_mismatch() -> None:
+    module = _load_peak_training_builder()
+
+    exact = module.label_peak_against_injection(
+        period_d=1.0005,
+        t0_bjd=2459825.001,
+        truth_period_d=1.0,
+        truth_t0_bjd=2459825.0,
+        truth_duration_min=6.0,
+    )
+    assert exact["match_kind"] == "exact"
+    assert exact["exact_ephemeris_match"] is True
+    assert exact["is_injected_signal_peak"] is True
+
+    harmonic = module.label_peak_against_injection(
+        period_d=2.001,
+        t0_bjd=2459825.0,
+        truth_period_d=1.0,
+        truth_t0_bjd=2459825.0,
+        truth_duration_min=6.0,
+    )
+    assert harmonic["match_kind"] == "harmonic"
+    assert harmonic["harmonic_ephemeris_match"] is True
+    assert np.isclose(harmonic["nearest_harmonic_factor"], 2.0)
+
+    mismatch = module.label_peak_against_injection(
+        period_d=1.25,
+        t0_bjd=2459825.0,
+        truth_period_d=1.0,
+        truth_t0_bjd=2459825.0,
+        truth_duration_min=6.0,
+    )
+    assert mismatch["match_kind"] == "mismatch"
+    assert mismatch["is_injected_signal_peak"] is False
+
+
+def test_peak_training_summary_reports_recall_at_k() -> None:
+    module = _load_peak_training_builder()
+    df = pd.DataFrame(
+        {
+            "injection_id": ["a", "a", "b", "b", "c"],
+            "is_candidate_peak": [True, True, True, True, False],
+            "peak_rank": [1, 2, 1, 2, 0],
+            "is_injected_signal_peak": [False, True, False, False, False],
+            "exact_ephemeris_match": [False, True, False, False, False],
+            "harmonic_ephemeris_match": [False, False, False, False, False],
+            "match_kind": ["mismatch", "exact", "mismatch", "mismatch", "no_peak"],
+            "search_branch": ["standard", "short_pmax2", "standard", "standard", "short_pmax2"],
+        }
+    )
+
+    summary = module.summarize_peak_table(df)
+
+    assert summary["n_injections"] == 3
+    assert summary["n_any_match_injections"] == 1
+    assert summary["recall_at_1"]["n"] == 0
+    assert summary["recall_at_2"]["n"] == 1
+    assert summary["match_kind_counts"]["exact"] == 1
+    assert summary["search_branch_counts"] == {"short_pmax2": 2, "standard": 3}
 
 
 def test_recovery_sweep_parser_accepts_duration_overrides() -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import sys
 from pathlib import Path
 
@@ -46,6 +47,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=5000)
+    ap.add_argument(
+        "--tunnel-host",
+        default=os.environ.get("TWIRL_TUNNEL_HOST", "pdogpu6"),
+        help="Remote host name to print in the SSH tunnel example.",
+    )
     ap.add_argument("--aperture", default="DET_FLUX")
     ap.add_argument("--labeler", default=getpass.getuser())
     ap.add_argument("--shuffle-order", action="store_true",
@@ -92,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print("[vet-app] local tunnel example:")
-    print(f"  ssh -L {args.port}:localhost:{args.port} pdogpu6")
+    print(f"  ssh -L {args.port}:localhost:{args.port} {args.tunnel_host}")
     print(f"  open http://localhost:{args.port}/")
     app.serve(host=args.host, port=args.port)
     return 0

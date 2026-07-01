@@ -52,6 +52,19 @@ Do not edit `review_queue.csv`; it contains hidden injection truth and recovery 
 
 ## After A Labeling Pass
 
+Run the post-labeling audit loop:
+
+```bash
+cd /Users/tehan/PycharmProjects/TWIRL
+bash scripts/stage5_validation/run_s56_human_label_audit_local.sh
+```
+
+This writes the label summary, model-ready training table, next-label priority
+list, and training-readiness audit without editing `review_queue.csv` or
+`human_labels_vetted.csv`.
+
+For debugging, the individual steps are:
+
 Summarize the labels and join them back to hidden truth metadata:
 
 ```bash
@@ -62,3 +75,45 @@ PYTHONPATH=src .venv/bin/python scripts/stage5_validation/summarize_human_vettin
 ```
 
 The next scientific gate is the label comparison against injected truth, BLS recovery mode, empirical SNR, period, radius, depth, and Tmag bins.
+
+Build the model-ready human-label table without editing the label CSV:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/stage5_validation/build_human_vetting_training_table.py \
+  --queue-csv reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/review_queue.csv \
+  --labels-csv reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/human_labels_vetted.csv \
+  --out-dir reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/human_training_table
+```
+
+This writes a full joined table, a strong-label teacher subset, an audit subset
+that keeps `uncertain`, and deterministic train/validation/test split markers.
+
+Select a high-value next batch of unlabeled rows:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/stage5_validation/select_next_human_labels.py \
+  --training-table reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/human_training_table/human_vetting_training_table.csv \
+  --out-dir reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/human_label_priority_next \
+  --n-rows 200 \
+  --target-per-cell 25
+```
+
+This writes `next_label_priority.csv` and `next_label_row_ids.txt`. The priority
+table is a planning artifact; keep using the browser app for the actual labels.
+
+Audit whether the current labels are ready for a model:
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/stage5_validation/audit_human_training_readiness.py \
+  --training-table reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/human_training_table/human_vetting_training_table.csv \
+  --priority-table reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/human_label_priority_next/next_label_priority.csv \
+  --out-dir reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/human_training_readiness
+```
+
+The audit intentionally separates injected-signal visibility from object-class
+training. The current `101`-label quick pass is enough for
+`ready_for_injection_visibility_smoke_only`, but it is not a teacher-model
+training set because the queue is injection-only and lacks real false-positive
+classes. Use the next priority rows to finish the 1k injected visibility check,
+then build a mixed real-plus-injected queue after the peak-ranker selects better
+real-candidate ephemerides.

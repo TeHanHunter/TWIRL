@@ -178,3 +178,31 @@ def test_target_tmag_sampler_zeroes_empty_bins() -> None:
     assert sampler is not None
     assert sampler["n_targets_by_bin"] == (1, 0, 0, 1)
     assert np.allclose(sampler["probabilities"], [0.5, 0.0, 0.0, 0.5])
+
+
+def test_target_attempt_sequence_covers_all_targets_before_repeats() -> None:
+    module = _load_predetrend_script()
+    rng = np.random.default_rng(42)
+    sequence = module._build_target_attempt_sequence(
+        rng,
+        np.array([10, 20, 30, 40], dtype=np.int64),
+        n_attempts=10,
+    )
+
+    assert len(sequence) == 10
+    assert set(sequence[:4]) == {10, 20, 30, 40}
+    assert set(sequence[4:8]) == {10, 20, 30, 40}
+    assert set(sequence[8:]).issubset({10, 20, 30, 40})
+
+
+def test_target_attempt_sequence_handles_short_request() -> None:
+    module = _load_predetrend_script()
+    rng = np.random.default_rng(42)
+    sequence = module._build_target_attempt_sequence(
+        rng,
+        np.array([10, 20, 30, 40], dtype=np.int64),
+        n_attempts=3,
+    )
+
+    assert len(sequence) == 3
+    assert len(set(sequence.tolist())) == 3

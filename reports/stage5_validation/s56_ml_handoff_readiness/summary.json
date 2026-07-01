@@ -1,0 +1,82 @@
+{
+  "checks": [
+    {
+      "evidence": "passed=True; n_rows=1000; leo_class_counts={'FA': 994, 'FP': 4, 'PC': 2}",
+      "name": "pdo_leo_queue_verified",
+      "next_action": "Keep the PDO app running if this passes; otherwise rebuild or verify the LEO queue.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_allhost_ranker_selected_real_leo_queue_pdo/verification.json",
+      "ready": true,
+      "status": "pass"
+    },
+    {
+      "evidence": "artifact is missing or empty",
+      "name": "human_labels_present",
+      "next_action": "Use the vetting app; the PDO label-audit monitor or run_s56_allhost_real_label_audit_pdo.sh will rebuild readiness after labels appear.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_allhost_ranker_selected_real_leo_queue_pdo/human_labels_vetted.csv",
+      "ready": false,
+      "status": "pending"
+    },
+    {
+      "evidence": "post-label readiness audit has not been run",
+      "name": "human_training_readiness",
+      "next_action": "After labels exist, run run_s56_allhost_real_label_audit_pdo.sh on PDO and sync the outputs.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_allhost_ranker_selected_real_leo_queue_pdo/human_training_readiness/summary.json",
+      "ready": false,
+      "status": "pending"
+    },
+    {
+      "evidence": "passed=True; rows=57204",
+      "name": "orcd_selected_ephemerides_synced",
+      "next_action": "Wait for the ORCD apply dependency chain and sync selected ephemerides back locally/PDO.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_ranker_selected_real_candidates_orcd/selected_ephemerides_verification.json",
+      "ready": true,
+      "status": "pass"
+    },
+    {
+      "evidence": "torch build info present",
+      "name": "orcd_torch_env_documented",
+      "next_action": "Use the documented twirl-s56-torch env for H200 training smokes.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/orcd_envs/twirl-s56-torch-build-info.txt",
+      "ready": true,
+      "status": "pass"
+    },
+    {
+      "evidence": "n_tensor_rows=128; shape=[128, 3, 257]; cuda_available=True; device=cuda:0",
+      "name": "h200_tensor_smoke",
+      "next_action": "Fix tensor extraction or H200 CUDA visibility before training.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_candidate_tensor_smoke_h200_torch/summary.json",
+      "ready": true,
+      "status": "pass"
+    },
+    {
+      "evidence": "synthetic_label_smoke=True; cuda=True; device=cuda:0; split_counts={'test': 26, 'train': 76, 'validation': 26}",
+      "name": "h200_synthetic_train_smoke",
+      "next_action": "Fix the trainer/env plumbing before using real labels.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_candidate_tensor_train_synthetic_smoke_h200/summary.json",
+      "ready": true,
+      "status": "pass"
+    },
+    {
+      "evidence": "real-label training smoke has not been run",
+      "name": "h200_real_label_train_smoke_complete",
+      "next_action": "Run scripts/orcd/run_s56_orcd_pilot.sh --run h200-tensor-train-smoke after labels pass readiness.",
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_candidate_tensor_train_smoke_h200/summary.json",
+      "ready": false,
+      "status": "pending"
+    }
+  ],
+  "created_utc": "2026-07-01T17:55:43.240517+00:00",
+  "flags": {
+    "orcd_selected_outputs_ready_for_pdo_leo": true,
+    "ready_for_human_triage": true,
+    "ready_for_post_label_audit": false,
+    "ready_to_submit_real_h200_training_smoke": false,
+    "real_h200_training_smoke_complete": false
+  },
+  "next_step": {
+    "action": "Use the vetting app; the PDO label-audit monitor or run_s56_allhost_real_label_audit_pdo.sh will rebuild readiness after labels appear.",
+    "name": "human_labels_present"
+  },
+  "orcd_selected_dir": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_ranker_selected_real_candidates_orcd",
+  "queue_dir": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_allhost_ranker_selected_real_leo_queue_pdo"
+}
