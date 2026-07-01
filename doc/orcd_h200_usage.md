@@ -446,10 +446,15 @@ Acceptance checks:
 
 Current helper scripts:
 
-- `scripts/orcd/stage_s56_orcd_inputs.sh` stages the local checkout plus compact
-  PDO S56 products under `/orcd/data/mki_aryeh/001/twirl/code/TWIRL/`. Checkout
-  sync preserves excluded `data_local/`, `reports/`, and `logs/` trees so
-  restartable ORCD artifacts are not removed by subset staging.
+- `scripts/orcd/stage_s56_orcd_inputs.sh` stages compact PDO S56 products into
+  `/orcd/data/mki_aryeh/001/twirl/code/TWIRL/`. The ORCD code tree is now a
+  sparse Git checkout tracking `origin/main`; staging updates code through Git
+  by default and preserves local `data_local/`, `reports/`, and `logs/`
+  artifacts.
+- `scripts/orcd/bootstrap_orcd_git_checkout.sh` initializes or refreshes the
+  ORCD checkout as a sparse Git worktree over HTTPS, because ORCD currently has
+  no GitHub SSH deploy key. It uses non-interactive SSH to ORCD and
+  non-prompting Git fetches.
 - `scripts/orcd/build_orcd_env.sh` builds/updates the reusable ORCD Python
   environment under `/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56`.
 - `scripts/orcd/check_s56_orcd_pipeline_status.sh` is a read-only local helper

@@ -13,8 +13,12 @@ usage() {
   cat <<'EOF'
 Usage: stage_s56_orcd_inputs.sh [--run] [--subset all|balanced|allhost]
 
-Stages the local checkout plus compact PDO artifacts to ORCD. Default mode is
-dry-run. Use --run only after the ORCD control socket is open.
+Bootstraps/refetches the ORCD Git checkout, then stages compact PDO artifacts
+to ORCD. Default mode is dry-run. Use --run only after the ORCD control socket
+is open.
+
+By default code is updated through Git, not rsync. Set
+TWIRL_STAGE_RSYNC_CODE=1 only for an explicit dirty-checkout deployment smoke.
 
 Subsets:
   all       Stage the full compact S56 downstream bundle.
@@ -53,6 +57,7 @@ PDO_REPO="${PDO_REPO:-/pdo/users/tehan/TWIRL}"
 ORCD_HOST="${ORCD_HOST:-tehan@orcd-login.mit.edu}"
 ORCD_REPO="${ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 ORCD_CONTROL_PATH="${ORCD_CONTROL_PATH:-$HOME/.ssh/cm/%r@%h:%p}"
+TWIRL_STAGE_RSYNC_CODE="${TWIRL_STAGE_RSYNC_CODE:-0}"
 
 ORCD_SSH=(
   ssh
@@ -132,7 +137,12 @@ if [[ "${DRY_RUN}" == "1" ]]; then
   echo "[stage-orcd] dry run. Re-run with --run after the ORCD control socket is open."
 fi
 
-run_or_echo "${ORCD_SSH[@]}" "${ORCD_HOST}" "mkdir -p '${ORCD_REPO}'"
+echo "[stage-orcd] ensuring ORCD code checkout is Git-tracked"
+if [[ "${DRY_RUN}" == "1" ]]; then
+  run_or_echo "${LOCAL_REPO}/scripts/orcd/bootstrap_orcd_git_checkout.sh" --run
+else
+  "${LOCAL_REPO}/scripts/orcd/bootstrap_orcd_git_checkout.sh" --run
+fi
 
 RSYNC_ARGS=(
   -az
@@ -151,8 +161,12 @@ if [[ "${DRY_RUN}" == "1" ]]; then
   RSYNC_ARGS=(-n "${RSYNC_ARGS[@]}")
 fi
 
-echo "[stage-orcd] syncing code checkout"
-run_or_echo rsync "${RSYNC_ARGS[@]}" -e "${ORCD_SSH_CMD}" "${LOCAL_REPO}/" "${ORCD_HOST}:${ORCD_REPO}/"
+if [[ "${TWIRL_STAGE_RSYNC_CODE}" == "1" ]]; then
+  echo "[stage-orcd] syncing current local code into the Git checkout"
+  run_or_echo rsync "${RSYNC_ARGS[@]}" -e "${ORCD_SSH_CMD}" "${LOCAL_REPO}/" "${ORCD_HOST}:${ORCD_REPO}/"
+else
+  echo "[stage-orcd] code sync skipped; ORCD code is managed by Git"
+fi
 
 echo "[stage-orcd] checking compact PDO artifact list"
 if [[ "${DRY_RUN}" == "1" ]]; then
