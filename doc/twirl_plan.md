@@ -33,6 +33,9 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-06-30`: **Coverage-first all-host S56 injection generation is complete on PDO.** The all-host pre-detrend BATMAN run produced `19,072` injections across `77` TIC-grouped shards and covers `19,071 / 19,072` unique exported S56 TICs; the lone missed host is documented as a nonpositive-baseline skip. The sharded robust-BLS peak-table pass is now running on PDO with bounded CPU concurrency.
 - `2026-07-01`: **Human triage is ready for the all-host ranker-selected real-candidate queue.** The all-host injected peak table and injected-truth ranker selected `57,204` real S56 ephemerides across `19,068` targets; a shuffled `1,000`-target LEO-backed queue now verifies with `1,000` PDFs, `0` LEO metric errors, and `0` LEO plot errors. The PDO app is live on `pdogpu1:5007`; labels write beside the queue for later teacher-model training.
 - `2026-07-01`: **Teacher-queue selection has moved off the peak ranker.** The active human-labeling path is now a blinded `10,000`-row mixed teacher pool: `9,000` stratified real S56 BLS/vetter rows plus `1,000` pre-detrend BATMAN injection-recovery rows, with a random `1,000`-row first-pass queue (`900` real, `100` injected). The builder and PDO/local wrappers are in [script](../scripts/stage5_validation/build_s56_mixed_teacher_queue.py); a local no-LEO dry run verifies row counts, source blinding, hidden truth columns, bucket balance, and finite ephemerides. PDO LEO rendering/sync is the remaining operational step before labeling this queue.
+- `2026-07-02`: **Downstream testing/vetting shifts to ORCD by default.** PDO remains the Stage 1/TGLC/HLSP production and compact-export staging home, while raw-flux detrending-strength audits, two-aperture BLS/vetting-sheet production, injection-recovery branch tests, and later ML training should run from compact S56 exports on ORCD CPU/H200 resources as appropriate. The first ORCD ADP+ audit is now treated only as a post-ADP vetting/display diagnostic: it shows residual trends matter, but it is not an independent production search product because it starts from already detrended ADP curves. The production search branch must be chosen from raw-flux re-detrending variants, i.e. the same family of comparison as canonical `DET_FLUX` versus `DET_FLUX_ADP`.
+- `2026-07-02`: **Raw-flux detrending-strength audit favors small-aperture search.** ORCD CPU job `17020767` compared `7` fresh raw-flux spline settings across `DET_FLUX_ADP_SML`-style small aperture and default/primary aperture on `3,000` BATMAN injections. The best branch is small aperture with `bkspace_d=0.15 d`, `gap_split_d=0.2 d`, quantile knots (`1534/3000 = 51.1%` strict top-1; `1713/3000 = 57.1%` top-N exact/harmonic), only slightly ahead of current small-aperture ADP (`1515/3000 = 50.5%`) and well ahead of default/primary aperture (`1233/3000 = 41.1%`). Next vetting sheets should therefore search on small aperture, show primary aperture as a comparison, and keep the `0.15 d` setting as a candidate production update pending real-data vetter QA.
+- `2026-07-04`: **The `0.15 d` candidate branch is now a concrete S56 first-pass vetting product.** The named branch is `twirl-fs-v2-adp015q`, compare FITS columns are `DET_FLUX_ADP015*`, and the two-aperture vetter runs BLS directly on `DET_FLUX_ADP015_SML + DET_FLUX_ADP015` without an additional ADP+ high-pass. Full S56 ADP015 FITS production completed on PDO (`19,072 / 19,072`, zero failures), the compact export verifies `19,072` target groups, and ORCD rendered the random `1,000`-row mixed-teacher queue with `1,000/1,000` reports verified. Next gate is human triage plus the first-label audit; `twirl-fs-v2` remains canonical until real-data QA and WD 1856 checks pass for the candidate branch.
 - `2026-06-17`: **Julien joins the active collaboration/follow-up planning.** Meeting notes are recorded in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership). Immediate implications: compare S56 TWIRL-FS search/vetting results against Julien's SPOC Stage-1 candidate funnel, define what signal classes the current products are sensitive to before first-paper claims, and verify follow-up/funding routes before treating SPECULOOS, MISCOT, LCO 1m, EPRV, or proto-Lightspeed as executable paths.
 - `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
@@ -959,14 +962,29 @@ grid currently covers `0.120-13 d`, not the requested `0.08-13 d`; treat the
 shortest-period gap as a targeted second-batch item if the first-pass audit
 needs it.
 
+Status (`2026-07-06`, recovery-boundary first-pass queue): the immediate human
+labeling set is now the recovery-boundary two-aperture queue built by
+[builder](../scripts/stage5_validation/build_s56_recovery50_teacher_queue.py),
+not the random `900` real / `100` injected dry run. It contains `700`
+stratified real candidates plus `300` injected positives selected from
+empirical recovery-map cells with broad/top-N recovery fraction `0.35-0.65`,
+while each injected row remains a strict top-1 BLS recovery in both available
+small apertures. ORCD CPU rendering produced `1,000/1,000` local TWIRL
+two-aperture sheets. Caveat: the existing `20k` injection HDF5 has
+`DET_FLUX_ADP_SML + DET_FLUX_SML`, while the real compact export has
+`DET_FLUX_ADP_SML + DET_FLUX_ADP`; the next full injection generation should
+include the final real-data aperture pair once it is locked.
+
 Pre-human-labeling path:
 
-1. Use the accepted S56 pilot light-curve product:
-   `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare`.
-   The canonical product remains TWIRL-FS v2 `DET_FLUX`; model/training
-   inputs must preserve all three aperture channels (`DET_FLUX_SML`,
-   `DET_FLUX`, `DET_FLUX_LAG`) because aperture behavior is evidence, not a
-   nuisance column.
+1. Use the accepted S56 pilot light-curve product as the baseline, with the
+   current adaptive compare columns as the active first-pass vetting/search
+   product. The browser sheets for real rows currently use
+   `DET_FLUX_ADP_SML + DET_FLUX_ADP`; existing injected recovery-map rows use
+   `DET_FLUX_ADP_SML + DET_FLUX_SML` until the next injection HDF5 is rebuilt
+   with the final real-data aperture pair. Model and training inputs must
+   preserve multiple aperture channels because aperture behavior is evidence,
+   not a nuisance column.
 2. Build a compact full-S56 HDF5 export on PDO from the HLSP FITS tree. This is
    the transfer/training boundary; do not move raw TGLC cutouts or FFI products
    for this step.
@@ -975,24 +993,27 @@ Pre-human-labeling path:
    target. Store injection truth, split, source target, aperture baselines, and
    original/injected arrays.
 4. Run the transparent search/vetting stack before human labels: BLS recovery
-   across all three apertures, per-aperture recovery status, representative
-   aperture selection, WD-tuned LEO-Vetter metrics/reports, and real-candidate
-   provenance from the S56 BLS/vetter table.
+   across the active apertures, per-aperture recovery status, representative
+   aperture selection, TWIRL-native two-aperture vet sheets, and
+   real-candidate provenance from the S56 BLS/vetter table. Keep LEO as an
+   offline comparison rather than the required browser artifact for this
+   first-pass queue.
 5. Produce the browser-ready review queue only after the above steps are
-   complete. The active first-pass teacher queue is the mixed
-   `10,000`-row pool with a random `1,000`-row review subset built by
-   [builder](../scripts/stage5_validation/build_s56_mixed_teacher_queue.py)
-   and PDO [runner](../scripts/stage5_validation/run_s56_mixed_teacher_queue_pdo.sh).
-   Human labels attach to this queue, not to raw light curves, the old
-   `300`-row bootstrap sheet, the injection-only pilot, or ranker-selected
-   diagnostic queues.
-6. Gate before labeling the mixed real+injected training queue: the pool must
-   verify as exactly `9,000` real plus `1,000` injected rows; the first-pass
-   queue must verify as exactly `900` real plus `100` injected rows; browser
-   visible source fields must be blinded; hidden truth/provenance columns must
-   remain present; all rows need finite period, epoch, duration, and
-   representative aperture; and every browser-served row must have a referenced
-   WD-tuned LEO report. The current builder writes its own `verification.json`.
+   complete. The active first-pass teacher-check queue is the
+   recovery-boundary `1,000`-row subset built by
+   [builder](../scripts/stage5_validation/build_s56_recovery50_teacher_queue.py).
+   The broader `10,000`-row pool remains the next scale-up after the first
+   visibility/class-balance audit. Human labels attach to this queue, not to
+   raw light curves, the old `300`-row bootstrap sheet, the injection-only
+   pilot, or ranker-selected diagnostic queues.
+6. Gate before labeling the mixed real+injected training queue: the active
+   first-pass queue must verify as exactly `700` real plus `300` injected
+   rows; browser-visible source fields must be blinded; hidden
+   truth/provenance columns must remain present; all rows need finite period,
+   epoch, duration, and representative aperture; injected rows need truth
+   period/radius/depth/impact metadata and recovery-cell provenance; and every
+   browser-served row must have a referenced TWIRL two-aperture vet sheet. The
+   current builder and sheet summaries write their own verification JSON files.
 7. Launch the app only after that verifier passes. The active local entrypoint
    after syncing PDO outputs is
    [launcher](../scripts/stage5_validation/run_s56_mixed_teacher_vetting_app_local.sh),

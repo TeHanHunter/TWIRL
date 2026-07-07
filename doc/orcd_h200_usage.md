@@ -4,7 +4,7 @@ This note records the initial ORCD/Engaging reconnaissance for the MKI Aryeh
 CPU/GPU nodes and how TWIRL should use them. It is operational guidance, not a
 scientific pipeline decision.
 
-Last updated: `2026-07-01`. ORCD access last verified: `2026-06-30`.
+Last updated: `2026-07-06`. ORCD access last verified: `2026-06-30`.
 
 ## Access And Scheduler Names
 
@@ -13,6 +13,33 @@ Use the ORCD login host:
 ```bash
 ssh tehan@orcd-login.mit.edu
 ```
+
+The direct command above is for user-owned interactive login only. Codex,
+agents, scripts, monitors, and probes must not open a fresh direct ORCD SSH
+session. Any automated ORCD access must reuse the user-opened SSH control
+socket documented below with `ControlPath=$HOME/.ssh/cm/%r@%h:%p`,
+`BatchMode=yes`, password authentication disabled, keyboard-interactive
+authentication disabled, and zero password prompts. If the socket is missing or
+stale, stop and ask the user to re-open it.
+
+Preferred browser entry point:
+
+```text
+https://orcd-ood.mit.edu/
+```
+
+Use the new ORCD OnDemand site for user-initiated browser sessions. It replaces
+the older `engaging-ood.mit.edu` OnDemand site after the July maintenance,
+supports the newer Engaging hardware, and exposes File Browser,
+Shell/Terminal, Remote Desktop, Jupyter, RStudio Server, and the Engaging
+`Job Statistics` page for recent-job utilization checks.
+
+ORCD documentation says logging into `https://orcd-ood.mit.edu/` can allow
+short-lived SSH-key login to Engaging without a fresh password and Duo prompt.
+Treat this only as a user-owned authentication convenience. It does not relax
+the TWIRL automation rule below: Codex, helper scripts, and batch probes must
+still use non-interactive SSH checks only and must stop rather than triggering
+password, Duo, or keyboard-interactive authentication.
 
 Login requires the account password plus Duo. Do not put passwords in scripts.
 For repeated local probes, use an SSH control socket that you authenticate once
@@ -30,6 +57,11 @@ Use this protocol whenever Codex or another agent needs ORCD access. ORCD is
 different from PDO because login requires a password plus Duo, so the user owns
 the interactive authentication step and the agent only reuses the resulting SSH
 control socket.
+
+Optional pre-step: from a browser, log into `https://orcd-ood.mit.edu/` first.
+This may refresh short-lived SSH-key access for Engaging. The subsequent SSH
+control socket is still opened from a user terminal, never by Codex or an
+automated script that can trigger Duo.
 
 1. From a user terminal, open the shared ORCD control socket:
 
@@ -253,6 +285,61 @@ ORCD should consume compact downstream products:
 - vetting feature tables
 - compact manifests with input paths, checksums, code versions, and sample cuts
 
+Operational boundary as of `2026-07-02`: use PDO only for Stage 1/TGLC/HLSP
+production and for building compact exports from the PDO-resident light-curve
+tree. Run downstream testing, vetting, injection-recovery, BLS branch audits,
+and model-training experiments on ORCD after those compact products are staged.
+This includes two classes of CPU-bound Astropy-BLS work: production-level
+raw-flux detrending-strength audits, and post-ADP vetting diagnostics such as
+ADP+/two-aperture sheets. Run these on ORCD CPU nodes first, not on the H200
+node and not as long PDO tmux jobs.
+
+Current branch name: the July 2026 raw-flux audit promotes
+`twirl-fs-v2-adp015q` (`bkspace_d=0.15 d`, `gap_split_d=0.2 d`, quantile
+knots) as the next S56 search/vetting candidate. Build its compare FITS on PDO
+with `scripts/stage1_lightcurves/run_s56_twirlfs_adp015q_compare_pdo.sh`, then
+stage compact `DET_FLUX_ADP015*` exports to ORCD. Do not emulate this by adding
+a second ADP+ layer to older `DET_FLUX_ADP*` columns.
+
+As of `2026-07-04`, the S56 ADP015 compare FITS tree and compact two-aperture
+export have both been built on PDO. The next ORCD action is to stage the compact
+ADP015 export and run full two-aperture BLS/vet-sheet production from that
+export; keep PDO for product generation and short smokes only.
+
+The two-aperture renderer supports compact-HDF5 input via `--lc-export-h5`, so
+ORCD does not need the full ADP015 FITS tree. Until the ADP015 code path is
+merged/pushed, run `sync-code` before staging/submitting:
+
+```bash
+scripts/orcd/run_s56_orcd_pilot.sh --run sync-code stage-balanced twoap-smoke
+```
+
+For a lighter transfer when the balanced injection bundle is already present,
+use the narrower two-aperture staging subset:
+
+```bash
+scripts/orcd/run_s56_orcd_pilot.sh --run sync-code stage-twoap twoap-smoke
+```
+
+After the smoke Slurm job completes, sync the smoke products for inspection:
+
+```bash
+scripts/orcd/run_s56_orcd_pilot.sh --run sync-twoap-smoke
+```
+
+If the smoke passes, submit the full CPU render:
+
+```bash
+scripts/orcd/run_s56_orcd_pilot.sh --run twoap-full
+```
+
+After the full render completes, sync the full sheet directory plus metrics back
+to local and PDO:
+
+```bash
+scripts/orcd/run_s56_orcd_pilot.sh --run sync-twoap
+```
+
 Do not transfer raw TGLC cutout, source-pickle, ePSF, or FFI trees by default.
 Those products are large, PDO-layout-specific, and not the right first target
 for ORCD.
@@ -475,6 +562,18 @@ Current helper scripts:
   peak ranker to the staged real S56 BLS peak table, verifies the real peak
   table, verifies the selected ephemerides, and writes top-N ephemerides per
   TIC for downstream LEO/human review on PDO.
+- `scripts/orcd/slurm_s56_predetrend_detrending_bls_audit_cpu.sbatch` runs the
+  production-level raw-flux detrending-strength audit on ORCD CPU nodes. This
+  is the appropriate branch-selection test because it starts from stored
+  original/injected raw aperture flux, applies alternative `FluxDetrendConfig`
+  strengths, then reruns BLS and compares against injected truth. Its default
+  method set now uses `twirl_fs_v2_adp015q` as the named candidate branch.
+- `scripts/orcd/slurm_s56_adpplus_bls_audit_cpu.sbatch` runs the ADP+
+  post-processing and two-aperture BLS diagnostic on ORCD CPU nodes. Submit via
+  `scripts/orcd/run_s56_orcd_pilot.sh --run adpplus-smoke` first, then
+  `adpplus-full` after the smoke summary passes. This job should use the
+  compact ADP export HDF5 rather than walking PDO HLSP FITS. Treat its output
+  as a vetting/display diagnostic, not the production detrending choice.
 - `scripts/orcd/sync_s56_orcd_ranker_outputs_to_pdo.sh` copies only the small
   verified ORCD ranker-selected outputs back to the PDO checkout for LEO
   rendering; it refuses to sync until the expected selected-ephemerides and
@@ -501,3 +600,7 @@ Current helper scripts:
   <https://orcd-docs.mit.edu/filesystems-file-transfer/filesystems/>
 - ORCD transfers:
   <https://orcd-docs.mit.edu/filesystems-file-transfer/transferring-files/>
+- ORCD OnDemand:
+  <https://orcd-ood.mit.edu/>
+- ORCD SSH login:
+  <https://orcd-docs.mit.edu/accessing-orcd/ssh-login/#logging-in-via-ssh>

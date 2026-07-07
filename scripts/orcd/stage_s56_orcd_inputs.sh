@@ -11,7 +11,7 @@ STAGE_SUBSET="${TWIRL_STAGE_SUBSET:-all}"
 
 usage() {
   cat <<'EOF'
-Usage: stage_s56_orcd_inputs.sh [--run] [--subset all|balanced|allhost]
+Usage: stage_s56_orcd_inputs.sh [--run] [--subset all|balanced|allhost|twoap]
 
 Bootstraps/refetches the ORCD Git checkout, then stages compact PDO artifacts
 to ORCD. Default mode is dry-run. Use --run only after the ORCD control socket
@@ -26,6 +26,8 @@ Subsets:
             S56 BLS table, and recovery summaries.
   allhost   Stage the all-host sharded injection product, all-host validation
             reports/peak chunks, and real S56 BLS table.
+  twoap     Stage only the ADP015 compact export plus mixed-teacher queue files
+            needed for two-aperture vet-sheet rendering.
 EOF
 }
 
@@ -57,6 +59,7 @@ PDO_REPO="${PDO_REPO:-/pdo/users/tehan/TWIRL}"
 ORCD_HOST="${ORCD_HOST:-tehan@orcd-login.mit.edu}"
 ORCD_REPO="${ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 ORCD_CONTROL_PATH="${ORCD_CONTROL_PATH:-$HOME/.ssh/cm/%r@%h:%p}"
+ORCD_CONNECT_TIMEOUT="${ORCD_CONNECT_TIMEOUT:-15}"
 TWIRL_STAGE_RSYNC_CODE="${TWIRL_STAGE_RSYNC_CODE:-0}"
 
 ORCD_SSH=(
@@ -65,10 +68,14 @@ ORCD_SSH=(
   -o PasswordAuthentication=no
   -o KbdInteractiveAuthentication=no
   -o NumberOfPasswordPrompts=0
+  -o ConnectTimeout="${ORCD_CONNECT_TIMEOUT}"
+  -o ConnectionAttempts=1
+  -o ServerAliveInterval=15
+  -o ServerAliveCountMax=1
   -o ControlMaster=auto
   -o ControlPath="${ORCD_CONTROL_PATH}"
 )
-ORCD_SSH_CMD="ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o NumberOfPasswordPrompts=0 -o ControlMaster=auto -o ControlPath=${ORCD_CONTROL_PATH}"
+ORCD_SSH_CMD="ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o NumberOfPasswordPrompts=0 -o ConnectTimeout=${ORCD_CONNECT_TIMEOUT} -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=1 -o ControlMaster=auto -o ControlPath=${ORCD_CONTROL_PATH}"
 PDO_SSH=(
   ssh
   -o BatchMode=yes
@@ -79,6 +86,10 @@ PDO_SSH=(
 BALANCED_PDO_PATHS=(
   data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_lc_export_pdo.h5
   data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_lc_export_pdo.manifest.json
+  data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5
+  data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.manifest.json
+  data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp015_lc_export_pdo.h5
+  data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp015_lc_export_pdo.manifest.json
   data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injected_lightcurves.h5
   data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injection_manifest.csv
   data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injection_labels.csv
@@ -88,6 +99,11 @@ BALANCED_PDO_PATHS=(
   reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv
   reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/recovery_mode_summary/summary.json
   reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/duration_aware/summary.json
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/mixed_teacher_pool.csv
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/review_queue_1k.csv
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/review_queue_1k_pre_leo.csv
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/summary.json
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/verification.json
 )
 
 ALLHOST_PDO_PATHS=(
@@ -101,6 +117,16 @@ ALLHOST_PDO_PATHS=(
   data_local/stage2/bls_first_pass_v2/sector_0056/candidates.csv
 )
 
+TWOAP_PDO_PATHS=(
+  data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp015_lc_export_pdo.h5
+  data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp015_lc_export_pdo.manifest.json
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/mixed_teacher_pool.csv
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/review_queue_1k.csv
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/review_queue_1k_pre_leo.csv
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/summary.json
+  reports/stage5_validation/s56_mixed_teacher_queue_pdo/verification.json
+)
+
 case "${STAGE_SUBSET}" in
   all)
     PDO_PATHS=("${BALANCED_PDO_PATHS[@]}" "${ALLHOST_PDO_PATHS[@]}")
@@ -110,6 +136,9 @@ case "${STAGE_SUBSET}" in
     ;;
   allhost)
     PDO_PATHS=("${ALLHOST_PDO_PATHS[@]}")
+    ;;
+  twoap)
+    PDO_PATHS=("${TWOAP_PDO_PATHS[@]}")
     ;;
   *)
     echo "[stage-orcd] unknown subset: ${STAGE_SUBSET}" >&2
@@ -180,4 +209,4 @@ fi
 
 echo "[stage-orcd] done"
 echo "[stage-orcd] next ORCD check:"
-echo "  ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o NumberOfPasswordPrompts=0 -o ControlMaster=auto -o ControlPath=${ORCD_CONTROL_PATH} ${ORCD_HOST} 'cd ${ORCD_REPO} && ls -lh data_local/stage3_injections/s56_twirlfs_v2_lc_export || true'"
+echo "  ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o NumberOfPasswordPrompts=0 -o ConnectTimeout=${ORCD_CONNECT_TIMEOUT} -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=1 -o ControlMaster=auto -o ControlPath=${ORCD_CONTROL_PATH} ${ORCD_HOST} 'cd ${ORCD_REPO} && ls -lh data_local/stage3_injections/s56_twirlfs_v2_lc_export || true'"

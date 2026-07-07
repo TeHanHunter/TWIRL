@@ -50,7 +50,7 @@ DEFAULT_INJECTION_H5 = (
     / "data_local/stage3_injections/s56_twirlfs_v2_injection_training/"
     / "pdo_20k_predetrend_batman_periodradius_bright_balanced/injected_lightcurves.h5"
 )
-DEFAULT_HLSP_ROOT = REPO_ROOT / "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare"
+DEFAULT_HLSP_ROOT = REPO_ROOT / "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_adp015q_compare"
 DEFAULT_STAR_CATALOG = (
     REPO_ROOT / "data_local/catalogs/twirl_master_catalog/twirl_wd_master_catalog_v0_ticmatched.fits"
 )
@@ -735,7 +735,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-leo-reports", type=int, default=1000)
     parser.add_argument("--leo-timeout-s", type=int, default=300)
     parser.add_argument("--leo-workers", type=int, default=8)
-    parser.add_argument("--aperture", default="DET_FLUX_ADP_SML")
+    parser.add_argument("--aperture", default="DET_FLUX_ADP015_SML")
     parser.add_argument("--overwrite", action="store_true")
     return parser
 

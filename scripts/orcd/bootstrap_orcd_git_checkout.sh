@@ -41,6 +41,7 @@ done
 ORCD_HOST="${ORCD_HOST:-tehan@orcd-login.mit.edu}"
 ORCD_REPO="${ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 ORCD_CONTROL_PATH="${ORCD_CONTROL_PATH:-$HOME/.ssh/cm/%r@%h:%p}"
+ORCD_CONNECT_TIMEOUT="${ORCD_CONNECT_TIMEOUT:-15}"
 TWIRL_GIT_REMOTE="${TWIRL_GIT_REMOTE:-https://github.com/TeHanHunter/TWIRL.git}"
 TWIRL_GIT_BRANCH="${TWIRL_GIT_BRANCH:-main}"
 TWIRL_ORCD_SPARSE="${TWIRL_ORCD_SPARSE:-1}"
@@ -51,6 +52,10 @@ ORCD_SSH=(
   -o PasswordAuthentication=no
   -o KbdInteractiveAuthentication=no
   -o NumberOfPasswordPrompts=0
+  -o ConnectTimeout="${ORCD_CONNECT_TIMEOUT}"
+  -o ConnectionAttempts=1
+  -o ServerAliveInterval=15
+  -o ServerAliveCountMax=1
   -o ControlMaster=auto
   -o ControlPath="${ORCD_CONTROL_PATH}"
 )

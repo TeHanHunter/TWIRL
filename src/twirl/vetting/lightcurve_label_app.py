@@ -25,6 +25,9 @@ REVIEW_APERTURES: tuple[str, ...] = (
     "DET_FLUX_ADP",
     "DET_FLUX_ADP_SML",
     "DET_FLUX_ADP_LAG",
+    "DET_FLUX_ADP015",
+    "DET_FLUX_ADP015_SML",
+    "DET_FLUX_ADP015_LAG",
 )
 
 DEFAULT_DISPLAY_COLUMNS: tuple[str, ...] = (
@@ -110,6 +113,37 @@ def find_leo_report_for_row(leo_report_roots: tuple[Path, ...], row: pd.Series) 
                 return path
     tic = _safe_float(row.get("tic"))
     return None if tic is None else find_leo_report(leo_report_roots, int(tic))
+
+
+def find_twirl_vet_sheet_for_row(twirl_vet_roots: tuple[Path, ...], row: pd.Series) -> Path | None:
+    """Find a pre-rendered TWIRL two-aperture PNG vet sheet for ``row``."""
+    names: list[str] = []
+    for col in ("twirl_vet_sheet_name", "twirl_vet_sheet"):
+        value = _clean_value(row.get(col))
+        if value:
+            names.append(str(value))
+    review_id = str(_clean_value(row.get("review_id")) or "")
+    tic = _safe_float(row.get("tic"))
+    if review_id:
+        safe = review_id.replace("/", "_").replace(":", "_")
+        names.append(f"{safe}_twirl_twoap_twirl_fs_v2_adp015q.png")
+        names.append(f"{safe}_twirl_twoap_adpplus_0p20.png")
+    if tic is not None:
+        names.append(f"*tic{int(tic)}*_twirl_twoap_*.png")
+    for root in twirl_vet_roots:
+        root = Path(root)
+        if not root.exists():
+            continue
+        for name in names:
+            if "*" in name:
+                matches = sorted(root.glob(name))
+                if matches:
+                    return matches[0]
+            else:
+                path = root / name
+                if path.exists():
+                    return path
+    return None
 
 
 def leo_class_from_report(path: Path | None) -> str:
@@ -299,6 +333,7 @@ class LightCurveVettingApp:
         labels_out: Path,
         hlsp_root: Path,
         leo_report_roots: tuple[Path, ...] = (),
+        twirl_vet_roots: tuple[Path, ...] = (),
         default_aperture: str = "DET_FLUX",
         labeler: str = "",
         shuffle_order: bool = False,
@@ -314,6 +349,7 @@ class LightCurveVettingApp:
         )
         self.hlsp_root = Path(hlsp_root)
         self.leo_report_roots = tuple(Path(p) for p in leo_report_roots)
+        self.twirl_vet_roots = tuple(Path(p) for p in twirl_vet_roots)
         self.default_aperture = default_aperture
         self.labeler = labeler
         self.leo_metrics_by_review_id, self.leo_metrics_by_tic = load_leo_metric_maps(self.store.candidates_path)
@@ -340,13 +376,21 @@ class LightCurveVettingApp:
             display[col] = value
         sector = _safe_float(row.get("sector"))
         path = None
-        if _safe_float(row.get("tic")) is not None:
+        if self.hlsp_root.exists() and _safe_float(row.get("tic")) is not None:
             path = find_hlsp_path(
                 self.hlsp_root,
                 int(float(row["tic"])),
                 int(sector) if sector is not None else None,
             )
         leo_report = find_leo_report_for_row(self.leo_report_roots, row)
+        twirl_vet_sheet = find_twirl_vet_sheet_for_row(self.twirl_vet_roots, row)
+        twirl_vet_sheet_version = ""
+        if twirl_vet_sheet is not None:
+            try:
+                stat = twirl_vet_sheet.stat()
+                twirl_vet_sheet_version = f"{stat.st_mtime_ns}-{stat.st_size}"
+            except OSError:
+                twirl_vet_sheet_version = ""
         leo_metric = self._leo_metric_for_row(row)
         leo_plot_error = _clean_value(leo_metric.get("plot_error")) or ""
         leo_error = _clean_value(leo_metric.get("error")) or ""
@@ -367,6 +411,9 @@ class LightCurveVettingApp:
             "hlsp_path": str(path) if path else None,
             "leo_report_path": str(leo_report) if leo_report else None,
             "leo_report_name": leo_report.name if leo_report else "",
+            "twirl_vet_sheet_path": str(twirl_vet_sheet) if twirl_vet_sheet else None,
+            "twirl_vet_sheet_name": twirl_vet_sheet.name if twirl_vet_sheet else "",
+            "twirl_vet_sheet_version": twirl_vet_sheet_version,
             "leo_class": leo_class_from_report(leo_report),
             "leo_report_kind": leo_report_kind,
             "leo_plot_error": leo_plot_error,
@@ -393,11 +440,13 @@ class LightCurveVettingApp:
         row = self.store.row(index)
         tic = _safe_float(row.get("tic"))
         sector = _safe_float(row.get("sector"))
-        path = None if tic is None else find_hlsp_path(
-            self.hlsp_root,
-            int(tic),
-            int(sector) if sector is not None else None,
-        )
+        path = None
+        if self.hlsp_root.exists() and tic is not None:
+            path = find_hlsp_path(
+                self.hlsp_root,
+                int(tic),
+                int(sector) if sector is not None else None,
+            )
 
         fig, axes = plt.subplots(2, 1, figsize=(10.5, 6.0), constrained_layout=True)
         if path is None:
@@ -491,6 +540,14 @@ class LightCurveVettingApp:
                             self.send_error(HTTPStatus.NOT_FOUND, "LEO report not found")
                         else:
                             self._send_file(report, "application/pdf", cache_seconds=3600)
+                    elif parsed.path == "/twirl_vet_sheet.png":
+                        index = int(query.get("index", ["0"])[0])
+                        row = app.store.row(index)
+                        sheet = find_twirl_vet_sheet_for_row(app.twirl_vet_roots, row)
+                        if sheet is None:
+                            self.send_error(HTTPStatus.NOT_FOUND, "TWIRL vet sheet not found")
+                        else:
+                            self._send_file(sheet, "image/png")
                     elif parsed.path == "/labels.csv":
                         self._send_file(app.store.labels_out, "text/csv")
                     else:
@@ -555,6 +612,8 @@ class LightCurveVettingApp:
                     self.send_header("Cache-Control", f"private, max-age={int(cache_seconds)}")
                 else:
                     self.send_header("Cache-Control", "no-store")
+                    self.send_header("Pragma", "no-cache")
+                    self.send_header("Expires", "0")
                 self.send_header("Content-Length", str(len(body)))
                 filename = "leo_report.pdf" if content_type == "application/pdf" else path.name
                 self.send_header("Content-Disposition", f'inline; filename="{filename}"')
@@ -624,6 +683,7 @@ main {{ display: grid; grid-template-columns: minmax(480px, 1fr) 390px; gap: 12p
 #plotMessage {{ margin-top: 8px; color: #9b2f25; font-size: 13px; min-height: 18px; }}
 #leoFrame {{ width: 100%; height: min(78vh, 900px); border: 1px solid #d9dee7; border-radius: 6px; background: #fff; }}
 #leoEmpty {{ display: none; min-height: 180px; align-items: center; justify-content: center; color: #607080; border: 1px dashed #bac3d0; border-radius: 6px; }}
+#twirlVetImage {{ width: 100%; border: 1px solid #d9dee7; border-radius: 6px; background: #fff; display: none; }}
 #preloadBin {{ position: fixed; left: -10000px; top: -10000px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }}
 #preloadBin iframe {{ width: 1px; height: 1px; border: 0; }}
 .lc-panel {{ grid-column: 1 / -1; }}
@@ -655,12 +715,13 @@ textarea {{ width: 100%; min-height: 90px; resize: vertical; box-sizing: border-
 <main>
   <section class="panel">
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-      <h2 id="reportTitle" style="margin: 0; font-size: 16px;">LEO-Vetter Report</h2>
-      <a id="leoLink" target="_blank" style="display: none;">open PDF</a>
+      <h2 id="reportTitle" style="margin: 0; font-size: 16px;">TWIRL Vet Sheet</h2>
+      <a id="leoLink" target="_blank" style="display: none;">open report</a>
       <span class="muted" id="leoStatus"></span>
     </div>
+    <img id="twirlVetImage" alt="TWIRL two-aperture vet sheet">
     <iframe id="leoFrame" title="LEO-Vetter report"></iframe>
-    <div id="leoEmpty">No pre-rendered LEO report for this candidate yet.</div>
+    <div id="leoEmpty">No pre-rendered TWIRL or LEO report for this candidate yet.</div>
   </section>
   <aside class="panel">
     <div class="muted" id="counter"></div>
@@ -713,6 +774,10 @@ function isTextEntry(target) {{
 function leoReportUrl(index) {{
   return `/leo_report.pdf?index=${{index}}`;
 }}
+function twirlVetUrl(index, version) {{
+  const v = version || Date.now();
+  return `/twirl_vet_sheet.png?index=${{index}}&v=${{encodeURIComponent(v)}}`;
+}}
 function preloadPdf(url) {{
   if (preloadedPdfUrls.has(url)) return;
   preloadedPdfUrls.add(url);
@@ -746,7 +811,12 @@ function preloadNextCandidates(index) {{
     fetch(`/api/candidate?index=${{nextIndex}}`, {{ cache: "no-store" }})
       .then(resp => resp.ok ? resp.json() : null)
       .then(data => {{
-        if (data && data.leo_report_path) preloadPdf(leoReportUrl(data.index));
+        if (data && data.twirl_vet_sheet_path) {{
+          const img = new Image();
+          img.src = twirlVetUrl(data.index, data.twirl_vet_sheet_version);
+        }} else if (data && data.leo_report_path) {{
+          preloadPdf(leoReportUrl(data.index));
+        }}
       }})
       .catch(() => preloadedCandidateIndices.delete(nextIndex));
   }}
@@ -775,7 +845,7 @@ async function loadPlot(index, aperture) {{
   img.src = URL.createObjectURL(blob);
 }}
 async function loadCandidate(index) {{
-  const resp = await fetch(`/api/candidate?index=${{index}}`);
+  const resp = await fetch(`/api/candidate?index=${{index}}`, {{ cache: "no-store" }});
   const data = await resp.json();
   if (data.error) throw new Error(data.error);
   state = data;
@@ -797,12 +867,28 @@ async function loadCandidate(index) {{
   const leoLink = document.getElementById("leoLink");
   const leoStatus = document.getElementById("leoStatus");
   const reportTitle = document.getElementById("reportTitle");
-  if (data.leo_report_path) {{
+  const twirlVetImage = document.getElementById("twirlVetImage");
+  if (data.twirl_vet_sheet_path) {{
+    const url = twirlVetUrl(data.index, data.twirl_vet_sheet_version);
+    twirlVetImage.style.display = "block";
+    twirlVetImage.src = url;
+    leoFrame.removeAttribute("src");
+    leoFrame.style.display = "none";
+    leoEmpty.style.display = "none";
+    leoLink.href = url;
+    leoLink.textContent = "open PNG";
+    leoLink.style.display = "inline";
+    reportTitle.textContent = "TWIRL Two-Aperture Vet Sheet";
+    leoStatus.textContent = "pre-rendered";
+  }} else if (data.leo_report_path) {{
     const url = leoReportUrl(data.index);
+    twirlVetImage.removeAttribute("src");
+    twirlVetImage.style.display = "none";
     leoFrame.style.display = "block";
     leoEmpty.style.display = "none";
     leoFrame.src = url;
     leoLink.href = url;
+    leoLink.textContent = "open PDF";
     leoLink.style.display = "inline";
     if (data.leo_report_kind === "fallback_plot") {{
       reportTitle.textContent = "LEO Fallback Plot";
@@ -812,11 +898,13 @@ async function loadCandidate(index) {{
       leoStatus.textContent = data.leo_class ? `class: ${{data.leo_class}}` : "";
     }}
   }} else {{
+    twirlVetImage.removeAttribute("src");
+    twirlVetImage.style.display = "none";
     leoFrame.removeAttribute("src");
     leoFrame.style.display = "none";
     leoEmpty.style.display = "flex";
     leoLink.style.display = "none";
-    reportTitle.textContent = "LEO-Vetter Report";
+    reportTitle.textContent = "TWIRL Vet Sheet";
     leoStatus.textContent = "";
   }}
   const apertureSelect = document.getElementById("aperture");
@@ -827,7 +915,7 @@ async function loadCandidate(index) {{
   const lcDetails = document.getElementById("lcDetails");
   document.getElementById("plot").removeAttribute("src");
   document.getElementById("plotMessage").textContent = "";
-  lcDetails.open = !data.leo_report_path;
+  lcDetails.open = !(data.twirl_vet_sheet_path || data.leo_report_path);
   if (lcDetails.open) {{
     await loadPlot(data.index, currentAperture());
   }}

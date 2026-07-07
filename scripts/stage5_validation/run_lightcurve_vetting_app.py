@@ -45,6 +45,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Directory containing pre-rendered LEO-Vetter PDF reports. May be repeated.",
     )
+    ap.add_argument(
+        "--twirl-vet-root",
+        type=Path,
+        action="append",
+        default=None,
+        help="Directory containing pre-rendered TWIRL two-aperture PNG vet sheets. May be repeated.",
+    )
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=5000)
     ap.add_argument(
@@ -70,9 +77,18 @@ def main(argv: list[str] | None = None) -> int:
     if not args.candidates.exists():
         print(f"[vet-app] missing candidate CSV: {args.candidates}", file=sys.stderr)
         return 2
-    if not args.hlsp_root.exists():
+    twirl_vet_roots = tuple(args.twirl_vet_root or ())
+    has_twirl_vet_root = any(Path(root).exists() for root in twirl_vet_roots)
+    if not args.hlsp_root.exists() and not has_twirl_vet_root:
         print(f"[vet-app] missing HLSP root: {args.hlsp_root}", file=sys.stderr)
+        print("[vet-app] no existing --twirl-vet-root was provided as a rendered-sheet fallback", file=sys.stderr)
         return 2
+    if not args.hlsp_root.exists():
+        print(
+            f"[vet-app] warning: missing HLSP root {args.hlsp_root}; "
+            "serving pre-rendered TWIRL vet sheets only",
+            file=sys.stderr,
+        )
 
     from twirl.vetting.lightcurve_label_app import LightCurveVettingApp
 
@@ -81,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         labels_out=args.labels_out,
         hlsp_root=args.hlsp_root,
         leo_report_roots=tuple(args.leo_report_root or DEFAULT_LEO_REPORT_ROOTS),
+        twirl_vet_roots=twirl_vet_roots,
         default_aperture=args.aperture,
         labeler=args.labeler,
         shuffle_order=args.shuffle_order,

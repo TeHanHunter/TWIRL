@@ -96,6 +96,24 @@ polynomial path. The corrected compare product records adaptive diagnostics
 in `ADPMETH`, `ADPBKSP`, `ADPGAP`, `ADPKNOT`, `ADPNSEG`, `ADPFIT`,
 `ADPSCAL`, and `ADPCOTS`.
 
+## Candidate S56 Search Branch: `twirl-fs-v2-adp015q`
+
+The July 2026 raw-flux injection/BLS audit selected a modestly stronger
+small-aperture search branch for continued vetting:
+
+- method tag: `twirl-fs-v2-adp015q`
+- validation/table branch key: `twirl_fs_v2_adp015q`
+- compare columns: `DET_FLUX_ADP015`, `DET_FLUX_ADP015_ERR`,
+  `DET_FLUX_ADP015_SML`, and `DET_FLUX_ADP015_LAG`
+- parameters: `bkspace_d = 0.15` days, `gap_split_d = 0.2` days,
+  quantile knots, robust-auto subtractive residuals
+
+This is not yet the canonical survey FITS product. It is the current
+candidate search/vetting branch: use `DET_FLUX_ADP015_SML` as the primary
+BLS search aperture and `DET_FLUX_ADP015` as the two-aperture contamination
+comparison. The existing `twirl-fs-v2-adp03q` columns remain the historical
+S56 compare columns.
+
 ## Validation Gate Before Production Replacement
 
 Before replacing the normal QLP detrend path, TWIRL-FS should pass:

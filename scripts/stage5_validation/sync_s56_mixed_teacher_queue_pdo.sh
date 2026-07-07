@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sync the PDO mixed-teacher queue, LEO sheets, labels, and summaries locally.
+# Sync the PDO mixed-teacher queue, vet sheets, labels, and summaries locally.
 set -euo pipefail
 
 cd "${TWIRL_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
@@ -18,6 +18,7 @@ rsync -avhu --progress \
   --include='*.csv' \
   --include='*.json' \
   --include='*.md' \
+  --include='*.png' \
   --include='*.pdf' \
   --exclude='*' \
   "${REMOTE_HOST}:${REMOTE_DIR}/" \

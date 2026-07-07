@@ -33,6 +33,10 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from twirl.lightcurves.flux_detrend import FluxDetrendConfig, flux_space_detrend_result  # noqa: E402
+from twirl.lightcurves.detrend_presets import (  # noqa: E402
+    TWIRL_FS_V2_ADP015Q_BRANCH,
+    adp015q_config,
+)
 from twirl.plotting.style import apply_twirl_style, get_ordered_palette  # noqa: E402
 
 
@@ -61,7 +65,7 @@ DEFAULT_METHODS = (
     "pctl75_10_gap05",
     "pctl75_20_gap05",
     "current_adp03q",
-    "spline_q015_gap02",
+    TWIRL_FS_V2_ADP015Q_BRANCH,
     "spline_q02_gap02",
     "spline_q025_gap02",
     "spline_q05_gap02",
@@ -238,6 +242,11 @@ METHOD_SPECS: dict[str, MethodSpec] = {
             gap_split_d=0.2,
             knot_strategy="quantile",
         ),
+    ),
+    TWIRL_FS_V2_ADP015Q_BRANCH: MethodSpec(
+        name=TWIRL_FS_V2_ADP015Q_BRANCH,
+        kind="spline",
+        cfg=adp015q_config(),
     ),
     "spline_q02_gap02": MethodSpec(
         name="spline_q02_gap02",

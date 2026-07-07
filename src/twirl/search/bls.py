@@ -74,9 +74,19 @@ def _empty_result(
     )
 
 
+def _maybe_with_periodogram(
+    result: BLSResult,
+    return_periodogram: bool,
+    spectrum: dict | None = None,
+) -> BLSResult | tuple[BLSResult, dict | None]:
+    if return_periodogram:
+        return result, spectrum
+    return result
+
+
 def run_bls_on_lc(lc: HLSPLightCurve, cfg: BLSConfig | None = None,
                   aperture: str = "DET_FLUX",
-                  return_periodogram: bool = False) -> BLSResult | tuple[BLSResult, dict]:
+                  return_periodogram: bool = False) -> BLSResult | tuple[BLSResult, dict | None]:
     """Run BLS on one aperture of one light curve.
 
     Returns a `BLSResult`. If `return_periodogram=True`, returns a tuple
@@ -85,7 +95,8 @@ def run_bls_on_lc(lc: HLSPLightCurve, cfg: BLSConfig | None = None,
     """
     cfg = cfg or BLSConfig()
     if aperture not in lc.flux:
-        return _empty_result(lc, aperture, "missing_aperture", len(lc.time), 0, cfg)
+        res = _empty_result(lc, aperture, "missing_aperture", len(lc.time), 0, cfg)
+        return _maybe_with_periodogram(res, return_periodogram)
 
     t_all = lc.time
     f_all = lc.flux[aperture]
@@ -93,7 +104,8 @@ def run_bls_on_lc(lc: HLSPLightCurve, cfg: BLSConfig | None = None,
     mask = quality_mask(lc, aperture)
     n_cad_quality = int(mask.sum())
     if n_cad_quality < cfg.min_cadences:
-        return _empty_result(lc, aperture, "too_few_cadences", n_total, n_cad_quality, cfg)
+        res = _empty_result(lc, aperture, "too_few_cadences", n_total, n_cad_quality, cfg)
+        return _maybe_with_periodogram(res, return_periodogram)
 
     t = t_all[mask].astype(np.float64)
     f = f_all[mask].astype(np.float64)
@@ -124,7 +136,8 @@ def run_bls_on_lc(lc: HLSPLightCurve, cfg: BLSConfig | None = None,
 
     med = float(np.nanmedian(f))
     if not np.isfinite(med) or med == 0.0:
-        return _empty_result(lc, aperture, "all_nan", n_total, n_kept, cfg)
+        res = _empty_result(lc, aperture, "all_nan", n_total, n_kept, cfg)
+        return _maybe_with_periodogram(res, return_periodogram)
     y = f / med
 
     # Upper-tail-only sigma clip to suppress scattered-light spikes (always
@@ -156,17 +169,20 @@ def run_bls_on_lc(lc: HLSPLightCurve, cfg: BLSConfig | None = None,
         durations_d=durations_d,
     )
     if periods.size < 2:
-        return _empty_result(lc, aperture, "degenerate_grid", n_total, n_kept, cfg)
+        res = _empty_result(lc, aperture, "degenerate_grid", n_total, n_kept, cfg)
+        return _maybe_with_periodogram(res, return_periodogram)
 
     try:
         bls = BoxLeastSquares(t, y)
         pg = bls.power(periods, durations_d, oversample=1)
     except Exception:
-        return _empty_result(lc, aperture, "bls_fail", n_total, n_kept, cfg)
+        res = _empty_result(lc, aperture, "bls_fail", n_total, n_kept, cfg)
+        return _maybe_with_periodogram(res, return_periodogram)
 
     power = np.asarray(pg.power, dtype=np.float64)
     if not np.any(np.isfinite(power)):
-        return _empty_result(lc, aperture, "nan_power", n_total, n_kept, cfg)
+        res = _empty_result(lc, aperture, "nan_power", n_total, n_kept, cfg)
+        return _maybe_with_periodogram(res, return_periodogram)
 
     sde = compute_sde(power)
     extra = {

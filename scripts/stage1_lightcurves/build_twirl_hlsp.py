@@ -34,6 +34,14 @@ from twirl.lightcurves.flux_detrend import (  # noqa: E402
     FluxDetrendConfig,
     flux_space_detrend_result,
 )
+from twirl.lightcurves.detrend_presets import (  # noqa: E402
+    ADP03Q_COLUMN_TAG,
+    TWIRL_FS_V2_ADP03Q_METHOD,
+    TWIRL_FS_V2_METHOD,
+    adaptive_quantile_config,
+    canonical_config,
+    compare_column_names,
+)
 from twirl.lightcurves.hlsp_writer import (  # noqa: E402
     HLSPTarget,
     hlsp_path,
@@ -46,30 +54,15 @@ from twirl.lightcurves.tglc_h5_reader import (  # noqa: E402
 )
 
 
-METHOD_VERSION = "twirl-fs-v2"
-ADAPTIVE_METHOD_VERSION = "twirl-fs-v2-adp03q"
-CANONICAL_DETREND_CONFIG = FluxDetrendConfig(
-    output_mode="subtractive",
-    scale_strategy="auto",
-)
+METHOD_VERSION = TWIRL_FS_V2_METHOD
+ADAPTIVE_METHOD_VERSION = TWIRL_FS_V2_ADP03Q_METHOD
+CANONICAL_DETREND_CONFIG = canonical_config()
 DETREND_CONFIG = CANONICAL_DETREND_CONFIG
 
 
 def adaptive_detrend_config(bkspace_d: float, gap_split_d: float) -> FluxDetrendConfig:
     """Return the experimental tighter-spline compare-column config."""
-    return FluxDetrendConfig(
-        bkspace_d=bkspace_d,
-        k=CANONICAL_DETREND_CONFIG.k,
-        sigma_clip=CANONICAL_DETREND_CONFIG.sigma_clip,
-        max_iter=CANONICAL_DETREND_CONFIG.max_iter,
-        edge_pad_d=CANONICAL_DETREND_CONFIG.edge_pad_d,
-        output_mode=CANONICAL_DETREND_CONFIG.output_mode,
-        scale_strategy=CANONICAL_DETREND_CONFIG.scale_strategy,
-        min_scale_abs=CANONICAL_DETREND_CONFIG.min_scale_abs,
-        min_scale_snr=CANONICAL_DETREND_CONFIG.min_scale_snr,
-        gap_split_d=gap_split_d,
-        knot_strategy="quantile",
-    )
+    return adaptive_quantile_config(bkspace_d=bkspace_d, gap_split_d=gap_split_d)
 
 
 def discover_orbit_hdf5(orbit_root: Path) -> dict[int, Path]:
@@ -190,7 +183,7 @@ def detrend_apertures(
     return out, diagnostics
 
 
-def process_one(args: tuple[int, list[Path], Path, bool, float, float, str]) -> tuple[int, bool, str]:
+def process_one(args: tuple[int, list[Path], Path, bool, float, float, str, str, str]) -> tuple[int, bool, str]:
     (
         tic,
         paths,
@@ -199,6 +192,8 @@ def process_one(args: tuple[int, list[Path], Path, bool, float, float, str]) -> 
         adaptive_bkspace,
         adaptive_gap_split,
         method_version,
+        adaptive_method_version,
+        adaptive_column_tag,
     ) = args
     try:
         lcs = [read_tglc_h5(p) for p in paths]
@@ -212,15 +207,17 @@ def process_one(args: tuple[int, list[Path], Path, bool, float, float, str]) -> 
             adp_cfg = adaptive_detrend_config(adaptive_bkspace, adaptive_gap_split)
             adp_det, adp_diag = detrend_apertures(merged, cfg=adp_cfg)
             adp_primary_diag = adp_diag.get("Primary", {})
+            col = compare_column_names(adaptive_column_tag)
             extra_flux_columns = {
-                "DET_FLUX_ADP": adp_det["Primary"][1],
-                "DET_FLUX_ADP_ERR": adp_det["Primary"][2],
-                "DET_FLUX_ADP_SML": adp_det["Small"][1],
-                "DET_FLUX_ADP_LAG": adp_det["Large"][1],
+                col["primary"]: adp_det["Primary"][1],
+                col["primary_err"]: adp_det["Primary"][2],
+                col["small"]: adp_det["Small"][1],
+                col["large"]: adp_det["Large"][1],
             }
             extra_header = {
                 "HASADP": (True, "Includes adaptive detrend compare columns"),
-                "ADPMETH": (ADAPTIVE_METHOD_VERSION, "Adaptive compare method"),
+                "ADPMETH": (adaptive_method_version, "Adaptive compare method"),
+                "ADPTAG": (adaptive_column_tag, "Adaptive compare column tag"),
                 "ADPBKSP": (float(adp_cfg.bkspace_d), "Adaptive spline spacing (d)"),
                 "ADPSIG": (float(adp_cfg.sigma_clip), "Adaptive rejection threshold"),
                 "ADPGAP": (float(adp_cfg.gap_split_d), "Adaptive gap split threshold"),
@@ -323,8 +320,8 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=(
             "Add experimental tighter-spline compare columns "
-            "DET_FLUX_ADP, DET_FLUX_ADP_ERR, DET_FLUX_ADP_SML, "
-            "and DET_FLUX_ADP_LAG. DET_FLUX remains the canonical v2 product."
+            "DET_FLUX_<TAG>, DET_FLUX_<TAG>_ERR, DET_FLUX_<TAG>_SML, "
+            "and DET_FLUX_<TAG>_LAG. DET_FLUX remains the canonical v2 product."
         ),
     )
     ap.add_argument(
@@ -346,6 +343,24 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     ap.add_argument(
+        "--adaptive-method-version",
+        default=ADAPTIVE_METHOD_VERSION,
+        help=(
+            "Adaptive compare METHOD/provenance string. The existing S56 "
+            "ADP columns use twirl-fs-v2-adp03q; the current candidate "
+            "production branch is twirl-fs-v2-adp015q."
+        ),
+    )
+    ap.add_argument(
+        "--adaptive-column-tag",
+        default=ADP03Q_COLUMN_TAG,
+        help=(
+            "Column tag for adaptive compare columns. Default ADP preserves "
+            "the historical DET_FLUX_ADP* names; ADP015 writes "
+            "DET_FLUX_ADP015* columns for twirl-fs-v2-adp015q."
+        ),
+    )
+    ap.add_argument(
         "--method-version",
         default=METHOD_VERSION,
         help="Primary METHOD header value for the canonical DET_FLUX columns.",
@@ -359,7 +374,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.include_adaptive_columns:
         print(
             "[build-twirl-hlsp] adaptive compare columns enabled: "
-            f"method={ADAPTIVE_METHOD_VERSION} "
+            f"method={args.adaptive_method_version} "
+            f"tag={args.adaptive_column_tag} "
             f"bkspace={args.adaptive_bkspace} d "
             f"gap_split={args.adaptive_gap_split} d"
         )
@@ -386,6 +402,8 @@ def main(argv: list[str] | None = None) -> int:
                     args.adaptive_bkspace,
                     args.adaptive_gap_split,
                     args.method_version,
+                    args.adaptive_method_version,
+                    args.adaptive_column_tag,
                 )
             )
     if args.limit:

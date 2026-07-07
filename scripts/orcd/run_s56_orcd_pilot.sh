@@ -10,6 +10,7 @@ LOCAL_REPO="${LOCAL_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 ORCD_HOST="${ORCD_HOST:-tehan@orcd-login.mit.edu}"
 ORCD_REPO="${ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 ORCD_CONTROL_PATH="${ORCD_CONTROL_PATH:-$HOME/.ssh/cm/%r@%h:%p}"
+ORCD_CONNECT_TIMEOUT="${ORCD_CONNECT_TIMEOUT:-15}"
 PARTITION="${TWIRL_ORCD_PARTITION:-pg_mki_aryeh}"
 DRY_RUN=1
 COMMANDS=()
@@ -20,9 +21,11 @@ Usage: run_s56_orcd_pilot.sh [--run] COMMAND [COMMAND ...]
 
 Commands:
   probe          Verify the ORCD control socket and partition are reachable.
+  sync-code      Rsync the current local code checkout to ORCD, preserving data.
   stage          Stage the local checkout and compact S56 PDO artifacts.
   stage-balanced Stage only the compact balanced-grid S56 artifacts.
   stage-allhost  Stage only the all-host S56 artifacts and reports.
+  stage-twoap    Stage only ADP015 compact export + mixed-teacher queue files.
   smoke          Submit a 100-injection CPU peak-table smoke job.
   peak-full      Submit the full restartable CPU peak-table job.
   ranker         Submit peak-ranker training plus the post-BLS gate.
@@ -31,6 +34,17 @@ Commands:
   allhost-peak   Submit all-host sharded injected peak-table build.
   allhost-ranker Submit all-host peak-ranker training plus post-BLS gate.
   allhost-apply  Submit real-candidate ranker application using all-host model.
+  predetrend-bls-smoke
+                 Submit a CPU raw-flux detrending-strength BLS audit smoke.
+  predetrend-bls-full
+                 Submit the full CPU raw-flux detrending-strength BLS audit.
+  adpplus-smoke  Submit a CPU ADP+ two-aperture audit smoke.
+  adpplus-full   Submit the full CPU ADP+ two-aperture audit.
+  twoap-smoke    Submit a CPU ADP015 two-aperture vet-sheet smoke.
+  twoap-full     Submit the full CPU ADP015 two-aperture vet-sheet render.
+  sync-twoap-smoke
+                 Sync ORCD twoap-smoke outputs back to local/PDO.
+  sync-twoap     Sync full ORCD two-aperture outputs back to local/PDO.
   allhost-sync-apply
                  Sync verified all-host ORCD selected outputs back to PDO.
   allhost-monitor-apply
@@ -89,9 +103,14 @@ ORCD_SSH=(
   -o PasswordAuthentication=no
   -o KbdInteractiveAuthentication=no
   -o NumberOfPasswordPrompts=0
+  -o ConnectTimeout="${ORCD_CONNECT_TIMEOUT}"
+  -o ConnectionAttempts=1
+  -o ServerAliveInterval=15
+  -o ServerAliveCountMax=1
   -o ControlMaster=auto
   -o ControlPath="${ORCD_CONTROL_PATH}"
 )
+ORCD_SSH_CMD="ssh -o BatchMode=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o NumberOfPasswordPrompts=0 -o ConnectTimeout=${ORCD_CONNECT_TIMEOUT} -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=1 -o ControlMaster=auto -o ControlPath=${ORCD_CONTROL_PATH}"
 
 print_cmd() {
   printf '+'
@@ -171,6 +190,27 @@ cmd_probe() {
   orcd "hostname; whoami; sinfo -h -p '${PARTITION}' -o '%P %D %t %G' | head -10"
 }
 
+cmd_sync_code() {
+  echo "[orcd-pilot] sync current local code to ORCD"
+  local rsync_args=(
+    -az
+    --delete
+    --exclude .git/
+    --exclude .venv/
+    --exclude __pycache__/
+    --exclude .pytest_cache/
+    --exclude .matplotlib_cache/
+    --exclude data_local/
+    --exclude reports/
+    --exclude logs/
+    --exclude outputs/current_keynote_edit/
+  )
+  if [[ "${DRY_RUN}" == "1" ]]; then
+    rsync_args=(-n "${rsync_args[@]}")
+  fi
+  run_or_echo rsync "${rsync_args[@]}" -e "${ORCD_SSH_CMD}" "${LOCAL_REPO}/" "${ORCD_HOST}:${ORCD_REPO}/"
+}
+
 cmd_stage() {
   echo "[orcd-pilot] stage compact S56 inputs"
   if [[ "${DRY_RUN}" == "1" ]]; then
@@ -220,6 +260,56 @@ cmd_allhost_ranker() {
 
 cmd_allhost_apply() {
   submit "allhost-ranker-apply" "--export=ALL,TWIRL_RANKER_MODEL=reports/stage5_validation/s56_allhost_predetrend_batman_periodradius_grid_sharded_pdo/peak_ranker_orcd/peak_ranker_model.npz,TWIRL_RANKER_SELECTED_OUT_DIR=reports/stage5_validation/s56_allhost_ranker_selected_real_candidates_orcd" "scripts/orcd/slurm_s56_peak_ranker_apply_cpu.sbatch"
+}
+
+cmd_predetrend_bls_smoke() {
+  submit "predetrend-bls-smoke" "--exclude=node4900 --cpus-per-task=24 --mem=96G --export=ALL,TWIRL_PREDET_BLS_N_INJECTIONS=100,TWIRL_PREDET_BLS_N_PERIODS=5000,TWIRL_PREDET_BLS_N_PEAKS=10,TWIRL_PREDET_BLS_WORKERS=24,TWIRL_PREDET_BLS_OUT_DIR=reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_smoke" "scripts/orcd/slurm_s56_predetrend_detrending_bls_audit_cpu.sbatch"
+}
+
+cmd_predetrend_bls_full() {
+  submit "predetrend-bls-full" "--exclude=node4900 --cpus-per-task=96 --mem=384G --export=ALL,TWIRL_PREDET_BLS_N_INJECTIONS=3000,TWIRL_PREDET_BLS_N_PERIODS=50000,TWIRL_PREDET_BLS_N_PEAKS=20,TWIRL_PREDET_BLS_WORKERS=96,TWIRL_PREDET_BLS_OUT_DIR=reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_full" "scripts/orcd/slurm_s56_predetrend_detrending_bls_audit_cpu.sbatch"
+}
+
+cmd_adpplus_smoke() {
+  submit "adpplus-smoke" "--exclude=node4900 --cpus-per-task=24 --mem=96G --export=ALL,TWIRL_ADPPLUS_N_INJECTED=100,TWIRL_ADPPLUS_N_REAL=50,TWIRL_ADPPLUS_N_PERIODS=5000,TWIRL_ADPPLUS_N_PEAKS=10,TWIRL_ADPPLUS_WORKERS=24,TWIRL_ADPPLUS_OUT_DIR=reports/stage5_validation/s56_adpplus_bls_audit_orcd_smoke" "scripts/orcd/slurm_s56_adpplus_bls_audit_cpu.sbatch"
+}
+
+cmd_adpplus_full() {
+  submit "adpplus-full" "--exclude=node4900 --cpus-per-task=96 --mem=384G --export=ALL,TWIRL_ADPPLUS_N_INJECTED=3000,TWIRL_ADPPLUS_N_REAL=2000,TWIRL_ADPPLUS_N_PERIODS=50000,TWIRL_ADPPLUS_N_PEAKS=20,TWIRL_ADPPLUS_WORKERS=96,TWIRL_ADPPLUS_OUT_DIR=reports/stage5_validation/s56_adpplus_bls_audit_orcd_full" "scripts/orcd/slurm_s56_adpplus_bls_audit_cpu.sbatch"
+}
+
+cmd_twoap_smoke() {
+  submit "twoap-smoke" "--exclude=node4900 --cpus-per-task=8 --mem=32G --export=ALL,TWIRL_TWOAP_LIMIT=10,TWIRL_TWOAP_WORKERS=2,TWIRL_TWOAP_N_PERIODS=5000,TWIRL_TWOAP_OUT_DIR=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_sheets_adp015q_orcd_smoke,TWIRL_TWOAP_METRICS_CSV=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_metrics_adp015q_orcd_smoke.csv,TWIRL_TWOAP_SUMMARY_JSON=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_two_aperture_vet_summary_adp015q_orcd_smoke.json,TWIRL_TWOAP_OVERWRITE=1" "scripts/orcd/slurm_s56_two_aperture_vet_sheets_cpu.sbatch"
+}
+
+cmd_twoap_full() {
+  submit "twoap-full" "--exclude=node4900 --cpus-per-task=48 --mem=192G --export=ALL,TWIRL_TWOAP_LIMIT=0,TWIRL_TWOAP_WORKERS=48,TWIRL_TWOAP_N_PERIODS=20000,TWIRL_TWOAP_OUT_DIR=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_sheets_adp015q_orcd,TWIRL_TWOAP_METRICS_CSV=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_metrics_adp015q_orcd.csv,TWIRL_TWOAP_OVERWRITE=1" "scripts/orcd/slurm_s56_two_aperture_vet_sheets_cpu.sbatch"
+}
+
+cmd_sync_twoap_smoke() {
+  echo "[orcd-pilot] sync ORCD twoap-smoke outputs to local/PDO"
+  if [[ "${DRY_RUN}" == "1" ]]; then
+    print_cmd env \
+      TWIRL_ORCD_TWOAP_OUT_DIR=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_sheets_adp015q_orcd_smoke \
+      TWIRL_ORCD_TWOAP_METRICS_CSV=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_metrics_adp015q_orcd_smoke.csv \
+      TWIRL_ORCD_TWOAP_SUMMARY_JSON=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_two_aperture_vet_summary_adp015q_orcd_smoke.json \
+      "${LOCAL_REPO}/scripts/orcd/sync_s56_orcd_twoap_outputs.sh" --run
+  else
+    env \
+      TWIRL_ORCD_TWOAP_OUT_DIR=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_sheets_adp015q_orcd_smoke \
+      TWIRL_ORCD_TWOAP_METRICS_CSV=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_metrics_adp015q_orcd_smoke.csv \
+      TWIRL_ORCD_TWOAP_SUMMARY_JSON=reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_two_aperture_vet_summary_adp015q_orcd_smoke.json \
+      bash "${LOCAL_REPO}/scripts/orcd/sync_s56_orcd_twoap_outputs.sh" --run
+  fi
+}
+
+cmd_sync_twoap() {
+  echo "[orcd-pilot] sync full ORCD two-aperture outputs to local/PDO"
+  if [[ "${DRY_RUN}" == "1" ]]; then
+    print_cmd "${LOCAL_REPO}/scripts/orcd/sync_s56_orcd_twoap_outputs.sh" --run
+  else
+    bash "${LOCAL_REPO}/scripts/orcd/sync_s56_orcd_twoap_outputs.sh" --run
+  fi
 }
 
 cmd_sync_apply() {
@@ -352,9 +442,11 @@ require_socket
 for command in "${expanded[@]}"; do
   case "${command}" in
     probe) cmd_probe ;;
+    sync-code) cmd_sync_code ;;
     stage) cmd_stage ;;
     stage-balanced) cmd_stage_subset balanced ;;
     stage-allhost) cmd_stage_subset allhost ;;
+    stage-twoap) cmd_stage_subset twoap ;;
     smoke) cmd_smoke ;;
     peak-full) cmd_peak_full ;;
     ranker) cmd_ranker ;;
@@ -363,6 +455,14 @@ for command in "${expanded[@]}"; do
     allhost-peak) cmd_allhost_peak ;;
     allhost-ranker) cmd_allhost_ranker ;;
     allhost-apply) cmd_allhost_apply ;;
+    predetrend-bls-smoke) cmd_predetrend_bls_smoke ;;
+    predetrend-bls-full) cmd_predetrend_bls_full ;;
+    adpplus-smoke) cmd_adpplus_smoke ;;
+    adpplus-full) cmd_adpplus_full ;;
+    twoap-smoke) cmd_twoap_smoke ;;
+    twoap-full) cmd_twoap_full ;;
+    sync-twoap-smoke) cmd_sync_twoap_smoke ;;
+    sync-twoap) cmd_sync_twoap ;;
     allhost-sync-apply) cmd_allhost_sync_apply ;;
     allhost-monitor-apply) cmd_allhost_monitor_apply ;;
     sync-apply) cmd_sync_apply ;;
