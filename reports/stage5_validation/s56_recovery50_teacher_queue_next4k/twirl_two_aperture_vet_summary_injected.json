@@ -1,0 +1,20 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_SML"
+  ],
+  "branch_name": "current_adp",
+  "created_utc": "2026-07-07T18:57:55.222220+00:00",
+  "hlsp_root": "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare",
+  "injection_h5": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injected_lightcurves.h5",
+  "lc_export_h5": "",
+  "metrics_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/twirl_vet_metrics_injected.csv",
+  "n_peaks": 10,
+  "n_periods": 20000,
+  "n_rows": 600,
+  "out_dir": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/twirl_vet_sheets",
+  "queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k_injected.csv",
+  "status_counts": {
+    "ok": 600
+  }
+}

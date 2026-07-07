@@ -84,14 +84,16 @@ The MIT fork uses Gaia for the field-star model, but the light-curve extraction 
 
 If important WDs do not have usable TIC IDs, the MIT fork will need a small extension so the light-curve stage can emit Gaia-selected targets directly.
 
-### 4. The default magnitude limits are too bright for TWIRL
+### 4. The default magnitude limits are not acceptable for TWIRL production
 
 The MIT CLI defaults are tailored to QLP-like bright-star work:
 
 - `--max-magnitude 13.5`
 - `--mdwarf-magnitude 15.0`
 
-For WD work, you should explicitly raise the target magnitude limit, likely to around `20`, during catalog creation or `all` runs.
+For survey production, do not use the TIC magnitude limit as a science target gate. The TWIRL wrappers explicitly pass `--max-magnitude 99`, which is effectively unbounded for TIC Tmag and prevents faint requested WD TICs from being dropped before `tglc lightcurves`. Smaller values such as `20` are now smoke-test or diagnostic settings only.
+
+If the `99` setting makes TIC catalog queries too slow or too large in dense fields, the correct next fix is to extend the catalog bridge so every requested TWIRL TIC is included directly. Do not reintroduce a science target magnitude cap to control query size.
 
 ### 5. The old `prior` knob is gone from the public interface
 
@@ -170,7 +172,7 @@ The MIT code uses those exact database names.
 A typical production sequence is:
 
 ```bash
-tglc catalogs --orbit 185 --ccd 1,1 --max-magnitude 20 --nprocs 16 --tglc-data-dir /path/to/tglc-data
+tglc catalogs --orbit 185 --ccd 1,1 --max-magnitude 99 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 tglc cutouts --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 tglc epsfs --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 tglc lightcurves --orbit 185 --ccd 1,1 --nprocs 16 --tglc-data-dir /path/to/tglc-data
@@ -214,7 +216,7 @@ to `sector-<S>/catalogs/` so the reuse is automatic.
 Or, once the setup is trusted:
 
 ```bash
-tglc all --orbit 185 --ccd 1,1 --max-magnitude 20 --nprocs 16 --tglc-data-dir /path/to/tglc-data
+tglc all --orbit 185 --ccd 1,1 --max-magnitude 99 --nprocs 16 --tglc-data-dir /path/to/tglc-data
 ```
 
 ### 5. Use `--cutout` for smoke tests
@@ -222,7 +224,7 @@ tglc all --orbit 185 --ccd 1,1 --max-magnitude 20 --nprocs 16 --tglc-data-dir /p
 Before a full CCD run, test one cutout:
 
 ```bash
-tglc all --orbit 185 --ccd 1,1 --cutout 0,0 --max-magnitude 20 --tglc-data-dir /path/to/tglc-data
+tglc all --orbit 185 --ccd 1,1 --cutout 0,0 --max-magnitude 99 --tglc-data-dir /path/to/tglc-data
 ```
 
 This is the fastest way to validate:
@@ -437,7 +439,7 @@ env LD_LIBRARY_PATH=/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH
   -m tglc catalogs \
   --orbit 119 \
   --ccd 4,1 \
-  --max-magnitude 20 \
+  --max-magnitude 99 \
   --nprocs 16 \
   --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
 ```
@@ -452,7 +454,7 @@ env LD_LIBRARY_PATH=/pdo/app/python-versions/python-3.11.9/lib:${LD_LIBRARY_PATH
   -m tglc catalogs \
   --orbit 120 \
   --ccd 4,1 \
-  --max-magnitude 20 \
+  --max-magnitude 99 \
   --nprocs 16 \
   --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
 ```
@@ -664,7 +666,37 @@ This sets:
 
 This environment is separate from the TGLC environment (which uses `/sw/qlp-environment/.venv/bin/python`). Use the TGLC env for `tglc catalogs/cutouts/epsfs/lightcurves`, and the QLP env for `detrend` and `hlsp`.
 
-## HDF5 → FITS Conversion (detrend + hlsp)
+## HDF5 → FITS/Export Conversion
+
+For current TWIRL production, the preferred derived products are TWIRL-FS adaptive light curves built directly from TGLC HDF5 raw flux:
+
+- ADP: `DET_FLUX_ADP*`
+- ADP015: `DET_FLUX_ADP015*`
+
+The short production-family tag for the no-cap, saturated-mask,
+ADP/ADP015-only product is `A2v1` ("adaptive-two, version 1"). Sector products
+should carry that tag in their output root or compact-export filename, for
+example `hlsp_s0056_A2v1`.
+
+Old source pickles from `--max-magnitude 20` runs cannot be reused as-is for
+`A2v1` because each `Source` object embeds the TIC catalog match table used by
+`tglc lightcurves`. Their FFI pixel/time/quality/mask arrays are still valid.
+The preferred runtime-saving path is to build small
+`source_tic/source_X_Y.ecsv` overlays with
+`scripts/stage1_lightcurves/build_source_tic_overlays.py`, symlink the existing
+`source_*.pkl` files into the A2v1 staging root, and run a TGLC light-curve
+hook that assigns `source.tic` from the sidecar after unpickling. This avoids
+rereading FFIs and avoids rewriting the large source pickles. It can also be
+used for S94+ default source trees. For requested TWIRL WD target emission,
+prefer `--overlay-from-observations`, which builds the sidecars directly from
+the TWIRL observation table's detector coordinates and therefore bypasses
+full max-99 TIC catalog generation. Max-99 TIC catalogs remain a fallback when
+a broad all-TIC match table is needed. The tracked TGLC hook patch is
+`scripts/stage1_lightcurves/tglc_source_tic_overlay_hook.patch`.
+
+Canonical/default `DET_FLUX*` can stay in compare FITS while downstream compatibility requires it, but new production planning should not require the legacy QLP detrend path if ADP/ADP015 FITS or compact exports satisfy the downstream search/vetting interfaces.
+
+### Legacy QLP detrend + hlsp path
 
 The `tglc lightcurves` HDF5 output is not the final archival product. Converting to FITS requires two additional QLP steps and the **full QLP environment** (`lightcurvedb` + `qlp` package), not just TGLC.
 
@@ -713,8 +745,8 @@ Standard TWIRL audit after each production run: bin the shortfall by TESS magnit
 ## Known Constraints To Plan Around
 
 - The MIT fork is designed for TICA FFIs, not arbitrary remote download flows.
-- The default target magnitude limits are not WD-ready.
-- The product format is HDF5; conversion to archival FITS requires `qlp lctools detrend` + `qlp lctools hlsp` and the full QLP environment.
+- The default target magnitude limits are not WD-ready; production wrappers use `--max-magnitude 99`, while smaller limits are diagnostics only.
+- The product format is HDF5; legacy QLP archival FITS conversion requires `qlp lctools detrend` + `qlp lctools hlsp`, but TWIRL production can instead build TWIRL-FS ADP/ADP015 products from the HDF5 raw flux.
 - The public CLI no longer exposes the old `prior` option.
 - Light-curve emission is TIC-based, so Gaia-only WD targets may require a small extension.
 - For Sector < 67, HLSP generation must use SPOC quality flags (`--flag-type spoc`), not TICA flags.

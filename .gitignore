@@ -21,6 +21,8 @@ reports/stage2_search/wd1856_bls_s56_top30/
 # LEO-Vetter and TGLC-vs-QLP comparison outputs — regenerable; keep MANIFEST/parquet only
 reports/stage5_validation/**/vet_reports/
 reports/stage5_validation/**/vet_reports
+reports/stage5_validation/**/twirl_vet_sheets/
+reports/stage5_validation/**/twirl_vet_sheets*/
 reports/stage5_validation/leo_vetter_s56_*/vet_reports/
 reports/stage5_validation/**/chunks/
 reports/stage5_validation/**/chunk_ids/

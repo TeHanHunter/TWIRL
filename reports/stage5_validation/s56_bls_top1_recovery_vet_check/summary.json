@@ -1,0 +1,54 @@
+{
+  "apertures_for_render": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_SML"
+  ],
+  "branch_for_render": "current_adp",
+  "created_utc": "2026-07-06T13:50:17.005366+00:00",
+  "depth_pct_range": [
+    0.614762899588,
+    100.0
+  ],
+  "n_rows": 100,
+  "period_bin_counts": {
+    "p01": 16,
+    "p02": 12,
+    "p03": 16,
+    "p04": 19,
+    "p05": 12,
+    "p06": 12,
+    "p07": 13
+  },
+  "period_d_range": [
+    0.1249407099771794,
+    12.297263239145847
+  ],
+  "queue_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_bls_top1_recovery_vet_check/review_queue_100.csv",
+  "radius_bin_counts": {
+    "r00": 11,
+    "r01": 12,
+    "r02": 17,
+    "r03": 15,
+    "r04": 19,
+    "r05": 16,
+    "r06": 10
+  },
+  "radius_rearth_range": [
+    0.206684139570635,
+    17.80254668218531
+  ],
+  "recovery_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
+  "recovery_map_input_rows": 20000,
+  "seed": 560100,
+  "selection": "stratified random sample from strict top-1 BLS-recovered injections",
+  "strict_top1_recovered_rows": 7227,
+  "tmag_bin_counts": {
+    "t00": 27,
+    "t01": 20,
+    "t02": 23,
+    "t03": 19,
+    "t04": 11
+  },
+  "topn_exact_rows": 296,
+  "topn_harmonic_rows": 387
+}

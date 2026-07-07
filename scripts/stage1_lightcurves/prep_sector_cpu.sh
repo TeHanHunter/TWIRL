@@ -48,7 +48,6 @@ run_orbit() {
     --max-parallel-ccd-jobs 3 \
     --catalogs-nprocs 16 \
     --cutouts-nprocs 16 \
-    --max-magnitude 20 \
     --run-label "s$(printf '%02d' "$SECTOR")-prep" \
     --stages catalogs,cutouts \
     $EXTRA

@@ -16,7 +16,7 @@ LABEL_BUTTONS: tuple[tuple[str, str, str], ...] = (
     ("2", "eclipsing_binary_or_pceb", "EB/PCEB"),
     ("3", "stellar_variability", "Variable"),
     ("4", "instrumental_or_systematic", "Systematic"),
-    ("5", "uncertain", "Uncertain"),
+    ("5", "uncertain", "Flat/no signal"),
     ("0", "skip", "Skip"),
 )
 
@@ -25,6 +25,7 @@ LABEL_KEY_ALIASES: dict[str, str] = {
     "e": "eclipsing_binary_or_pceb",
     "v": "stellar_variability",
     "i": "instrumental_or_systematic",
+    "f": "uncertain",
     "u": "uncertain",
     "s": "skip",
     "x": "skip",

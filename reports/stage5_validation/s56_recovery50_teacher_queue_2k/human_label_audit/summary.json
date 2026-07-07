@@ -1,0 +1,126 @@
+{
+  "created_utc": "2026-07-07T20:25:27.134100+00:00",
+  "injected_planet_like_fraction_all": 0.6717724288840262,
+  "injected_planet_like_fraction_certain": 0.8771428571428571,
+  "label_by_source_kind": {
+    "injection_recovery": {
+      "eclipsing_binary_or_pceb": 1,
+      "instrumental_or_systematic": 41,
+      "planet_like": 307,
+      "skip": 1,
+      "stellar_variability": 1,
+      "uncertain": 106
+    },
+    "real_candidate": {
+      "eclipsing_binary_or_pceb": 16,
+      "instrumental_or_systematic": 311,
+      "planet_like": 40,
+      "skip": 2,
+      "stellar_variability": 121,
+      "uncertain": 1053
+    }
+  },
+  "label_counts": {
+    "eclipsing_binary_or_pceb": 17,
+    "instrumental_or_systematic": 352,
+    "planet_like": 347,
+    "skip": 3,
+    "stellar_variability": 122,
+    "uncertain": 1159
+  },
+  "labels_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_labels_vetted.csv",
+  "n_injected_certain": 350,
+  "n_injected_labeled": 457,
+  "n_injected_truth_human_disagreements": 43,
+  "n_labeled": 2000,
+  "n_queue_rows": 2000,
+  "n_real_labeled": 1543,
+  "n_unlabeled": 0,
+  "out_dir": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit",
+  "outputs": {
+    "disagreement_rows": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit/injected_truth_human_disagreement_rows.csv",
+    "joined": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit/joined_human_labels.csv"
+  },
+  "queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/review_queue_2k_labeled.csv",
+  "tables": {
+    "label_by_bls_truth_match": {
+      "False": {
+        "eclipsing_binary_or_pceb": 16,
+        "instrumental_or_systematic": 311,
+        "planet_like": 40,
+        "skip": 2,
+        "stellar_variability": 121,
+        "uncertain": 1053
+      },
+      "True": {
+        "eclipsing_binary_or_pceb": 1,
+        "instrumental_or_systematic": 41,
+        "planet_like": 307,
+        "skip": 1,
+        "stellar_variability": 1,
+        "uncertain": 106
+      }
+    },
+    "label_by_source_kind": {
+      "injection_recovery": {
+        "eclipsing_binary_or_pceb": 1,
+        "instrumental_or_systematic": 41,
+        "planet_like": 307,
+        "skip": 1,
+        "stellar_variability": 1,
+        "uncertain": 106
+      },
+      "real_candidate": {
+        "eclipsing_binary_or_pceb": 16,
+        "instrumental_or_systematic": 311,
+        "planet_like": 40,
+        "skip": 2,
+        "stellar_variability": 121,
+        "uncertain": 1053
+      }
+    },
+    "label_by_strict_top1_recovered": {
+      "": {
+        "eclipsing_binary_or_pceb": 16,
+        "instrumental_or_systematic": 311,
+        "planet_like": 40,
+        "skip": 2,
+        "stellar_variability": 121,
+        "uncertain": 1053
+      },
+      "True": {
+        "eclipsing_binary_or_pceb": 1,
+        "instrumental_or_systematic": 41,
+        "planet_like": 307,
+        "skip": 1,
+        "stellar_variability": 1,
+        "uncertain": 106
+      }
+    },
+    "label_by_topn_recovery_status": {
+      "": {
+        "eclipsing_binary_or_pceb": 16,
+        "instrumental_or_systematic": 311,
+        "planet_like": 40,
+        "skip": 2,
+        "stellar_variability": 121,
+        "uncertain": 1053
+      },
+      "bls_top1_recovered": {
+        "eclipsing_binary_or_pceb": 1,
+        "instrumental_or_systematic": 41,
+        "planet_like": 307,
+        "skip": 1,
+        "stellar_variability": 1,
+        "uncertain": 106
+      }
+    }
+  },
+  "trend_outputs": {
+    "sde_max": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit/injected_human_recovery_by_sde_max.csv",
+    "tmag": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit/injected_human_recovery_by_tmag.csv",
+    "truth_model_depth": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit/injected_human_recovery_by_truth_model_depth.csv",
+    "truth_period_d": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit/injected_human_recovery_by_truth_period_d.csv",
+    "truth_radius_rearth": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_label_audit/injected_human_recovery_by_truth_radius_rearth.csv"
+  }
+}

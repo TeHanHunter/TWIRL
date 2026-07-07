@@ -4,7 +4,7 @@ This note records the initial ORCD/Engaging reconnaissance for the MKI Aryeh
 CPU/GPU nodes and how TWIRL should use them. It is operational guidance, not a
 scientific pipeline decision.
 
-Last updated: `2026-07-06`. ORCD access last verified: `2026-06-30`.
+Last updated: `2026-07-07`. ORCD access last verified: `2026-06-30`.
 
 ## Access And Scheduler Names
 
@@ -163,6 +163,11 @@ partition is:
 -p pg_mki_aryeh
 ```
 
+TWIRL jobs should always target the assigned MKI Aryeh partition,
+`pg_mki_aryeh`. Do not submit TWIRL jobs to MIT general, preemptable, data
+transfer, GPU-general, or other group partitions unless the user explicitly
+approves that exception for a specific run.
+
 Verification from `2026-06-10` and re-check on `2026-06-30`:
 
 - `sinfo` lists `pg_mki_aryeh`.
@@ -186,9 +191,9 @@ Other partitions accepted `sbatch --test-only` for this account on
 `2026-06-30`, including `mit_normal`, `mit_preemptable`, `mit_quicktest`,
 `mit_normal_gpu`, and `mit_data_transfer`. Some `ou_mki*` partitions also
 accepted test-only submissions, but TWIRL should not use other group partitions
-without explicit policy confirmation. The default TWIRL target remains
-`pg_mki_aryeh`; use MIT general/preemptable partitions only for clearly
-appropriate fallback or short diagnostic work.
+without explicit policy confirmation. The required TWIRL target remains
+`pg_mki_aryeh`; general MIT partitions are not fallback targets for routine
+TWIRL work.
 
 ## Hardware
 

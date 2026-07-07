@@ -1,0 +1,51 @@
+{
+  "created_from": [
+    {
+      "label_counts": {
+        "eclipsing_binary_or_pceb": 11,
+        "instrumental_or_systematic": 223,
+        "planet_like": 239,
+        "skip": 2,
+        "stellar_variability": 106,
+        "uncertain": 419
+      },
+      "labeled_rows": 1000,
+      "labels_csv": "reports/stage5_validation/s56_recovery50_teacher_queue/human_labels_vetted.csv",
+      "origin_queue": "s56_recovery50_teacher_queue",
+      "queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue/review_queue_1k.csv"
+    },
+    {
+      "label_counts": {
+        "eclipsing_binary_or_pceb": 6,
+        "instrumental_or_systematic": 129,
+        "planet_like": 108,
+        "skip": 1,
+        "stellar_variability": 16,
+        "uncertain": 740
+      },
+      "labeled_rows": 1000,
+      "labels_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/human_labels_vetted.csv",
+      "origin_queue": "s56_recovery50_teacher_queue_next4k",
+      "queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k.csv"
+    }
+  ],
+  "label_counts": {
+    "eclipsing_binary_or_pceb": 17,
+    "instrumental_or_systematic": 352,
+    "planet_like": 347,
+    "skip": 3,
+    "stellar_variability": 122,
+    "uncertain": 1159
+  },
+  "label_policy_note": "raw uncertain preserved; training code maps uncertain to instrumental_or_systematic/no-visible-signal target",
+  "n_labels": 2000,
+  "n_rows": 2000,
+  "outputs": {
+    "labels_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_labels_vetted.csv",
+    "queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/review_queue_2k_labeled.csv"
+  },
+  "source_kind_counts": {
+    "injection_recovery": 457,
+    "real_candidate": 1543
+  }
+}

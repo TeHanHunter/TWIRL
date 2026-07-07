@@ -71,6 +71,22 @@ def _safe_sheet_name(review_id: Any, branch_name: str = DEFAULT_TWIRL_BRANCH) ->
     return f"{safe}_twirl_twoap_{branch_name}.png"
 
 
+def _load_excluded_review_ids(paths: list[Path]) -> set[str]:
+    excluded: set[str] = set()
+    for path in paths:
+        if not path:
+            continue
+        table = pd.read_csv(path)
+        if "review_id" not in table:
+            raise KeyError(f"exclude table missing review_id: {path}")
+        excluded.update(
+            review_id
+            for review_id in table["review_id"].fillna("").astype(str).tolist()
+            if review_id
+        )
+    return excluded
+
+
 def _add_recovery_cells(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     work = frame.copy()
     work["strict_top1_recovered"] = work["recovery_status"].fillna("").astype(str).eq("bls_recovered")
@@ -128,6 +144,7 @@ def select_recovery50_injections(
     max_cell_recovery: float,
     min_good_in_transit: int,
     require_both_apertures: bool,
+    exclude_review_ids: set[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     df = pd.read_csv(path)
     df = _coerce_numeric(
@@ -156,6 +173,12 @@ def select_recovery50_injections(
         ],
     )
     df, cells = _add_recovery_cells(df)
+    fallback_review_id = df["injection_id"].map(lambda x: f"inj:{x}")
+    if "review_id" in df:
+        review_id = df["review_id"].fillna("").astype(str)
+        df["review_id"] = review_id.where(review_id.ne(""), fallback_review_id)
+    else:
+        df["review_id"] = fallback_review_id
     df["both_apertures_top1_recovered"] = (
         df.get("recovery_status_DET_FLUX_ADP_SML", pd.Series("", index=df.index))
         .fillna("")
@@ -182,6 +205,8 @@ def select_recovery50_injections(
         & df["source_h5"].fillna("").astype(str).ne("")
         & df["recovery50_cell_any_frac"].between(min_cell_recovery, max_cell_recovery)
     )
+    if exclude_review_ids:
+        base &= ~df["review_id"].fillna("").astype(str).isin(exclude_review_ids)
     if require_both_apertures:
         base &= df["both_apertures_top1_recovered"]
     candidates = df.loc[base].copy()
@@ -256,6 +281,7 @@ def select_recovery50_injections(
 
     summary = {
         "input_rows": int(len(df)),
+        "excluded_review_id_rows": int(df["review_id"].fillna("").astype(str).isin(exclude_review_ids or set()).sum()),
         "coarse_recovery_cells": int(len(cells)),
         "candidate_rows_after_filters": int(len(candidates)),
         "selected_rows": int(len(selected)),
@@ -297,19 +323,45 @@ def downsample_real_teacher_rows(
     *,
     n_real: int,
     random_state: int,
+    quotas: list[tuple[str, int]] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Downsample the broad real pool into a compact teacher-review mix."""
 
-    quotas = [
-        ("real_wd1856_benchmark", 1),
-        ("real_high_sde_planet_like", 260),
-        ("real_eb_pceb_like", 160),
-        ("real_variability_broad_duration", 95),
-        ("real_aperture_disagreement", 70),
-        ("real_cadence_alias_systematic", 45),
-        ("real_mid_sde_control", 45),
-        ("real_low_sde_control", 24),
-    ]
+    if quotas is None:
+        quotas = [
+            ("real_wd1856_benchmark", 1),
+            ("real_high_sde_planet_like", 260),
+            ("real_eb_pceb_like", 160),
+            ("real_variability_broad_duration", 95),
+            ("real_aperture_disagreement", 70),
+            ("real_cadence_alias_systematic", 45),
+            ("real_mid_sde_control", 45),
+            ("real_low_sde_control", 24),
+        ]
+        selection_rule = "fixed teacher-review quotas from broad stratified real pool"
+    else:
+        quotas = [(str(bucket), int(quota)) for bucket, quota in quotas if int(quota) > 0]
+        selection_rule = "custom teacher-review quotas from broad stratified real pool"
+    base_total = sum(quota for _, quota in quotas)
+    if base_total <= 0:
+        raise ValueError("real quotas must request at least one row")
+    if n_real != base_total and n_real > 0:
+        scale = float(n_real) / float(base_total)
+        scaled: list[tuple[str, int]] = []
+        for bucket, quota in quotas:
+            if bucket == "real_wd1856_benchmark":
+                scaled_quota = min(1, n_real)
+            else:
+                scaled_quota = max(1, int(round(quota * scale)))
+            scaled.append((bucket, scaled_quota))
+        delta = n_real - sum(quota for _, quota in scaled)
+        if delta:
+            target = "real_high_sde_planet_like"
+            scaled = [
+                (bucket, quota + delta if bucket == target else quota)
+                for bucket, quota in scaled
+            ]
+        quotas = scaled
     available_counts = _value_counts(real_pool, "selection_bucket")
     pieces: list[pd.DataFrame] = []
     used_review_ids: set[str] = set()
@@ -352,7 +404,8 @@ def downsample_real_teacher_rows(
         "selected_rows": int(len(selected)),
         "broad_pool_bucket_counts": available_counts,
         "selected_bucket_counts": _value_counts(selected, "selection_bucket"),
-        "selection_rule": "fixed teacher-review quotas from broad stratified real pool",
+        "requested_bucket_quotas": {str(bucket): int(quota) for bucket, quota in quotas},
+        "selection_rule": selection_rule,
     }
     return selected, summary
 
@@ -403,18 +456,27 @@ def build_queue(
     min_good_in_transit: int,
     require_both_apertures: bool,
     cadence_alias_tolerance: float,
+    exclude_review_csvs: list[Path],
+    queue_name: str,
+    real_quotas: list[tuple[str, int]] | None = None,
 ) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
+    exclude_review_ids = _load_excluded_review_ids(exclude_review_csvs)
     real_pool, real_pool_summary = select_real_pool(
         real_candidates,
         n_real=n_real_source_pool,
         random_state=random_state,
         alias_tolerance=cadence_alias_tolerance,
     )
+    if exclude_review_ids:
+        real_pool = real_pool.loc[
+            ~real_pool["review_id"].fillna("").astype(str).isin(exclude_review_ids)
+        ].copy()
     real, real_summary = downsample_real_teacher_rows(
         real_pool,
         n_real=n_real,
         random_state=random_state + 500,
+        quotas=real_quotas,
     )
     real_summary["source_pool_summary"] = real_pool_summary
     injected, injected_summary = select_recovery50_injections(
@@ -425,9 +487,10 @@ def build_queue(
         max_cell_recovery=max_cell_recovery,
         min_good_in_transit=min_good_in_transit,
         require_both_apertures=require_both_apertures,
+        exclude_review_ids=exclude_review_ids,
     )
     pool = _finalize_queue(real, injected)
-    pool["teacher_pool_version"] = "s56_recovery50_teacher_1k_v1"
+    pool["teacher_pool_version"] = f"s56_recovery50_teacher_{queue_name}_v1"
     pool["pool_random_state"] = int(random_state)
     pool["truth_vet_class"] = pool.get("vet_class", "")
     pool["twirl_vet_sheet_name"] = pool["review_id"].map(_safe_sheet_name)
@@ -436,15 +499,15 @@ def build_queue(
     unblinded = pool.sample(frac=1.0, random_state=random_state + 2000).reset_index(drop=True)
     review = _blind_for_browser(unblinded)
     review["review_order_seed"] = int(random_state)
-    review_csv = out_dir / "review_queue_1k.csv"
+    review_csv = out_dir / f"{queue_name}.csv"
     review.to_csv(review_csv, index=False)
-    unblinded.to_csv(out_dir / "review_queue_1k_unblinded.csv", index=False)
+    unblinded.to_csv(out_dir / f"{queue_name}_unblinded.csv", index=False)
     review.loc[review["source_kind"].fillna("").astype(str).eq("real_candidate")].to_csv(
-        out_dir / "review_queue_1k_real.csv",
+        out_dir / f"{queue_name}_real.csv",
         index=False,
     )
     review.loc[review["source_kind"].fillna("").astype(str).eq("injection_recovery")].to_csv(
-        out_dir / "review_queue_1k_injected.csv",
+        out_dir / f"{queue_name}_injected.csv",
         index=False,
     )
     label_path = out_dir / "human_labels_vetted.csv"
@@ -469,12 +532,18 @@ def build_queue(
             "browser_visible_vet_class": "review_candidate",
             "hidden_truth_columns_retained": True,
         },
+        "excluded_review_csvs": [str(path) for path in exclude_review_csvs],
+        "excluded_review_id_count": int(len(exclude_review_ids)),
         "injected_selection": injected_summary,
         "real_selection": real_summary,
         "outputs": {
+            "review_queue_csv": str(review_csv),
+            "review_queue_real_csv": str(out_dir / f"{queue_name}_real.csv"),
+            "review_queue_injected_csv": str(out_dir / f"{queue_name}_injected.csv"),
+            "review_queue_unblinded_csv": str(out_dir / f"{queue_name}_unblinded.csv"),
             "review_queue_1k_csv": str(review_csv),
-            "review_queue_1k_real_csv": str(out_dir / "review_queue_1k_real.csv"),
-            "review_queue_1k_injected_csv": str(out_dir / "review_queue_1k_injected.csv"),
+            "review_queue_1k_real_csv": str(out_dir / f"{queue_name}_real.csv"),
+            "review_queue_1k_injected_csv": str(out_dir / f"{queue_name}_injected.csv"),
             "human_labels_vetted_csv": str(label_path),
             "twirl_vet_sheets": str(out_dir / "twirl_vet_sheets"),
         },
@@ -499,7 +568,46 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-good-in-transit", type=int, default=5)
     parser.add_argument("--allow-single-aperture-recovery", action="store_true")
     parser.add_argument("--cadence-alias-tolerance", type=float, default=0.02)
+    parser.add_argument(
+        "--queue-name",
+        default="review_queue_1k",
+        help="Base filename for the blinded review CSV and real/injected splits.",
+    )
+    parser.add_argument(
+        "--exclude-review-csv",
+        action="append",
+        default=[],
+        type=Path,
+        help="Existing review CSV whose review_id values must not be reused.",
+    )
+    parser.add_argument(
+        "--real-quota",
+        action="append",
+        default=[],
+        help=(
+            "Optional real selection quota as BUCKET=N. May be repeated. "
+            "When omitted, default recovery50 real quotas are scaled to --n-real."
+        ),
+    )
     return parser
+
+
+def _parse_real_quotas(values: list[str]) -> list[tuple[str, int]] | None:
+    if not values:
+        return None
+    quotas: list[tuple[str, int]] = []
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"--real-quota must be BUCKET=N, got {value!r}")
+        bucket, raw_quota = value.split("=", 1)
+        bucket = bucket.strip()
+        if not bucket:
+            raise ValueError(f"--real-quota has empty bucket in {value!r}")
+        quota = int(raw_quota)
+        if quota < 0:
+            raise ValueError(f"--real-quota must be non-negative, got {value!r}")
+        quotas.append((bucket, quota))
+    return quotas
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -517,6 +625,9 @@ def main(argv: list[str] | None = None) -> int:
         min_good_in_transit=int(args.min_good_in_transit),
         require_both_apertures=not bool(args.allow_single_aperture_recovery),
         cadence_alias_tolerance=float(args.cadence_alias_tolerance),
+        exclude_review_csvs=list(args.exclude_review_csv),
+        queue_name=str(args.queue_name),
+        real_quotas=_parse_real_quotas(list(args.real_quota)),
     )
     print(json.dumps(summary, indent=2, sort_keys=True, default=_json_default))
     return 0 if summary["verification_passed"] else 1

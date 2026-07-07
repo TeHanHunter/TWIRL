@@ -44,6 +44,7 @@ DEFAULT_LD_PREFIX = (
 )
 DEFAULT_LOG_DIR = Path("/pdo/users/tehan/tglc-deep-catalogs/twirl_logs")
 USER_WRITE_ROOT = Path("/pdo/users/tehan").resolve()
+SURVEY_MAX_MAGNITUDE = 99.0
 
 
 @dataclass(frozen=True)
@@ -262,7 +263,7 @@ def _process_one_ccd(
     runtime_env: dict[str, str],
     log_root: Path,
     tic_list: list[int],
-    max_magnitude: float,
+    max_magnitude: float | None,
     catalogs_nprocs: int,
     cutouts_nprocs: int,
     epsfs_nprocs: int,
@@ -323,22 +324,23 @@ def _process_one_ccd(
     command_prefix = [str(python_bin), "-m", "tglc"]
 
     if "catalogs" in stages:
+        catalogs_command = [
+            *command_prefix,
+            "catalogs",
+            "--orbit",
+            str(orbit),
+            "--ccd",
+            f"{job.camera},{job.ccd}",
+            "--nprocs",
+            str(catalogs_nprocs),
+            "--tglc-data-dir",
+            str(tglc_data_dir),
+        ]
+        if max_magnitude is not None:
+            catalogs_command.extend(["--max-magnitude", str(max_magnitude)])
         catalogs_record = _run_stage(
             stage_name="catalogs",
-            command=[
-                *command_prefix,
-                "catalogs",
-                "--orbit",
-                str(orbit),
-                "--ccd",
-                f"{job.camera},{job.ccd}",
-                "--max-magnitude",
-                str(max_magnitude),
-                "--nprocs",
-                str(catalogs_nprocs),
-                "--tglc-data-dir",
-                str(tglc_data_dir),
-            ],
+            command=catalogs_command,
             env=runtime_env,
             log_path=log_root / f"orbit-{orbit}_{job.label}_catalogs.log",
         )
@@ -563,7 +565,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-magnitude",
         type=float,
-        default=20.0,
+        default=SURVEY_MAX_MAGNITUDE,
+        help=(
+            "`tglc catalogs --max-magnitude` value. The TWIRL production "
+            f"default is {SURVEY_MAX_MAGNITUDE:g}, which intentionally avoids "
+            "dropping faint requested WD TICs. Lower values should be used only "
+            "for controlled smoke/diagnostic runs."
+        ),
     )
     parser.add_argument(
         "--tglc-data-dir",

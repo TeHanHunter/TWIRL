@@ -117,7 +117,8 @@ If this file and those docs disagree, treat the docs as authoritative and update
   - `pyticdb` access to `tic_82` and `gaia3`
   - MIT `tglc-data` directory layout
 - Use the MIT CLI stages: `catalogs`, `cutouts`, `epsfs`, `lightcurves`, or `all`.
-- For WD work, raise the target magnitude limit beyond the bright-star defaults, typically around `--max-magnitude 20`.
+- For WD survey production, do not impose a science target magnitude cap at TGLC catalog construction. The TWIRL wrappers pass an effectively unbounded catalog limit (`--max-magnitude 99`) so faint requested WD TICs are not dropped by the MIT fork's bright-star defaults. Smaller limits are only for controlled smoke or diagnostic runs.
+- If `--max-magnitude 99` makes TIC catalog queries too slow or too large, solve that by adding requested-TIC inclusion to the catalog bridge, not by reintroducing a science magnitude cap.
 - For the current CPU-only benchmark, use `--nprocs 16` as the default one-CCD `epsfs` worker count unless a new timing test motivates a change.
 - Prefer `pdogpu1` for CPU-only benchmark and Stage 2 work; use `pdogpu6` for GPU ePSF production when the `cupy` environment is active.
 - Preserve the MIT raw data layout. Add TWIRL metadata and indices on top rather than inventing a parallel raw layout.
@@ -155,7 +156,9 @@ GaiaEDR3_WD_main.fits (external seed, data_local/)
   -> TWIRL-FS HLSP FITS (hlsp_twirlfs_*)
 ```
 
-Current faint-end LC work should focus on the labeled TWIRL-FS v2 product: robust-auto subtractive residuals with `bkspace_d=0.8`, `sigma_clip=5`, gap-split cotrending, and `hlsp_twirlfs_tess_ffi_*` FITS outputs. The key behavior is preserving legitimate negative and near-zero background-subtracted flux cadences while avoiding a fragile `flux / spline` ratio.
+Current faint-end LC production planning should prioritize the adaptive TWIRL-FS branches used for human labeling and vetting: ADP (`DET_FLUX_ADP*`) and ADP015 (`DET_FLUX_ADP015*`). Keep canonical/default `DET_FLUX*` only where needed for compatibility or comparison until downstream readers and exports no longer require it.
+The short name for the regenerated production product family is `A2v1`: no TIC magnitude cap (`--max-magnitude 99`), saturated-pixel ePSF masking, and ADP plus ADP015 saved for the `1x1`, `3x3`, and `5x5` apertures only. Use that name when referring to the S56 remake or future sectors following the same production rule.
+To reuse existing prepared source pickles, prefer small `source_tic/source_X_Y.ecsv` TIC overlays plus a TGLC light-curve hook that assigns `source.tic` from the sidecar after unpickling. For requested TWIRL WD target emission, build those overlays from the TWIRL observation table detector coordinates (`--overlay-from-observations`) rather than regenerating max-99 TIC catalogs by default. Use max-99 TIC catalogs only when a broad all-TIC match table is required. Do not rewrite or regenerate large source pickles unless the overlay path fails validation.
 
 ## Safety And Boundaries
 
@@ -218,17 +221,17 @@ Current faint-end LC work should focus on the labeled TWIRL-FS v2 product: robus
 
 When choosing what to implement next, prefer this order:
 
-1. Run BLS/heuristic/LEO checks on the S56 TWIRL-FS v2 tree and compare against prior QLP/TWIRL S56 products.
-2. Complete full-product QA for TWIRL-FS v2, including cadence retention, RMS/MAD, quality-flag behavior, WD 1856 timing, and injected short-event preservation.
-3. Decide whether TWIRL-FS v2 replaces the normal QLP detrending path for production sectors.
-4. Build v2/v3/TWIRL-FS comparison tables only after the light-curve product is clearly validated.
+1. Regenerate S56 with the no-magnitude-cap TGLC catalog policy and use the same policy for all remaining production sectors.
+2. Produce and validate the `A2v1` ADP/ADP015-focused TWIRL-FS light-curve product for S56; keep canonical/default detrending only as a temporary compatibility product if still needed.
+3. Run BLS/heuristic/LEO checks on the regenerated S56 ADP/ADP015 products and compare against prior QLP/TWIRL S56 products.
+4. Complete full-product QA for the chosen ADP/ADP015 production product, including cadence retention, RMS/MAD, quality-flag behavior, WD 1856 timing, and injected short-event preservation.
 5. Consolidate the HDF5-to-TWIRL index format and QA reports for the production sectors.
 6. Continue Gaia-first target-support audit and no-TIC bridge characterization.
 7. Build transparent periodic and dip-search baselines before committing to ML-heavy triage.
 8. Build and human-label the S56 mixed teacher queue: a blinded `10,000`-row pool with `9,000` stratified real S56 BLS/vetter candidates plus `1,000` pre-detrend BATMAN injection-recovery rows, exposed first as a random `1,000`-row queue (`900` real, `100` injected) with WD-tuned LEO reports.
 9. Run pixel-level source-pickle/ePSF injections only as a calibration subset for extraction, crowding, aperture, and centroid effects; keep dense recovery grids on raw-aperture pre-detrend injections until the calibration delta is known.
 10. Build the S56 semi-supervised self-training vetting loop on top of transparent candidate tables, with human labels from the mixed teacher queue, injection truth, pseudo-label provenance, and targeted follow-up review queues.
-11. Export compact S56 TWIRL-FS v2 light curves to ORCD/H200-scale storage for LC-level injection-recovery and raw-light-curve training experiments; do not move raw TGLC/TICA trees.
+11. Export compact regenerated S56 ADP/ADP015 light curves to ORCD/H200-scale storage for LC-level injection-recovery and raw-light-curve training experiments; do not move raw TGLC/TICA trees.
 12. Develop follow-up coordination support after candidate validation criteria are stable.
 
 ## Follow-Up Planning Assumptions

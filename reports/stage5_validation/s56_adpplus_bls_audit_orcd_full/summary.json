@@ -1,0 +1,35 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_ADP"
+  ],
+  "branches": [
+    "current_adp",
+    "adpplus_0p20",
+    "adpplus_0p12",
+    "adpplus_adaptive"
+  ],
+  "created_utc": "2026-07-02T16:22:44.592793+00:00",
+  "export_h5": "data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5",
+  "hlsp_root": "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare",
+  "injection_csv": "reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/review_queue.csv",
+  "injection_h5": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injected_lightcurves.h5",
+  "mask_modes": [
+    "truth_masked",
+    "iterative"
+  ],
+  "n_injected_sample": 3000,
+  "n_peaks": 20,
+  "n_periods": 50000,
+  "n_real_sample": 2000,
+  "out_dir": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full",
+  "outputs": {
+    "audit_sample_injected": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/audit_sample_injected.csv",
+    "audit_sample_real": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/audit_sample_real.csv",
+    "branch_summary": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/branch_summary.csv",
+    "injection_branch_peak_table": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/injection_branch_peak_table.csv",
+    "real_branch_peak_table": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/real_branch_peak_table.csv",
+    "summary_json": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary.json"
+  },
+  "real_candidates": "data_local/stage2/bls_first_pass_v2/sector_0056/vetted_per_tic_centroid.csv"
+}

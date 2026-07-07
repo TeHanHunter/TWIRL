@@ -1,0 +1,25 @@
+{
+  "audit_dir": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full",
+  "n_injection_rows": 839867,
+  "n_real_rows": 320000,
+  "out_dir": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables",
+  "outputs": {
+    "branch_score": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/branch_acceptance_score.csv",
+    "injection_by_period": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/injection_recovery_by_period.csv",
+    "injection_by_period_radius": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/injection_recovery_by_period_radius.csv",
+    "injection_by_radius": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/injection_recovery_by_radius.csv",
+    "injection_by_tmag": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/injection_recovery_by_tmag.csv",
+    "injection_overall": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/injection_recovery_overall.csv",
+    "real_by_bucket": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/real_trend_by_bucket.csv",
+    "real_overall": "reports/stage5_validation/s56_adpplus_bls_audit_orcd_full/summary_tables/real_trend_overall.csv"
+  },
+  "status_counts": {
+    "injection": {
+      "ok": 839860,
+      "too_few_cadences": 7
+    },
+    "real": {
+      "ok": 320000
+    }
+  }
+}

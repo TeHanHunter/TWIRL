@@ -1,0 +1,28 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_ADP"
+  ],
+  "branches": [
+    "current_adp",
+    "adpplus_0p20",
+    "adpplus_0p12",
+    "adpplus_adaptive"
+  ],
+  "created_utc": "2026-07-02T16:36:04.417931+00:00",
+  "export_h5": "data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5",
+  "hlsp_path": "",
+  "hlsp_root": "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare",
+  "lc_path": "data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5:targets/0000000267574918",
+  "n_peaks": 20,
+  "n_periods": 50000,
+  "outputs": {
+    "peaks": "reports/stage5_validation/wd1856_adpplus_branch_check_orcd/wd1856_branch_peaks.csv",
+    "top1_summary": "reports/stage5_validation/wd1856_adpplus_branch_check_orcd/wd1856_top1_summary.csv"
+  },
+  "sector": 56,
+  "tic": 267574918,
+  "truth_duration_min": 8.0,
+  "truth_period_d": 1.407939211,
+  "truth_t0_bjd": 2458779.375083
+}

@@ -24,7 +24,7 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-05-18`: **TWIRL-FS v1 S56 product built.** The initial TWIRL-FS candidate (`twirl-fs-v1`, TWIRL Flux-Spline v1) used robust-auto subtractive scaling with `bkspace_d=0.8`, `sigma_clip=5`, and FITS files named `hlsp_twirlfs_tess_ffi_*`. Full S56 was built on `pdogpu6` at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v1`: `19,072 ok / 0 fail` in `17.4 min`; WD 1856 plus seven faint audit targets retained all negative quality-zero cadences as finite detrended measurements. See [methods](twirl_fs_methods.md) and progress log §2.6.
 - `2026-05-19`: **TWIRL-FS v1 failed S57 dim-target QA; v2 is the active candidate.** The bad case TIC `1400694779` exposed that v1 fit one spline across the multi-day orbit gap, hit an `LSQUnivariateSpline` knot-condition failure, then silently fell back to a low-order polynomial. S57-S63 relight was stopped and normal S64+ finalize remains paused by `qc_pause.flag`. The candidate fix is `twirl-fs-v2`: independent cotrend fits across gaps larger than `0.5 d`, still using robust-auto subtractive scaling. See [methods](twirl_fs_methods.md) and progress log §2.6.
 - `2026-05-22`: **S56 TWIRL-FS v2 rebuilt for collaboration handoff.** Full S56 was rebuilt on `pdogpu6` at `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2` using the current `twirl-fs-v2` code path. The initial run wrote `19,070` products and logged two transient I/O write failures; both failed TICs were retried successfully and reopen with `METHOD=twirl-fs-v2`, `GAPSPLIT=0.5`, and cotrend diagnostics. This is the current Franklin/Michelle handoff candidate while full product QA remains pending.
-- `2026-05-22`: **S56 compare-column product built for Franklin/Michelle.** The handoff tree `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare` keeps canonical `DET_FLUX` as `twirl-fs-v2` and adds experimental `DET_FLUX_ADP` columns using `twirl-fs-v2-adp03q` (`0.3 d` quantile-knot spline, `0.2 d` adaptive gap split). Full corrected rebuild wrote `19,072 / 19,072` FITS; the 100-target QA sample has all adaptive fits in spline mode and includes all 16 CCDs. Use canonical `DET_FLUX` by default and treat adaptive columns as opt-in comparison inputs.
+- `2026-05-22`: **S56 compare-column product built for Franklin/Michelle.** The handoff tree `/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_compare` keeps canonical `DET_FLUX` as `twirl-fs-v2` and adds experimental `DET_FLUX_ADP` columns using `twirl-fs-v2-adp03q` (`0.3 d` quantile-knot spline, `0.2 d` adaptive gap split). Full corrected rebuild wrote `19,072 / 19,072` FITS; the 100-target QA sample has all adaptive fits in spline mode and includes all 16 CCDs. This product established ADP as a first-class comparison branch; later production planning shifts toward ADP/ADP015 as the columns of record.
 - `2026-06-18`: **S56-S93 cutout prep/recovery is complete and size/count QA passed.** On `pdogpu1`, the refreshed S56-S93 completion map shows `38/38` sectors with cutout prep complete; the full source-pickle metadata sweep checked `1,216` orbit/camera/CCD source directories with `0` size/count issues. `qc_pause.flag` remains in place, so normal GPU finalize is still intentionally paused while TWIRL-FS v2 product QA remains the gate.
 - `2026-06-03`: **Current-stage talk and QA visuals wrapped for the post-talk checkpoint.** The clean local Keynote/PPTX deck is preserved in `outputs/` and the ignored `reports/exploratory/talks/2026-06-02-current-stage/` archive; the tracked repo now keeps only the reusable scripts and compact report artifacts. New presentation-facing QA products are the S56-S93 production-status map and the rebuilt WD 1856 S56 pixel-map diagnostic. The precision-plot work remains exploratory and should not be used as a final product-QA claim until the normalization/plotting choice is re-run and signed off.
 - `2026-06-24`: **ORCD 8xH200 downstream-compute path is usable for TWIRL once compact S56 exports are staged.** The runnable Slurm partition is `pg_mki_aryeh`; the current control-socket probe reaches login host `login007` and sees the H200 node `node4900` with `gpu:h200:8`. PDO remains the Stage 1 TGLC/ePSF production home; the first ORCD pilot should move compact S56 TWIRL-FS v2 light-curve exports, manifests, candidate tables, and recovery outputs to `/orcd/data/mki_aryeh/001/twirl/exports/s56_twirlfs_v2/`, then run CPU/1xH200 smoke tests before larger Stage 3/4 sweeps. Operational details live in [ORCD guide](orcd_h200_usage.md).
@@ -36,6 +36,9 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-07-02`: **Downstream testing/vetting shifts to ORCD by default.** PDO remains the Stage 1/TGLC/HLSP production and compact-export staging home, while raw-flux detrending-strength audits, two-aperture BLS/vetting-sheet production, injection-recovery branch tests, and later ML training should run from compact S56 exports on ORCD CPU/H200 resources as appropriate. The first ORCD ADP+ audit is now treated only as a post-ADP vetting/display diagnostic: it shows residual trends matter, but it is not an independent production search product because it starts from already detrended ADP curves. The production search branch must be chosen from raw-flux re-detrending variants, i.e. the same family of comparison as canonical `DET_FLUX` versus `DET_FLUX_ADP`.
 - `2026-07-02`: **Raw-flux detrending-strength audit favors small-aperture search.** ORCD CPU job `17020767` compared `7` fresh raw-flux spline settings across `DET_FLUX_ADP_SML`-style small aperture and default/primary aperture on `3,000` BATMAN injections. The best branch is small aperture with `bkspace_d=0.15 d`, `gap_split_d=0.2 d`, quantile knots (`1534/3000 = 51.1%` strict top-1; `1713/3000 = 57.1%` top-N exact/harmonic), only slightly ahead of current small-aperture ADP (`1515/3000 = 50.5%`) and well ahead of default/primary aperture (`1233/3000 = 41.1%`). Next vetting sheets should therefore search on small aperture, show primary aperture as a comparison, and keep the `0.15 d` setting as a candidate production update pending real-data vetter QA.
 - `2026-07-04`: **The `0.15 d` candidate branch is now a concrete S56 first-pass vetting product.** The named branch is `twirl-fs-v2-adp015q`, compare FITS columns are `DET_FLUX_ADP015*`, and the two-aperture vetter runs BLS directly on `DET_FLUX_ADP015_SML + DET_FLUX_ADP015` without an additional ADP+ high-pass. Full S56 ADP015 FITS production completed on PDO (`19,072 / 19,072`, zero failures), the compact export verifies `19,072` target groups, and ORCD rendered the random `1,000`-row mixed-teacher queue with `1,000/1,000` reports verified. Next gate is human triage plus the first-label audit; `twirl-fs-v2` remains canonical until real-data QA and WD 1856 checks pass for the candidate branch.
+- `2026-07-07`: **Stage 1 production policy updated after the S56 missing-HDF5 audit.** Do not use `--max-magnitude 20` as a production catalog gate. Regenerate S56 and all remaining sectors with the TWIRL wrapper's effectively unbounded TIC catalog limit (`--max-magnitude 99`) so faint requested WD TICs are not excluded by TIC-side Tmag. The derived survey product should prioritize ADP and ADP015 light curves; canonical/default `DET_FLUX*` can be retained temporarily for compatibility, but it is no longer the planned production search branch.
+- `2026-07-07`: **A2v1 source-pickle reuse smoke passed on S56.** The faster target-emission path builds `source_tic` sidecars directly from the TWIRL observation table and symlinks existing source pickles, avoiding both cutout regeneration and full max-99 TIC catalog queries for requested WD targets. On `pdogpu6`, TIC `1400899528` was recovered into HDF5 for both S56 orbits from existing source pickles; this validates the overlay hook but not the still-pending saturated-pixel ePSF mask.
+- `2026-07-07`: **Recovery50 CNN teacher scaffold is working on the combined 2k labels.** The current teacher maps raw `uncertain` labels to the negative/no-visible-signal target, keeps EB/PCEB audit-only below the `40`-label threshold, and excludes injected truth/recovery/source columns from inputs. The one-H200 combined small-aperture plus BLS-metadata CNN is the current infrastructure winner on the `1,999` accepted tensors (`0.916` validation balanced accuracy, `0.885` test balanced accuracy), but it is not yet the final science teacher because rare FP classes and real-row planet-like recall need more human support.
 - `2026-06-17`: **Julien joins the active collaboration/follow-up planning.** Meeting notes are recorded in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership). Immediate implications: compare S56 TWIRL-FS search/vetting results against Julien's SPOC Stage-1 candidate funnel, define what signal classes the current products are sensitive to before first-paper claims, and verify follow-up/funding routes before treating SPECULOOS, MISCOT, LCO 1m, EPRV, or proto-Lightspeed as executable paths.
 - `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
@@ -404,8 +407,8 @@ Use two nested samples:
 A practical starting point is:
 
 - use `Pwd > 0.75` as the default high-confidence reference sample for pilot QA and crossmatch studies
-- primary sample near `T <= 18`
-- full sample extended toward `T <= 20` where recovery remains useful
+- collect light curves for all reachable Gaia-first WD targets with TIC bridges; do not use `T <= 20` as a TGLC extraction cap
+- reserve magnitude cuts such as `T <= 18` or `T <= 20` for QA summaries, first-look search subsets, and the later locked statistical denominator
 - include WD 1856+534 as the mandatory smoke-test target
 - choose one `Sector >= 56` containing WD 1856+534 as the first end-to-end benchmark; the exact sector can be selected later
 
@@ -456,13 +459,14 @@ The MIT fork runs in four logical stages:
 3. `epsfs`
 4. `lightcurves`
 
-For TWIRL, the key configuration change is to lift the TIC magnitude limit well beyond the default value. The MIT fork defaults to bright-star QLP use cases; WD work needs a much deeper target cut.
+For TWIRL, the key configuration change is to avoid using the TIC magnitude limit as a science target gate. The MIT fork defaults to bright-star QLP use cases and requires an explicit override; production wrappers therefore pass an effectively unbounded TIC catalog limit (`--max-magnitude 99`) so requested WD TICs are not dropped before light-curve extraction.
 
 Initial production assumptions:
 
-- run `--max-magnitude 20`
+- run with the TWIRL wrapper default `--max-magnitude 99`; lower limits are smoke-test or diagnostic settings only
 - keep Gaia catalogs for all relevant field stars
 - run per orbit and per CCD, not per target
+- regenerate Sector `56` under this policy before treating the Julien comparison or S56 missing-HDF5 counts as final production behavior
 
 #### Status
 
@@ -474,24 +478,53 @@ Initial production assumptions:
 
 ### 1.5 Extract and consolidate WD light curves
 
-The full Stage 1 pipeline per orbit/camera/CCD is:
+The full Stage 1 extraction pipeline per orbit/camera/CCD is:
 
 ```
 tglc catalogs → tglc cutouts → tglc epsfs → tglc lightcurves
-  → qlp lctools detrend → qlp lctools hlsp (→ FITS per TIC)
+  → TWIRL-FS ADP/ADP015 product build (→ FITS or compact exports per TIC)
 ```
 
-`tglc lightcurves` writes one HDF5 file per TIC target. The `detrend` step (run via `qlp lctools detrend`) annotates those HDF5 files with a `bestdmagkey` attribute that `hlsp.py` reads to select the detrended magnitude column. **Without detrending, HLSP generation fails.** The `hlsp` step then converts HDF5 → FITS, requiring the full QLP environment (`lightcurvedb` + `qlp` package, not just TGLC).
+`tglc lightcurves` writes one HDF5 file per TIC target. For current survey production, Stage 1 is complete at this HDF5 extraction layer plus the TWIRL-FS product build. The production-facing derived light curves should prioritize the adaptive TWIRL-FS branches:
+
+- ADP: `DET_FLUX_ADP*` (`twirl-fs-v2-adp03q`)
+- ADP015: `DET_FLUX_ADP015*` (`twirl-fs-v2-adp015q`)
+
+The trackable product-family name for the regenerated no-cap, saturated-mask,
+ADP/ADP015-only production light curves is **`A2v1`**. Read this as
+"adaptive-two, version 1". For S56, use short roots such as
+`hlsp_s0056_A2v1` and compact exports named with the same tag. Its product
+contract is:
+
+- TGLC catalog construction uses the TWIRL production default
+  `--max-magnitude 99`;
+- ePSF fitting enables the saturated/overexposed-pixel mask from the ePSF
+  normalization test work, without adopting unit-sum ePSF normalization unless
+  separately validated;
+- saved derived light-curve branches are ADP and ADP015 only, for all three
+  apertures: `DET_FLUX_ADP_SML`, `DET_FLUX_ADP`, `DET_FLUX_ADP_LAG`,
+  `DET_FLUX_ADP015_SML`, `DET_FLUX_ADP015`, and `DET_FLUX_ADP015_LAG`;
+- canonical/default `DET_FLUX*` columns are excluded from the production product
+  except in explicitly labeled compatibility or comparison trees.
+
+Prepared source pickles may be reused for `A2v1` through lightweight
+`source_tic/source_X_Y.ecsv` TIC overlays rather than regenerated cutouts. The
+overlay path requires a small TGLC light-curve-stage hook that replaces
+`source.tic` from the sidecar after unpickling; the tracked patch artifact is
+`scripts/stage1_lightcurves/tglc_source_tic_overlay_hook.patch`. This is the
+preferred runtime-saving path for S56-S93 and later S94+ default source trees.
+
+Canonical/default `DET_FLUX*` can remain in compare FITS while downstream compatibility requires it, but it is no longer the planned search branch of record. The old `qlp lctools detrend → qlp lctools hlsp` path is a legacy/public-style export route; it requires `bestdmagkey` and the full QLP environment, and should not be treated as mandatory for TWIRL production products if ADP/ADP015 exports satisfy downstream needs.
 
 For Sector 56 specifically, HLSP generation uses SPOC quality flags (not TICA), because `get_ticaflags` in `hlsp.py` raises `ValueError` for `sector < 67`. These SPOC flags live at `/pdo/qlp-data/spocflags/`.
 
-**Standard recovery rate check** — run after both HDF5 and FITS production:
+**Standard recovery rate check** — run after HDF5 extraction and after whichever TWIRL-FS FITS/compact export is produced:
 
 For each orbit/camera/CCD:
 1. Count TIC IDs requested (from TWIRL detector target table)
 2. Count HDF5 files produced (`tglc lightcurves` output)
-3. Count FITS files produced (`qlp lctools hlsp` output; missing TICs logged as warnings by `generate_qlp_hlsp_fits_file`)
-4. Bin the shortfall by TESS magnitude to detect faint-end dropout
+3. Count TWIRL-FS FITS or compact-export products produced
+4. Bin the shortfall by TIC and Gaia/TWIRL TESS magnitudes to detect catalog-gate or faint-end dropout
 5. Cross-check against Gaia-only targets (no TIC bridge): these will always be 0% recovered until the MIT fork is extended to emit Gaia-selected targets directly
 
 This 3-level audit (requested → h5 → FITS) is the standard health check for every production run. Log counts and dropout fractions in the progress log.
@@ -541,7 +574,8 @@ Known gaps to track early:
 - Gaia-to-TIC matching should be audited for metadata and implementation reasons, but it should not define the scientific parent sample by itself.
 - If important WD targets lack TIC IDs, the light-curve stage will need to be extended to support Gaia-selected targets directly.
 - For current terminology, distinguish `TGLC end-to-end` from `QLP/MAST end-to-end`: Stage 1 extraction is complete at the HDF5 `lightcurves` output, while public-style FITS deliverables require the later QLP detrend + HLSP export path.
-- After the full Sector 56 benchmark run, verify that all metadata needed to launch whole-sector TIC light-curve extraction with a magnitude cut is already present and discoverable from the generated products, not hidden in ad hoc scripts.
+- After the no-magnitude-cap Sector 56 regeneration, verify that all metadata needed to launch whole-sector TIC light-curve extraction is present and discoverable from generated products, not hidden in ad hoc scripts.
+- If the effective no-cap setting makes TIC catalog queries too slow or too large, patch the TGLC/TWIRL catalog bridge to guarantee inclusion of requested TWIRL TICs directly rather than relying on a broad all-TIC magnitude limit.
 - After the full Sector 56 benchmark run, confirm that the `cutouts` and `epsf` products under `/pdo/users/tehan/tglc-deep-catalogs/orbit-*/ffi/cam*/ccd*/` are exactly in the MKI TGLC `Manifest` layout so they can be reused by standard `tglc lightcurves` commands without special-case path handling.
 - The new output product is decontaminated aperture photometry in HDF5, not the old per-target FITS product with `cal_psf_flux` and `cal_aper_flux`.
 - The old `prior`-based single-target workflow is not exposed in the new CLI, so any need for floating-field-star priors must be added explicitly.
@@ -553,7 +587,7 @@ Questions to answer before mass production:
 - Why do the WD-only `lightcurves` runs currently write fewer `.h5` files than requested TIC IDs, and is that shortfall astrophysical, metadata-driven, or an extraction/control-plane issue?
 - What is the official QLP/LCDB metadata path needed to run detrend and HLSP export without the current local benchmark shims?
 - Once the full Sector `56` benchmark is done, should whole-sector production stay WD-only at `lightcurves`, or should TWIRL also preserve a full-TIC sector archive for direct QLP/MAST-style downstream products?
-- **QLP ingestion for Sectors 94+**: TGLC has been incorporated into QLP (Petitpas et al. 2025, in prep.) and is producing light curves from Sector 94 onward. Should TWIRL ingest those QLP/MAST products directly for recent sectors rather than re-running MIT PDO extraction? Key questions: format compatibility with the HDF5 archive, whether the WD magnitude limit (`--max-magnitude 20`) was applied, and whether the Gaia-first target list is recoverable from QLP outputs. Resolving this could substantially reduce the PDO compute load for newer sectors.
+- **QLP ingestion for Sectors 94+**: TGLC has been incorporated into QLP (Petitpas et al. 2025, in prep.) and is producing light curves from Sector 94 onward. Should TWIRL ingest those QLP/MAST products directly for recent sectors rather than re-running MIT PDO extraction? Key questions: format compatibility with the HDF5 archive, whether any target magnitude gate was applied, and whether the Gaia-first target list is recoverable from QLP outputs. Resolving this could substantially reduce the PDO compute load for newer sectors.
 
 ### Stage 1 Deliverables
 
@@ -650,9 +684,9 @@ Status (`2026-06-18`): the initial S56 v2 human-vetting template is ready in
 with a companion [guide](../reports/stage5_validation/self_training_s56_v2/labeling_guide.md),
 but it is now treated as a bootstrap sheet, not the final review substrate. The
 preferred review unit is an end-to-end candidate/recovery object with explicit
-provenance: TWIRL-FS v2 canonical `DET_FLUX` light curve, injection truth when
-present, BLS recovery columns, WD-tuned LEO-Vetter diagnostics, and then a human
-label. The browser vetter ([module](../src/twirl/vetting/lightcurve_label_app.py),
+provenance: TWIRL-FS ADP/ADP015 light curve, injection truth when present,
+BLS recovery columns, WD-tuned LEO-Vetter diagnostics, and then a human label.
+The browser vetter ([module](../src/twirl/vetting/lightcurve_label_app.py),
 [runner](../scripts/stage5_validation/run_lightcurve_vetting_app.py)) now
 presents pre-rendered LEO-Vetter reports first; the plain TWIRL light curve is
 collapsed fallback/debug context. Existing LEO outputs cover `51 / 300`
@@ -975,6 +1009,20 @@ two-aperture sheets. Caveat: the existing `20k` injection HDF5 has
 `DET_FLUX_ADP_SML + DET_FLUX_ADP`; the next full injection generation should
 include the final real-data aperture pair once it is locked.
 
+Status (`2026-07-07`, recovery50 CNN teacher smoke): the first full-label ORCD
+CNN teacher smoke is implemented and trained from only the completed
+`1,000`-row recovery-boundary queue. The label policy is explicit: human label
+is the main vetting target, injection truth is auxiliary/evaluation provenance,
+and truth/recovery/source/path/selection columns are excluded from model inputs.
+Current outputs are under
+[queue dir](../reports/stage5_validation/s56_recovery50_teacher_queue/):
+`human_label_audit/`, `human_training_table/`, `cnn_tensors/`, and
+`cnn_teacher/`. The usable teacher table has `568` strong rows (`239`
+planet-like, `223` instrumental/systematic, `106` stellar variability); the
+combined shape+BLS CNN is the current infrastructure winner, but rare FP
+classes and real-row planet-like recall still need more human support before a
+final science teacher/student pass.
+
 Pre-human-labeling path:
 
 1. Use the accepted S56 pilot light-curve product as the baseline, with the
@@ -1048,8 +1096,8 @@ Stage 3 should explicitly keep two injection levels separate:
 - **Pixel-level injections**: inject synthetic occultation signals into the cutout/FFI pixel data before ePSF fitting and aperture extraction, then run the real TGLC/TWIRL light-curve builder and search stack. This is slower and should be run on a calibration subset, but it is the completeness layer needed for publication-grade occurrence rates because it includes extraction systematics, crowding, aperture disagreements, and centroid/on-target behavior.
 - **Adopt a two-stage protocol**: use LC-level injections for iteration and first-order completeness surfaces; use pixel-level injections to calibrate where the LC-level approximation breaks, especially near the faint limit, in crowded fields, and for candidates where centroid or aperture behavior drives classification.
 
-The ORCD/H200 path should start from compact S56 TWIRL-FS v2 exports, not raw
-TGLC or TICA trees. The current transfer scaffold is [export script](../scripts/stage3_injections/export_s56_lc_training_set.py)
+The ORCD/H200 path should start from compact regenerated S56 ADP/ADP015 exports,
+not raw TGLC or TICA trees. The current transfer scaffold is [export script](../scripts/stage3_injections/export_s56_lc_training_set.py)
 plus [injection builder](../scripts/stage3_injections/make_s56_lc_injection_training_set.py)
 and [config](../configs/injections/s56_lc_training_export.yaml): export the
 `~19k` S56 HLSP-derived light curves on PDO or another spacious working disk,
@@ -1251,14 +1299,13 @@ A publishable null result still requires:
 
 ## Immediate Implementation Priorities For This Repo
 
-1. Rebuild targeted S57 TWIRL-FS v2 products and pass dim-target QA, including TIC `1400694779`, before any production restart.
-2. Complete product QA for TWIRL-FS v2 with full-sample cadence retention, RMS/MAD, quality flags, WD 1856 timing, and injected short-event preservation.
-3. Run BLS/heuristic/LEO checks on the validated TWIRL-FS v2 S56 tree and compare against the prior QLP/TWIRL S56 products.
-4. Resume S57-S63 relight and then S64+ production only after v2 QA passes; leave `qc_pause.flag` in place until then.
-5. Build the v2/v3/TWIRL-FS comparison table only after the light-curve product is clearly validated.
-6. Define the consolidated HDF5-to-TWIRL index format and attach QA metrics.
-7. Audit Gaia-first target support and decide what MIT fork changes are needed for targets without TIC IDs.
-8. Build the transparent periodic and dip-search baselines before committing to an ML-heavy workflow.
-9. Build the S56 self-training vetting loop on top of the verified mixed teacher pool: human labels, injection truth, teacher pseudo-labels, student scores, and targeted follow-up review queues.
-10. Stage compact TWIRL-FS exports for ORCD and run S56 equivalence tests before scaling H200 injection-recovery or search jobs.
-11. Lock down follow-up readiness and coordination only after the candidate-validation criteria are stable.
+1. Regenerate S56 TGLC HDF5s for `A2v1` with the no-science-cap catalog policy (`--max-magnitude 99`) and verify TIC `1400899528` plus the three non-edge boundary cases are no longer catalog-gate misses.
+2. Build the regenerated S56 `A2v1` ADP/ADP015 TWIRL-FS product; keep canonical/default `DET_FLUX*` only in explicitly labeled compatibility/comparison trees if still needed.
+3. Complete product QA for the chosen ADP/ADP015 product with full-sample cadence retention, RMS/MAD, quality flags, WD 1856 timing, injected short-event preservation, and Julien-ten-target rerun.
+4. Resume all-sector production under the same no-cap catalog policy after S56 passes the regeneration QA gate.
+5. Define the consolidated HDF5-to-TWIRL index format and attach QA metrics.
+6. Audit Gaia-first target support and decide what MIT fork changes are needed for targets without TIC IDs.
+7. Build the transparent periodic and dip-search baselines before committing to an ML-heavy workflow.
+8. Build the S56 self-training vetting loop on top of the verified mixed teacher pool: human labels, injection truth, teacher pseudo-labels, student scores, and targeted follow-up review queues.
+9. Stage compact regenerated ADP/ADP015 exports for ORCD and run S56 equivalence tests before scaling H200 injection-recovery or search jobs.
+10. Lock down follow-up readiness and coordination only after the candidate-validation criteria are stable.

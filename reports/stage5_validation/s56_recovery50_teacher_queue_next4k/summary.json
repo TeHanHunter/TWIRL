@@ -1,0 +1,160 @@
+{
+  "created_utc": "2026-07-07T18:41:39.596221+00:00",
+  "excluded_review_csvs": [
+    "reports/stage5_validation/s56_recovery50_teacher_queue/review_queue_1k.csv"
+  ],
+  "excluded_review_id_count": 1000,
+  "injected_fraction": 0.15,
+  "injected_selection": {
+    "candidate_rows_after_filters": 1971,
+    "coarse_recovery_cells": 324,
+    "excluded_review_id_rows": 300,
+    "input_rows": 20000,
+    "min_good_in_transit": 5,
+    "recovery_status_counts": {
+      "bls_recovered": 600
+    },
+    "require_both_apertures": true,
+    "selected_cell_any_recovery_quantiles": {
+      "0.0": 0.25333333333333335,
+      "0.1": 0.3088235294117647,
+      "0.5": 0.5559928443649373,
+      "0.9": 0.7317073170731707,
+      "1.0": 0.75
+    },
+    "selected_depth_pct_quantiles": {
+      "0.0": 1.3645876812003899,
+      "0.1": 7.626402635970314,
+      "0.5": 63.484547204055374,
+      "0.9": 100.0,
+      "1.0": 100.0
+    },
+    "selected_rows": 600,
+    "selected_strict_cell_recovery_quantiles": {
+      "0.0": 0.14285714285714285,
+      "0.1": 0.22371475953565506,
+      "0.5": 0.5,
+      "0.9": 0.6829268292682927,
+      "1.0": 0.7321428571428571
+    },
+    "selected_tmag_quantiles": {
+      "0.0": 13.361936363916314,
+      "0.1": 15.435260336594764,
+      "0.5": 17.97284394173198,
+      "0.9": 19.569962581912005,
+      "1.0": 20.068104073678416
+    },
+    "selected_truth_period_d_quantiles": {
+      "0.0": 0.1218647291189148,
+      "0.1": 0.1551992627861352,
+      "0.5": 0.8333369640465953,
+      "0.9": 7.300082157560072,
+      "1.0": 12.397444572462897
+    },
+    "selected_truth_radius_rearth_quantiles": {
+      "0.0": 0.3644204700784166,
+      "0.1": 0.8585839843756191,
+      "0.5": 2.9426950849084736,
+      "0.9": 10.351689326847954,
+      "1.0": 17.74728211303348
+    },
+    "target_cell_any_recovery_range": [
+      0.25,
+      0.75
+    ],
+    "topn_recovery_counts": {
+      "bls_top1_recovered": 600
+    }
+  },
+  "injection_recovery_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
+  "n_injected": 600,
+  "n_real": 3400,
+  "n_real_source_pool": 9000,
+  "n_review": 4000,
+  "outputs": {
+    "human_labels_vetted_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/human_labels_vetted.csv",
+    "review_queue_1k_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k.csv",
+    "review_queue_1k_injected_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k_injected.csv",
+    "review_queue_1k_real_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k_real.csv",
+    "review_queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k.csv",
+    "review_queue_injected_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k_injected.csv",
+    "review_queue_real_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k_real.csv",
+    "review_queue_unblinded_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/review_queue_4k_unblinded.csv",
+    "twirl_vet_sheets": "reports/stage5_validation/s56_recovery50_teacher_queue_next4k/twirl_vet_sheets"
+  },
+  "random_state": 561053,
+  "real_candidates": "/Users/tehan/PycharmProjects/TWIRL/data_local/stage2/bls_first_pass_v2/sector_0056/vetted_per_tic_centroid.csv",
+  "real_selection": {
+    "broad_pool_bucket_counts": {
+      "real_aperture_disagreement": 964,
+      "real_cadence_alias_systematic": 655,
+      "real_eb_pceb_like": 2040,
+      "real_high_sde_planet_like": 1540,
+      "real_low_sde_control": 789,
+      "real_mid_sde_control": 1344,
+      "real_variability_broad_duration": 1067
+    },
+    "broad_pool_rows": 8399,
+    "requested_bucket_quotas": {
+      "real_aperture_disagreement": 275,
+      "real_cadence_alias_systematic": 275,
+      "real_eb_pceb_like": 900,
+      "real_high_sde_planet_like": 700,
+      "real_low_sde_control": 349,
+      "real_mid_sde_control": 350,
+      "real_variability_broad_duration": 550,
+      "real_wd1856_benchmark": 1
+    },
+    "selected_bucket_counts": {
+      "real_aperture_disagreement": 275,
+      "real_cadence_alias_systematic": 275,
+      "real_eb_pceb_like": 901,
+      "real_high_sde_planet_like": 700,
+      "real_low_sde_control": 349,
+      "real_mid_sde_control": 350,
+      "real_variability_broad_duration": 550
+    },
+    "selected_rows": 3400,
+    "selection_rule": "custom teacher-review quotas from broad stratified real pool",
+    "source_pool_summary": {
+      "cadence_alias_selected": 568,
+      "duration_q80_min": 30.0,
+      "input_rows": 14545,
+      "period_cluster_q95": 24.0,
+      "sde_quantiles": {
+        "q40": 8.87688500234097,
+        "q70": 11.199771136272103,
+        "q90": 19.272529469949657
+      },
+      "selected_rows": 9000,
+      "selection_bucket_available_counts": {
+        "real_aperture_disagreement": 12896,
+        "real_cadence_alias_systematic": 1386,
+        "real_eb_pceb_like": 10152,
+        "real_high_sde_planet_like": 3007,
+        "real_low_sde_control": 5535,
+        "real_mid_sde_control": 3962,
+        "real_variability_broad_duration": 7622,
+        "real_wd1856_benchmark": 1
+      },
+      "selection_bucket_counts": {
+        "real_aperture_disagreement": 1000,
+        "real_cadence_alias_systematic": 700,
+        "real_eb_pceb_like": 2200,
+        "real_high_sde_planet_like": 1800,
+        "real_low_sde_control": 799,
+        "real_mid_sde_control": 1400,
+        "real_variability_broad_duration": 1100,
+        "real_wd1856_benchmark": 1
+      }
+    }
+  },
+  "source_blinding": {
+    "browser_visible_source_bucket": "review_candidate",
+    "browser_visible_vet_class": "review_candidate",
+    "hidden_truth_columns_retained": true
+  },
+  "stage": "s56_recovery50_teacher_queue",
+  "verification_failures": [],
+  "verification_passed": true
+}

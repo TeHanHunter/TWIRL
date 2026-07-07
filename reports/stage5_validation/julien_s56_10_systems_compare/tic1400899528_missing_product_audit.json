@@ -1,0 +1,54 @@
+{
+  "catalog_status": "present_in_gaia_wd_catalog_and_unique_tic_bridge",
+  "created_utc": "2026-07-07T14:58:27.460700+00:00",
+  "gaia_source_id": 1439208012920230656,
+  "gaia_to_tic_matches_row": "data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_matches.csv:636548",
+  "gaia_to_tic_summary_row": "data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv:613282",
+  "interpretation": "This is not absence from the Gaia WD parent catalog and not a detector-edge target. The likely root cause is TGLC catalog construction: TIC-side Tmag is 20.0136, just fainter than the --max-magnitude 20 threshold, while the TWIRL/Gaia-derived target-table tmag is 19.8303.",
+  "lightcurve_product_status": {
+    "local_hlsp_compare_shard": "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare/0000/0014/0089/9528",
+    "local_hlsp_compare_shard_exists": false,
+    "local_s56_lightcurve_tic_index": "reports/stage1_lightcurves/s56_tic_ids/tic_ids_s0056_lightcurves_orbits119_120.csv",
+    "pdo_adp015_hlsp_shard_exists": false,
+    "pdo_current_adp_hlsp_shard_exists": false,
+    "pdo_orbit119_h5_exists": false,
+    "pdo_orbit120_h5_exists": false,
+    "present_in_local_s56_lightcurve_tic_index": false
+  },
+  "pwd": 0.910251,
+  "s56_missing_h5_population_audit": "reports/stage1_lightcurves/s56_missing_h5_audit/summary.md",
+  "s56_detector_target_rows": [
+    {
+      "camera": 4,
+      "ccd": 4,
+      "colpix": 720.3116455078125,
+      "edge_warn": false,
+      "orbit": 119,
+      "path": "data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/orbit0119_cam4_ccd4_twirl_targets.ecsv",
+      "rowpix": 1764.88232421875,
+      "sector": 56,
+      "tmag": 19.83029591133148
+    },
+    {
+      "camera": 4,
+      "ccd": 4,
+      "colpix": 720.3116455078125,
+      "edge_warn": false,
+      "orbit": 120,
+      "path": "data_local/catalogs/twirl_master_catalog/tess_detector_target_tables_v0/orbit0120_cam4_ccd4_twirl_targets.ecsv",
+      "rowpix": 1764.88232421875,
+      "sector": 56,
+      "tmag": 19.83029591133148
+    }
+  ],
+  "tglc_catalog_gate": {
+    "pdo_orbit119_tic_catalog": "/pdo/users/tehan/tglc-gpu-production/orbit-119/ffi/catalogs/TIC_cam4_ccd4.ecsv",
+    "pdo_orbit119_tic_catalog_contains_tic": false,
+    "pdo_orbit120_tic_catalog": "/pdo/users/tehan/tglc-gpu-production/orbit-120/ffi/catalogs/TIC_cam4_ccd4.ecsv",
+    "pdo_orbit120_tic_catalog_contains_tic": false,
+    "tglc_catalog_max_magnitude": 20.0,
+    "tic_catalog_unique_tmag": 20.0136,
+    "twirl_detector_table_tmag": 19.83029591133148
+  },
+  "tic": 1400899528
+}

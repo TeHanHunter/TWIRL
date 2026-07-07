@@ -1,0 +1,76 @@
+{
+  "counts": {
+    "class_counts": {
+      "has_h5": 19072,
+      "tic_tmag_gt_20_catalog_cut": 12430,
+      "within_ticmag20_edge_warn": 85,
+      "within_ticmag20_no_edge_tmag_boundary": 3
+    },
+    "highconf_missing_h5_tics": 9105,
+    "highconf_missing_h5_tics_with_tic_tmag_le_20": 56,
+    "highconf_observed_tics": 22135,
+    "s56_observation_rows_with_tic": 63238,
+    "unique_h5_product_tics": 19072,
+    "unique_missing_h5_tics": 12518,
+    "unique_missing_h5_tics_with_tic_tmag_gt_20": 12430,
+    "unique_missing_h5_tics_with_tic_tmag_le_20": 88,
+    "unique_observed_tics": 31590,
+    "unique_observed_tics_with_tic_tmag_le_20": 19160,
+    "within_ticmag20_missing_edge_warn_false": 3,
+    "within_ticmag20_missing_edge_warn_true": 85
+  },
+  "created_utc": "2026-07-07T15:14:30.155380+00:00",
+  "inputs": {
+    "h5_index_definition": "Union of TIC IDs with TGLC HDF5 light curves in S56 orbits 119 and 120.",
+    "h5_tic_index_csv": "reports/stage1_lightcurves/s56_tic_ids/tic_ids_s0056_lightcurves_orbits119_120.csv",
+    "h5_tic_index_meta_json": "reports/stage1_lightcurves/s56_tic_ids/tic_ids_s0056_lightcurves_orbits119_120_meta.json",
+    "observations_fits": "data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits",
+    "tic_bridge_csv": "data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_summary.csv"
+  },
+  "julien_tic_1400899528": {
+    "any_edge_warn": false,
+    "any_highconf_wd": true,
+    "cameras": "cam4",
+    "ccds": "ccd4",
+    "colpix_max": 720.3116455078125,
+    "colpix_min": 720.3116455078125,
+    "detectors": "cam4/ccd4",
+    "gaia_twirl_tmag_max": 19.83029591133148,
+    "gaia_twirl_tmag_min": 19.83029591133148,
+    "h5_status_class": "tic_tmag_gt_20_catalog_cut",
+    "has_h5": false,
+    "is_julien_example": true,
+    "max_pwd": 0.910251,
+    "min_pwd": 0.910251,
+    "n_obs_rows": 2,
+    "n_source_ids": 1,
+    "orbits": "119;120",
+    "rowpix_max": 1764.88232421875,
+    "rowpix_min": 1764.88232421875,
+    "source_ids": "1439208012920230656",
+    "tic_bridge_source_count": 1,
+    "tic_id": 1400899528,
+    "tic_match_statuses": "unique_tic",
+    "unique_tic_tmag_max": 20.0136,
+    "unique_tic_tmag_min": 20.0136
+  },
+  "notes": [
+    "TIC-side unique_tic_tmag is used for the catalog-cut classification because the MIT TGLC catalog stage was run with --max-magnitude 20 and the generated TIC_cam*_ccd*.ecsv catalogs are TIC catalog products.",
+    "edge_warn comes from twirl_wd_tess_observations_v0.fits; it is treated as an upstream detector-edge warning, not recomputed here.",
+    "The local product index is the previously generated union of TIC IDs with TGLC HDF5 light curves in S56 orbits 119 and 120."
+  ],
+  "outputs": {
+    "full_csv": "reports/stage1_lightcurves/s56_missing_h5_audit/s56_observation_to_h5_audit.csv",
+    "julien_targets_csv": "reports/stage1_lightcurves/s56_missing_h5_audit/s56_julien_target_h5_audit.csv",
+    "missing_all_csv": "reports/stage1_lightcurves/s56_missing_h5_audit/s56_missing_h5_all.csv",
+    "missing_within_ticmag20_csv": "reports/stage1_lightcurves/s56_missing_h5_audit/s56_missing_h5_within_ticmag20.csv"
+  },
+  "selection": {
+    "orbits_seen": [
+      119,
+      120
+    ],
+    "sector": 56,
+    "tic_id_positive_only": true
+  }
+}

@@ -379,6 +379,7 @@ def test_peak_training_truth_labels_exact_harmonic_and_mismatch() -> None:
     exact = module.label_peak_against_injection(
         period_d=1.0005,
         t0_bjd=2459825.001,
+        duration_min=6.0,
         truth_period_d=1.0,
         truth_t0_bjd=2459825.0,
         truth_duration_min=6.0,
@@ -390,6 +391,7 @@ def test_peak_training_truth_labels_exact_harmonic_and_mismatch() -> None:
     harmonic = module.label_peak_against_injection(
         period_d=2.001,
         t0_bjd=2459825.0,
+        duration_min=6.0,
         truth_period_d=1.0,
         truth_t0_bjd=2459825.0,
         truth_duration_min=6.0,
@@ -401,6 +403,7 @@ def test_peak_training_truth_labels_exact_harmonic_and_mismatch() -> None:
     mismatch = module.label_peak_against_injection(
         period_d=1.25,
         t0_bjd=2459825.0,
+        duration_min=6.0,
         truth_period_d=1.0,
         truth_t0_bjd=2459825.0,
         truth_duration_min=6.0,

@@ -1,0 +1,52 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP_SML"
+  ],
+  "compact_lc_h5": "data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5",
+  "context_shape": [
+    1999,
+    1,
+    512
+  ],
+  "created_utc": "2026-07-07T20:26:16.422454+00:00",
+  "events_shape": [
+    1999,
+    1,
+    16,
+    128
+  ],
+  "folded_shape": [
+    1999,
+    1,
+    512
+  ],
+  "hlsp_root": "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare",
+  "injection_h5_override": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injected_lightcurves.h5",
+  "n_input_rows": 2000,
+  "n_tensor_rows": 1999,
+  "observable_channel_policy": "only channels present for both real and injected rows; injected original/pre-injection arrays excluded",
+  "out_dir": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_tensors",
+  "outputs": {
+    "npz": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_tensors/recovery50_cnn_tensors.npz",
+    "rows": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_tensors/recovery50_cnn_tensor_rows.csv",
+    "summary": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_tensors/summary.json"
+  },
+  "status_counts": {
+    "no_observed_bins": 1,
+    "ok": 1999
+  },
+  "tensor_config": {
+    "apertures": [
+      "DET_FLUX_ADP_SML"
+    ],
+    "context_points": 512,
+    "context_window_durations": 12.0,
+    "event_points": 128,
+    "event_window_durations": 4.0,
+    "folded_points": 512,
+    "folded_window_durations": 4.0,
+    "max_events": 16,
+    "min_event_points": 1
+  },
+  "training_table": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/human_vetting_training_table.csv"
+}

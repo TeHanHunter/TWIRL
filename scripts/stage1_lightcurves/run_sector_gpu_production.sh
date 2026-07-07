@@ -55,7 +55,6 @@ while (( attempt < MAX_RETRIES )); do
     --catalogs-nprocs 16 \
     --cutouts-nprocs 16 \
     --lightcurves-nprocs 16 \
-    --max-magnitude 20 \
     --run-label "$RUN_LABEL" \
     $GPU_ARGS \
     "$@"

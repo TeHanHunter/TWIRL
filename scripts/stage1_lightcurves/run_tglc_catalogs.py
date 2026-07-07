@@ -22,6 +22,7 @@ DEFAULT_COMMAND_SCRIPT = Path(
 DEFAULT_JOB_TABLE = Path(
     "data_local/catalogs/twirl_master_catalog/tglc_catalog_jobs_v0.csv"
 )
+SURVEY_MAX_MAGNITUDE = 99.0
 
 
 @dataclass(frozen=True)
@@ -69,8 +70,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-magnitude",
         type=float,
-        default=20.0,
-        help="`tglc catalogs --max-magnitude` value.",
+        default=SURVEY_MAX_MAGNITUDE,
+        help=(
+            "`tglc catalogs --max-magnitude` value. The TWIRL production "
+            f"default is {SURVEY_MAX_MAGNITUDE:g}, which intentionally avoids "
+            "dropping faint requested WD TICs. Lower values should be used only "
+            "for controlled smoke/diagnostic jobs."
+        ),
     )
     parser.add_argument(
         "--nprocs",
@@ -217,20 +223,21 @@ def keep_job(job: CatalogJob, args: argparse.Namespace) -> bool:
 
 
 def command_for_job(job: CatalogJob, args: argparse.Namespace) -> list[str]:
-    return [
+    command = [
         "tglc",
         "catalogs",
         "--orbit",
         str(job.orbit),
         "--ccd",
         f"{job.camera},{job.ccd}",
-        "--max-magnitude",
-        str(args.max_magnitude),
         "--nprocs",
         str(args.nprocs),
         "--tglc-data-dir",
         str(args.tglc_data_dir),
     ]
+    if args.max_magnitude is not None:
+        command[6:6] = ["--max-magnitude", str(args.max_magnitude)]
+    return command
 
 
 def format_command(argv: list[str]) -> str:

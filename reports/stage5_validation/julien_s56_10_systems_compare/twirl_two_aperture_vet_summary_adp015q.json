@@ -1,0 +1,19 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP015_SML",
+    "DET_FLUX_ADP015"
+  ],
+  "branch_name": "twirl_fs_v2_adp015q",
+  "created_utc": "2026-07-07T14:47:15.717500+00:00",
+  "hlsp_root": "/pdo/users/tehan/tglc-gpu-production/hlsp_s0056_twirl_fs_v2_adp015q_compare",
+  "lc_export_h5": "",
+  "metrics_csv": "reports/stage5_validation/julien_s56_10_systems_compare/twirl_vet_metrics_adp015q.csv",
+  "n_peaks": 10,
+  "n_periods": 20000,
+  "n_rows": 9,
+  "out_dir": "reports/stage5_validation/julien_s56_10_systems_compare/twirl_vet_sheets_adp015q",
+  "queue_csv": "reports/stage5_validation/julien_s56_10_systems_compare/julien_s56_9_existing_hlsp_queue.csv",
+  "status_counts": {
+    "ok": 9
+  }
+}

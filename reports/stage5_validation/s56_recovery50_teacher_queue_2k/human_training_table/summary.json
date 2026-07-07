@@ -1,0 +1,39 @@
+{
+  "label_counts": {
+    "eclipsing_binary_or_pceb": 17,
+    "instrumental_or_systematic": 352,
+    "planet_like": 347,
+    "skip": 3,
+    "stellar_variability": 122,
+    "uncertain": 1159
+  },
+  "label_policy": "main human-visible teacher target; injection truth auxiliary/evaluation only",
+  "labels_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_labels_vetted.csv",
+  "min_multiclass_count": 40,
+  "n_audit_rows": 1997,
+  "n_labeled": 2000,
+  "n_rows": 2000,
+  "n_teacher_rows": 1980,
+  "out_dir": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table",
+  "outputs": {
+    "audit_rows": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/audit_labeled_rows.csv",
+    "teacher_rows": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/teacher_labeled_rows.csv",
+    "training_table": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/human_vetting_training_table.csv"
+  },
+  "queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/review_queue_2k_labeled.csv",
+  "teacher_source_kind_counts": {
+    "injection_recovery": 455,
+    "real_candidate": 1525
+  },
+  "teacher_target_counts": {
+    "instrumental_or_systematic": 1511,
+    "planet_like": 347,
+    "stellar_variability": 122
+  },
+  "training_split_counts": {
+    "test": 395,
+    "train": 1190,
+    "unlabeled_or_audit": 20,
+    "validation": 395
+  }
+}

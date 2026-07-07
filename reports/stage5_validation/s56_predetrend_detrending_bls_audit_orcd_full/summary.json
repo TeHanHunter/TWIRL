@@ -1,0 +1,30 @@
+{
+  "created_utc": "2026-07-02T18:29:55.984284+00:00",
+  "injection_h5": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injected_lightcurves.h5",
+  "injection_manifest": "data_local/stage3_injections/s56_twirlfs_v2_injection_training/pdo_20k_predetrend_batman_periodradius_bright_balanced/injection_manifest.csv",
+  "methods": [
+    "current_adp03q",
+    "spline_q015_gap02",
+    "spline_q02_gap02",
+    "spline_q025_gap02",
+    "spline_q05_gap02",
+    "spline_q08_gap02",
+    "current_uniform08_gap05"
+  ],
+  "n_injections": 3000,
+  "n_peaks": 20,
+  "n_periods": 50000,
+  "out_dir": "reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_full",
+  "outputs": {
+    "audit_sample_injected": "reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_full/audit_sample_injected.csv",
+    "branch_summary": "reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_full/detrending_bls_branch_summary.csv",
+    "peak_table": "reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_full/detrending_bls_peak_table.csv",
+    "summary_json": "reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_full/summary.json",
+    "summary_md": "reports/stage5_validation/s56_predetrend_detrending_bls_audit_orcd_full/summary.md"
+  },
+  "raw_apertures": [
+    "Small",
+    "Primary"
+  ],
+  "workers": 96
+}

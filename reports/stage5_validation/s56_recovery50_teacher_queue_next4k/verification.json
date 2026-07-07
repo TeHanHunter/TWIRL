@@ -1,0 +1,24 @@
+{
+  "created_utc": "2026-07-07T18:41:39.594883+00:00",
+  "failures": [],
+  "n_rows": 4000,
+  "passed": true,
+  "selection_bucket_counts": {
+    "inj_recovery50_strict_top1": 600,
+    "real_aperture_disagreement": 275,
+    "real_cadence_alias_systematic": 275,
+    "real_eb_pceb_like": 901,
+    "real_high_sde_planet_like": 700,
+    "real_low_sde_control": 349,
+    "real_mid_sde_control": 350,
+    "real_variability_broad_duration": 550
+  },
+  "source_kind_counts": {
+    "injection_recovery": 600,
+    "real_candidate": 3400
+  },
+  "truth_source_kind_counts": {
+    "injection_recovery": 600,
+    "real_candidate": 3400
+  }
+}

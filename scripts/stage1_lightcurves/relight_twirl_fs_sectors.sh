@@ -97,7 +97,6 @@ refresh_orbit_lightcurves() {
     --cutouts-nprocs 16 \
     --lightcurves-nprocs 16 \
     --max-parallel-ccd-jobs 4 \
-    --max-magnitude 20 \
     --run-label "s${tag}-twirlfs-relight" \
     --stages lightcurves \
     --no-auto-resume \

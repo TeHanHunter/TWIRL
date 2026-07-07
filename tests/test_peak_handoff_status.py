@@ -104,7 +104,7 @@ def test_peak_handoff_audit_supports_orcd_layout(tmp_path: Path) -> None:
     _write_json(root / "peak_ranker_orcd" / "summary.json", {"n": 1})
     selected_dir = repo / "reports/stage5_validation/s56_ranker_selected_real_candidates_orcd"
     _write_json(selected_dir / "real_peak_table_verification.json", {"passed": True})
-    (selected_dir / "selected_ephemerides.csv").parent.mkdir(parents=True)
+    (selected_dir / "selected_ephemerides.csv").parent.mkdir(parents=True, exist_ok=True)
     (selected_dir / "selected_ephemerides.csv").write_text("tic\n1\n")
     _write_json(selected_dir / "selected_ephemerides_verification.json", {"passed": True})
 
@@ -134,7 +134,7 @@ def test_peak_handoff_audit_supports_allhost_pdo_layout(tmp_path: Path) -> None:
     _write_json(root / "peak_ranker_pdo" / "summary.json", {"n": 1})
     selected_dir = repo / "reports/stage5_validation/s56_allhost_ranker_selected_real_candidates_pdo"
     _write_json(selected_dir / "real_peak_table_verification.json", {"passed": True})
-    (selected_dir / "selected_ephemerides.csv").parent.mkdir(parents=True)
+    (selected_dir / "selected_ephemerides.csv").parent.mkdir(parents=True, exist_ok=True)
     (selected_dir / "selected_ephemerides.csv").write_text("tic\n1\n")
     review_dir = repo / "reports/stage5_validation/s56_allhost_ranker_selected_real_review_queue_pdo"
     (review_dir / "review_queue.csv").parent.mkdir(parents=True)

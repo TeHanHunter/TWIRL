@@ -1,0 +1,568 @@
+{
+  "best_epoch": 32,
+  "best_validation_balanced_accuracy": 0.8537795992714026,
+  "classes": [
+    "planet_like",
+    "instrumental_or_systematic",
+    "stellar_variability"
+  ],
+  "metadata_columns": [],
+  "metrics": {
+    "source_injection_recovery": {
+      "accuracy": 0.7626373626373626,
+      "balanced_accuracy": 0.4571266074290737,
+      "calibration": {
+        "bins": [
+          {
+            "hi": 0.1,
+            "lo": 0.0,
+            "n": 0
+          },
+          {
+            "hi": 0.2,
+            "lo": 0.1,
+            "n": 0
+          },
+          {
+            "hi": 0.30000000000000004,
+            "lo": 0.2,
+            "n": 0
+          },
+          {
+            "hi": 0.4,
+            "lo": 0.30000000000000004,
+            "n": 0
+          },
+          {
+            "accuracy": 0.8,
+            "confidence": 0.46567368507385254,
+            "hi": 0.5,
+            "lo": 0.4,
+            "n": 5
+          },
+          {
+            "accuracy": 0.5396825396825397,
+            "confidence": 0.5490137934684753,
+            "hi": 0.6000000000000001,
+            "lo": 0.5,
+            "n": 63
+          },
+          {
+            "accuracy": 0.7283950617283951,
+            "confidence": 0.6516672372817993,
+            "hi": 0.7000000000000001,
+            "lo": 0.6000000000000001,
+            "n": 81
+          },
+          {
+            "accuracy": 0.6909090909090909,
+            "confidence": 0.748423159122467,
+            "hi": 0.8,
+            "lo": 0.7000000000000001,
+            "n": 55
+          },
+          {
+            "accuracy": 0.7708333333333334,
+            "confidence": 0.8594818115234375,
+            "hi": 0.9,
+            "lo": 0.8,
+            "n": 96
+          },
+          {
+            "accuracy": 0.8903225806451613,
+            "confidence": 0.9493198394775391,
+            "hi": 1.0,
+            "lo": 0.9,
+            "n": 155
+          }
+        ],
+        "ece": 0.06437924641829268
+      },
+      "confusion_matrix": {
+        "instrumental_or_systematic": {
+          "instrumental_or_systematic": 68,
+          "planet_like": 79,
+          "stellar_variability": 0
+        },
+        "planet_like": {
+          "instrumental_or_systematic": 26,
+          "planet_like": 279,
+          "stellar_variability": 2
+        },
+        "stellar_variability": {
+          "instrumental_or_systematic": 0,
+          "planet_like": 1,
+          "stellar_variability": 0
+        }
+      },
+      "n": 455,
+      "per_class": {
+        "instrumental_or_systematic": {
+          "precision": 0.723404255319149,
+          "predicted": 94.0,
+          "recall": 0.46258503401360546,
+          "support": 147.0
+        },
+        "planet_like": {
+          "precision": 0.7771587743732591,
+          "predicted": 359.0,
+          "recall": 0.9087947882736156,
+          "support": 307.0
+        },
+        "stellar_variability": {
+          "precision": 0.0,
+          "predicted": 2.0,
+          "recall": 0.0,
+          "support": 1.0
+        }
+      }
+    },
+    "source_real_candidate": {
+      "accuracy": 0.8314754098360656,
+      "balanced_accuracy": 0.68950502088332,
+      "calibration": {
+        "bins": [
+          {
+            "hi": 0.1,
+            "lo": 0.0,
+            "n": 0
+          },
+          {
+            "hi": 0.2,
+            "lo": 0.1,
+            "n": 0
+          },
+          {
+            "hi": 0.30000000000000004,
+            "lo": 0.2,
+            "n": 0
+          },
+          {
+            "hi": 0.4,
+            "lo": 0.30000000000000004,
+            "n": 0
+          },
+          {
+            "accuracy": 0.5217391304347826,
+            "confidence": 0.4730433523654938,
+            "hi": 0.5,
+            "lo": 0.4,
+            "n": 23
+          },
+          {
+            "accuracy": 0.6764705882352942,
+            "confidence": 0.5501599907875061,
+            "hi": 0.6000000000000001,
+            "lo": 0.5,
+            "n": 136
+          },
+          {
+            "accuracy": 0.8141592920353983,
+            "confidence": 0.6549813747406006,
+            "hi": 0.7000000000000001,
+            "lo": 0.6000000000000001,
+            "n": 226
+          },
+          {
+            "accuracy": 0.8595890410958904,
+            "confidence": 0.7498905062675476,
+            "hi": 0.8,
+            "lo": 0.7000000000000001,
+            "n": 292
+          },
+          {
+            "accuracy": 0.8411214953271028,
+            "confidence": 0.8480859398841858,
+            "hi": 0.9,
+            "lo": 0.8,
+            "n": 321
+          },
+          {
+            "accuracy": 0.8709677419354839,
+            "confidence": 0.9594936370849609,
+            "hi": 1.0,
+            "lo": 0.9,
+            "n": 527
+          }
+        ],
+        "ece": 0.08865125185153525
+      },
+      "confusion_matrix": {
+        "instrumental_or_systematic": {
+          "instrumental_or_systematic": 1139,
+          "planet_like": 64,
+          "stellar_variability": 161
+        },
+        "planet_like": {
+          "instrumental_or_systematic": 18,
+          "planet_like": 10,
+          "stellar_variability": 12
+        },
+        "stellar_variability": {
+          "instrumental_or_systematic": 2,
+          "planet_like": 0,
+          "stellar_variability": 119
+        }
+      },
+      "n": 1525,
+      "per_class": {
+        "instrumental_or_systematic": {
+          "precision": 0.9827437446074202,
+          "predicted": 1159.0,
+          "recall": 0.8350439882697948,
+          "support": 1364.0
+        },
+        "planet_like": {
+          "precision": 0.13513513513513514,
+          "predicted": 74.0,
+          "recall": 0.25,
+          "support": 40.0
+        },
+        "stellar_variability": {
+          "precision": 0.4075342465753425,
+          "predicted": 292.0,
+          "recall": 0.9834710743801653,
+          "support": 121.0
+        }
+      }
+    },
+    "test": {
+      "accuracy": 0.7755102040816326,
+      "balanced_accuracy": 0.8356177308364049,
+      "calibration": {
+        "bins": [
+          {
+            "hi": 0.1,
+            "lo": 0.0,
+            "n": 0
+          },
+          {
+            "hi": 0.2,
+            "lo": 0.1,
+            "n": 0
+          },
+          {
+            "hi": 0.30000000000000004,
+            "lo": 0.2,
+            "n": 0
+          },
+          {
+            "hi": 0.4,
+            "lo": 0.30000000000000004,
+            "n": 0
+          },
+          {
+            "accuracy": 0.5714285714285714,
+            "confidence": 0.48330816626548767,
+            "hi": 0.5,
+            "lo": 0.4,
+            "n": 7
+          },
+          {
+            "accuracy": 0.6956521739130435,
+            "confidence": 0.543384313583374,
+            "hi": 0.6000000000000001,
+            "lo": 0.5,
+            "n": 46
+          },
+          {
+            "accuracy": 0.7794117647058824,
+            "confidence": 0.6558718681335449,
+            "hi": 0.7000000000000001,
+            "lo": 0.6000000000000001,
+            "n": 68
+          },
+          {
+            "accuracy": 0.7457627118644068,
+            "confidence": 0.7480908632278442,
+            "hi": 0.8,
+            "lo": 0.7000000000000001,
+            "n": 59
+          },
+          {
+            "accuracy": 0.7671232876712328,
+            "confidence": 0.8500576019287109,
+            "hi": 0.9,
+            "lo": 0.8,
+            "n": 73
+          },
+          {
+            "accuracy": 0.8273381294964028,
+            "confidence": 0.9580053091049194,
+            "hi": 1.0,
+            "lo": 0.9,
+            "n": 139
+          }
+        ],
+        "ece": 0.10300046228328533
+      },
+      "confusion_matrix": {
+        "instrumental_or_systematic": {
+          "instrumental_or_systematic": 228,
+          "planet_like": 31,
+          "stellar_variability": 42
+        },
+        "planet_like": {
+          "instrumental_or_systematic": 10,
+          "planet_like": 53,
+          "stellar_variability": 4
+        },
+        "stellar_variability": {
+          "instrumental_or_systematic": 1,
+          "planet_like": 0,
+          "stellar_variability": 23
+        }
+      },
+      "n": 392,
+      "per_class": {
+        "instrumental_or_systematic": {
+          "precision": 0.9539748953974896,
+          "predicted": 239.0,
+          "recall": 0.7574750830564784,
+          "support": 301.0
+        },
+        "planet_like": {
+          "precision": 0.6309523809523809,
+          "predicted": 84.0,
+          "recall": 0.7910447761194029,
+          "support": 67.0
+        },
+        "stellar_variability": {
+          "precision": 0.3333333333333333,
+          "predicted": 69.0,
+          "recall": 0.9583333333333334,
+          "support": 24.0
+        }
+      }
+    },
+    "train": {
+      "accuracy": 0.8337489609310058,
+      "balanced_accuracy": 0.8844613241873516,
+      "calibration": {
+        "bins": [
+          {
+            "hi": 0.1,
+            "lo": 0.0,
+            "n": 0
+          },
+          {
+            "hi": 0.2,
+            "lo": 0.1,
+            "n": 0
+          },
+          {
+            "hi": 0.30000000000000004,
+            "lo": 0.2,
+            "n": 0
+          },
+          {
+            "hi": 0.4,
+            "lo": 0.30000000000000004,
+            "n": 0
+          },
+          {
+            "accuracy": 0.5,
+            "confidence": 0.46675270795822144,
+            "hi": 0.5,
+            "lo": 0.4,
+            "n": 16
+          },
+          {
+            "accuracy": 0.608,
+            "confidence": 0.5519082546234131,
+            "hi": 0.6000000000000001,
+            "lo": 0.5,
+            "n": 125
+          },
+          {
+            "accuracy": 0.8248587570621468,
+            "confidence": 0.6537527441978455,
+            "hi": 0.7000000000000001,
+            "lo": 0.6000000000000001,
+            "n": 177
+          },
+          {
+            "accuracy": 0.8657407407407407,
+            "confidence": 0.7497045993804932,
+            "hi": 0.8,
+            "lo": 0.7000000000000001,
+            "n": 216
+          },
+          {
+            "accuracy": 0.83203125,
+            "confidence": 0.8510737419128418,
+            "hi": 0.9,
+            "lo": 0.8,
+            "n": 256
+          },
+          {
+            "accuracy": 0.9031476997578692,
+            "confidence": 0.9563201069831848,
+            "hi": 1.0,
+            "lo": 0.9,
+            "n": 413
+          }
+        ],
+        "ece": 0.07458693081403114
+      },
+      "confusion_matrix": {
+        "instrumental_or_systematic": {
+          "instrumental_or_systematic": 744,
+          "planet_like": 78,
+          "stellar_variability": 88
+        },
+        "planet_like": {
+          "instrumental_or_systematic": 26,
+          "planet_like": 186,
+          "stellar_variability": 7
+        },
+        "stellar_variability": {
+          "instrumental_or_systematic": 0,
+          "planet_like": 1,
+          "stellar_variability": 73
+        }
+      },
+      "n": 1203,
+      "per_class": {
+        "instrumental_or_systematic": {
+          "precision": 0.9662337662337662,
+          "predicted": 770.0,
+          "recall": 0.8175824175824176,
+          "support": 910.0
+        },
+        "planet_like": {
+          "precision": 0.7018867924528301,
+          "predicted": 265.0,
+          "recall": 0.8493150684931506,
+          "support": 219.0
+        },
+        "stellar_variability": {
+          "precision": 0.43452380952380953,
+          "predicted": 168.0,
+          "recall": 0.9864864864864865,
+          "support": 74.0
+        }
+      }
+    },
+    "validation": {
+      "accuracy": 0.8,
+      "balanced_accuracy": 0.8537795992714026,
+      "calibration": {
+        "bins": [
+          {
+            "hi": 0.1,
+            "lo": 0.0,
+            "n": 0
+          },
+          {
+            "hi": 0.2,
+            "lo": 0.1,
+            "n": 0
+          },
+          {
+            "hi": 0.30000000000000004,
+            "lo": 0.2,
+            "n": 0
+          },
+          {
+            "hi": 0.4,
+            "lo": 0.30000000000000004,
+            "n": 0
+          },
+          {
+            "accuracy": 0.8,
+            "confidence": 0.47143322229385376,
+            "hi": 0.5,
+            "lo": 0.4,
+            "n": 5
+          },
+          {
+            "accuracy": 0.6428571428571429,
+            "confidence": 0.5509081482887268,
+            "hi": 0.6000000000000001,
+            "lo": 0.5,
+            "n": 28
+          },
+          {
+            "accuracy": 0.7096774193548387,
+            "confidence": 0.6531823873519897,
+            "hi": 0.7000000000000001,
+            "lo": 0.6000000000000001,
+            "n": 62
+          },
+          {
+            "accuracy": 0.8055555555555556,
+            "confidence": 0.7508022785186768,
+            "hi": 0.8,
+            "lo": 0.7000000000000001,
+            "n": 72
+          },
+          {
+            "accuracy": 0.8522727272727273,
+            "confidence": 0.8501906991004944,
+            "hi": 0.9,
+            "lo": 0.8,
+            "n": 88
+          },
+          {
+            "accuracy": 0.8384615384615385,
+            "confidence": 0.9590367078781128,
+            "hi": 1.0,
+            "lo": 0.9,
+            "n": 130
+          }
+        ],
+        "ece": 0.07148136148205053
+      },
+      "confusion_matrix": {
+        "instrumental_or_systematic": {
+          "instrumental_or_systematic": 235,
+          "planet_like": 34,
+          "stellar_variability": 31
+        },
+        "planet_like": {
+          "instrumental_or_systematic": 8,
+          "planet_like": 50,
+          "stellar_variability": 3
+        },
+        "stellar_variability": {
+          "instrumental_or_systematic": 1,
+          "planet_like": 0,
+          "stellar_variability": 23
+        }
+      },
+      "n": 385,
+      "per_class": {
+        "instrumental_or_systematic": {
+          "precision": 0.9631147540983607,
+          "predicted": 244.0,
+          "recall": 0.7833333333333333,
+          "support": 300.0
+        },
+        "planet_like": {
+          "precision": 0.5952380952380952,
+          "predicted": 84.0,
+          "recall": 0.819672131147541,
+          "support": 61.0
+        },
+        "stellar_variability": {
+          "precision": 0.40350877192982454,
+          "predicted": 57.0,
+          "recall": 0.9583333333333334,
+          "support": 24.0
+        }
+      }
+    }
+  },
+  "n_metadata_features": 0,
+  "n_rows": 1980,
+  "outputs": {
+    "history": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_teacher/cnn_shape_only/training_history.csv",
+    "model": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_teacher/cnn_shape_only/cnn_teacher.pt",
+    "predictions": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_teacher/cnn_shape_only/cnn_predictions.parquet",
+    "summary": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_teacher/cnn_shape_only/summary.json"
+  },
+  "profile": "cnn_shape_only",
+  "status": "ok",
+  "use_metadata": false
+}
