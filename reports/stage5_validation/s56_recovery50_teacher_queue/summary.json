@@ -1,0 +1,143 @@
+{
+  "created_utc": "2026-07-06T14:32:18.287893+00:00",
+  "injected_fraction": 0.3,
+  "injected_selection": {
+    "candidate_rows_after_filters": 1084,
+    "coarse_recovery_cells": 324,
+    "input_rows": 20000,
+    "min_good_in_transit": 5,
+    "recovery_status_counts": {
+      "bls_recovered": 300
+    },
+    "require_both_apertures": true,
+    "selected_cell_any_recovery_quantiles": {
+      "0.0": 0.3548387096774194,
+      "0.1": 0.3888888888888889,
+      "0.5": 0.5324675324675324,
+      "0.9": 0.6304347826086957,
+      "1.0": 0.65
+    },
+    "selected_depth_pct_quantiles": {
+      "0.0": 1.56872064130331,
+      "0.1": 9.02695288907461,
+      "0.5": 72.84414828523659,
+      "0.9": 100.0,
+      "1.0": 100.0
+    },
+    "selected_rows": 300,
+    "selected_strict_cell_recovery_quantiles": {
+      "0.0": 0.2641509433962264,
+      "0.1": 0.3389830508474576,
+      "0.5": 0.45454545454545453,
+      "0.9": 0.5538461538461539,
+      "1.0": 0.6265060240963856
+    },
+    "selected_tmag_quantiles": {
+      "0.0": 13.361936363916314,
+      "0.1": 15.573272569460958,
+      "0.5": 17.714972028398748,
+      "0.9": 19.50694133709435,
+      "1.0": 20.019609730841783
+    },
+    "selected_truth_period_d_quantiles": {
+      "0.0": 0.1216159901852455,
+      "0.1": 0.20323152946642722,
+      "0.5": 1.3749392732403014,
+      "0.9": 9.126996995285952,
+      "1.0": 12.391207498292024
+    },
+    "selected_truth_radius_rearth_quantiles": {
+      "0.0": 0.602320801455539,
+      "0.1": 0.8341054894736228,
+      "0.5": 2.4818417272255813,
+      "0.9": 9.767909050979428,
+      "1.0": 17.438485084997335
+    },
+    "target_cell_any_recovery_range": [
+      0.35,
+      0.65
+    ],
+    "topn_recovery_counts": {
+      "bls_top1_recovered": 300
+    }
+  },
+  "injection_recovery_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_20k_predetrend_physical_bright_bls_map_pdo/small_pair_200k/injection_bls_recoveries.csv",
+  "n_injected": 300,
+  "n_real": 700,
+  "n_real_source_pool": 9000,
+  "n_review": 1000,
+  "outputs": {
+    "human_labels_vetted_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/human_labels_vetted.csv",
+    "review_queue_1k_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/review_queue_1k.csv",
+    "review_queue_1k_injected_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/review_queue_1k_injected.csv",
+    "review_queue_1k_real_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/review_queue_1k_real.csv",
+    "twirl_vet_sheets": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/twirl_vet_sheets"
+  },
+  "random_state": 561050,
+  "real_candidates": "/Users/tehan/PycharmProjects/TWIRL/data_local/stage2/bls_first_pass_v2/sector_0056/vetted_per_tic_centroid.csv",
+  "real_selection": {
+    "broad_pool_bucket_counts": {
+      "real_aperture_disagreement": 1000,
+      "real_cadence_alias_systematic": 700,
+      "real_eb_pceb_like": 2200,
+      "real_high_sde_planet_like": 1800,
+      "real_low_sde_control": 799,
+      "real_mid_sde_control": 1400,
+      "real_variability_broad_duration": 1100,
+      "real_wd1856_benchmark": 1
+    },
+    "broad_pool_rows": 9000,
+    "selected_bucket_counts": {
+      "real_aperture_disagreement": 70,
+      "real_cadence_alias_systematic": 45,
+      "real_eb_pceb_like": 160,
+      "real_high_sde_planet_like": 260,
+      "real_low_sde_control": 24,
+      "real_mid_sde_control": 45,
+      "real_variability_broad_duration": 95,
+      "real_wd1856_benchmark": 1
+    },
+    "selected_rows": 700,
+    "selection_rule": "fixed teacher-review quotas from broad stratified real pool",
+    "source_pool_summary": {
+      "cadence_alias_selected": 568,
+      "duration_q80_min": 30.0,
+      "input_rows": 14545,
+      "period_cluster_q95": 24.0,
+      "sde_quantiles": {
+        "q40": 8.87688500234097,
+        "q70": 11.199771136272103,
+        "q90": 19.272529469949657
+      },
+      "selected_rows": 9000,
+      "selection_bucket_available_counts": {
+        "real_aperture_disagreement": 12896,
+        "real_cadence_alias_systematic": 1386,
+        "real_eb_pceb_like": 10152,
+        "real_high_sde_planet_like": 3007,
+        "real_low_sde_control": 5535,
+        "real_mid_sde_control": 3962,
+        "real_variability_broad_duration": 7622,
+        "real_wd1856_benchmark": 1
+      },
+      "selection_bucket_counts": {
+        "real_aperture_disagreement": 1000,
+        "real_cadence_alias_systematic": 700,
+        "real_eb_pceb_like": 2200,
+        "real_high_sde_planet_like": 1800,
+        "real_low_sde_control": 799,
+        "real_mid_sde_control": 1400,
+        "real_variability_broad_duration": 1100,
+        "real_wd1856_benchmark": 1
+      }
+    }
+  },
+  "source_blinding": {
+    "browser_visible_source_bucket": "review_candidate",
+    "browser_visible_vet_class": "review_candidate",
+    "hidden_truth_columns_retained": true
+  },
+  "stage": "s56_recovery50_teacher_queue",
+  "verification_failures": [],
+  "verification_passed": true
+}

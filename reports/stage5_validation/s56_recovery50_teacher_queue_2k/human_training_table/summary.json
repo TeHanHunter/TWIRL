@@ -1,4 +1,8 @@
 {
+  "display_ephemeris_source_counts": {
+    "queue": 1,
+    "twirl_vet_anchor": 1999
+  },
   "label_counts": {
     "eclipsing_binary_or_pceb": 17,
     "instrumental_or_systematic": 352,
@@ -8,19 +12,26 @@
     "uncertain": 1159
   },
   "label_policy": "main human-visible teacher target; injection truth auxiliary/evaluation only",
-  "labels_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_labels_vetted.csv",
+  "labels_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_labels_vetted.csv",
+  "metrics_tables": [
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/twirl_vet_metrics_injected_fullphase_binmatch.csv",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/twirl_vet_metrics_real.csv",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_next4k/twirl_vet_metrics_real.csv",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_next4k/twirl_vet_metrics_injected.csv"
+  ],
   "min_multiclass_count": 40,
   "n_audit_rows": 1997,
+  "n_display_ephemeris_anchor": 1999,
   "n_labeled": 2000,
   "n_rows": 2000,
   "n_teacher_rows": 1980,
-  "out_dir": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table",
+  "out_dir": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table",
   "outputs": {
-    "audit_rows": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/audit_labeled_rows.csv",
-    "teacher_rows": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/teacher_labeled_rows.csv",
-    "training_table": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/human_vetting_training_table.csv"
+    "audit_rows": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/audit_labeled_rows.csv",
+    "teacher_rows": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/teacher_labeled_rows.csv",
+    "training_table": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/human_vetting_training_table.csv"
   },
-  "queue_csv": "reports/stage5_validation/s56_recovery50_teacher_queue_2k/review_queue_2k_labeled.csv",
+  "queue_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/review_queue_2k_labeled.csv",
   "teacher_source_kind_counts": {
     "injection_recovery": 455,
     "real_candidate": 1525

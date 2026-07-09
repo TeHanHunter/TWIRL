@@ -89,6 +89,7 @@ def test_balanced_real_table_can_pass_object_teacher_gate(tmp_path) -> None:
     module = _load_auditor()
     labels = [
         "planet_like",
+        "wide_transit_like",
         "eclipsing_binary_or_pceb",
         "stellar_variability",
         "instrumental_or_systematic",

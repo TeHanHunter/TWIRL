@@ -9,6 +9,10 @@ from twirl.search.bls import BLSConfig, run_bls_on_lc
 from twirl.search.candidates import result_to_rows
 
 
+def test_bls_defaults_use_active_adp_pair() -> None:
+    assert BLSConfig().apertures == ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
+
+
 def _synthetic_lc() -> HLSPLightCurve:
     n = 300
     time = np.linspace(0.0, 2.0, n)

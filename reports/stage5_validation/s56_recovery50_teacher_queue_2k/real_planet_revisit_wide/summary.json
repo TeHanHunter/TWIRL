@@ -1,0 +1,20 @@
+{
+  "half_period_review_ids": [
+    "real:1400739415",
+    "real:1400855795",
+    "real:160520962",
+    "real:1961800465"
+  ],
+  "include_half_period_variants": false,
+  "label_policy_note": "wide_transit_like is a separate raw human label; the main teacher target should continue to keep compact planet_like separate from wide/long-duration signals.",
+  "labels_out": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/real_planet_revisit_wide/human_labels_revisit.csv",
+  "missing_half_period_review_ids": [],
+  "n_current_fold_rows": 40,
+  "n_half_period_fold_rows": 0,
+  "n_half_period_source_rows": 4,
+  "n_real_planet_like_source_rows": 40,
+  "n_revisit_rows": 40,
+  "review_queue": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/real_planet_revisit_wide/review_queue_real_planet_revisit.csv",
+  "sheet_branch_name": "current_adp",
+  "training_table": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/human_vetting_training_table.csv"
+}

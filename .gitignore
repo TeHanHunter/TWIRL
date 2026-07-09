@@ -26,6 +26,15 @@ reports/stage5_validation/**/twirl_vet_sheets*/
 reports/stage5_validation/leo_vetter_s56_*/vet_reports/
 reports/stage5_validation/**/chunks/
 reports/stage5_validation/**/chunk_ids/
+# Regenerable ML payloads. Commit compact summaries, labels, and selected
+# paper-facing figures explicitly; keep tensors/checkpoints/score chunks on
+# local or ORCD storage.
+reports/stage5_validation/**/cnn_tensors*/
+reports/stage5_validation/**/cnn_teacher*/
+reports/stage5_validation/**/eb_cnn_miner/
+reports/stage5_validation/**/candidate_pool/
+reports/stage5_validation/**/score_chunks/
+reports/stage5_validation/**/*.zip
 reports/stage3_injections/**/*.h5
 reports/stage3_injections/**/*.fits
 reports/stage3_injections/**/*.npy

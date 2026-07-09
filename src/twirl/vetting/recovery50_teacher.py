@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 from typing import Any, Iterable, Sequence
 
 import numpy as np
@@ -12,6 +13,7 @@ import pandas as pd
 
 from twirl.io.compact_export import read_compact_lc_export, read_injected_lc_group
 from twirl.io.hlsp import BJDREFI, HLSPLightCurve, read_hlsp
+from twirl.vetting.adp_only import ADP_ONLY_APERTURES, ADP_ONLY_METADATA_COLUMNS
 from twirl.vetting.label_schema import BLS_TRUTH_MATCH_MODES
 from twirl.vetting.lightcurve_label_app import find_hlsp_path
 from twirl.vetting.self_training import (
@@ -35,95 +37,21 @@ TRAINING_LABEL_MAP = {
     "no_visible_signal": TEACHER_NEGATIVE_LABEL,
 }
 EXCLUDED_MAIN_LABELS = frozenset({"", "skip"})
-DEFAULT_APERTURES = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
+DEFAULT_APERTURES = ADP_ONLY_APERTURES
 DEFAULT_SHAPE_BINS = 65
 DEFAULT_SHAPE_WINDOW_DURATIONS = 3.0
 
-SCALAR_METADATA_COLUMNS: tuple[str, ...] = (
-    "tmag",
-    "period_d",
-    "duration_min",
-    "depth",
-    "depth_snr",
-    "sde_max",
-    "n_apertures_agree",
-    "centroid_pass",
-    "centroid_delta_pix",
-    "centroid_z",
-    "n_in_transit",
-    "n_oot_band",
-    "rep_peak_rank",
-    "sde_DET_FLUX_ADP_SML",
-    "rank_DET_FLUX_ADP_SML",
-    "sde_DET_FLUX_SML",
-    "rank_DET_FLUX_SML",
-    "min_twoap_sde",
-    "both_apertures_top1_recovered_feature_disabled",
-    "class_rank",
-    "blind_rank",
-    "dur_envelope_min",
-    "period_cluster_count",
-    "roche_period_d",
-    "vetted_rank",
-    "centroid_dx_pix",
-    "centroid_dy_pix",
-    "centroid_sigma_oot_pix",
-    "cadence_period_n",
-    "cadence_period_nearest_n",
-    "cadence_alias_delta",
-    "truth_n_good_in_transit_feature_disabled",
-    "anchor_duration_min",
-    "anchor_sde",
-    "adp_sml_peak_rank",
-    "adp_sml_duration_min",
-    "adp_sml_depth",
-    "adp_sml_depth_snr",
-    "adp_sml_sde",
-    "adp_sml_log_power",
-    "adp_sml_own_even_n_in",
-    "adp_sml_own_even_depth",
-    "adp_sml_own_odd_n_in",
-    "adp_sml_own_odd_depth",
-    "adp_sml_own_even_odd_depth_delta",
-    "adp_sml_own_even_odd_sigma_delta",
-    "adp_sml_anchor_depth",
-    "adp_sml_anchor_snr",
-    "adp_sml_anchor_n_in",
-    "adp_sml_anchor_even_n_in",
-    "adp_sml_anchor_even_depth",
-    "adp_sml_anchor_odd_n_in",
-    "adp_sml_anchor_odd_depth",
-    "adp_sml_anchor_even_odd_depth_delta",
-    "adp_sml_anchor_even_odd_sigma_delta",
-    "adp_sml_trend_ptp",
-    "adp_peak_rank",
-    "adp_duration_min",
-    "adp_depth",
-    "adp_depth_snr",
-    "adp_sde",
-    "adp_log_power",
-    "adp_own_even_n_in",
-    "adp_own_even_depth",
-    "adp_own_odd_n_in",
-    "adp_own_odd_depth",
-    "adp_own_even_odd_depth_delta",
-    "adp_own_even_odd_sigma_delta",
-    "adp_anchor_depth",
-    "adp_anchor_snr",
-    "adp_anchor_n_in",
-    "adp_anchor_even_n_in",
-    "adp_anchor_even_depth",
-    "adp_anchor_odd_n_in",
-    "adp_anchor_odd_depth",
-    "adp_anchor_even_odd_depth_delta",
-    "adp_anchor_even_odd_sigma_delta",
-    "adp_trend_ptp",
-    "aperture_period_rel_delta",
-    "aperture_depth_ratio_primary_over_small",
-    "aperture_disagreement_flag",
-)
+SCALAR_METADATA_COLUMNS: tuple[str, ...] = ADP_ONLY_METADATA_COLUMNS
 
 LEAKAGE_PREFIXES = (
+    "compact_",
+    "display_",
+    "ephemeris_",
+    "model_",
+    "pre_revisit_",
+    "preserve_",
+    "refold_",
+    "revisit_",
     "truth_",
     "recovery_status",
     "topn_",
@@ -158,6 +86,7 @@ LEAKAGE_EXACT = frozenset(
         "is_labeled",
         "main_teacher_include",
         "audit_include",
+        "harmonic_suspect",
         "training_split",
         "review_id",
         "tic",
@@ -415,6 +344,255 @@ def _safe_float(value: Any, default: float = float("nan")) -> float:
     return out if np.isfinite(out) else default
 
 
+_HALF_PERIOD_RE = re.compile(
+    r"(?ix)"
+    r"("
+    r"\bp\s*/\s*2\b"
+    r"|refold\s+(?:at|to|on)\s+p\s*/\s*2"
+    r"|half[-\s]*period"
+    r"|half\s+of\s+(?:the\s+)?period"
+    r")"
+)
+_DOUBLE_PERIOD_RE = re.compile(
+    r"(?ix)"
+    r"("
+    r"\b2\s*\*?\s*p\b"
+    r"|\b2p\b"
+    r"|double[-\s]*period"
+    r"|twice\s+(?:the\s+)?period"
+    r")"
+)
+_HARMONIC_SUSPECT_RE = re.compile(r"(?i)\b(possible\s+)?harmonic\b|\bwrong\s+period\b|\bwrong\s+fold\b")
+
+
+def infer_harmonic_refold(notes: Any) -> tuple[bool, float, str]:
+    """Infer a simple period refold factor from reviewer notes.
+
+    The return value is ``(harmonic_suspect, refold_factor, reason)``. A finite
+    factor means the row can be folded automatically for tensor generation.
+    """
+
+    text = "" if notes is None or pd.isna(notes) else str(notes).strip()
+    if not text:
+        return False, float("nan"), ""
+    if _HALF_PERIOD_RE.search(text):
+        return True, 0.5, "half_period_note"
+    if _DOUBLE_PERIOD_RE.search(text):
+        return True, 2.0, "double_period_note"
+    if _HARMONIC_SUSPECT_RE.search(text):
+        return True, float("nan"), "harmonic_note"
+    return False, float("nan"), ""
+
+
+def select_model_ephemeris(row: pd.Series) -> tuple[float, float, float, str]:
+    """Return the ephemeris a model should fold on, with provenance."""
+
+    candidates = (
+        ("model_", row.get("model_ephemeris_source", "model")),
+        ("display_", row.get("display_ephemeris_source", "display")),
+        ("anchor_", "twirl_vet_anchor"),
+        ("", "queue"),
+    )
+    for prefix, source in candidates:
+        period_col = f"{prefix}period_d" if prefix else "period_d"
+        t0_col = f"{prefix}t0_bjd" if prefix else "t0_bjd"
+        duration_col = f"{prefix}duration_min" if prefix else "duration_min"
+        period_d = _safe_float(row.get(period_col))
+        t0_bjd = _safe_float(row.get(t0_col))
+        duration_min = _safe_float(row.get(duration_col))
+        if np.isfinite(period_d) and np.isfinite(t0_bjd) and np.isfinite(duration_min) and period_d > 0 and duration_min > 0:
+            source_text = str(source or "model").strip() or "model"
+            return period_d, t0_bjd, duration_min, source_text
+    return float("nan"), float("nan"), float("nan"), "invalid"
+
+
+def select_bls_ephemeris(row: pd.Series) -> tuple[float, float, float, str]:
+    """Return the displayed/BLS ephemeris before human harmonic correction."""
+
+    candidates = (
+        ("display_", row.get("display_ephemeris_source", "display")),
+        ("anchor_", "twirl_vet_anchor"),
+        ("", "queue"),
+    )
+    for prefix, source in candidates:
+        period_col = f"{prefix}period_d" if prefix else "period_d"
+        t0_col = f"{prefix}t0_bjd" if prefix else "t0_bjd"
+        duration_col = f"{prefix}duration_min" if prefix else "duration_min"
+        period_d = _safe_float(row.get(period_col))
+        t0_bjd = _safe_float(row.get(t0_col))
+        duration_min = _safe_float(row.get(duration_col))
+        if np.isfinite(period_d) and np.isfinite(t0_bjd) and np.isfinite(duration_min) and period_d > 0 and duration_min > 0:
+            source_text = str(source or "bls").strip() or "bls"
+            return period_d, t0_bjd, duration_min, source_text
+    return float("nan"), float("nan"), float("nan"), "invalid"
+
+
+def add_harmonic_ephemeris_annotations(
+    df: pd.DataFrame,
+    *,
+    notes_column: str = "human_notes",
+) -> pd.DataFrame:
+    """Add reviewer-note harmonic flags and model-fold ephemeris overrides."""
+
+    out = df.copy()
+    for col in ("model_period_d", "model_t0_bjd", "model_duration_min"):
+        if col not in out:
+            out[col] = np.nan
+    if "model_ephemeris_source" not in out:
+        out["model_ephemeris_source"] = ""
+
+    harmonic_suspect: list[bool] = []
+    refold_factor: list[float] = []
+    refold_period: list[float] = []
+    refold_t0: list[float] = []
+    refold_duration: list[float] = []
+    ephemeris_status: list[str] = []
+    compact_target: list[str] = []
+    compact_include: list[bool] = []
+    preserve_target: list[str] = []
+
+    for idx, row in out.iterrows():
+        notes = row.get(notes_column, row.get("human_notes", ""))
+        suspect, factor, reason = infer_harmonic_refold(notes)
+        bls_period, bls_t0, bls_duration, bls_source = select_bls_ephemeris(row)
+        period = bls_period * factor if suspect and np.isfinite(factor) and np.isfinite(bls_period) else float("nan")
+        harmonic_suspect.append(bool(suspect))
+        refold_factor.append(float(factor))
+        refold_period.append(float(period))
+        refold_t0.append(float(bls_t0) if suspect and np.isfinite(period) else float("nan"))
+        refold_duration.append(float(bls_duration) if suspect and np.isfinite(period) else float("nan"))
+
+        if suspect and np.isfinite(period):
+            out.at[idx, "model_period_d"] = period
+            out.at[idx, "model_t0_bjd"] = bls_t0
+            out.at[idx, "model_duration_min"] = bls_duration
+            out.at[idx, "model_ephemeris_source"] = f"human_{reason}:{bls_source}"
+            ephemeris_status.append("human_refold_ready")
+        elif suspect:
+            ephemeris_status.append("human_harmonic_suspect_unresolved")
+        else:
+            ephemeris_status.append("display_or_queue")
+
+        label = str(row.get("human_label", "") or "")
+        if label in {"planet_like", "wide_transit_like", "eclipsing_binary_or_pceb", "stellar_variability"}:
+            preserve_target.append("preserve_signal")
+        elif label in {"instrumental_or_systematic", "uncertain", "no_visible_signal"}:
+            preserve_target.append("reject_signal")
+        else:
+            preserve_target.append("")
+
+        if label == "planet_like" and (not suspect or np.isfinite(period)):
+            compact_target.append("planet_like")
+            compact_include.append(True)
+        elif label in {"instrumental_or_systematic", "uncertain", "no_visible_signal", "wide_transit_like", "eclipsing_binary_or_pceb", "stellar_variability"}:
+            compact_target.append(label)
+            compact_include.append(label != "uncertain")
+        else:
+            compact_target.append("")
+            compact_include.append(False)
+
+    out["harmonic_suspect"] = harmonic_suspect
+    out["refold_factor"] = refold_factor
+    out["refold_period_d"] = refold_period
+    out["refold_t0_bjd"] = refold_t0
+    out["refold_duration_min"] = refold_duration
+    out["ephemeris_status"] = ephemeris_status
+    out["preserve_signal_target"] = preserve_target
+    out["compact_morphology_target"] = compact_target
+    out["compact_morphology_include"] = compact_include
+    return out
+
+
+def add_display_ephemeris(df: pd.DataFrame, metrics_tables: Sequence[Path] = ()) -> pd.DataFrame:
+    """Attach the ephemeris used in vet-sheet displays, falling back to queue timing."""
+
+    out = df.copy()
+    index = out.index
+    for col in ("period_d", "t0_bjd", "duration_min"):
+        out[f"queue_{col}"] = pd.to_numeric(out.get(col, pd.Series(np.nan, index=index)), errors="coerce")
+
+    out["display_period_d"] = out["queue_period_d"]
+    out["display_t0_bjd"] = out["queue_t0_bjd"]
+    out["display_duration_min"] = out["queue_duration_min"]
+    out["display_ephemeris_source"] = "queue"
+    out["display_anchor_aperture"] = ""
+    out["display_anchor_sde"] = np.nan
+    out["display_vet_sheet_name"] = ""
+    out["display_vet_sheet_pdf_name"] = ""
+    out["display_vet_status"] = ""
+
+    metric_frames: list[pd.DataFrame] = []
+    wanted = {
+        "review_id",
+        "anchor_period_d",
+        "anchor_t0_bjd",
+        "anchor_duration_min",
+        "anchor_aperture",
+        "anchor_sde",
+        "twirl_vet_sheet_name",
+        "twirl_vet_sheet_pdf_name",
+        "twirl_vet_status",
+    }
+    for path in metrics_tables:
+        if not path.exists():
+            continue
+        metrics = read_table(path)
+        if "review_id" not in metrics:
+            continue
+        keep = [col for col in metrics.columns if col in wanted]
+        metric = metrics.loc[:, keep].copy()
+        for col in wanted:
+            if col not in metric:
+                metric[col] = np.nan if col.endswith(("_d", "_min", "_sde")) else ""
+        metric_frames.append(metric)
+
+    if metric_frames:
+        metrics = pd.concat(metric_frames, ignore_index=True)
+        metrics = metrics.dropna(subset=["review_id"]).copy()
+        metrics["review_id"] = metrics["review_id"].astype(str)
+        metrics = metrics.drop_duplicates("review_id", keep="last")
+        metrics = metrics.rename(
+            columns={
+                "anchor_period_d": "_metric_display_period_d",
+                "anchor_t0_bjd": "_metric_display_t0_bjd",
+                "anchor_duration_min": "_metric_display_duration_min",
+                "anchor_aperture": "_metric_display_anchor_aperture",
+                "anchor_sde": "_metric_display_anchor_sde",
+                "twirl_vet_sheet_name": "_metric_display_vet_sheet_name",
+                "twirl_vet_sheet_pdf_name": "_metric_display_vet_sheet_pdf_name",
+                "twirl_vet_status": "_metric_display_vet_status",
+            }
+        )
+        out["review_id"] = out["review_id"].astype(str)
+        out = out.merge(metrics, on="review_id", how="left", validate="many_to_one")
+        metric_period = pd.to_numeric(out["_metric_display_period_d"], errors="coerce")
+        metric_t0 = pd.to_numeric(out["_metric_display_t0_bjd"], errors="coerce")
+        metric_duration = pd.to_numeric(out["_metric_display_duration_min"], errors="coerce")
+        use_anchor = metric_period.gt(0) & metric_t0.notna() & metric_duration.gt(0)
+        out.loc[use_anchor, "display_period_d"] = metric_period[use_anchor]
+        out.loc[use_anchor, "display_t0_bjd"] = metric_t0[use_anchor]
+        out.loc[use_anchor, "display_duration_min"] = metric_duration[use_anchor]
+        out.loc[use_anchor, "display_ephemeris_source"] = "twirl_vet_anchor"
+        for src, dst in (
+            ("_metric_display_anchor_aperture", "display_anchor_aperture"),
+            ("_metric_display_anchor_sde", "display_anchor_sde"),
+            ("_metric_display_vet_sheet_name", "display_vet_sheet_name"),
+            ("_metric_display_vet_sheet_pdf_name", "display_vet_sheet_pdf_name"),
+            ("_metric_display_vet_status", "display_vet_status"),
+        ):
+            out.loc[use_anchor, dst] = out.loc[use_anchor, src]
+        out = out.drop(columns=[col for col in out.columns if col.startswith("_metric_display_")])
+
+    denom = out["queue_period_d"].abs()
+    out["display_ephemeris_period_rel_delta"] = np.where(
+        denom > 0,
+        (pd.to_numeric(out["display_period_d"], errors="coerce") - out["queue_period_d"]).abs() / denom,
+        np.nan,
+    )
+    out["display_ephemeris_used_anchor"] = out["display_ephemeris_source"].eq("twirl_vet_anchor")
+    return out
+
+
 def _clean_aperture_name(aperture: str) -> str:
     return aperture.lower().replace("det_flux_", "").replace("det_flux", "flux")
 
@@ -543,9 +721,14 @@ def build_folded_shape_features(
             "tic": int(row.get("tic", -1)),
             "source_kind": str(row.get("source_kind", "")),
         }
-        period_d = _safe_float(row.get("period_d"))
-        t0_bjd = _safe_float(row.get("t0_bjd"))
-        duration_min = _safe_float(row.get("duration_min"))
+        period_d, t0_bjd, duration_min, ephemeris_source = select_model_ephemeris(row)
+        rec["model_period_d"] = period_d
+        rec["model_t0_bjd"] = t0_bjd
+        rec["model_duration_min"] = duration_min
+        rec["model_ephemeris_source"] = ephemeris_source
+        rec["queue_period_d"] = _safe_float(row.get("period_d"))
+        rec["queue_t0_bjd"] = _safe_float(row.get("t0_bjd"))
+        rec["queue_duration_min"] = _safe_float(row.get("duration_min"))
         lc = _read_lc_for_row(
             row,
             apertures=apertures,

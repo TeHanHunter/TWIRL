@@ -38,7 +38,9 @@ This document is the executable software and survey plan for TWIRL.
 - `2026-07-04`: **The `0.15 d` candidate branch is now a concrete S56 first-pass vetting product.** The named branch is `twirl-fs-v2-adp015q`, compare FITS columns are `DET_FLUX_ADP015*`, and the two-aperture vetter runs BLS directly on `DET_FLUX_ADP015_SML + DET_FLUX_ADP015` without an additional ADP+ high-pass. Full S56 ADP015 FITS production completed on PDO (`19,072 / 19,072`, zero failures), the compact export verifies `19,072` target groups, and ORCD rendered the random `1,000`-row mixed-teacher queue with `1,000/1,000` reports verified. Next gate is human triage plus the first-label audit; `twirl-fs-v2` remains canonical until real-data QA and WD 1856 checks pass for the candidate branch.
 - `2026-07-07`: **Stage 1 production policy updated after the S56 missing-HDF5 audit.** Do not use `--max-magnitude 20` as a production catalog gate. Regenerate S56 and all remaining sectors with the TWIRL wrapper's effectively unbounded TIC catalog limit (`--max-magnitude 99`) so faint requested WD TICs are not excluded by TIC-side Tmag. The derived survey product should prioritize ADP and ADP015 light curves; canonical/default `DET_FLUX*` can be retained temporarily for compatibility, but it is no longer the planned production search branch.
 - `2026-07-07`: **A2v1 source-pickle reuse smoke passed on S56.** The faster target-emission path builds `source_tic` sidecars directly from the TWIRL observation table and symlinks existing source pickles, avoiding both cutout regeneration and full max-99 TIC catalog queries for requested WD targets. On `pdogpu6`, TIC `1400899528` was recovered into HDF5 for both S56 orbits from existing source pickles; this validates the overlay hook but not the still-pending saturated-pixel ePSF mask.
+- `2026-07-07`: **S56 A2v1 HDF5 reproduction is running with empty-mask ePSF reuse.** The clean A2v1 root is `/pdo/users/tehan/tglc-gpu-production-A2v1/`: source pickles are symlinked from the existing prepared tree, `source_tic` overlays live beside them, old ePSFs are symlinked only for no-mask cutouts, and masked cutouts are recomputed under the A2v1 root. The active run is tmux `twirl-s56-a2v1-r4`, resumed after a GPU-lane scheduler fix in [run_tglc_orbit_pipeline.py](../scripts/stage1_lightcurves/run_tglc_orbit_pipeline.py); full orbit/sector completion remains pending. The reusable launcher is now [run_a2v1_reproduction_pdo.sh](../scripts/stage1_lightcurves/run_a2v1_reproduction_pdo.sh), so S94+ can use the same A2v1 structure by passing sector and orbit tags. The ADP/ADP015-only export mode is implemented and smoke-tested through [run_a2v1_hlsp_pdo.sh](../scripts/stage1_lightcurves/run_a2v1_hlsp_pdo.sh), but full S56 FITS production waits for both orbit HDF5 trees.
 - `2026-07-07`: **Recovery50 CNN teacher scaffold is working on the combined 2k labels.** The current teacher maps raw `uncertain` labels to the negative/no-visible-signal target, keeps EB/PCEB audit-only below the `40`-label threshold, and excludes injected truth/recovery/source columns from inputs. The one-H200 combined small-aperture plus BLS-metadata CNN is the current infrastructure winner on the `1,999` accepted tensors (`0.916` validation balanced accuracy, `0.885` test balanced accuracy), but it is not yet the final science teacher because rare FP classes and real-row planet-like recall need more human support.
+- `2026-07-09`: **Active S56 ML and candidate search now enforce an ADP-only contract.** Teacher/EB tensors use `DET_FLUX_ADP_SML` as the main channel and `DET_FLUX_ADP` as the supplement; scalar metadata, review ephemerides, and new full-real BLS peaks must also be derived from those columns. The sanitized 2k table retains all rows for audit but excludes `158` rows from active training (`157` reviewed with a historical canonical supplement and `1` missing ADP anchor). Tensor indices and checkpoints carry the ordered-aperture contract, test metrics are evaluated only after validation selects the epoch, and EB ensemble members choose shape-only versus shape+BLS by validation performance. Historical canonical artifacts remain provenance-only and are rejected by active model/search validators.
 - `2026-06-17`: **Julien joins the active collaboration/follow-up planning.** Meeting notes are recorded in progress log [§2.5](twirl_progress_log.md#25-collaboration-meetings-and-ownership). Immediate implications: compare S56 TWIRL-FS search/vetting results against Julien's SPOC Stage-1 candidate funnel, define what signal classes the current products are sensitive to before first-paper claims, and verify follow-up/funding routes before treating SPECULOOS, MISCOT, LCO 1m, EPRV, or proto-Lightspeed as executable paths.
 - `2026-05-13`: **TWIRL pivots to a Schwamb-group collaboration.** Michelle Kunimoto brings a well-tuned BLS and LEO-Vetter expertise; her student + Franklin Chen tune LEO-Vetter for WDs in parallel with our `wd-host-tuning` fork. Te Han is the LC producer + data steward (the v3 TWIRL HLSP tree shipped today is the shared survey input) and is offered lead authorship on the **occurrence-rate paper** (verbal — to be locked in writing this week); **catalog paper leadership undecided**. Injection-recovery becomes shared exploratory work with multiple approaches in parallel. See progress log [§2.5](twirl_progress_log.md) for the meeting record and the [Collaboration & Ownership](#collaboration--ownership-2026-05-13) section below for the explicit division of labor and ownership-protection plan.
 
@@ -1023,14 +1025,40 @@ combined shape+BLS CNN is the current infrastructure winner, but rare FP
 classes and real-row planet-like recall still need more human support before a
 final science teacher/student pass.
 
+Status (`2026-07-08`, real-planet relabel audit): added one extra raw human
+label, `wide_transit_like`, for broad/long-duration transit-like signals that
+should be preserved but not merged into the compact `planet_like` class. Built
+a focused revisit queue from the combined-2k table containing the `40` real rows
+previously labeled `planet_like`; half-period duplicate rows are deferred until
+after this sheet-level audit. The revised sheets replace the redundant anchor
+fold with a secondary-transit fold at phase `0.5`, show transit duration in
+days, and fold on the row ephemeris rather than a fresh BLS anchor. The revisit
+queue and separate relabel output live under
+[queue dir](../reports/stage5_validation/s56_recovery50_teacher_queue_2k/real_planet_revisit_wide/);
+the original labels remain unchanged.
+
+Status (`2026-07-09`, EB/PCEB active-learning miner): the first EB/PCEB miner
+is implemented as an enrichment tool, not a final EB classifier. It trains only
+on real human-labeled rows, treats explicit `eclipsing_binary_or_pceb` labels
+as positives, maps flat `uncertain` labels to capped negatives, excludes `skip`
+and all injected rows from EB training, and scans the larger real S56 candidate
+pool for a PNG-only follow-up review queue. Its earlier canonical
+ranker-selected scan is deprecated after the first `59` human labels contained
+zero EB/PCEBs. The replacement chain first reruns BLS on
+the two ADP apertures for all `19,072` real targets, then uses one H200 for a
+five-member CNN ensemble plus ADP BLS metadata scoring and a dependent CPU
+render job for newest-style two-aperture sheets. Release now requires a
+non-degenerate grouped held-out recall/AP gate and starts with a `100`-row human
+pilot; expand to `500` only if the pilot has useful EB enrichment.
+
 Pre-human-labeling path:
 
 1. Use the accepted S56 pilot light-curve product as the baseline, with the
    current adaptive compare columns as the active first-pass vetting/search
    product. The browser sheets for real rows currently use
-   `DET_FLUX_ADP_SML + DET_FLUX_ADP`; existing injected recovery-map rows use
-   `DET_FLUX_ADP_SML + DET_FLUX_SML` until the next injection HDF5 is rebuilt
-   with the final real-data aperture pair. Model and training inputs must
+   `DET_FLUX_ADP_SML + DET_FLUX_ADP`. The recovery50 injected display subsets
+   have also been rebuilt with that same pair; canonical small-aperture arrays
+   in older source HDF5 files are provenance-only. Model and training inputs must
    preserve multiple aperture channels because aperture behavior is evidence,
    not a nuisance column.
 2. Build a compact full-S56 HDF5 export on PDO from the HLSP FITS tree. This is

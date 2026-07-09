@@ -1,0 +1,49 @@
+{
+  "base_table": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table/human_vetting_training_table.csv",
+  "ephemeris_status_counts": {
+    "display_or_queue": 1998,
+    "human_refold_ready": 2
+  },
+  "label_counts": {
+    "eclipsing_binary_or_pceb": 18,
+    "instrumental_or_systematic": 353,
+    "planet_like": 317,
+    "skip": 3,
+    "stellar_variability": 122,
+    "uncertain": 1177,
+    "wide_transit_like": 10
+  },
+  "n_base_rows_matched": 40,
+  "n_harmonic_suspect": 2,
+  "n_revisit_applied": 40,
+  "n_revisit_labeled": 40,
+  "n_revisit_rows": 40,
+  "n_rows": 2000,
+  "n_teacher_rows": 1969,
+  "out_dir": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_revisit_harmonic",
+  "outputs": {
+    "audit_rows": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_revisit_harmonic/audit_labeled_rows.csv",
+    "harmonic_rows": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_revisit_harmonic/harmonic_suspect_rows.csv",
+    "summary": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_revisit_harmonic/summary.json",
+    "teacher_rows": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_revisit_harmonic/teacher_labeled_rows.csv",
+    "training_table": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_revisit_harmonic/human_vetting_training_table.csv"
+  },
+  "policy": "revisit labels override prior human labels for matched rows; reviewer harmonic notes set model_* fold ephemerides but remain leakage-excluded audit columns",
+  "refold_factor_counts": {
+    "0.5": 2
+  },
+  "revisit_label_counts": {
+    "eclipsing_binary_or_pceb": 1,
+    "instrumental_or_systematic": 1,
+    "planet_like": 10,
+    "uncertain": 18,
+    "wide_transit_like": 10
+  },
+  "revisit_labels": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/real_planet_revisit_wide/human_labels_revisit.csv",
+  "revisit_queue": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/real_planet_revisit_wide/review_queue_real_planet_revisit.csv",
+  "teacher_target_counts": {
+    "instrumental_or_systematic": 1530,
+    "planet_like": 317,
+    "stellar_variability": 122
+  }
+}

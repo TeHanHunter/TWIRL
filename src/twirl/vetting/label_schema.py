@@ -3,6 +3,7 @@ from __future__ import annotations
 
 LABEL_OPTIONS: tuple[str, ...] = (
     "planet_like",
+    "wide_transit_like",
     "eclipsing_binary_or_pceb",
     "stellar_variability",
     "instrumental_or_systematic",
@@ -17,11 +18,13 @@ LABEL_BUTTONS: tuple[tuple[str, str, str], ...] = (
     ("3", "stellar_variability", "Variable"),
     ("4", "instrumental_or_systematic", "Systematic"),
     ("5", "uncertain", "Flat/no signal"),
+    ("6", "wide_transit_like", "Wide transit"),
     ("0", "skip", "Skip"),
 )
 
 LABEL_KEY_ALIASES: dict[str, str] = {
     "p": "planet_like",
+    "w": "wide_transit_like",
     "e": "eclipsing_binary_or_pceb",
     "v": "stellar_variability",
     "i": "instrumental_or_systematic",
@@ -34,6 +37,7 @@ LABEL_KEY_ALIASES: dict[str, str] = {
 STRONG_LABELS: frozenset[str] = frozenset(
     {
         "planet_like",
+        "wide_transit_like",
         "eclipsing_binary_or_pceb",
         "stellar_variability",
         "instrumental_or_systematic",
@@ -54,6 +58,7 @@ BLS_TRUTH_MATCH_MODES: frozenset[str] = frozenset(
 
 OBJECT_TEACHER_LABELS: tuple[str, ...] = (
     "planet_like",
+    "wide_transit_like",
     "eclipsing_binary_or_pceb",
     "stellar_variability",
     "instrumental_or_systematic",

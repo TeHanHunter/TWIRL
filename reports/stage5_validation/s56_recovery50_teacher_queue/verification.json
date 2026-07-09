@@ -1,0 +1,25 @@
+{
+  "created_utc": "2026-07-06T14:32:18.285197+00:00",
+  "failures": [],
+  "n_rows": 1000,
+  "passed": true,
+  "selection_bucket_counts": {
+    "inj_recovery50_strict_top1": 300,
+    "real_aperture_disagreement": 70,
+    "real_cadence_alias_systematic": 45,
+    "real_eb_pceb_like": 160,
+    "real_high_sde_planet_like": 260,
+    "real_low_sde_control": 24,
+    "real_mid_sde_control": 45,
+    "real_variability_broad_duration": 95,
+    "real_wd1856_benchmark": 1
+  },
+  "source_kind_counts": {
+    "injection_recovery": 300,
+    "real_candidate": 700
+  },
+  "truth_source_kind_counts": {
+    "injection_recovery": 300,
+    "real_candidate": 700
+  }
+}

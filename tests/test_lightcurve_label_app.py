@@ -59,6 +59,22 @@ def test_candidate_store_saves_and_reloads_labels(tmp_path) -> None:
     assert row["notes"] == "clear transit"
 
 
+def test_candidate_store_replaces_upstream_row_id(tmp_path) -> None:
+    candidates = tmp_path / "scored_candidates.csv"
+    labels = tmp_path / "labels.csv"
+    pd.DataFrame(
+        [
+            {"row_id": 374, "tic": 10, "period_d": 1.0, "t0_bjd": 2.0},
+            {"row_id": 812, "tic": 20, "period_d": 2.0, "t0_bjd": 3.0},
+        ]
+    ).to_csv(candidates, index=False)
+
+    store = CandidateStore(candidates_path=candidates, labels_out=labels)
+
+    assert store.frame["row_id"].tolist() == [0, 1]
+    assert store.frame["tic"].tolist() == [10, 20]
+
+
 def test_candidate_store_shuffles_review_order_without_changing_row_ids(tmp_path) -> None:
     candidates = tmp_path / "candidates.csv"
     labels = tmp_path / "labels.csv"

@@ -220,6 +220,10 @@ class CandidateStore:
         self.candidates_path = Path(self.candidates_path)
         self.labels_out = Path(self.labels_out)
         self.frame = pd.read_csv(self.candidates_path)
+        # Scored/model queues may already carry an upstream tensor row index.
+        # The vetting app owns row_id and always defines it from display order.
+        if "row_id" in self.frame.columns:
+            self.frame = self.frame.drop(columns=["row_id"])
         self.frame.insert(0, "row_id", np.arange(len(self.frame), dtype=int))
         self.frame["candidate_key"] = self.frame.apply(_candidate_key, axis=1)
         self.labels = self._load_labels()

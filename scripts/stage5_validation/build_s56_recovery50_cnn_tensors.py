@@ -18,19 +18,15 @@ from twirl.vetting.recovery50_cnn import (  # noqa: E402
 )
 from twirl.vetting.recovery50_teacher import DEFAULT_APERTURES, json_default  # noqa: E402
 
-DEFAULT_ROOT = REPO_ROOT / "reports/stage5_validation/s56_recovery50_teacher_queue"
-DEFAULT_TRAINING_TABLE = DEFAULT_ROOT / "human_training_table/human_vetting_training_table.csv"
-DEFAULT_OUT_DIR = DEFAULT_ROOT / "cnn_tensors"
+DEFAULT_ROOT = REPO_ROOT / "reports/stage5_validation/s56_recovery50_teacher_queue_2k"
+DEFAULT_TRAINING_TABLE = DEFAULT_ROOT / "human_training_table_adp_only/human_vetting_training_table.csv"
+DEFAULT_OUT_DIR = DEFAULT_ROOT / "cnn_tensors_adp_only"
 DEFAULT_COMPACT_LC = (
     REPO_ROOT
     / "data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5"
 )
 DEFAULT_HLSP_ROOT = REPO_ROOT / "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare"
-DEFAULT_INJECTION_H5 = (
-    REPO_ROOT
-    / "data_local/stage3_injections/s56_twirlfs_v2_injection_training/"
-    "recovery50_adp_pair_subset/injected_lightcurves.h5"
-)
+DEFAULT_INJECTION_H5 = None
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -40,10 +36,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--compact-lc-h5", type=Path, default=DEFAULT_COMPACT_LC)
     parser.add_argument("--hlsp-root", type=Path, default=DEFAULT_HLSP_ROOT)
     parser.add_argument("--injection-h5-override", type=Path, default=DEFAULT_INJECTION_H5)
+    parser.add_argument(
+        "--use-row-injection-h5",
+        action="store_true",
+        help="Use each row's source_h5 for injected rows instead of a single override file.",
+    )
     parser.add_argument("--apertures", default=",".join(DEFAULT_APERTURES))
     parser.add_argument("--folded-points", type=int, default=512)
     parser.add_argument("--context-points", type=int, default=512)
     parser.add_argument("--event-points", type=int, default=128)
+    parser.add_argument("--timeline-points", type=int, default=16384)
+    parser.add_argument("--folded-raw-points", type=int, default=8192)
+    parser.add_argument("--context-raw-points", type=int, default=8192)
     parser.add_argument("--max-events", type=int, default=16)
     parser.add_argument("--folded-window-durations", type=float, default=4.0)
     parser.add_argument("--context-window-durations", type=float, default=12.0)
@@ -62,6 +66,9 @@ def main(argv: list[str] | None = None) -> int:
         folded_points=args.folded_points,
         context_points=args.context_points,
         event_points=args.event_points,
+        timeline_points=args.timeline_points,
+        folded_raw_points=args.folded_raw_points,
+        context_raw_points=args.context_raw_points,
         max_events=args.max_events,
         folded_window_durations=args.folded_window_durations,
         context_window_durations=args.context_window_durations,
@@ -73,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         out_dir=args.out_dir,
         compact_lc_h5=args.compact_lc_h5,
         hlsp_root=args.hlsp_root,
-        injection_h5_override=args.injection_h5_override,
+        injection_h5_override=None if args.use_row_injection_h5 else args.injection_h5_override,
         config=cfg,
         max_rows=args.max_rows,
         progress_every=args.progress_every,

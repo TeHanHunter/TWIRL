@@ -224,6 +224,45 @@ def _best_peak_dict(result: Any) -> dict[str, float]:
     return asdict(result.peaks[0])
 
 
+def _finite_peak_dict(peak: dict[str, Any] | None) -> dict[str, float] | None:
+    if peak is None:
+        return None
+    try:
+        period_d = float(peak.get("period_d", np.nan))
+        t0_bjd = float(peak.get("t0_bjd", np.nan))
+        duration_min = float(peak.get("duration_min", np.nan))
+    except (TypeError, ValueError):
+        return None
+    if not (np.isfinite(period_d) and np.isfinite(t0_bjd) and np.isfinite(duration_min)):
+        return None
+    if period_d <= 0 or duration_min <= 0:
+        return None
+    return {
+        "period_d": period_d,
+        "t0_bjd": t0_bjd,
+        "duration_min": duration_min,
+        "depth": float(peak.get("depth", np.nan)),
+        "depth_snr": float(peak.get("depth_snr", np.nan)),
+        "sde": float(peak.get("sde", np.nan)),
+    }
+
+
+def _row_ephemeris_peak(row_metadata: dict[str, Any] | None) -> dict[str, float] | None:
+    if not row_metadata:
+        return None
+    peak = _finite_peak_dict(
+        {
+            "period_d": row_metadata.get("period_d"),
+            "t0_bjd": row_metadata.get("t0_bjd"),
+            "duration_min": row_metadata.get("duration_min"),
+            "depth": row_metadata.get("depth", np.nan),
+            "depth_snr": row_metadata.get("depth_snr", np.nan),
+            "sde": row_metadata.get("sde_max", row_metadata.get("sde", np.nan)),
+        }
+    )
+    return peak
+
+
 def _depth_at_ephemeris(
     lc: HLSPLightCurve,
     aperture: str,
@@ -312,6 +351,18 @@ def _duration_hours_label(duration_min: float | None) -> str:
     return rf"$t_\mathrm{{dur}}={float(duration_min) / 60.0:.3g}\,\mathrm{{hr}}$"
 
 
+def _duration_days_label(duration_min: float | None) -> str:
+    if duration_min is None or not np.isfinite(duration_min):
+        return r"$t_\mathrm{dur}=\mathrm{nan}$"
+    return rf"$t_\mathrm{{dur}}={float(duration_min) / 1440.0:.3g}\,\mathrm{{d}}$"
+
+
+def _duration_days_text(duration_min: float | None) -> str:
+    if duration_min is None or not np.isfinite(duration_min):
+        return "nan d"
+    return f"{float(duration_min) / 1440.0:.6g} d"
+
+
 def _set_fold_ylim(ax: Any, y: np.ndarray, sel: np.ndarray, *, depth: float | None = None) -> None:
     if np.count_nonzero(sel) < 3:
         return
@@ -341,7 +392,7 @@ def _annotate_fold_period(
 ) -> None:
     lines = [f"P={_format_period(period_d)}"]
     if duration_min is not None and np.isfinite(duration_min):
-        lines.append(f"dur={duration_min:.3g} min")
+        lines.append(f"dur={_duration_days_text(duration_min)}")
     if sde is not None and np.isfinite(sde):
         lines.append(f"SDE={sde:.2g}")
     ax.text(
@@ -452,21 +503,48 @@ def _plot_full_phase_fold(
         solid_capstyle="butt",
         clip_on=True,
     )
-    ax.set_title(f"{title}; {_bold_period(period_d)}", loc="left", fontsize=10.2)
+    ax.set_title(title, loc="left", fontsize=10.2)
     ax.set_xlabel("orbital phase")
     ax.set_ylabel("relative flux")
 
 
-def _plot_periodogram(ax: Any, spec: dict[str, np.ndarray] | None, *, peak: dict[str, float]) -> None:
+def _plot_periodogram(
+    ax: Any,
+    spec: dict[str, np.ndarray] | None,
+    *,
+    bls_peak: dict[str, float],
+    review_peak: dict[str, float] | None = None,
+) -> None:
     if spec is None:
         ax.text(0.5, 0.5, "No periodogram", ha="center", va="center")
         ax.set_axis_off()
         return
     ax.semilogx(spec["period"], spec["sde"], color="0.25", lw=0.55, rasterized=True)
-    if np.isfinite(peak.get("period_d", np.nan)):
-        ax.axvline(float(peak["period_d"]), color="#b83227", lw=0.9, ls="--")
+    review_period = float((review_peak or bls_peak).get("period_d", np.nan))
+    bls_period = float(bls_peak.get("period_d", np.nan))
+    if np.isfinite(review_period):
+        ax.axvline(
+            review_period,
+            color="#b83227",
+            lw=1.15,
+            ls="-",
+            label=f"review P={review_period:.4g} d",
+        )
+    if np.isfinite(bls_period) and (
+        not np.isfinite(review_period) or not np.isclose(bls_period, review_period, rtol=1.0e-4, atol=0.0)
+    ):
+        ax.axvline(
+            bls_period,
+            color="#1f4e79",
+            lw=1.0,
+            ls="--",
+            label=f"aperture BLS max={bls_period:.4g} d",
+        )
     ax.set_xlim(float(np.nanmin(spec["period"])), float(np.nanmax(spec["period"])))
     ax.set_ylabel("SDE")
+    ax.set_xlabel("Period (d)")
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend(loc="upper left", fontsize=6.6, framealpha=0.88, handlelength=1.8)
     ax.tick_params(labelsize=8.5)
 
 
@@ -481,11 +559,13 @@ def _plot_folded_bins(
     depth: float | None = None,
     sde: float | None = None,
     title: str,
-    show_duration_hours: bool = False,
+    show_duration_days: bool = False,
+    phase_shift: float = 0.0,
 ) -> None:
     y = _norm_flux(blc, aperture)
     keep = quality_mask(blc, aperture)
-    phase = _phase_cycle(blc.time, period_d=period_d, t0_bjd=t0_bjd)
+    shifted_t0 = float(t0_bjd) + float(phase_shift) * float(period_d)
+    phase = _phase_cycle(blc.time, period_d=period_d, t0_bjd=shifted_t0)
     window, window_min = _fold_window_phase(period_d, duration_min)
     sel = keep & np.isfinite(y) & np.isfinite(phase) & (np.abs(phase) <= window)
     ax.scatter(phase[sel], y[sel], s=5.2, c="0.55", alpha=0.34, linewidths=0, rasterized=True)
@@ -511,9 +591,12 @@ def _plot_folded_bins(
     ax.axvline(0.0, color="#9b2f25", lw=0.9, alpha=0.80)
     ax.set_xlim(-window, window)
     _set_fold_ylim(ax, y, sel, depth=depth)
-    title_bits = [title, _bold_period(period_d)]
-    if show_duration_hours:
-        title_bits.append(_duration_hours_label(duration_min))
+    if phase_shift:
+        title_bits = [title, r"$\phi=0.5$"]
+    else:
+        title_bits = [title]
+    if show_duration_days:
+        title_bits.append(_duration_days_label(duration_min))
     ax.set_title("; ".join(title_bits), loc="left", fontsize=10.2)
     ax.set_xlabel("orbital phase")
     ax.set_ylabel("relative flux")
@@ -530,6 +613,7 @@ def _plot_even_odd_bins(
     title: str,
     metrics: dict[str, Any],
     prefix: str,
+    metric_scope: str = "own",
 ) -> None:
     y = _norm_flux(blc, aperture)
     keep = quality_mask(blc, aperture)
@@ -562,8 +646,8 @@ def _plot_even_odd_bins(
     ax.axvline(0.0, color="#9b2f25", lw=0.9, alpha=0.75)
     ax.set_xlim(-window, window)
     _set_fold_ylim(ax, y, sel)
-    ax.set_title(f"{title}; {_bold_period(period_d)}", loc="left", fontsize=10.2)
-    sigma_delta = metrics.get(f"{prefix}_own_even_odd_sigma_delta", np.nan)
+    ax.set_title(title, loc="left", fontsize=10.2)
+    sigma_delta = metrics.get(f"{prefix}_{metric_scope}_even_odd_sigma_delta", np.nan)
     if np.isfinite(sigma_delta):
         ax.text(
             0.98,
@@ -586,6 +670,7 @@ def build_two_aperture_metrics(
     cfg: BLSConfig,
     apertures: tuple[str, ...] = DEFAULT_TWO_APERTURE_APERTURES,
     anchor_aperture: str | None = None,
+    anchor_peak_override: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run BLS for both apertures and return metrics plus plotting payload."""
 
@@ -621,7 +706,8 @@ def build_two_aperture_metrics(
         anchor_ap = anchor_aperture
     else:
         anchor_ap = apertures[0] if apertures and apertures[0] in results else next(iter(results), "")
-    anchor_peak = _best_peak_dict(results[anchor_ap]) if anchor_ap else {}
+    override_peak = _finite_peak_dict(anchor_peak_override)
+    anchor_peak = override_peak or (_best_peak_dict(results[anchor_ap]) if anchor_ap else {})
     metrics: dict[str, Any] = {
         "tic": lc.tic,
         "sector": lc.sector,
@@ -634,6 +720,7 @@ def build_two_aperture_metrics(
         "anchor_t0_bjd": anchor_peak.get("t0_bjd", np.nan),
         "anchor_duration_min": anchor_peak.get("duration_min", np.nan),
         "anchor_sde": anchor_peak.get("sde", np.nan),
+        "anchor_source": "row_metadata" if override_peak else "bls_anchor_aperture",
     }
     for ap, res in results.items():
         peak = _best_peak_dict(res)
@@ -705,6 +792,8 @@ def render_two_aperture_sheet(
     apertures: tuple[str, ...] = DEFAULT_TWO_APERTURE_APERTURES,
     anchor_aperture: str | None = None,
     row_metadata: dict[str, Any] | None = None,
+    use_row_ephemeris: bool = False,
+    write_pdf: bool = True,
 ) -> tuple[Path, dict[str, Any]]:
     """Render a PNG/PDF two-aperture vet sheet and return metrics."""
 
@@ -725,6 +814,7 @@ def render_two_aperture_sheet(
         cfg=cfg,
         apertures=apertures,
         anchor_aperture=anchor_aperture,
+        anchor_peak_override=_row_ephemeris_peak(row_metadata) if use_row_ephemeris else None,
     )
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -749,81 +839,101 @@ def render_two_aperture_sheet(
         offset = 0 if col == 0 else 2
         blc: HLSPLightCurve = payload["lcs"][ap]
         peak = _best_peak_dict(payload["results"][ap])
+        prefix = _aperture_prefix(ap)
+        anchor_depth = metrics.get(f"{prefix}_anchor_depth", np.nan)
+        plot_peak = peak
+        if use_row_ephemeris and np.isfinite(anchor_period) and np.isfinite(anchor_t0) and np.isfinite(anchor_dur):
+            plot_peak = {
+                "period_d": float(anchor_period),
+                "t0_bjd": float(anchor_t0),
+                "duration_min": float(anchor_dur),
+                "depth": float(anchor_depth) if np.isfinite(anchor_depth) else np.nan,
+                "depth_snr": metrics.get(f"{prefix}_anchor_snr", np.nan),
+                "sde": metrics.get("anchor_sde", np.nan),
+            }
+        plot_title = "Review fold" if use_row_ephemeris else "Own fold"
+        metric_scope = "anchor" if use_row_ephemeris else "own"
 
         ax = fig.add_subplot(gs[0, offset : offset + 2])
-        _plot_full_lc(ax, blc, ap, branch_name=branch.name, peak=peak)
+        _plot_full_lc(ax, blc, ap, branch_name=branch.name, peak=plot_peak)
 
         ax = fig.add_subplot(gs[1, offset : offset + 2])
-        if np.isfinite(peak["period_d"]):
+        if np.isfinite(plot_peak["period_d"]):
             _plot_full_phase_fold(
                 ax,
                 blc,
                 ap,
-                period_d=float(peak["period_d"]),
-                t0_bjd=float(peak["t0_bjd"]),
-                duration_min=float(peak["duration_min"]),
-                depth=float(peak["depth"]) if np.isfinite(peak.get("depth", np.nan)) else None,
+                period_d=float(plot_peak["period_d"]),
+                t0_bjd=float(plot_peak["t0_bjd"]),
+                duration_min=float(plot_peak["duration_min"]),
+                depth=float(plot_peak["depth"]) if np.isfinite(plot_peak.get("depth", np.nan)) else None,
                 title="Full phase fold",
             )
         else:
-            ax.text(0.5, 0.5, "No finite own BLS peak", ha="center", va="center")
+            ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
             ax.set_axis_off()
 
         ax = fig.add_subplot(gs[2, offset])
-        _plot_periodogram(ax, payload["spectra"].get(ap), peak=peak)
+        _plot_periodogram(
+            ax,
+            payload["spectra"].get(ap),
+            bls_peak=peak,
+            review_peak=plot_peak,
+        )
 
         ax = fig.add_subplot(gs[2, offset + 1])
-        if np.isfinite(peak["period_d"]):
+        if np.isfinite(plot_peak["period_d"]):
             _plot_folded_bins(
                 ax,
                 blc,
                 ap,
-                period_d=float(peak["period_d"]),
-                t0_bjd=float(peak["t0_bjd"]),
-                duration_min=float(peak["duration_min"]),
-                depth=float(peak["depth"]) if np.isfinite(peak.get("depth", np.nan)) else None,
-                sde=float(peak["sde"]) if np.isfinite(peak.get("sde", np.nan)) else None,
-                title="Own fold",
-                show_duration_hours=True,
+                period_d=float(plot_peak["period_d"]),
+                t0_bjd=float(plot_peak["t0_bjd"]),
+                duration_min=float(plot_peak["duration_min"]),
+                depth=float(plot_peak["depth"]) if np.isfinite(plot_peak.get("depth", np.nan)) else None,
+                sde=float(plot_peak["sde"]) if np.isfinite(plot_peak.get("sde", np.nan)) else None,
+                title=plot_title,
+                show_duration_days=True,
             )
             ax.set_xlabel("")
         else:
-            ax.text(0.5, 0.5, "No finite own BLS peak", ha="center", va="center")
+            ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
             ax.set_axis_off()
 
         ax = fig.add_subplot(gs[3, offset])
-        if np.isfinite(anchor_period):
-            anchor_depth = metrics.get(f"{_aperture_prefix(ap)}_anchor_depth", np.nan)
+        if np.isfinite(plot_peak["period_d"]):
             _plot_folded_bins(
                 ax,
                 blc,
                 ap,
-                period_d=float(anchor_period),
-                t0_bjd=float(anchor_t0),
-                duration_min=float(anchor_dur),
-                depth=float(anchor_depth) if np.isfinite(anchor_depth) and anchor_depth > 0 else None,
-                sde=float(metrics.get("anchor_sde", np.nan)) if np.isfinite(metrics.get("anchor_sde", np.nan)) else None,
-                title="Anchor fold",
+                period_d=float(plot_peak["period_d"]),
+                t0_bjd=float(plot_peak["t0_bjd"]),
+                duration_min=float(plot_peak["duration_min"]),
+                depth=float(plot_peak["depth"]) if np.isfinite(plot_peak.get("depth", np.nan)) else None,
+                sde=float(plot_peak["sde"]) if np.isfinite(plot_peak.get("sde", np.nan)) else None,
+                title="Secondary fold",
+                phase_shift=0.5,
             )
         else:
-            ax.text(0.5, 0.5, "No finite shared anchor", ha="center", va="center")
+            ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
             ax.set_axis_off()
 
         ax = fig.add_subplot(gs[3, offset + 1])
-        if np.isfinite(peak["period_d"]):
+        if np.isfinite(plot_peak["period_d"]):
             _plot_even_odd_bins(
                 ax,
                 blc,
                 ap,
-                period_d=float(peak["period_d"]),
-                t0_bjd=float(peak["t0_bjd"]),
-                duration_min=float(peak["duration_min"]),
+                period_d=float(plot_peak["period_d"]),
+                t0_bjd=float(plot_peak["t0_bjd"]),
+                duration_min=float(plot_peak["duration_min"]),
                 title="Odd/even fold",
                 metrics=metrics,
-                prefix=_aperture_prefix(ap),
+                prefix=prefix,
+                metric_scope=metric_scope,
             )
         else:
-            ax.text(0.5, 0.5, "No finite own BLS peak", ha="center", va="center")
+            ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
             ax.set_axis_off()
 
     ax_txt = fig.add_subplot(gs[4, :])
@@ -834,7 +944,7 @@ def render_two_aperture_sheet(
             f"anchor={metrics.get('anchor_aperture', '')}  "
             f"P={metrics.get('anchor_period_d', np.nan):.6g} d  "
             f"T0={metrics.get('anchor_t0_bjd', np.nan):.6f}  "
-            f"dur={metrics.get('anchor_duration_min', np.nan):.3g} min  "
+            f"dur={_duration_days_text(metrics.get('anchor_duration_min', np.nan))}  "
             f"SDE={metrics.get('anchor_sde', np.nan):.3g}"
         ),
         (
@@ -853,11 +963,12 @@ def render_two_aperture_sheet(
     ax_txt.text(0.0, 1.0, "\n".join(lines), va="top", ha="left", family="monospace", fontsize=9.4)
     fig.subplots_adjust(top=0.975, bottom=0.040, left=0.060, right=0.992)
     fig.savefig(out_path, dpi=160)
-    try:
-        fig.savefig(out_path.with_suffix(".pdf"))
-    except Exception:
-        pass
+    if write_pdf:
+        try:
+            fig.savefig(out_path.with_suffix(".pdf"))
+        except Exception:
+            pass
     plt.close(fig)
     metrics["twirl_vet_sheet_name"] = out_path.name
-    metrics["twirl_vet_sheet_pdf_name"] = out_path.with_suffix(".pdf").name
+    metrics["twirl_vet_sheet_pdf_name"] = out_path.with_suffix(".pdf").name if write_pdf else ""
     return out_path, metrics

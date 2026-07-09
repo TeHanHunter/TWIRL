@@ -1,0 +1,149 @@
+{
+  "active_apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_ADP"
+  ],
+  "adp_only": {
+    "active_apertures": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_ADP"
+    ],
+    "contract_version": "s56_adp_pair_v1",
+    "dropped_columns": [
+      "any_exact_or_harmonic_recovered",
+      "apertures_agree",
+      "baseline_d",
+      "blind_rank",
+      "bls_run_id",
+      "both_apertures_top1_recovered",
+      "cadence_alias_delta",
+      "cadence_alias_flag",
+      "cadence_period_n",
+      "cadence_period_nearest_n",
+      "candidate_key",
+      "centroid_delta_pix",
+      "centroid_dx_pix",
+      "centroid_dy_pix",
+      "centroid_pass",
+      "centroid_sigma_oot_pix",
+      "centroid_status",
+      "centroid_z",
+      "class_rank",
+      "display_ephemeris_period_rel_delta",
+      "dur_envelope_min",
+      "dur_envelope_pass",
+      "dur_grid_ceiling_hit",
+      "human_candidate_key",
+      "min_twoap_sde",
+      "n_apertures_agree",
+      "n_cad_kept_max",
+      "n_harmonic_apertures_agree",
+      "n_in_transit",
+      "n_oot_band",
+      "n_topn_apertures_agree",
+      "p_alias_pass",
+      "p_cluster_pass",
+      "period_cluster_count",
+      "period_rel_err",
+      "period_rel_err_DET_FLUX_SML",
+      "queue_duration_min",
+      "queue_period_d",
+      "queue_t0_bjd",
+      "rank_DET_FLUX",
+      "rank_DET_FLUX_LAG",
+      "rank_DET_FLUX_SML",
+      "recovery_status",
+      "recovery_status_DET_FLUX_SML",
+      "rep_aperture",
+      "rep_peak_rank",
+      "roche_pass",
+      "roche_period_d",
+      "sde_DET_FLUX",
+      "sde_DET_FLUX_LAG",
+      "sde_DET_FLUX_SML",
+      "selection_bucket",
+      "selection_note",
+      "selection_weight",
+      "strict_top1_recovered",
+      "t0_phase_err_min",
+      "t0_phase_err_min_DET_FLUX_SML",
+      "top_harmonic_ephemeris_match_DET_FLUX_SML",
+      "top_harmonic_factor_DET_FLUX_SML",
+      "top_harmonic_period_match_DET_FLUX_SML",
+      "top_harmonic_rel_err_DET_FLUX_SML",
+      "top_harmonic_t0_phase_err_min_DET_FLUX_SML",
+      "top_period_ratio_DET_FLUX_SML",
+      "topn_apertures_agree",
+      "topn_exact_peak_rank_DET_FLUX_SML",
+      "topn_exact_period_rel_err_DET_FLUX_SML",
+      "topn_exact_recovered_DET_FLUX_SML",
+      "topn_exact_sde_DET_FLUX_SML",
+      "topn_exact_t0_phase_err_min_DET_FLUX_SML",
+      "topn_harmonic_factor_DET_FLUX_SML",
+      "topn_harmonic_match_DET_FLUX_SML",
+      "topn_harmonic_peak_rank_DET_FLUX_SML",
+      "topn_harmonic_period_ratio_DET_FLUX_SML",
+      "topn_harmonic_rel_err_DET_FLUX_SML",
+      "topn_harmonic_sde_DET_FLUX_SML",
+      "topn_harmonic_t0_phase_err_min_DET_FLUX_SML",
+      "topn_recovery_status",
+      "truth_n_good_in_transit",
+      "truth_n_in_transit",
+      "vet_class",
+      "vetted_rank"
+    ],
+    "exclusion_reason_counts": {
+      "missing_adp_primary_supplement": 157,
+      "missing_adp_small_anchor": 1
+    },
+    "n_adp_only_review_ok": 1842,
+    "n_excluded": 158,
+    "n_rows": 2000
+  },
+  "display_source_counts": {
+    "queue": 1,
+    "twirl_vet_anchor": 1999
+  },
+  "display_vs_adp_small": {
+    "exact": 1999,
+    "missing": 1
+  },
+  "display_vs_supplement": {
+    "exact": 672,
+    "harmonic": 43,
+    "unrelated": 1285
+  },
+  "existing_combined_model_canonical_metadata": [
+    "rank_DET_FLUX_SML",
+    "sde_DET_FLUX_SML"
+  ],
+  "injection_source_h5_counts": {
+    "data_local/stage3_injections/s56_twirlfs_v2_injection_training/recovery50_adp_pair_subset/injected_lightcurves.h5": 300,
+    "data_local/stage3_injections/s56_twirlfs_v2_injection_training/recovery50_adp_pair_subset_next4k/injected_lightcurves.h5": 157
+  },
+  "legacy_queue_vs_adp_small": {
+    "exact": 509,
+    "harmonic": 87,
+    "missing": 1,
+    "unrelated": 1403
+  },
+  "metrics_tables": [
+    "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/twirl_vet_metrics_real.csv",
+    "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue/twirl_vet_metrics_injected_fullphase_binmatch.csv",
+    "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_next4k/twirl_vet_metrics_real.csv",
+    "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_next4k/twirl_vet_metrics_injected.csv"
+  ],
+  "n_rows": 2000,
+  "out_dir": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_adp_only",
+  "outputs": {
+    "active_training_table": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_adp_only/human_vetting_training_table.csv",
+    "audit_rows": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_adp_only/ephemeris_audit_rows.csv",
+    "excluded_rows": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_adp_only/excluded_pending_adp_review.csv",
+    "summary": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_adp_only/summary.json"
+  },
+  "supplement_kind_counts": {
+    "adp_primary": 1843,
+    "canonical_sml": 157
+  },
+  "training_table": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_recovery50_teacher_queue_2k/human_training_table_revisit_harmonic/human_vetting_training_table.csv"
+}

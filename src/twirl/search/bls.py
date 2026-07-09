@@ -1,8 +1,8 @@
 """astropy BoxLeastSquares wrapper for the per-sector BLS first pass.
 
 Runs BLS on a single HLSP light curve, extracts the top-N SDE peaks, and
-returns a `BLSResult`. Detrending is *not* done here — DET_FLUX is already
-QLP/BSpline-detrended; we only median-normalize before BLS.
+returns a `BLSResult`. Detrending is not done here; active S56 searches use
+the already-detrended ADP small/primary pair and median-normalize before BLS.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from twirl.search.grids import build_period_grid, duration_grid_days
 
 @dataclass
 class BLSConfig:
-    apertures: tuple[str, ...] = ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG")
+    apertures: tuple[str, ...] = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
     # p_min_d raised from 2 h (v1) to 0.12 d (~2.9 h) to cut the empirical
     # alias wall pile-up (26% of best-peaks landed in [0.083, 0.10] d in v1)
     # and the cadence-sampling floor where even a central 2 R_jup transit
@@ -85,7 +85,7 @@ def _maybe_with_periodogram(
 
 
 def run_bls_on_lc(lc: HLSPLightCurve, cfg: BLSConfig | None = None,
-                  aperture: str = "DET_FLUX",
+                  aperture: str = "DET_FLUX_ADP_SML",
                   return_periodogram: bool = False) -> BLSResult | tuple[BLSResult, dict | None]:
     """Run BLS on one aperture of one light curve.
 

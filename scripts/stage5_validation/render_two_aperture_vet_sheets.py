@@ -81,6 +81,8 @@ def _render_one(
         int,
         int,
         str,
+        str,
+        str,
     ]
 ) -> dict[str, Any]:
     (
@@ -95,12 +97,16 @@ def _render_one(
         n_periods,
         n_peaks,
         overwrite_s,
+        use_row_ephemeris_s,
+        write_pdf_s,
     ) = payload
     hlsp_root = Path(hlsp_root_s)
     lc_export_h5 = Path(lc_export_h5_s) if lc_export_h5_s else None
     injection_h5 = Path(injection_h5_s) if injection_h5_s else None
     out_dir = Path(out_dir_s)
     overwrite = overwrite_s == "1"
+    use_row_ephemeris = use_row_ephemeris_s == "1"
+    write_pdf = write_pdf_s == "1"
     tic = int(float(row["tic"]))
     sector_value = row.get("sector")
     sector = int(float(sector_value)) if pd.notna(sector_value) else None
@@ -162,6 +168,8 @@ def _render_one(
             apertures=apertures,
             anchor_aperture=apertures[0] if apertures else None,
             row_metadata=row,
+            use_row_ephemeris=use_row_ephemeris,
+            write_pdf=write_pdf,
         )
     except Exception as exc:
         record["twirl_vet_status"] = f"error:{type(exc).__name__}: {exc}"
@@ -187,6 +195,8 @@ def render_queue(
     n_periods: int,
     n_peaks: int,
     overwrite: bool,
+    use_row_ephemeris: bool,
+    write_pdf: bool,
 ) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
     queue = pd.read_csv(queue_csv)
@@ -205,6 +215,8 @@ def render_queue(
             int(n_periods),
             int(n_peaks),
             "1" if overwrite else "0",
+            "1" if use_row_ephemeris else "0",
+            "1" if write_pdf else "0",
         )
         for idx, row in enumerate(queue.to_dict("records"))
     ]
@@ -241,6 +253,8 @@ def render_queue(
         },
         "n_periods": int(n_periods),
         "n_peaks": int(n_peaks),
+        "use_row_ephemeris": bool(use_row_ephemeris),
+        "write_pdf": bool(write_pdf),
     }
     summary_json.parent.mkdir(parents=True, exist_ok=True)
     summary_json.write_text(
@@ -297,6 +311,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--n-periods", type=int, default=20_000)
     ap.add_argument("--n-peaks", type=int, default=10)
     ap.add_argument("--overwrite", action="store_true")
+    ap.add_argument(
+        "--use-row-ephemeris",
+        action="store_true",
+        help="Use each queue row's period_d/t0_bjd/duration_min as the sheet fold ephemeris.",
+    )
+    ap.add_argument(
+        "--no-pdf",
+        action="store_true",
+        help="Write PNG sheets only. This is sufficient for the browser app and keeps handoff packages smaller.",
+    )
     return ap
 
 
@@ -323,6 +347,8 @@ def main(argv: list[str] | None = None) -> int:
         n_periods=args.n_periods,
         n_peaks=args.n_peaks,
         overwrite=bool(args.overwrite),
+        use_row_ephemeris=bool(args.use_row_ephemeris),
+        write_pdf=not bool(args.no_pdf),
     )
     print(json.dumps(summary, indent=2, sort_keys=True, default=_json_default))
     return 0

@@ -18,15 +18,12 @@ from twirl.vetting.recovery50_cnn import (  # noqa: E402
 )
 from twirl.vetting.recovery50_teacher import json_default  # noqa: E402
 
-DEFAULT_ROOT = REPO_ROOT / "reports/stage5_validation/s56_recovery50_teacher_queue"
-DEFAULT_TENSOR_NPZ = DEFAULT_ROOT / "cnn_tensors/recovery50_cnn_tensors.npz"
-DEFAULT_TENSOR_ROWS = DEFAULT_ROOT / "cnn_tensors/recovery50_cnn_tensor_rows.csv"
-DEFAULT_TRAINING_TABLE = DEFAULT_ROOT / "human_training_table/human_vetting_training_table.csv"
-DEFAULT_METRICS = (
-    DEFAULT_ROOT / "twirl_vet_metrics_real_fullphase_binmatch.csv",
-    DEFAULT_ROOT / "twirl_vet_metrics_injected_fullphase_binmatch.csv",
-)
-DEFAULT_OUT_DIR = DEFAULT_ROOT / "cnn_teacher"
+DEFAULT_ROOT = REPO_ROOT / "reports/stage5_validation/s56_recovery50_teacher_queue_2k"
+DEFAULT_TENSOR_NPZ = DEFAULT_ROOT / "cnn_tensors_adp_only/recovery50_cnn_tensors.npz"
+DEFAULT_TENSOR_ROWS = DEFAULT_ROOT / "cnn_tensors_adp_only/recovery50_cnn_tensor_rows.csv"
+DEFAULT_TRAINING_TABLE = DEFAULT_ROOT / "human_training_table_adp_only/human_vetting_training_table.csv"
+DEFAULT_METRICS: tuple[Path, ...] = ()
+DEFAULT_OUT_DIR = DEFAULT_ROOT / "cnn_teacher_adp_only"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
