@@ -105,6 +105,8 @@ def write_twirl_hlsp(
     method_version: str = METHOD_VERSION,
     extra_flux_columns: Mapping[str, np.ndarray] | None = None,
     extra_header: Mapping[str, object] | None = None,
+    include_canonical_det_flux: bool = True,
+    include_sys_rm_flux: bool = True,
 ) -> Path:
     """Write a single TWIRL-FS HLSP FITS file in QLP-compatible schema.
 
@@ -121,18 +123,29 @@ def write_twirl_hlsp(
         fits.Column(name="TIME", format="D", unit="BJD-2457000, days", array=time_btjd),
         fits.Column(name="CADENCENO", format="J", array=cadenceno.astype(np.int32)),
         fits.Column(name="SAP_FLUX", format="E", array=sap_flux.astype(np.float32)),
-        fits.Column(name="DET_FLUX", format="E", array=det_flux.astype(np.float32)),
-        fits.Column(name="DET_FLUX_ERR", format="E", array=det_flux_err.astype(np.float32)),
+    ]
+    if include_canonical_det_flux:
+        cols.extend([
+            fits.Column(name="DET_FLUX", format="E", array=det_flux.astype(np.float32)),
+            fits.Column(name="DET_FLUX_ERR", format="E", array=det_flux_err.astype(np.float32)),
+        ])
+    cols.extend([
         fits.Column(name="QUALITY", format="J", array=quality.astype(np.int32)),
         fits.Column(name="ORBITID", format="J", array=orbitid.astype(np.int32)),
         fits.Column(name="SAP_X", format="E", unit="pixel", array=sap_x.astype(np.float32)),
         fits.Column(name="SAP_Y", format="E", unit="pixel", array=sap_y.astype(np.float32)),
         fits.Column(name="SAP_BKG", format="E", array=sap_bkg.astype(np.float32)),
         fits.Column(name="SAP_BKG_ERR", format="E", array=sap_bkg_err.astype(np.float32)),
-        fits.Column(name="DET_FLUX_SML", format="E", array=det_flux_sml.astype(np.float32)),
-        fits.Column(name="DET_FLUX_LAG", format="E", array=det_flux_lag.astype(np.float32)),
-        fits.Column(name="SYS_RM_FLUX", format="E", array=sys_rm_flux.astype(np.float32)),
-    ]
+    ])
+    if include_canonical_det_flux:
+        cols.extend([
+            fits.Column(name="DET_FLUX_SML", format="E", array=det_flux_sml.astype(np.float32)),
+            fits.Column(name="DET_FLUX_LAG", format="E", array=det_flux_lag.astype(np.float32)),
+        ])
+    if include_sys_rm_flux:
+        cols.append(
+            fits.Column(name="SYS_RM_FLUX", format="E", array=sys_rm_flux.astype(np.float32))
+        )
     if extra_flux_columns:
         for name, values in extra_flux_columns.items():
             values = np.asarray(values)

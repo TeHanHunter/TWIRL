@@ -21,6 +21,17 @@ import numpy as np
 from astropy.io import fits
 
 APERTURES: tuple[str, ...] = ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG")
+A2V1_ADP_APERTURES: tuple[str, ...] = (
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_ADP",
+    "DET_FLUX_ADP_LAG",
+)
+A2V1_ADP015_APERTURES: tuple[str, ...] = (
+    "DET_FLUX_ADP015_SML",
+    "DET_FLUX_ADP015",
+    "DET_FLUX_ADP015_LAG",
+)
+A2V1_APERTURES: tuple[str, ...] = A2V1_ADP_APERTURES + A2V1_ADP015_APERTURES
 BJDREFI: int = 2457000
 
 

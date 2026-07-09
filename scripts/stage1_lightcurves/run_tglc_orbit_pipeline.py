@@ -20,6 +20,7 @@ import argparse
 import concurrent.futures as cf
 import json
 import os
+import queue
 import shlex
 import subprocess
 import time
@@ -813,43 +814,86 @@ def main() -> int:
         )
         gpu_ids = []
 
+    if gpu_ids:
+        worker_gpu_ids: list[str | None] = gpu_ids[: args.max_parallel_ccd_jobs]
+        if args.max_parallel_ccd_jobs > len(worker_gpu_ids):
+            print(
+                "[orbit-pipeline] capping concurrent GPU CCD jobs to "
+                f"{len(worker_gpu_ids)} because --gpu-list has "
+                f"{len(worker_gpu_ids)} device(s)",
+                flush=True,
+            )
+    else:
+        worker_gpu_ids = [None] * args.max_parallel_ccd_jobs
+
+    print(
+        "[orbit-pipeline] "
+        f"worker_lanes={len(worker_gpu_ids)} "
+        f"gpu_lanes={','.join(g for g in worker_gpu_ids if g is not None) or 'none'}",
+        flush=True,
+    )
+
+    work_queue: queue.Queue[CcdJob] = queue.Queue()
+    for job in ccd_jobs:
+        work_queue.put(job)
+
+    def run_worker_lane(lane_index: int, gpu_id: str | None) -> list[dict[str, object]]:
+        lane_summaries: list[dict[str, object]] = []
+        while True:
+            try:
+                job = work_queue.get_nowait()
+            except queue.Empty:
+                return lane_summaries
+            try:
+                lane_summaries.append(
+                    _process_one_ccd(
+                        job=job,
+                        gpu_id=gpu_id,
+                        no_gpu=args.no_gpu,
+                        orbit=args.orbit,
+                        sector=args.sector,
+                        orbit_tag=args.orbit_tag,
+                        tglc_data_dir=args.tglc_data_dir,
+                        tica_root=args.tica_root,
+                        python_bin=args.python_bin,
+                        runtime_env=runtime_env,
+                        log_root=run_log_root,
+                        tic_list=tic_lists_by_ccd[job],
+                        max_magnitude=args.max_magnitude,
+                        catalogs_nprocs=args.catalogs_nprocs,
+                        cutouts_nprocs=args.cutouts_nprocs,
+                        epsfs_nprocs=args.epsfs_nprocs,
+                        lightcurves_nprocs=args.lightcurves_nprocs,
+                        stop_on_warning=args.stop_on_warning,
+                        reuse_catalogs_from_orbit=args.reuse_catalogs_from_orbit,
+                        stages=stages,
+                    )
+                )
+            except Exception as exc:
+                print(
+                    f"[orbit-pipeline] FAILED lane={lane_index} {job.label}: {exc}",
+                    flush=True,
+                )
+                raise
+            finally:
+                work_queue.task_done()
+
     run_start = time.perf_counter()
     summaries: list[dict[str, object]] = []
-    with cf.ThreadPoolExecutor(max_workers=args.max_parallel_ccd_jobs) as executor:
+    with cf.ThreadPoolExecutor(max_workers=len(worker_gpu_ids)) as executor:
         futures = {
-            executor.submit(
-                _process_one_ccd,
-                job=job,
-                gpu_id=(gpu_ids[idx % len(gpu_ids)] if gpu_ids else None),
-                no_gpu=args.no_gpu,
-                orbit=args.orbit,
-                sector=args.sector,
-                orbit_tag=args.orbit_tag,
-                tglc_data_dir=args.tglc_data_dir,
-                tica_root=args.tica_root,
-                python_bin=args.python_bin,
-                runtime_env=runtime_env,
-                log_root=run_log_root,
-                tic_list=tic_lists_by_ccd[job],
-                max_magnitude=args.max_magnitude,
-                catalogs_nprocs=args.catalogs_nprocs,
-                cutouts_nprocs=args.cutouts_nprocs,
-                epsfs_nprocs=args.epsfs_nprocs,
-                lightcurves_nprocs=args.lightcurves_nprocs,
-                stop_on_warning=args.stop_on_warning,
-                reuse_catalogs_from_orbit=args.reuse_catalogs_from_orbit,
-                stages=stages,
-            ): job
-            for idx, job in enumerate(ccd_jobs)
+            executor.submit(run_worker_lane, idx, gpu_id): (idx, gpu_id)
+            for idx, gpu_id in enumerate(worker_gpu_ids)
         }
 
         for future in cf.as_completed(futures):
-            job = futures[future]
+            lane_index, gpu_id = futures[future]
             try:
-                summaries.append(future.result())
+                summaries.extend(future.result())
             except Exception as exc:
+                gpu_label = gpu_id if gpu_id is not None else "none"
                 print(
-                    f"[orbit-pipeline] FAILED {job.label}: {exc}",
+                    f"[orbit-pipeline] FAILED lane={lane_index} gpu={gpu_label}: {exc}",
                     flush=True,
                 )
                 raise

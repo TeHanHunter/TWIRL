@@ -36,8 +36,12 @@ from twirl.lightcurves.flux_detrend import (  # noqa: E402
 )
 from twirl.lightcurves.detrend_presets import (  # noqa: E402
     ADP03Q_COLUMN_TAG,
+    ADP015Q_COLUMN_TAG,
     TWIRL_FS_V2_ADP03Q_METHOD,
+    TWIRL_FS_V2_ADP015Q_METHOD,
     TWIRL_FS_V2_METHOD,
+    adp015q_config,
+    adp03q_config,
     adaptive_quantile_config,
     canonical_config,
     compare_column_names,
@@ -56,6 +60,7 @@ from twirl.lightcurves.tglc_h5_reader import (  # noqa: E402
 
 METHOD_VERSION = TWIRL_FS_V2_METHOD
 ADAPTIVE_METHOD_VERSION = TWIRL_FS_V2_ADP03Q_METHOD
+A2V1_METHOD_VERSION = "A2v1"
 CANONICAL_DETREND_CONFIG = canonical_config()
 DETREND_CONFIG = CANONICAL_DETREND_CONFIG
 
@@ -63,6 +68,21 @@ DETREND_CONFIG = CANONICAL_DETREND_CONFIG
 def adaptive_detrend_config(bkspace_d: float, gap_split_d: float) -> FluxDetrendConfig:
     """Return the experimental tighter-spline compare-column config."""
     return adaptive_quantile_config(bkspace_d=bkspace_d, gap_split_d=gap_split_d)
+
+
+def _branch_flux_columns(
+    *,
+    tag: str,
+    detrended: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]],
+) -> dict[str, np.ndarray]:
+    """Return primary/small/large FITS columns for one named detrend branch."""
+    col = compare_column_names(tag)
+    return {
+        col["primary"]: detrended["Primary"][1],
+        col["primary_err"]: detrended["Primary"][2],
+        col["small"]: detrended["Small"][1],
+        col["large"]: detrended["Large"][1],
+    }
 
 
 def discover_orbit_hdf5(orbit_root: Path) -> dict[int, Path]:
@@ -183,7 +203,7 @@ def detrend_apertures(
     return out, diagnostics
 
 
-def process_one(args: tuple[int, list[Path], Path, bool, float, float, str, str, str]) -> tuple[int, bool, str]:
+def process_one(args: tuple[int, list[Path], Path, bool, float, float, str, str, str, bool]) -> tuple[int, bool, str]:
     (
         tic,
         paths,
@@ -194,26 +214,73 @@ def process_one(args: tuple[int, list[Path], Path, bool, float, float, str, str,
         method_version,
         adaptive_method_version,
         adaptive_column_tag,
+        a2v1_only,
     ) = args
     try:
         lcs = [read_tglc_h5(p) for p in paths]
         merged = merge_orbits(lcs)
         if merged is None:
             return tic, False, "no_lc"
-        ap_det, ap_diag = detrend_apertures(merged, cfg=CANONICAL_DETREND_CONFIG)
+        include_canonical_det_flux = True
+        include_sys_rm_flux = True
+        primary_detrend_config = CANONICAL_DETREND_CONFIG
         extra_flux_columns = None
         extra_header = None
+        if a2v1_only:
+            adp_cfg = adp03q_config()
+            adp015_cfg = adp015q_config()
+            adp_det, adp_diag = detrend_apertures(merged, cfg=adp_cfg)
+            adp015_det, adp015_diag = detrend_apertures(merged, cfg=adp015_cfg)
+            ap_det = adp_det
+            ap_diag = adp_diag
+            primary_detrend_config = adp_cfg
+            extra_flux_columns = {
+                **_branch_flux_columns(tag=ADP03Q_COLUMN_TAG, detrended=adp_det),
+                **_branch_flux_columns(tag=ADP015Q_COLUMN_TAG, detrended=adp015_det),
+            }
+            adp_primary_diag = adp_diag.get("Primary", {})
+            adp015_primary_diag = adp015_diag.get("Primary", {})
+            extra_header = {
+                "PRODTAG": ("A2v1", "TWIRL production product tag"),
+                "A2V1": (True, "A2v1 ADP/ADP015-only branch product"),
+                "BRANCHES": ("ADP,ADP015", "Saved detrended branch tags"),
+                "HASADP": (True, "Includes ADP detrend branch"),
+                "HASADP15": (True, "Includes ADP015 detrend branch"),
+                "ADPMETH": (TWIRL_FS_V2_ADP03Q_METHOD, "ADP method"),
+                "A15METH": (TWIRL_FS_V2_ADP015Q_METHOD, "ADP015 method"),
+                "ADPBKSP": (float(adp_cfg.bkspace_d), "ADP spline spacing (d)"),
+                "A15BKSP": (float(adp015_cfg.bkspace_d), "ADP015 spline spacing (d)"),
+                "ADPGAP": (float(adp_cfg.gap_split_d), "ADP gap split threshold"),
+                "A15GAP": (float(adp015_cfg.gap_split_d), "ADP015 gap split threshold"),
+                "ADPNSEG": (
+                    int(adp_primary_diag.get("n_segments", -1)),
+                    "ADP cotrend segment count",
+                ),
+                "A15NSEG": (
+                    int(adp015_primary_diag.get("n_segments", -1)),
+                    "ADP015 cotrend segment count",
+                ),
+                "ADPCOTS": (
+                    str(adp_primary_diag.get("cotrend_status", "")),
+                    "ADP cotrend status",
+                ),
+                "A15COTS": (
+                    str(adp015_primary_diag.get("cotrend_status", "")),
+                    "ADP015 cotrend status",
+                ),
+            }
+            include_canonical_det_flux = False
+            include_sys_rm_flux = False
+        else:
+            ap_det, ap_diag = detrend_apertures(merged, cfg=CANONICAL_DETREND_CONFIG)
         if include_adaptive_columns:
             adp_cfg = adaptive_detrend_config(adaptive_bkspace, adaptive_gap_split)
             adp_det, adp_diag = detrend_apertures(merged, cfg=adp_cfg)
             adp_primary_diag = adp_diag.get("Primary", {})
-            col = compare_column_names(adaptive_column_tag)
-            extra_flux_columns = {
-                col["primary"]: adp_det["Primary"][1],
-                col["primary_err"]: adp_det["Primary"][2],
-                col["small"]: adp_det["Small"][1],
-                col["large"]: adp_det["Large"][1],
-            }
+            extra_flux_columns = _branch_flux_columns(
+                tag=adaptive_column_tag,
+                detrended=adp_det,
+            )
             extra_header = {
                 "HASADP": (True, "Includes adaptive detrend compare columns"),
                 "ADPMETH": (adaptive_method_version, "Adaptive compare method"),
@@ -265,11 +332,13 @@ def process_one(args: tuple[int, list[Path], Path, bool, float, float, str, str,
             sap_bkg_err=merged.background_err.astype(np.float32),
             det_flux_sml=det_sml,
             det_flux_lag=det_lag,
-            detrend_config=CANONICAL_DETREND_CONFIG,
+            detrend_config=primary_detrend_config,
             detrend_diagnostics=ap_diag.get("Primary"),
             method_version=method_version,
             extra_flux_columns=extra_flux_columns,
             extra_header=extra_header,
+            include_canonical_det_flux=include_canonical_det_flux,
+            include_sys_rm_flux=include_sys_rm_flux,
         )
         return tic, True, "ok"
     except Exception as e:
@@ -325,6 +394,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     ap.add_argument(
+        "--a2v1-only",
+        action="store_true",
+        help=(
+            "Write the A2v1 production schema: ADP and ADP015 detrended branch "
+            "columns only for small/primary/large apertures. Canonical "
+            "DET_FLUX*, SYS_RM_FLUX, and compare-column mode are omitted."
+        ),
+    )
+    ap.add_argument(
         "--adaptive-bkspace",
         type=float,
         default=0.3,
@@ -367,10 +445,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
+    if args.a2v1_only and args.include_adaptive_columns:
+        raise SystemExit("--a2v1-only and --include-adaptive-columns are mutually exclusive")
+    if args.a2v1_only and args.method_version == METHOD_VERSION:
+        args.method_version = A2V1_METHOD_VERSION
+
     print(
         f"[build-twirl-hlsp] sector={args.sector} workers={args.workers} "
         f"method={args.method_version}"
     )
+    if args.a2v1_only:
+        print(
+            "[build-twirl-hlsp] A2v1-only schema enabled: "
+            "DET_FLUX_ADP*, DET_FLUX_ADP015* only"
+        )
     if args.include_adaptive_columns:
         print(
             "[build-twirl-hlsp] adaptive compare columns enabled: "
@@ -389,7 +477,7 @@ def main(argv: list[str] | None = None) -> int:
     all_tics = set().union(*[i.keys() for i in per_orbit_index])
     if args.tic is not None:
         all_tics = {args.tic} & all_tics
-    work: list[tuple[int, list[Path], Path, bool, float, float, str]] = []
+    work: list[tuple[int, list[Path], Path, bool, float, float, str, str, str, bool]] = []
     for tic in sorted(all_tics):
         paths = [idx[tic] for idx in per_orbit_index if tic in idx]
         if paths:
@@ -404,6 +492,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.method_version,
                     args.adaptive_method_version,
                     args.adaptive_column_tag,
+                    args.a2v1_only,
                 )
             )
     if args.limit:
