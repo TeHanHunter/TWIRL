@@ -35,6 +35,17 @@ reports/stage5_validation/**/eb_cnn_miner/
 reports/stage5_validation/**/candidate_pool/
 reports/stage5_validation/**/score_chunks/
 reports/stage5_validation/**/*.zip
+# These local queue roots contain a deliberately tracked compact checkpoint;
+# ignore additional regenerated audits, split tables, screenshots, and package
+# copies. Use `git add -f` when a new compact artifact is intentionally kept.
+reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/**
+reports/stage5_validation/s56_eb_miner/**
+reports/stage5_validation/s56_franklin_real5k_handoff/**
+reports/stage5_validation/s56_franklin_real5k_handoff_download/**
+reports/stage5_validation/s56_mixed_teacher_queue_pdo/**
+reports/stage5_validation/s56_recovery50_teacher_queue/**
+reports/stage5_validation/s56_recovery50_teacher_queue_2k/**
+reports/stage5_validation/s56_recovery50_teacher_queue_next1k/**
 reports/stage3_injections/**/*.h5
 reports/stage3_injections/**/*.fits
 reports/stage3_injections/**/*.npy
