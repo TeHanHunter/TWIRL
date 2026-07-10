@@ -83,11 +83,11 @@ def test_eb_training_table_uses_latest_real_labels_and_excludes_injections(tmp_p
     labels = _write_csv(
         tmp_path / "labels.csv",
         [
-            {"row_id": 0, "label": "uncertain", "updated_utc": "2026-07-01T00:00:00Z"},
-            {"row_id": 0, "label": "eclipsing_binary_or_pceb", "updated_utc": "2026-07-02T00:00:00Z"},
-            {"row_id": 1, "label": "uncertain", "updated_utc": "2026-07-01T00:00:00Z"},
-            {"row_id": 2, "label": "skip", "updated_utc": "2026-07-01T00:00:00Z"},
-            {"row_id": 3, "label": "eclipsing_binary_or_pceb", "updated_utc": "2026-07-01T00:00:00Z"},
+            {"row_id": 0, "candidate_key": "1|56|1.0|2459000.0|real_test", "label": "uncertain", "updated_utc": "2026-07-01T00:00:00Z"},
+            {"row_id": 0, "candidate_key": "1|56|1.0|2459000.0|real_test", "label": "eclipsing_binary_or_pceb", "updated_utc": "2026-07-02T00:00:00Z"},
+            {"row_id": 1, "candidate_key": "2|56|2.0|2459001.0|real_test", "label": "uncertain", "updated_utc": "2026-07-01T00:00:00Z"},
+            {"row_id": 2, "candidate_key": "3|56|3.0|2459002.0|real_test", "label": "skip", "updated_utc": "2026-07-01T00:00:00Z"},
+            {"row_id": 3, "candidate_key": "4|56|4.0|2459003.0|inj_test", "label": "eclipsing_binary_or_pceb", "updated_utc": "2026-07-01T00:00:00Z"},
         ],
     )
 

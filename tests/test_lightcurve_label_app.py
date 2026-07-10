@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from twirl.vetting.lightcurve_label_app import (
     CandidateStore,
@@ -47,9 +48,12 @@ def test_candidate_store_saves_and_reloads_labels(tmp_path) -> None:
         label="planet_like",
         labeler="tester",
         notes="clear transit",
+        period_factor="0.5",
     )
 
     assert record["label"] == "planet_like"
+    assert record["period_factor"] == "0.5"
+    assert record["period_status"] == "refolded"
     assert labels.exists()
 
     reloaded = CandidateStore(candidates_path=candidates, labels_out=labels)
@@ -57,6 +61,29 @@ def test_candidate_store_saves_and_reloads_labels(tmp_path) -> None:
     assert row["label"] == "planet_like"
     assert row["labeler"] == "tester"
     assert row["notes"] == "clear transit"
+    assert row["period_factor"] == "0.5"
+    assert row["period_status"] == "refolded"
+
+
+def test_candidate_store_hard_fails_candidate_key_mismatch(tmp_path) -> None:
+    candidates = tmp_path / "candidates.csv"
+    labels = tmp_path / "labels.csv"
+    pd.DataFrame(
+        [{"tic": 10, "sector": 56, "period_d": 1.0, "t0_bjd": 2.0, "source_bucket": "real"}]
+    ).to_csv(candidates, index=False)
+    pd.DataFrame(
+        [
+            {
+                "row_id": 0,
+                "candidate_key": "wrong",
+                "label": "planet_like",
+                "updated_utc": "2026-07-10T00:00:00Z",
+            }
+        ]
+    ).to_csv(labels, index=False)
+
+    with pytest.raises(ValueError, match="candidate_key mismatch"):
+        CandidateStore(candidates_path=candidates, labels_out=labels)
 
 
 def test_candidate_store_replaces_upstream_row_id(tmp_path) -> None:

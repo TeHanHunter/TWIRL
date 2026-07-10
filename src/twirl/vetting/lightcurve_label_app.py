@@ -17,6 +17,13 @@ import pandas as pd
 
 from twirl.io.hlsp import APERTURES, BJDREFI, read_hlsp
 from twirl.search.injections import box_transit_mask
+from twirl.vetting.label_io import (
+    ADJUDICATION_LABEL_COLUMNS,
+    candidate_key as shared_candidate_key,
+    latest_label_records,
+    normalize_review_queue,
+    validate_label_records,
+)
 from twirl.vetting.label_schema import LABEL_BUTTONS, LABEL_KEY_ALIASES, LABEL_OPTIONS
 
 
@@ -63,6 +70,16 @@ PROVENANCE_DISPLAY_COLUMNS: frozenset[str] = frozenset(
         "truth_source_bucket",
     }
 )
+
+PERIOD_FACTOR_OPTIONS: tuple[tuple[str, str], ...] = (
+    ("0.25", "P/4"),
+    ("0.5", "P/2"),
+    ("1", "P"),
+    ("2", "2P"),
+    ("4", "4P"),
+    ("unresolved", "Unresolved"),
+)
+PERIOD_FACTOR_VALUES: frozenset[str] = frozenset(value for value, _ in PERIOD_FACTOR_OPTIONS)
 
 
 def tic_shard_path(hlsp_root: Path, tic: int) -> Path:
@@ -202,10 +219,18 @@ def _safe_float(value: Any) -> float | None:
 
 
 def _candidate_key(row: pd.Series) -> str:
-    return "|".join(
-        str(_clean_value(row.get(col, "")) or "")
-        for col in ("tic", "sector", "period_d", "t0_bjd", "source_bucket")
-    )
+    return shared_candidate_key(row)
+
+
+def _normalize_period_factor(value: Any) -> tuple[str, str]:
+    text = str(_clean_value(value) or "1").strip().lower()
+    aliases = {"0.250": "0.25", "0.50": "0.5", "1.0": "1", "2.0": "2", "4.0": "4", "?": "unresolved"}
+    text = aliases.get(text, text)
+    if text not in PERIOD_FACTOR_VALUES:
+        raise ValueError(f"unsupported period factor: {value}")
+    if text == "unresolved":
+        return text, "unresolved"
+    return text, "review_period" if text == "1" else "refolded"
 
 
 @dataclass
@@ -219,14 +244,9 @@ class CandidateStore:
     def __post_init__(self) -> None:
         self.candidates_path = Path(self.candidates_path)
         self.labels_out = Path(self.labels_out)
-        self.frame = pd.read_csv(self.candidates_path)
-        # Scored/model queues may already carry an upstream tensor row index.
-        # The vetting app owns row_id and always defines it from display order.
-        if "row_id" in self.frame.columns:
-            self.frame = self.frame.drop(columns=["row_id"])
-        self.frame.insert(0, "row_id", np.arange(len(self.frame), dtype=int))
-        self.frame["candidate_key"] = self.frame.apply(_candidate_key, axis=1)
+        self.frame = normalize_review_queue(pd.read_csv(self.candidates_path))
         self.labels = self._load_labels()
+        validate_label_records(self.frame, self.labels)
         self._apply_labels()
         self.review_order = self._build_review_order()
 
@@ -249,28 +269,27 @@ class CandidateStore:
         return order
 
     def _load_labels(self) -> pd.DataFrame:
-        if self.labels_out.exists():
-            labels = pd.read_csv(self.labels_out)
-            if "row_id" in labels.columns:
-                labels["row_id"] = labels["row_id"].astype(int)
-            return labels
-        return pd.DataFrame(columns=["row_id", "candidate_key", "label", "label_source", "labeler", "notes", "updated_utc"])
+        return latest_label_records(self.labels_out, columns=ADJUDICATION_LABEL_COLUMNS)
 
     def _apply_labels(self) -> None:
-        for col in ("label", "label_source", "labeler", "notes", "updated_utc"):
+        for col in ("label", "label_source", "labeler", "notes", "updated_utc", "period_factor", "period_status"):
             if col not in self.frame.columns:
-                self.frame[col] = ""
+                self.frame[col] = "1" if col == "period_factor" else ""
             else:
                 self.frame[col] = self.frame[col].fillna("").astype(object)
+        self.frame.loc[self.frame["period_factor"].astype(str).eq(""), "period_factor"] = "1"
         if self.labels.empty:
             return
         labels = self.labels.drop_duplicates("row_id", keep="last").set_index("row_id")
         for row_id, label_row in labels.iterrows():
             if row_id not in self.frame.index:
                 continue
-            for col in ("label", "label_source", "labeler", "notes", "updated_utc"):
+            for col in ("label", "label_source", "labeler", "notes", "updated_utc", "period_factor", "period_status"):
                 if col in label_row:
-                    self.frame.loc[int(row_id), col] = label_row[col]
+                    value = label_row[col]
+                    if col == "period_factor":
+                        value = _normalize_period_factor(value)[0]
+                    self.frame.loc[int(row_id), col] = value
 
     @property
     def count(self) -> int:
@@ -288,9 +307,17 @@ class CandidateStore:
             raise KeyError(f"unknown row_id: {row_id}")
         return int(hits[0])
 
-    def save_label(self, row_id: int, label: str, labeler: str, notes: str) -> dict[str, Any]:
+    def save_label(
+        self,
+        row_id: int,
+        label: str,
+        labeler: str,
+        notes: str,
+        period_factor: Any = "1",
+    ) -> dict[str, Any]:
         if label not in LABEL_OPTIONS and label != "":
             raise ValueError(f"unsupported label: {label}")
+        period_factor, period_status = _normalize_period_factor(period_factor)
         index = self.current_index_for_row_id(row_id)
         row = self.frame.iloc[index]
         from datetime import datetime, timezone
@@ -305,6 +332,8 @@ class CandidateStore:
             "labeler": labeler,
             "notes": notes,
             "updated_utc": datetime.now(timezone.utc).isoformat(),
+            "period_factor": period_factor,
+            "period_status": period_status,
         }
         labels = self.labels[self.labels.get("row_id", pd.Series(dtype=int)).astype(str) != str(row_id)].copy()
         labels = pd.concat([labels, pd.DataFrame([record])], ignore_index=True)
@@ -326,6 +355,7 @@ class CandidateStore:
             "label_counts": labels[labeled].value_counts().sort_index().to_dict(),
             "candidates_path": str(self.candidates_path),
             "labels_out": str(self.labels_out),
+            "period_factor_counts": self.frame.loc[labeled, "period_factor"].fillna("1").astype(str).value_counts().sort_index().to_dict(),
         }
 
 
@@ -412,6 +442,8 @@ class LightCurveVettingApp:
             "labeler": _clean_value(row.get("labeler")) or self.labeler,
             "notes": _clean_value(row.get("notes")) or "",
             "updated_utc": _clean_value(row.get("updated_utc")) or "",
+            "period_factor": _clean_value(row.get("period_factor")) or "1",
+            "period_status": _clean_value(row.get("period_status")) or "review_period",
             "hlsp_path": str(path) if path else None,
             "leo_report_path": str(leo_report) if leo_report else None,
             "leo_report_name": leo_report.name if leo_report else "",
@@ -424,6 +456,7 @@ class LightCurveVettingApp:
             "leo_error": leo_error,
             "summary": self.store.summary(),
             "label_options": LABEL_OPTIONS,
+            "period_factor_options": PERIOD_FACTOR_OPTIONS,
             "apertures": REVIEW_APERTURES,
             "default_aperture": self.default_aperture,
         }
@@ -572,6 +605,7 @@ class LightCurveVettingApp:
                         label=str(payload.get("label", "")),
                         labeler=str(payload.get("labeler", "")),
                         notes=str(payload.get("notes", "")),
+                        period_factor=payload.get("period_factor", "1"),
                     )
                     self._send_json({"ok": True, "record": record, "summary": app.store.summary()})
                 except Exception as exc:
@@ -658,6 +692,10 @@ def _index_html() -> str:
         for key, label, text in LABEL_BUTTONS
     )
     apertures = "".join(f'<option value="{ap}">{ap}</option>' for ap in REVIEW_APERTURES)
+    period_factors = "".join(
+        f'<button type="button" class="period-factor" data-factor="{value}">{text}</button>'
+        for value, text in PERIOD_FACTOR_OPTIONS
+    )
     shortcut_labels = {key: label for key, label, _ in LABEL_BUTTONS}
     shortcut_labels.update(LABEL_KEY_ALIASES)
     shortcut_json = json.dumps(shortcut_labels, sort_keys=True)
@@ -675,12 +713,17 @@ button {{ border: 1px solid #bac3d0; background: #fff; border-radius: 6px; paddi
 button:hover {{ background: #eef3f8; }}
 button:disabled {{ opacity: 0.55; cursor: wait; }}
 button.active {{ background: #17324d; color: #fff; border-color: #17324d; }}
-.toolbar {{ display: flex; align-items: center; gap: 8px; min-width: 0; }}
+.toolbar {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }}
 .toolbar input[type="number"] {{ width: 82px; }}
 .quick-labels {{ display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }}
 button.label {{ display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 5px 9px 5px 6px; border-color: #aeb8c5; }}
 button.label .key {{ display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 2px; border-radius: 4px; background: #edf1f5; color: #233040; font-weight: 700; font-size: 12px; }}
 button.label.active .key {{ background: rgba(255,255,255,0.18); color: #fff; }}
+.period-review {{ border-top: 1px solid #e1e5eb; margin-top: 14px; padding-top: 12px; }}
+.period-review-title {{ color: #536170; font-size: 13px; margin-bottom: 7px; }}
+.period-factors {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }}
+button.period-factor {{ min-width: 0; padding: 6px 4px; font-size: 12px; }}
+button.period-factor.active {{ background: #17324d; color: #fff; border-color: #17324d; }}
 main {{ display: grid; grid-template-columns: minmax(480px, 1fr) 390px; gap: 12px; padding: 12px; }}
 .panel {{ background: #fff; border: 1px solid #d9dee7; border-radius: 8px; padding: 12px; }}
 #plot {{ width: 100%; min-height: 420px; border: 1px solid #e1e5eb; border-radius: 6px; background: #fff; display: block; }}
@@ -694,12 +737,14 @@ main {{ display: grid; grid-template-columns: minmax(480px, 1fr) 390px; gap: 12p
 .lc-panel summary {{ cursor: pointer; font-weight: 600; margin-bottom: 8px; }}
 .meta {{ display: grid; grid-template-columns: 150px 1fr; gap: 4px 8px; font-size: 13px; }}
 .meta div:nth-child(odd) {{ color: #536170; }}
+.meta div:nth-child(even) {{ min-width: 0; overflow-wrap: anywhere; }}
 .notes {{ border-top: 1px solid #e1e5eb; margin-top: 14px; padding-top: 12px; }}
 .notes-row {{ display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-top: 8px; }}
 textarea {{ width: 100%; min-height: 90px; resize: vertical; box-sizing: border-box; }}
 .muted {{ color: #607080; font-size: 13px; }}
 .status {{ color: #536170; font-size: 13px; white-space: nowrap; }}
-@media (max-width: 1100px) {{ header {{ grid-template-columns: 1fr; }} .quick-labels {{ justify-content: flex-start; }} main {{ grid-template-columns: 1fr; }} .notes-row {{ grid-template-columns: 1fr; }} }}
+@media (max-width: 1500px) {{ header {{ grid-template-columns: 1fr; }} .quick-labels {{ justify-content: flex-start; }} }}
+@media (max-width: 1100px) {{ main {{ grid-template-columns: 1fr; }} .notes-row {{ grid-template-columns: 1fr; }} }}
 </style>
 </head>
 <body tabindex="-1">
@@ -731,6 +776,10 @@ textarea {{ width: 100%; min-height: 90px; resize: vertical; box-sizing: border-
     <div class="muted" id="counter"></div>
     <h2 id="title" style="margin: 6px 0 10px 0; font-size: 18px;"></h2>
     <div class="meta" id="meta"></div>
+    <div class="period-review">
+      <div class="period-review-title">Fold period relative to solid-red review P</div>
+      <div class="period-factors" id="periodFactors">{period_factors}</div>
+    </div>
     <div class="notes">
       <textarea id="notes" placeholder="notes"></textarea>
       <div class="notes-row">
@@ -752,7 +801,7 @@ const preloadAhead = 4;
 const preloadedPdfUrls = new Set();
 const preloadedCandidateIndices = new Set();
 const preloadFrames = new Map();
-let state = {{ index: 0, row_id: null, label: "" }};
+let state = {{ index: 0, row_id: null, label: "", period_factor: "1" }};
 let isSaving = false;
 function esc(x) {{ return String(x ?? "").replace(/[&<>"']/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c])); }}
 function currentAperture() {{
@@ -762,9 +811,14 @@ function setActiveLabel(label) {{
   state.label = label || "";
   document.querySelectorAll("button.label").forEach(b => b.classList.toggle("active", b.dataset.label === state.label));
 }}
+function setActivePeriodFactor(factor) {{
+  state.period_factor = factor || "1";
+  document.querySelectorAll("button.period-factor").forEach(b => b.classList.toggle("active", b.dataset.factor === state.period_factor));
+}}
 function setSavingUi(saving) {{
   isSaving = saving;
   document.querySelectorAll("button.label").forEach(b => b.disabled = saving);
+  document.querySelectorAll("button.period-factor").forEach(b => b.disabled = saving);
   document.getElementById("save").disabled = saving;
 }}
 function showError(err) {{
@@ -859,6 +913,7 @@ async function loadCandidate(index) {{
   document.getElementById("labeler").value = data.labeler || "";
   document.getElementById("notes").value = data.notes || "";
   setActiveLabel(data.label || "");
+  setActivePeriodFactor(data.period_factor || "1");
   const rows = Object.entries(data.display).map(([k, v]) => `<div>${{esc(k)}}</div><div>${{esc(v)}}</div>`).join("");
   document.getElementById("meta").innerHTML = rows
     + `<div>leo_class</div><div>${{esc(data.leo_class || "")}}</div>`
@@ -936,7 +991,8 @@ async function saveLabel(options = {{}}) {{
     row_id: state.row_id,
     label,
     labeler: document.getElementById("labeler").value,
-    notes: document.getElementById("notes").value
+    notes: document.getElementById("notes").value,
+    period_factor: state.period_factor || "1"
   }};
   setSavingUi(true);
   document.getElementById("status").textContent = "saving...";
@@ -970,6 +1026,7 @@ document.getElementById("lcDetails").addEventListener("toggle", () => {{
   }}
 }});
 document.querySelectorAll("button.label").forEach(b => b.onclick = () => labelAndNext(b.dataset.label).catch(showError));
+document.querySelectorAll("button.period-factor").forEach(b => b.onclick = () => setActivePeriodFactor(b.dataset.factor));
 document.addEventListener("keydown", event => {{
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || isSaving || isTextEntry(event.target)) return;
   const key = event.key.toLowerCase();
@@ -997,6 +1054,7 @@ __all__ = [
     "CandidateStore",
     "LABEL_OPTIONS",
     "LightCurveVettingApp",
+    "PERIOD_FACTOR_OPTIONS",
     "find_leo_report_for_row",
     "find_hlsp_path",
     "tic_shard_path",

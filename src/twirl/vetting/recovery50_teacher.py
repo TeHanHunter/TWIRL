@@ -11,6 +11,14 @@ from typing import Any, Iterable, Sequence
 import numpy as np
 import pandas as pd
 
+from twirl.vetting.label_io import (
+    BASE_LABEL_COLUMNS,
+    candidate_key as shared_candidate_key,
+    latest_label_records,
+    normalize_review_queue,
+    validate_label_records,
+)
+
 from twirl.io.compact_export import read_compact_lc_export, read_injected_lc_group
 from twirl.io.hlsp import BJDREFI, HLSPLightCurve, read_hlsp
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES, ADP_ONLY_METADATA_COLUMNS
@@ -44,10 +52,12 @@ DEFAULT_SHAPE_WINDOW_DURATIONS = 3.0
 SCALAR_METADATA_COLUMNS: tuple[str, ...] = ADP_ONLY_METADATA_COLUMNS
 
 LEAKAGE_PREFIXES = (
+    "adjudicated_",
     "compact_",
     "display_",
     "ephemeris_",
     "model_",
+    "prior_",
     "pre_revisit_",
     "preserve_",
     "refold_",
@@ -62,6 +72,9 @@ LEAKAGE_PREFIXES = (
     "teacher_",
     "student_",
     "pseudo_",
+    "raw_",
+    "repeat_",
+    "resolution_",
     "human_",
     "queue_",
 )
@@ -88,6 +101,11 @@ LEAKAGE_EXACT = frozenset(
         "audit_include",
         "harmonic_suspect",
         "training_split",
+        "period_factor",
+        "period_status",
+        "is_repeat",
+        "origin_queue",
+        "labeling_era",
         "review_id",
         "tic",
         "sector",
@@ -143,54 +161,24 @@ def write_table(df: pd.DataFrame, path: Path) -> Path:
 def latest_labels(labels_csv: Path) -> pd.DataFrame:
     """Return the latest browser label per row_id."""
 
-    columns = (
-        "row_id",
-        "candidate_key",
-        "tic",
-        "sector",
-        "label",
-        "label_source",
-        "labeler",
-        "notes",
-        "updated_utc",
-    )
-    if not labels_csv.exists() or labels_csv.stat().st_size == 0:
-        return pd.DataFrame(columns=columns)
-    labels = pd.read_csv(labels_csv)
-    for col in columns:
-        if col not in labels:
-            labels[col] = ""
-    if labels.empty:
-        return labels.loc[:, columns]
-    labels["row_id"] = pd.to_numeric(labels["row_id"], errors="coerce")
-    labels = labels.dropna(subset=["row_id"]).copy()
-    labels["row_id"] = labels["row_id"].astype(int)
-    labels["_updated_sort"] = pd.to_datetime(labels["updated_utc"], errors="coerce")
-    labels = labels.sort_values(["row_id", "_updated_sort"], na_position="first", kind="stable")
-    return labels.drop_duplicates("row_id", keep="last").loc[:, columns].reset_index(drop=True)
+    return latest_label_records(Path(labels_csv), columns=BASE_LABEL_COLUMNS)
 
 
 def candidate_key(row: pd.Series) -> str:
-    return "|".join(
-        str(row.get(col, "") if pd.notna(row.get(col, "")) else "")
-        for col in ("tic", "sector", "period_d", "t0_bjd", "source_bucket")
-    )
+    return shared_candidate_key(row)
 
 
 def join_queue_labels(queue_csv: Path, labels_csv: Path) -> pd.DataFrame:
     """Join a review queue to latest browser labels without mutating either."""
 
-    queue = read_table(queue_csv).copy()
-    if "row_id" not in queue:
-        queue.insert(0, "row_id", np.arange(len(queue), dtype=int))
-    queue["row_id"] = pd.to_numeric(queue["row_id"], errors="coerce").astype(int)
-    if "candidate_key" not in queue:
-        queue["candidate_key"] = queue.apply(candidate_key, axis=1)
+    queue = normalize_review_queue(read_table(queue_csv))
     for col in ("label", "label_source", "labeler", "notes", "updated_utc"):
         if col in queue:
             queue = queue.rename(columns={col: f"queue_{col}"})
 
-    labels = latest_labels(labels_csv).rename(
+    raw_labels = latest_labels(labels_csv)
+    validate_label_records(queue, raw_labels)
+    labels = raw_labels.rename(
         columns={
             "candidate_key": "human_candidate_key",
             "label": "human_label",

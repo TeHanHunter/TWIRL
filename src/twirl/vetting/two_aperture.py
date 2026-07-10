@@ -508,6 +508,62 @@ def _plot_full_phase_fold(
     ax.set_ylabel("relative flux")
 
 
+def _plot_harmonic_fold(
+    ax: Any,
+    blc: HLSPLightCurve,
+    aperture: str,
+    *,
+    period_d: float,
+    t0_bjd: float,
+    duration_min: float,
+    depth: float | None,
+    title: str,
+    show_ylabel: bool,
+) -> None:
+    """Plot one raw-plus-binned full-cycle harmonic view."""
+
+    y = _norm_flux(blc, aperture)
+    keep = quality_mask(blc, aperture)
+    phase = _phase_cycle(blc.time, period_d=period_d, t0_bjd=t0_bjd)
+    phase = np.where(phase < -0.25, phase + 1.0, phase)
+    sel = keep & np.isfinite(y) & np.isfinite(phase)
+    ax.scatter(phase[sel], y[sel], s=2.2, c="0.45", alpha=0.22, linewidths=0, rasterized=True)
+    zoom_window, zoom_window_min = _fold_window_phase(period_d, duration_min)
+    zoom_bins = _fold_bin_count(zoom_window_min, duration_min)
+    zoom_bin_width = 2.0 * float(zoom_window) / max(int(zoom_bins), 1)
+    n_bins = int(np.ceil(1.0 / zoom_bin_width)) if zoom_bin_width > 0 else 100
+    n_bins = int(np.clip(n_bins, 36, 180))
+    bx, by, _, _ = _bin_stats(
+        phase[sel],
+        y[sel],
+        n_bins=n_bins,
+        x_min=-0.25,
+        x_max=0.75,
+        min_count=1,
+    )
+    ax.scatter(bx, by, s=7.0, c="#1f4e79", alpha=0.88, linewidths=0, rasterized=True)
+    half = 0.5 * float(duration_min) / (float(period_d) * 1440.0)
+    if np.isfinite(half) and half > 0:
+        ax.axvspan(-half, half, color="#d24b32", alpha=0.13, lw=0)
+    ax.axvline(0.0, color="#9b2f25", lw=0.95, alpha=0.84)
+    ax.axvline(0.5, color="#1f4e79", lw=0.90, ls="--", alpha=0.82)
+    ax.set_xlim(-0.25, 0.75)
+    ax.set_xticks([-0.25, 0.0, 0.25, 0.5, 0.75])
+    _set_fold_ylim(ax, y, sel, depth=depth)
+    ax.set_title(title, loc="left", fontsize=8.4)
+    ax.set_xlabel("phase", fontsize=8.0)
+    ax.set_ylabel("relative flux" if show_ylabel else "", fontsize=8.0)
+    ax.tick_params(labelsize=7.2)
+
+
+def _harmonic_factor_label(factor: float) -> str:
+    labels = {0.25: "P/4", 0.5: "P/2", 1.0: "P", 2.0: "2P", 4.0: "4P"}
+    for value, label in labels.items():
+        if np.isclose(float(factor), value):
+            return label
+    return f"{float(factor):g}P"
+
+
 def _plot_periodogram(
     ax: Any,
     spec: dict[str, np.ndarray] | None,
@@ -794,6 +850,7 @@ def render_two_aperture_sheet(
     row_metadata: dict[str, Any] | None = None,
     use_row_ephemeris: bool = False,
     write_pdf: bool = True,
+    harmonic_factors: tuple[float, ...] = (),
 ) -> tuple[Path, dict[str, Any]]:
     """Render a PNG/PDF two-aperture vet sheet and return metrics."""
 
@@ -819,15 +876,32 @@ def render_two_aperture_sheet(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig = plt.figure(figsize=(13.6, 10.2))
-    gs = fig.add_gridspec(
-        5,
-        4,
-        height_ratios=[1.02, 0.82, 0.92, 0.92, 0.28],
-        width_ratios=[0.82, 1.18, 0.82, 1.18],
-        hspace=0.40,
-        wspace=0.24,
-    )
+    harmonic_factors = tuple(float(value) for value in harmonic_factors)
+    if any(not np.isfinite(value) or value <= 0 for value in harmonic_factors):
+        raise ValueError("harmonic factors must be finite and positive")
+    if harmonic_factors:
+        fig = plt.figure(figsize=(13.6, 14.4))
+        outer = fig.add_gridspec(2, 1, height_ratios=[4.9, 1.75], hspace=0.22)
+        gs = outer[0].subgridspec(
+            5,
+            4,
+            height_ratios=[1.02, 0.82, 0.92, 0.92, 0.28],
+            width_ratios=[0.82, 1.18, 0.82, 1.18],
+            hspace=0.52,
+            wspace=0.24,
+        )
+        harmonic_gs = outer[1].subgridspec(2, len(harmonic_factors), hspace=0.42, wspace=0.24)
+    else:
+        fig = plt.figure(figsize=(13.6, 10.6))
+        gs = fig.add_gridspec(
+            5,
+            4,
+            height_ratios=[1.02, 0.82, 0.92, 0.92, 0.28],
+            width_ratios=[0.82, 1.18, 0.82, 1.18],
+            hspace=0.52,
+            wspace=0.24,
+        )
+        harmonic_gs = None
     apertures = [ap for ap in apertures if ap in payload["lcs"]]
     anchor_period = metrics.get("anchor_period_d", np.nan)
     anchor_t0 = metrics.get("anchor_t0_bjd", np.nan)
@@ -936,6 +1010,26 @@ def render_two_aperture_sheet(
             ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
             ax.set_axis_off()
 
+        if harmonic_gs is not None:
+            for factor_index, factor in enumerate(harmonic_factors):
+                ax = fig.add_subplot(harmonic_gs[col, factor_index])
+                harmonic_period = float(plot_peak["period_d"]) * float(factor)
+                if np.isfinite(harmonic_period) and harmonic_period > 0:
+                    _plot_harmonic_fold(
+                        ax,
+                        blc,
+                        ap,
+                        period_d=harmonic_period,
+                        t0_bjd=float(plot_peak["t0_bjd"]),
+                        duration_min=float(plot_peak["duration_min"]),
+                        depth=float(plot_peak["depth"]) if np.isfinite(plot_peak.get("depth", np.nan)) else None,
+                        title=f"{ap}: {_harmonic_factor_label(factor)} ({harmonic_period:.5g} d)",
+                        show_ylabel=factor_index == 0,
+                    )
+                else:
+                    ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
+                    ax.set_axis_off()
+
     ax_txt = fig.add_subplot(gs[4, :])
     ax_txt.axis("off")
     lines = [
@@ -961,7 +1055,7 @@ def render_two_aperture_sheet(
         if np.isfinite(sigma_delta):
             lines.append(f"{ap} even/odd: |depth delta|={float(sigma_delta):.2g} sigma; n_even={int(n_even)}, n_odd={int(n_odd)}")
     ax_txt.text(0.0, 1.0, "\n".join(lines), va="top", ha="left", family="monospace", fontsize=9.4)
-    fig.subplots_adjust(top=0.975, bottom=0.040, left=0.060, right=0.992)
+    fig.subplots_adjust(top=0.980, bottom=0.035, left=0.060, right=0.992)
     fig.savefig(out_path, dpi=160)
     if write_pdf:
         try:
@@ -971,4 +1065,5 @@ def render_two_aperture_sheet(
     plt.close(fig)
     metrics["twirl_vet_sheet_name"] = out_path.name
     metrics["twirl_vet_sheet_pdf_name"] = out_path.with_suffix(".pdf").name if write_pdf else ""
+    metrics["harmonic_factors"] = ",".join(f"{value:g}" for value in harmonic_factors)
     return out_path, metrics

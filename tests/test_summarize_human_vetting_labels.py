@@ -26,6 +26,10 @@ def test_summary_uses_label_csv_when_queue_has_empty_label_columns(tmp_path: Pat
             {
                 "row_id": 0,
                 "tic": 1,
+                "sector": 56,
+                "period_d": 1.0,
+                "t0_bjd": 2459825.0,
+                "source_bucket": "review_candidate",
                 "label": "",
                 "label_source": "",
                 "leo_class": "PC",
@@ -37,6 +41,10 @@ def test_summary_uses_label_csv_when_queue_has_empty_label_columns(tmp_path: Pat
             {
                 "row_id": 1,
                 "tic": 2,
+                "sector": 56,
+                "period_d": 2.0,
+                "t0_bjd": 2459826.0,
+                "source_bucket": "review_candidate",
                 "label": "",
                 "label_source": "",
                 "leo_class": "FA",

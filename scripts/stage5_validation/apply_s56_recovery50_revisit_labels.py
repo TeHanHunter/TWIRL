@@ -24,6 +24,7 @@ from twirl.vetting.recovery50_teacher import (  # noqa: E402
     latest_labels,
     read_table,
 )
+from twirl.vetting.label_io import normalize_review_queue, validate_label_records  # noqa: E402
 
 DEFAULT_ROOT = REPO_ROOT / "reports/stage5_validation/s56_recovery50_teacher_queue_2k"
 DEFAULT_BASE_TABLE = DEFAULT_ROOT / "human_training_table/human_vetting_training_table.csv"
@@ -38,11 +39,10 @@ def _as_bool_counts(series: pd.Series) -> dict[str, int]:
 
 
 def load_revisit_labels(revisit_queue: Path, revisit_labels: Path) -> pd.DataFrame:
-    queue = read_table(revisit_queue).copy()
-    if "row_id" not in queue:
-        queue.insert(0, "row_id", np.arange(len(queue), dtype=int))
-    queue["row_id"] = pd.to_numeric(queue["row_id"], errors="coerce").astype(int)
-    labels = latest_labels(revisit_labels).rename(
+    queue = normalize_review_queue(read_table(revisit_queue))
+    raw_labels = latest_labels(revisit_labels)
+    validate_label_records(queue, raw_labels)
+    labels = raw_labels.rename(
         columns={
             "label": "revisit_label",
             "label_source": "revisit_label_source",

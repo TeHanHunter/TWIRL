@@ -13,14 +13,24 @@ LABEL_OPTIONS: tuple[str, ...] = (
 )
 
 LABEL_BUTTONS: tuple[tuple[str, str, str], ...] = (
-    ("1", "planet_like", "Planet"),
-    ("2", "eclipsing_binary_or_pceb", "EB/PCEB"),
-    ("3", "stellar_variability", "Variable"),
-    ("4", "instrumental_or_systematic", "Systematic"),
+    ("1", "planet_like", "Planet-like"),
+    ("2", "eclipsing_binary_or_pceb", "Eclipse/contact"),
+    ("3", "stellar_variability", "Smooth variable"),
+    ("4", "instrumental_or_systematic", "Systematic/artifact"),
     ("5", "uncertain", "Flat/no signal"),
-    ("6", "wide_transit_like", "Wide transit"),
+    ("6", "wide_transit_like", "Broad isolated dip"),
     ("0", "skip", "Skip"),
 )
+
+LABEL_DECISION_RULES: dict[str, str] = {
+    "planet_like": "Compact isolated transit-like event without convincing secondary or binary morphology.",
+    "eclipsing_binary_or_pceb": "Discrete secondary, alternating depths, or detached/contact eclipse morphology.",
+    "stellar_variability": "Continuous or sinusoidal modulation without discrete eclipses.",
+    "instrumental_or_systematic": "Recognizable window-edge, cadence, leakage, or detrending artifact.",
+    "uncertain": "No obvious useful signal; this is not an ambiguity label.",
+    "wide_transit_like": "Broad isolated event without convincing secondary or continuous variability.",
+    "skip": "Broken or unusable evidence only.",
+}
 
 LABEL_KEY_ALIASES: dict[str, str] = {
     "p": "planet_like",

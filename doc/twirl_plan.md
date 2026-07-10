@@ -1055,6 +1055,22 @@ held-out recall `0.567`, and weighted average precision `0.264`. Its verified
 `100`-row, `100`-TIC PNG-only pilot is now the active EB-enrichment review
 queue and is served locally on `127.0.0.1:5004`.
 
+Status (`2026-07-10`, real-label adjudication cleanup): the active consistency
+review is now a blinded real-only `343`-row queue: `223` unique rows ever
+labeled planet-like, eclipse/contact, smooth-variable, or broad-dip; `50`
+systematic controls; `50` flat/no-signal controls; and `20` hidden repeats.
+The browser keeps the six stored labels but uses tightened visible wording and
+saves a selected `P/4`, `P/2`, `P`, `2P`, `4P`, or unresolved factor atomically
+with each decision. Sheets use only `DET_FLUX_ADP_SML + DET_FLUX_ADP` and add
+raw-plus-binned harmonic views for both apertures. The completed EB-pilot label
+file is snapshotted, legacy duplicated queue IDs are normalized by display
+order, and the deprecated EB rows are re-anchored to current ADP-small BLS
+top-1 ephemerides. After all reviews, the audit emits transition matrices,
+blind-repeat agreement/kappa, a third-pass queue for discordant repeats, and a
+deduplicated adjudicated training table. The one-H200 teacher/EB retraining job
+is implemented but hard-gated on all `343` decisions plus repeat resolution;
+student training remains deferred.
+
 Pre-human-labeling path:
 
 1. Use the accepted S56 pilot light-curve product as the baseline, with the

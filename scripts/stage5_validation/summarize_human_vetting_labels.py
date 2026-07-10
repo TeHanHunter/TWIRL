@@ -12,10 +12,23 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from twirl.vetting.label_io import (  # noqa: E402
+    BASE_LABEL_COLUMNS,
+    latest_label_records,
+    normalize_review_queue,
+    validate_label_records,
+)
 
 
 SNR_BINS = (-np.inf, 1.0, 3.0, 5.0, 7.0, 10.0, 20.0, np.inf)
@@ -39,30 +52,11 @@ def _json_default(value: Any) -> Any:
 
 
 def _latest_labels(labels_path: Path) -> pd.DataFrame:
-    columns = ["row_id", "candidate_key", "label", "label_source", "labeler", "notes", "updated_utc"]
-    if not labels_path.exists() or labels_path.stat().st_size == 0:
-        return pd.DataFrame(columns=columns)
-    labels = pd.read_csv(labels_path)
-    for col in columns:
-        if col not in labels:
-            labels[col] = ""
-    if labels.empty:
-        return labels.loc[:, columns]
-    labels["row_id"] = pd.to_numeric(labels["row_id"], errors="coerce")
-    labels = labels.dropna(subset=["row_id"]).copy()
-    labels["row_id"] = labels["row_id"].astype(int)
-    if "updated_utc" in labels:
-        labels["_updated_sort"] = pd.to_datetime(labels["updated_utc"], errors="coerce")
-        labels = labels.sort_values(["row_id", "_updated_sort"], na_position="first")
-    return labels.drop_duplicates("row_id", keep="last").loc[:, columns]
+    return latest_label_records(labels_path, columns=BASE_LABEL_COLUMNS)
 
 
 def _with_row_ids(queue: pd.DataFrame) -> pd.DataFrame:
-    out = queue.copy()
-    if "row_id" not in out:
-        out.insert(0, "row_id", np.arange(len(out), dtype=int))
-    out["row_id"] = pd.to_numeric(out["row_id"], errors="coerce").astype(int)
-    return out
+    return normalize_review_queue(queue)
 
 
 def _merge_labels(queue_csv: Path, labels_csv: Path) -> pd.DataFrame:
@@ -71,6 +65,7 @@ def _merge_labels(queue_csv: Path, labels_csv: Path) -> pd.DataFrame:
         if col in queue:
             queue = queue.rename(columns={col: f"queue_{col}"})
     labels = _latest_labels(labels_csv)
+    validate_label_records(queue, labels)
     merged = queue.merge(labels, on="row_id", how="left", validate="one_to_one")
     for col in ("label", "label_source", "labeler", "notes", "updated_utc"):
         if col not in merged:

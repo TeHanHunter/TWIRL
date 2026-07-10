@@ -83,6 +83,7 @@ def _render_one(
         str,
         str,
         str,
+        tuple[float, ...],
     ]
 ) -> dict[str, Any]:
     (
@@ -99,6 +100,7 @@ def _render_one(
         overwrite_s,
         use_row_ephemeris_s,
         write_pdf_s,
+        harmonic_factors,
     ) = payload
     hlsp_root = Path(hlsp_root_s)
     lc_export_h5 = Path(lc_export_h5_s) if lc_export_h5_s else None
@@ -118,7 +120,7 @@ def _render_one(
         "tic": tic,
         "sector": sector if sector is not None else "",
         "twirl_vet_sheet_name": out_path.name,
-        "twirl_vet_sheet_pdf_name": out_path.with_suffix(".pdf").name,
+        "twirl_vet_sheet_pdf_name": out_path.with_suffix(".pdf").name if write_pdf else "",
         "twirl_vet_status": "",
     }
     if out_path.exists() and not overwrite:
@@ -170,6 +172,7 @@ def _render_one(
             row_metadata=row,
             use_row_ephemeris=use_row_ephemeris,
             write_pdf=write_pdf,
+            harmonic_factors=harmonic_factors,
         )
     except Exception as exc:
         record["twirl_vet_status"] = f"error:{type(exc).__name__}: {exc}"
@@ -197,6 +200,7 @@ def render_queue(
     overwrite: bool,
     use_row_ephemeris: bool,
     write_pdf: bool,
+    harmonic_factors: tuple[float, ...] = (),
 ) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
     queue = pd.read_csv(queue_csv)
@@ -217,6 +221,7 @@ def render_queue(
             "1" if overwrite else "0",
             "1" if use_row_ephemeris else "0",
             "1" if write_pdf else "0",
+            harmonic_factors,
         )
         for idx, row in enumerate(queue.to_dict("records"))
     ]
@@ -255,6 +260,7 @@ def render_queue(
         "n_peaks": int(n_peaks),
         "use_row_ephemeris": bool(use_row_ephemeris),
         "write_pdf": bool(write_pdf),
+        "harmonic_factors": [float(value) for value in harmonic_factors],
     }
     summary_json.parent.mkdir(parents=True, exist_ok=True)
     summary_json.write_text(
@@ -321,6 +327,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write PNG sheets only. This is sufficient for the browser app and keeps handoff packages smaller.",
     )
+    ap.add_argument(
+        "--harmonic-factors",
+        nargs="*",
+        type=float,
+        default=(),
+        help="Optional full-cycle harmonic grid, e.g. 0.25 0.5 1 2 4.",
+    )
     return ap
 
 
@@ -349,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
         overwrite=bool(args.overwrite),
         use_row_ephemeris=bool(args.use_row_ephemeris),
         write_pdf=not bool(args.no_pdf),
+        harmonic_factors=tuple(args.harmonic_factors),
     )
     print(json.dumps(summary, indent=2, sort_keys=True, default=_json_default))
     return 0

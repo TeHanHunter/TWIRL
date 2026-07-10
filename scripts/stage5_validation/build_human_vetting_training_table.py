@@ -29,6 +29,13 @@ from twirl.vetting.label_schema import (  # noqa: E402
     STRONG_LABELS,
     teacher_target,
 )
+from twirl.vetting.label_io import (  # noqa: E402
+    BASE_LABEL_COLUMNS,
+    candidate_key as shared_candidate_key,
+    latest_label_records,
+    normalize_review_queue,
+    validate_label_records,
+)
 
 
 DEFAULT_QUEUE = (
@@ -63,39 +70,17 @@ def _read_table(path: Path) -> pd.DataFrame:
 
 
 def _candidate_key(row: pd.Series) -> str:
-    return "|".join(
-        str(row.get(col, "") if pd.notna(row.get(col, "")) else "")
-        for col in ("tic", "sector", "period_d", "t0_bjd", "source_bucket")
-    )
+    return shared_candidate_key(row)
 
 
 def _with_row_ids(queue: pd.DataFrame) -> pd.DataFrame:
-    out = queue.copy()
-    if "row_id" not in out:
-        out.insert(0, "row_id", np.arange(len(out), dtype=int))
-    out["row_id"] = pd.to_numeric(out["row_id"], errors="coerce").astype("Int64")
-    if "candidate_key" not in out:
-        out["candidate_key"] = out.apply(_candidate_key, axis=1)
-    return out
+    return normalize_review_queue(queue)
 
 
 def latest_labels(labels_csv: Path) -> pd.DataFrame:
     """Return the latest label per row_id, preserving the app schema."""
 
-    if not labels_csv.exists() or labels_csv.stat().st_size == 0:
-        return pd.DataFrame(columns=LABEL_COLUMNS)
-    labels = pd.read_csv(labels_csv)
-    for col in LABEL_COLUMNS:
-        if col not in labels:
-            labels[col] = ""
-    if labels.empty:
-        return labels.loc[:, LABEL_COLUMNS]
-    labels["row_id"] = pd.to_numeric(labels["row_id"], errors="coerce")
-    labels = labels.dropna(subset=["row_id"]).copy()
-    labels["row_id"] = labels["row_id"].astype("Int64")
-    labels["_updated_sort"] = pd.to_datetime(labels["updated_utc"], errors="coerce")
-    labels = labels.sort_values(["row_id", "_updated_sort"], na_position="first", kind="stable")
-    return labels.drop_duplicates("row_id", keep="last").loc[:, LABEL_COLUMNS].reset_index(drop=True)
+    return latest_label_records(Path(labels_csv), columns=BASE_LABEL_COLUMNS)
 
 
 def join_queue_and_labels(queue_csv: Path, labels_csv: Path) -> pd.DataFrame:
@@ -103,7 +88,9 @@ def join_queue_and_labels(queue_csv: Path, labels_csv: Path) -> pd.DataFrame:
     for col in ("label", "label_source", "labeler", "notes", "updated_utc"):
         if col in queue:
             queue = queue.rename(columns={col: f"queue_{col}"})
-    labels = latest_labels(labels_csv).rename(
+    raw_labels = latest_labels(labels_csv)
+    validate_label_records(queue, raw_labels)
+    labels = raw_labels.rename(
         columns={
             "candidate_key": "human_candidate_key",
             "label": "human_label",
