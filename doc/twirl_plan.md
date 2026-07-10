@@ -1049,7 +1049,11 @@ the two ADP apertures for all `19,072` real targets, then uses one H200 for a
 five-member CNN ensemble plus ADP BLS metadata scoring and a dependent CPU
 render job for newest-style two-aperture sheets. Release now requires a
 non-degenerate grouped held-out recall/AP gate and starts with a `100`-row human
-pilot; expand to `500` only if the pilot has useful EB enrichment.
+pilot; expand to `500` only if the pilot has useful EB enrichment. The repaired
+ADP-only run passed that gate with five evaluable ensemble members, aggregate
+held-out recall `0.567`, and weighted average precision `0.264`. Its verified
+`100`-row, `100`-TIC PNG-only pilot is now the active EB-enrichment review
+queue and is served locally on `127.0.0.1:5004`.
 
 Pre-human-labeling path:
 

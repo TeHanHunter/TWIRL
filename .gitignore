@@ -40,6 +40,7 @@ reports/stage5_validation/**/*.zip
 # copies. Use `git add -f` when a new compact artifact is intentionally kept.
 reports/stage5_validation/s56_1k_predetrend_small_pair_200k_review_queue_pdo/**
 reports/stage5_validation/s56_eb_miner/**
+reports/stage5_validation/s56_eb_miner_adp_only/**
 reports/stage5_validation/s56_franklin_real5k_handoff/**
 reports/stage5_validation/s56_franklin_real5k_handoff_download/**
 reports/stage5_validation/s56_mixed_teacher_queue_pdo/**
