@@ -115,6 +115,18 @@ def test_candidate_scoring_pool_excludes_prior_tics_and_review_ids(tmp_path: Pat
         tmp_path / "ranker.csv",
         [
             {
+                "tic": 9,
+                "peak_rank": 4,
+                "sector": 56,
+                "period_d": 0.5,
+                "t0_bjd": 2458999.0,
+                "duration_min": 8,
+                "sde": 21,
+                "aperture": "DET_FLUX_ADP_SML",
+                "bls_search_branch": "current_adp",
+                "adp_only_contract_version": ADP_ONLY_CONTRACT_VERSION,
+            },
+            {
                 "tic": 10,
                 "peak_rank": 1,
                 "sector": 56,

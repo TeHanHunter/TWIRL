@@ -322,7 +322,6 @@ def _normalize_candidate_table(
     out["anchor_t0_bjd"] = out["t0_bjd"]
     out["anchor_duration_min"] = out["duration_min"]
     out["anchor_sde"] = pd.to_numeric(out.get("sde"), errors="coerce")
-    small = out["aperture"].eq(ADP_ONLY_APERTURES[0])
     metric_columns = (
         ("peak_rank", "peak_rank"),
         ("period_d", "period_d"),
@@ -348,6 +347,7 @@ def _normalize_candidate_table(
     # The branch that generated this candidate uses that exact peak; the other
     # branch carries its rank-1 counterpart so combined models see both ADP
     # apertures rather than a systematic missing-metadata pattern.
+    small = out["aperture"].eq(ADP_ONLY_APERTURES[0])
     for source, suffix in metric_columns:
         values = pd.to_numeric(
             out[source] if source in out else pd.Series(np.nan, index=out.index),
