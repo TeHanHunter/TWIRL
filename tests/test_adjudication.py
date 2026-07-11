@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from twirl.io.hlsp import HLSPLightCurve
 from twirl.vetting.adjudication import (
+    ADJUDICATION_VET_SHEET_VERSION,
     REPEAT_QUOTAS,
     _public_and_manifest,
     _select_repeat_sources,
@@ -20,8 +21,11 @@ from twirl.vetting.adjudication import (
     verify_queue_contract,
 )
 from twirl.vetting.adjudication_audit import (
+    add_harmonic_cnn_targets,
+    harmonic_target_for_factor,
     load_adjudication_reviews,
     normalize_period_factor,
+    parse_note_period_factor,
     repeat_agreement,
 )
 from twirl.vetting.label_io import canonicalize_candidate_key, normalize_review_queue
@@ -72,6 +76,10 @@ def _unique_source_rows() -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def test_adjudication_sheet_version_is_stable() -> None:
+    assert ADJUDICATION_VET_SHEET_VERSION == "S56-ADP-HV1"
 
 
 def test_fixed_queue_layout_has_343_rows_and_hidden_repeats() -> None:
@@ -183,6 +191,99 @@ def test_period_factor_and_repeat_agreement_are_separate_from_label() -> None:
     assert summary["n_discordant_pairs"] == 1
 
 
+def test_harmonic_cnn_targets_use_note_override_and_broad_preserve_only() -> None:
+    frame = pd.DataFrame(
+        {
+            "human_label": [
+                "eclipsing_binary_or_pceb",
+                "stellar_variability",
+                "wide_transit_like",
+                "planet_like",
+                "instrumental_or_systematic",
+                "uncertain",
+                "skip",
+            ],
+            "human_notes": ["this should be 3P", "maybe P/14", "", "", "", "", ""],
+            "period_d": [2.0] * 7,
+            "adjudication_final": [True] * 7,
+            "adjudicated_period_factor": ["1", "1", "0.25", "0.5", "1", "1", "1"],
+            "adjudicated_period_status": [
+                "review_period",
+                "unresolved",
+                "refolded",
+                "refolded",
+                "review_period",
+                "review_period",
+                "review_period",
+            ],
+            "refold_factor": [np.nan] * 7,
+        }
+    )
+
+    out = add_harmonic_cnn_targets(frame)
+
+    assert out.loc[0, "note_period_factor"] == 3.0
+    assert out.loc[0, "effective_period_factor"] == 3.0
+    assert out.loc[0, "effective_period_d"] == 6.0
+    assert out.loc[0, "period_factor_source"] == "note"
+    assert out.loc[0, "harmonic_target_v1"] == "3p"
+    assert out.loc[0, "morphology_target_v1"] == "eclipse_contact"
+    assert np.isclose(out.loc[1, "note_period_factor"], 1.0 / 14.0)
+    assert out.loc[1, "morphology_target_v1"] == "smooth_variable"
+    assert bool(out.loc[1, "morphology_include_v1"])
+    assert out.loc[1, "period_task"] == "variable_period_refinement"
+    assert not bool(out.loc[1, "harmonic_include_v1"])
+    assert out.loc[2, "morphology_target_v1"] == ""
+    assert out.loc[2, "preserve_target_v1"] == "preserve"
+    assert bool(out.loc[2, "broad_preserve_only"])
+    assert out.loc[2, "harmonic_target_v1"] == "p_over_4"
+    assert out.loc[3, "morphology_target_v1"] == "planet_like"
+    assert out.loc[4, "morphology_target_v1"] == "other"
+    assert out.loc[5, "preserve_target_v1"] == "reject"
+    assert not bool(out.loc[6, "morphology_include_v1"])
+    assert not bool(out.loc[6, "preserve_include_v1"])
+
+
+def test_note_period_factor_parser_is_strict_and_supports_thirds() -> None:
+    assert parse_note_period_factor("period of 3P") == 3.0
+    assert parse_note_period_factor("refold at P/3") == 1.0 / 3.0
+    assert parse_note_period_factor("maybe p/17??") == 1.0 / 17.0
+    assert parse_note_period_factor("this is at half period") == 0.5
+    assert parse_note_period_factor("try double the period") == 2.0
+    assert np.isnan(parse_note_period_factor("possible harmonic"))
+    assert harmonic_target_for_factor(1.0 / 3.0) == "p_over_3"
+    assert harmonic_target_for_factor(3.0) == "3p"
+    assert harmonic_target_for_factor(1.0 / 14.0) == ""
+
+
+def test_injected_harmonic_target_uses_truth_ratio_without_changing_morphology() -> None:
+    frame = pd.DataFrame(
+        {
+            "human_label": ["planet_like", "planet_like"],
+            "human_notes": ["", ""],
+            "source_kind": ["injection_recovery", "injection_recovery"],
+            "is_injected_row": [True, True],
+            "period_d": [1.0, 1.0],
+            "truth_period_d": [2.001, 1.37],
+            "adjudication_final": [False, False],
+            "adjudicated_period_factor": [np.nan, np.nan],
+            "adjudicated_period_status": ["", ""],
+            "refold_factor": [np.nan, np.nan],
+        }
+    )
+
+    out = add_harmonic_cnn_targets(frame)
+
+    assert out.loc[0, "morphology_target_v1"] == "planet_like"
+    assert out.loc[0, "effective_period_factor"] == 2.0
+    assert out.loc[0, "harmonic_target_v1"] == "2p"
+    assert bool(out.loc[0, "harmonic_include_v1"])
+    assert out.loc[0, "period_factor_source"] == "injection_truth_harmonic"
+    assert out.loc[1, "morphology_target_v1"] == "planet_like"
+    assert not bool(out.loc[1, "harmonic_include_v1"])
+    assert out.loc[1, "period_factor_source"] == "injection_truth_unresolved"
+
+
 def test_review_join_computes_corrected_period_and_unresolved(tmp_path: Path) -> None:
     queue = normalize_review_queue(
         pd.DataFrame(
@@ -228,6 +329,11 @@ def test_adjudication_columns_are_leakage() -> None:
         "repeat_group",
         "raw_human_label",
         "period_factor",
+        "morphology_target_v1",
+        "harmonic_target_v1",
+        "note_period_factor",
+        "effective_period_factor",
+        "period_task",
         "anchor_sde",
     ]
     leaks = leakage_columns(columns)

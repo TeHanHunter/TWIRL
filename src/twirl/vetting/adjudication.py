@@ -39,6 +39,7 @@ REPEAT_QUOTAS: Mapping[str, int] = {
 ORIGINAL_1K = "s56_recovery50_teacher_queue"
 NEXT4K_SLICE = "s56_recovery50_teacher_queue_next4k"
 ADP_APERTURES = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
+ADJUDICATION_VET_SHEET_VERSION = "S56-ADP-HV1"
 
 PUBLIC_QUEUE_COLUMNS: tuple[str, ...] = (
     "row_id",
@@ -84,8 +85,23 @@ ADJUDICATION_LEAKAGE_COLUMNS: frozenset[str] = frozenset(
         "adjudicated_period_factor",
         "adjudicated_period_status",
         "adjudicated_period_d",
+        "adjudicated_notes",
         "adjudicated_labeler",
         "adjudicated_updated_utc",
+        "morphology_target_v1",
+        "morphology_include_v1",
+        "preserve_target_v1",
+        "preserve_include_v1",
+        "harmonic_target_v1",
+        "harmonic_include_v1",
+        "note_period_factor",
+        "effective_period_factor",
+        "effective_period_d",
+        "period_factor_source",
+        "period_task",
+        "variable_period_factor",
+        "broad_preserve_only",
+        "model_target_policy_version",
         "raw_human_label",
         "raw_human_notes",
         "raw_human_updated_utc",
@@ -750,6 +766,7 @@ def build_real_adjudication_queue(
         ),
         "repeat_quotas": dict(REPEAT_QUOTAS),
         "apertures": list(ADP_APERTURES),
+        "vet_sheet_version": ADJUDICATION_VET_SHEET_VERSION,
         "deprecated_ephemeris_policy": "current DET_FLUX_ADP_SML BLS peak_rank=1 only",
         "verification": verification,
         "source_snapshot": str(snapshot_path),
@@ -773,6 +790,7 @@ def build_real_adjudication_queue(
 
 __all__ = [
     "ADJUDICATION_LEAKAGE_COLUMNS",
+    "ADJUDICATION_VET_SHEET_VERSION",
     "ADP_APERTURES",
     "CONTROL_LABELS",
     "REPEAT_QUOTAS",

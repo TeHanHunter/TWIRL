@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH -p pg_mki_aryeh
-#SBATCH --job-name=twirl-adjud-retrain
+#SBATCH --job-name=twirl-harmonic-cnn-v1
 #SBATCH -N 1
+#SBATCH -n 1
 #SBATCH -c 48
 #SBATCH --mem=384G
 #SBATCH --gres=gpu:h200:1
-#SBATCH -t 16:00:00
+#SBATCH -t 24:00:00
 #SBATCH -o /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.out
 #SBATCH -e /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.err
 
@@ -15,13 +16,10 @@ REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56-torch/bin/python}"
 ROOT="${TWIRL_ADJUDICATION_ROOT:-reports/stage5_validation/s56_label_adjudication_real343}"
 TRAINING="${ROOT}/adjudicated_training_table/human_vetting_training_table_adjudicated.csv"
-TENSORS="${ROOT}/retrained/cnn_tensors"
-CNN_OUT="${ROOT}/retrained/cnn_teacher"
-EB_ROOT="${ROOT}/retrained/eb_miner"
-COMPACT_LC="${TWIRL_ADJUDICATION_COMPACT_LC:-data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5}"
-HLSP_ROOT="${TWIRL_ADJUDICATION_HLSP_ROOT:-data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_compare}"
+NATIVE_H5="${TWIRL_HARMONIC_NATIVE_H5:-${ROOT}/native_inputs/s56_adp_raw_pair_v1.h5}"
+OUT="${ROOT}/retrained/s56_harmonic_cnn_v1"
 
-mkdir -p /orcd/data/mki_aryeh/001/twirl/logs
+mkdir -p /orcd/data/mki_aryeh/001/twirl/logs "${OUT}"
 cd "${REPO}"
 export PYTHONPATH=src
 export OMP_NUM_THREADS=1
@@ -37,54 +35,17 @@ nvidia-smi
   --root "${ROOT}" \
   --require-complete
 
-"${PYTHON}" scripts/stage5_validation/build_s56_recovery50_cnn_tensors.py \
+"${PYTHON}" scripts/stage5_validation/train_s56_harmonic_cnn_v1.py \
   --training-table "${TRAINING}" \
-  --out-dir "${TENSORS}" \
-  --compact-lc-h5 "${COMPACT_LC}" \
-  --hlsp-root "${HLSP_ROOT}" \
-  --use-row-injection-h5 \
-  --apertures DET_FLUX_ADP_SML,DET_FLUX_ADP
-
-"${PYTHON}" scripts/stage5_validation/train_s56_recovery50_cnn_teacher.py \
-  --tensor-npz "${TENSORS}/recovery50_cnn_tensors.npz" \
-  --tensor-rows "${TENSORS}/recovery50_cnn_tensor_rows.csv" \
-  --training-table "${TRAINING}" \
-  --out-dir "${CNN_OUT}" \
-  --epochs 80 \
+  --native-h5 "${NATIVE_H5}" \
+  --out-dir "${OUT}" \
+  --profiles metadata_only,single_period_native_fold,seven_harmonic_shape,shape_plus_raw_chronology,shape_plus_periodogram_bls,full_combined \
+  --epochs 100 \
+  --pretrain-epochs 20 \
   --batch-size 32 \
-  --min-class-count 40
+  --workers 16 \
+  --learning-rate 3e-4 \
+  --weight-decay 1e-4 \
+  --patience 12
 
-OLD_ROOT="reports/stage5_validation/s56_recovery50_teacher_queue_2k/cnn_teacher_harmonic_raw_multiview"
-for profile in cnn_shape_only cnn_shape_plus_bls; do
-  "${PYTHON}" scripts/stage5_validation/score_s56_recovery50_cnn_teacher.py \
-    --tensor-npz "${TENSORS}/recovery50_cnn_tensors.npz" \
-    --tensor-rows "${TENSORS}/recovery50_cnn_tensor_rows.csv" \
-    --model-path "${OLD_ROOT}/${profile}/cnn_teacher.pt" \
-    --feature-table "${TRAINING}" \
-    --out-dir "${ROOT}/retrained/old_checkpoint_scores/${profile}" \
-    --require-cuda
-done
-
-"${PYTHON}" scripts/stage5_validation/compare_s56_adjudicated_cnn_checkpoints.py \
-  --new-root "${CNN_OUT}" \
-  --old-score-root "${ROOT}/retrained/old_checkpoint_scores" \
-  --out-dir "${ROOT}/retrained/checkpoint_comparison"
-
-"${PYTHON}" scripts/stage5_validation/build_s56_adjudicated_eb_miner_tables.py \
-  --training-table "${TRAINING}" \
-  --out-root "${EB_ROOT}"
-
-"${PYTHON}" scripts/stage5_validation/train_score_s56_eb_miner.py \
-  --training-table "${EB_ROOT}/training/eb_miner_training_table.csv" \
-  --candidate-pool "${EB_ROOT}/candidate_pool/eb_miner_candidate_pool.csv" \
-  --out-dir "${EB_ROOT}/eb_cnn_miner" \
-  --compact-lc-h5 "${COMPACT_LC}" \
-  --hlsp-root "${HLSP_ROOT}" \
-  --ensemble-size 5 \
-  --epochs 80 \
-  --batch-size 32 \
-  --candidate-chunk-size 512 \
-  --score-chunk-workers 8 \
-  --no-resume-scoring
-
-echo "[adjudicated-retrain] complete $(date -Is)"
+echo "[harmonic-cnn-v1] complete $(date -Is): ${OUT}"

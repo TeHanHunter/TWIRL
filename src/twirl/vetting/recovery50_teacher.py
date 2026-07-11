@@ -77,6 +77,12 @@ LEAKAGE_PREFIXES = (
     "resolution_",
     "human_",
     "queue_",
+    "morphology_",
+    "harmonic_",
+    "note_period_",
+    "effective_period_",
+    "variable_period_",
+    "broad_",
 )
 LEAKAGE_EXACT = frozenset(
     {
@@ -103,6 +109,9 @@ LEAKAGE_EXACT = frozenset(
         "training_split",
         "period_factor",
         "period_status",
+        "period_factor_source",
+        "period_task",
+        "model_target_policy_version",
         "is_repeat",
         "origin_queue",
         "labeling_era",
@@ -230,7 +239,13 @@ def add_label_roles(df: pd.DataFrame, policy: LabelPolicy | None = None) -> pd.D
     out["is_labeled"] = label.ne("")
     out["is_injected_row"] = source_kind.eq("injection_recovery")
     out["truth_signal_present"] = out["is_injected_row"]
-    out["bls_truth_match"] = topn.isin(BLS_TRUTH_MATCH_MODES)
+    bls_truth_match = topn.isin(BLS_TRUTH_MATCH_MODES)
+    for column in out.columns:
+        if column.startswith(("topn_exact_recovered_", "topn_harmonic_match_")):
+            bls_truth_match |= _as_bool(out[column], out.index)
+    if "strict_top1_recovered" in out:
+        bls_truth_match |= _as_bool(out["strict_top1_recovered"], out.index)
+    out["bls_truth_match"] = bls_truth_match
     out["main_teacher_target"] = np.where(
         (~label.isin(EXCLUDED_MAIN_LABELS)) & training_label.isin(allowed),
         training_label,

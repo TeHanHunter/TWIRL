@@ -49,6 +49,21 @@ def test_human_label_remains_main_target_for_injected_rows() -> None:
     assert out.loc[1, "main_teacher_target"] == "planet_like"
 
 
+def test_bls_truth_match_accepts_aperture_specific_recovery_columns() -> None:
+    out = add_label_roles(
+        pd.DataFrame(
+            {
+                "source_kind": ["injection_recovery", "injection_recovery"],
+                "human_label": ["planet_like", "uncertain"],
+                "topn_exact_recovered_DET_FLUX_ADP_SML": [True, False],
+                "topn_harmonic_match_DET_FLUX_ADP_SML": [False, True],
+            }
+        )
+    )
+
+    assert out["bls_truth_match"].tolist() == [True, True]
+
+
 def test_uncertain_maps_to_negative_teacher_target_without_overwriting_raw_label() -> None:
     df = pd.DataFrame(
         [

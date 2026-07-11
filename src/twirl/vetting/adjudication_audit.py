@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 import numpy as np
@@ -11,6 +12,7 @@ import pandas as pd
 
 from twirl.vetting.adjudication import (
     ADJUDICATION_LEAKAGE_COLUMNS,
+    ADJUDICATION_VET_SHEET_VERSION,
     ADP_APERTURES,
     SIGNAL_LABELS,
     join_browser_labels,
@@ -25,6 +27,52 @@ from twirl.vetting.label_io import (
     validate_label_records,
 )
 from twirl.vetting.recovery50_teacher import add_deterministic_splits, add_label_roles
+
+
+HARMONIC_CNN_TARGET_POLICY = "s56_harmonic_cnn_v1"
+MORPHOLOGY_CLASSES_V1: tuple[str, ...] = (
+    "planet_like",
+    "eclipse_contact",
+    "smooth_variable",
+    "other",
+)
+MORPHOLOGY_TARGET_MAP_V1: dict[str, str] = {
+    "planet_like": "planet_like",
+    "eclipsing_binary_or_pceb": "eclipse_contact",
+    "stellar_variability": "smooth_variable",
+    "instrumental_or_systematic": "other",
+    "uncertain": "other",
+    "no_visible_signal": "other",
+    "centroid_contaminant": "other",
+}
+PRESERVE_LABELS_V1: frozenset[str] = frozenset(
+    {
+        "planet_like",
+        "eclipsing_binary_or_pceb",
+        "stellar_variability",
+        "wide_transit_like",
+    }
+)
+REJECT_LABELS_V1: frozenset[str] = frozenset(
+    {"instrumental_or_systematic", "uncertain", "no_visible_signal", "centroid_contaminant"}
+)
+TRANSIT_HARMONIC_LABELS_V1: frozenset[str] = frozenset(
+    {"planet_like", "eclipsing_binary_or_pceb", "wide_transit_like"}
+)
+TRANSIT_HARMONIC_FACTORS_V1: tuple[float, ...] = (0.25, 1.0 / 3.0, 0.5, 1.0, 2.0, 3.0, 4.0)
+TRANSIT_HARMONIC_TARGETS_V1: tuple[str, ...] = (
+    "p_over_4",
+    "p_over_3",
+    "p_over_2",
+    "p",
+    "2p",
+    "3p",
+    "4p",
+)
+_NOTE_PERIOD_DIVISOR_RE = re.compile(r"(?i)\bp\s*/\s*(?P<divisor>\d+(?:\.\d+)?)\b")
+_NOTE_PERIOD_MULTIPLIER_RE = re.compile(
+    r"(?i)(?<![\w/])(?P<multiplier>\d+(?:\.\d+)?)\s*\*?\s*p\b"
+)
 
 
 def _json_default(value: Any) -> Any:
@@ -50,6 +98,157 @@ def _as_bool(series: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(series):
         return series.fillna(False).astype(bool)
     return series.fillna("").astype(str).str.strip().str.lower().isin({"1", "true", "yes", "y"})
+
+
+def parse_note_period_factor(value: Any) -> float:
+    """Parse explicit ``P/n`` or ``nP`` reviewer notes into a period factor."""
+
+    text = _text(value).strip()
+    if not text:
+        return float("nan")
+    lowered = text.lower()
+    word_factors = (
+        (r"\bquarter[- ]period\b", 0.25),
+        (r"\bhalf[- ]period\b", 0.5),
+        (r"\b(?:double|twice)[- ](?:the[- ])?period\b", 2.0),
+        (r"\btriple[- ](?:the[- ])?period\b", 3.0),
+    )
+    for pattern, factor in word_factors:
+        if re.search(pattern, lowered):
+            return factor
+    divisor = _NOTE_PERIOD_DIVISOR_RE.search(text)
+    if divisor:
+        number = float(divisor.group("divisor"))
+        return 1.0 / number if np.isfinite(number) and number > 0 else float("nan")
+    multiplier = _NOTE_PERIOD_MULTIPLIER_RE.search(text)
+    if multiplier:
+        number = float(multiplier.group("multiplier"))
+        return number if np.isfinite(number) and number > 0 else float("nan")
+    return float("nan")
+
+
+def harmonic_target_for_factor(factor: Any, *, atol: float = 1.0e-8) -> str:
+    """Return the seven-way transit-harmonic target for a numeric factor."""
+
+    try:
+        value = float(factor)
+    except (TypeError, ValueError):
+        return ""
+    if not np.isfinite(value):
+        return ""
+    for candidate, target in zip(TRANSIT_HARMONIC_FACTORS_V1, TRANSIT_HARMONIC_TARGETS_V1):
+        if np.isclose(value, candidate, rtol=0.0, atol=atol):
+            return target
+    return ""
+
+
+def _nearest_supported_factor(value: float, *, relative_tolerance: float = 0.02) -> float:
+    if not np.isfinite(value) or value <= 0:
+        return float("nan")
+    candidates = np.asarray(TRANSIT_HARMONIC_FACTORS_V1, dtype=float)
+    errors = np.abs(value / candidates - 1.0)
+    index = int(np.argmin(errors))
+    return float(candidates[index]) if float(errors[index]) <= relative_tolerance else float("nan")
+
+
+def add_harmonic_cnn_targets(frame: pd.DataFrame) -> pd.DataFrame:
+    """Attach leakage-safe target columns for the post-adjudication CNN.
+
+    The returned target and audit columns are never candidate observables. A
+    parseable reviewer note overrides the period-factor button only in these
+    derived fields; the raw browser decision remains unchanged.
+    """
+
+    out = frame.copy()
+    index = out.index
+    label = out.get("human_label", pd.Series("", index=index)).fillna("").astype(str)
+    notes = out.get("human_notes", pd.Series("", index=index)).fillna("").astype(str)
+    if "adjudicated_notes" in out:
+        adjudicated = out["adjudicated_notes"].fillna("").astype(str)
+        notes = adjudicated.where(adjudicated.str.strip().ne(""), notes)
+
+    note_factor = notes.map(parse_note_period_factor).astype(float)
+    adjudicated_factor = pd.to_numeric(
+        out.get("adjudicated_period_factor", pd.Series(np.nan, index=index)), errors="coerce"
+    )
+    legacy_factor = pd.to_numeric(
+        out.get("refold_factor", pd.Series(np.nan, index=index)), errors="coerce"
+    )
+    period_status = out.get("adjudicated_period_status", pd.Series("", index=index)).fillna("").astype(str)
+    adjudicated_final = _as_bool(
+        out.get("adjudication_final", pd.Series(False, index=index))
+    )
+
+    effective_factor = pd.Series(1.0, index=index, dtype=float)
+    factor_source = pd.Series("default_p", index=index, dtype=object)
+    legacy_ok = np.isfinite(legacy_factor) & legacy_factor.gt(0)
+    effective_factor.loc[legacy_ok] = legacy_factor.loc[legacy_ok]
+    factor_source.loc[legacy_ok] = "legacy_refold"
+    adjudicated_ok = adjudicated_final & np.isfinite(adjudicated_factor) & adjudicated_factor.gt(0)
+    effective_factor.loc[adjudicated_ok] = adjudicated_factor.loc[adjudicated_ok]
+    factor_source.loc[adjudicated_ok] = "adjudication_button"
+    unresolved = adjudicated_final & period_status.eq("unresolved")
+    effective_factor.loc[unresolved] = np.nan
+    factor_source.loc[unresolved] = "unresolved"
+    injected = _as_bool(
+        out.get("is_injected_row", pd.Series(False, index=index))
+    ) | out.get("source_kind", pd.Series("", index=index)).fillna("").astype(str).str.contains(
+        "inject", case=False
+    )
+    review_period = pd.to_numeric(out.get("period_d", pd.Series(np.nan, index=index)), errors="coerce")
+    truth_period = pd.to_numeric(
+        out.get("truth_period_d", pd.Series(np.nan, index=index)), errors="coerce"
+    )
+    injection_factor = (truth_period / review_period).map(_nearest_supported_factor)
+    injection_transit = injected & label.isin(TRANSIT_HARMONIC_LABELS_V1)
+    injection_resolved = injection_transit & np.isfinite(injection_factor)
+    effective_factor.loc[injection_resolved] = injection_factor.loc[injection_resolved]
+    factor_source.loc[injection_resolved] = "injection_truth_harmonic"
+    injection_unresolved = injection_transit & ~injection_resolved
+    effective_factor.loc[injection_unresolved] = np.nan
+    factor_source.loc[injection_unresolved] = "injection_truth_unresolved"
+    note_ok = np.isfinite(note_factor) & note_factor.gt(0)
+    effective_factor.loc[note_ok] = note_factor.loc[note_ok]
+    factor_source.loc[note_ok] = "note"
+
+    morphology_target = label.map(MORPHOLOGY_TARGET_MAP_V1).fillna("")
+    preserve_target = pd.Series("", index=index, dtype=object)
+    preserve_target.loc[label.isin(PRESERVE_LABELS_V1)] = "preserve"
+    preserve_target.loc[label.isin(REJECT_LABELS_V1)] = "reject"
+    period_task = pd.Series("", index=index, dtype=object)
+    period_task.loc[label.isin(TRANSIT_HARMONIC_LABELS_V1)] = "transit_harmonic"
+    period_task.loc[label.eq("stellar_variability")] = "variable_period_refinement"
+
+    harmonic_target = pd.Series("", index=index, dtype=object)
+    transit_rows = label.isin(TRANSIT_HARMONIC_LABELS_V1)
+    harmonic_target.loc[transit_rows] = effective_factor.loc[transit_rows].map(harmonic_target_for_factor)
+    resolved_sources = {
+        "legacy_refold",
+        "adjudication_button",
+        "note",
+        "injection_truth_harmonic",
+    }
+    harmonic_include = transit_rows & harmonic_target.ne("") & factor_source.isin(resolved_sources)
+
+    effective_period = review_period * effective_factor
+    effective_period.loc[~np.isfinite(effective_factor)] = np.nan
+    variable_factor = effective_factor.where(label.eq("stellar_variability"), np.nan)
+
+    out["note_period_factor"] = note_factor
+    out["effective_period_factor"] = effective_factor
+    out["effective_period_d"] = effective_period
+    out["period_factor_source"] = factor_source
+    out["period_task"] = period_task
+    out["variable_period_factor"] = variable_factor
+    out["morphology_target_v1"] = morphology_target
+    out["morphology_include_v1"] = morphology_target.ne("")
+    out["preserve_target_v1"] = preserve_target
+    out["preserve_include_v1"] = preserve_target.ne("")
+    out["harmonic_target_v1"] = harmonic_target
+    out["harmonic_include_v1"] = harmonic_include
+    out["broad_preserve_only"] = label.eq("wide_transit_like")
+    out["model_target_policy_version"] = HARMONIC_CNN_TARGET_POLICY
+    return out
 
 
 def normalize_period_factor(value: Any) -> tuple[str, str, float]:
@@ -258,6 +457,7 @@ def _load_resolution_decisions(resolution_dir: Path) -> pd.DataFrame:
         "resolution_period_status",
         "resolution_period_d",
         "resolution_labeler",
+        "resolution_notes",
         "resolution_updated_utc",
     ]
     if not queue_path.exists() or not manifest_path.exists() or not labels_path.exists():
@@ -282,6 +482,7 @@ def _load_resolution_decisions(resolution_dir: Path) -> pd.DataFrame:
                 "resolution_period_status": status,
                 "resolution_period_d": review_period * factor if np.isfinite(factor) else np.nan,
                 "resolution_labeler": _text(row.get("labeler")),
+                "resolution_notes": _text(row.get("notes")),
                 "resolution_updated_utc": _text(row.get("updated_utc")),
             }
         )
@@ -316,6 +517,7 @@ def final_unique_decisions(rows: pd.DataFrame, resolution: pd.DataFrame) -> pd.D
                         "adjudicated_row_period_status": resolved["resolution_period_status"],
                         "adjudicated_row_period_d": resolved["resolution_period_d"],
                         "adjudicated_row_labeler": resolved["resolution_labeler"],
+                        "adjudicated_row_notes": resolved["resolution_notes"],
                         "adjudicated_row_updated_utc": resolved["resolution_updated_utc"],
                     }
                 )
@@ -325,6 +527,7 @@ def final_unique_decisions(rows: pd.DataFrame, resolution: pd.DataFrame) -> pd.D
         base["adjudicated_period_factor"] = _text(decision.get("adjudicated_row_period_factor")) if decision else ""
         base["adjudicated_period_status"] = _text(decision.get("adjudicated_row_period_status")) if decision else ""
         base["adjudicated_period_d"] = decision.get("adjudicated_row_period_d", np.nan) if decision else np.nan
+        base["adjudicated_notes"] = _text(decision.get("adjudicated_row_notes")) if decision else ""
         base["adjudicated_labeler"] = _text(decision.get("adjudicated_row_labeler")) if decision else ""
         base["adjudicated_updated_utc"] = _text(decision.get("adjudicated_row_updated_utc")) if decision else ""
         base["adjudicated_decision_source"] = decision_source
@@ -461,6 +664,7 @@ def build_adjudicated_training_table(
         "adjudicated_period_factor",
         "adjudicated_period_status",
         "adjudicated_period_d",
+        "adjudicated_notes",
         "adjudicated_labeler",
         "adjudicated_updated_utc",
         "adjudication_final",
@@ -473,6 +677,7 @@ def build_adjudicated_training_table(
             master[column] = ""
     final_mask = _as_bool(master["adjudication_final"])
     master.loc[final_mask, "human_label"] = master.loc[final_mask, "human_label_adjudicated"]
+    master.loc[final_mask, "human_notes"] = master.loc[final_mask, "adjudicated_notes"]
     resolved = final_mask & master["adjudicated_period_status"].fillna("").astype(str).ne("unresolved")
     master.loc[resolved, "model_period_d"] = pd.to_numeric(
         master.loc[resolved, "adjudicated_period_d"], errors="coerce"
@@ -503,6 +708,7 @@ def build_adjudicated_training_table(
         np.where(label.eq("eclipsing_binary_or_pceb"), "eb_pceb", "not_eb"),
         "",
     )
+    master = add_harmonic_cnn_targets(master)
     master["adjudication_leakage_columns"] = ",".join(sorted(ADJUDICATION_LEAKAGE_COLUMNS))
     master["source_row_id"] = master.get("row_id", pd.Series(np.nan, index=master.index))
     master["row_id"] = np.arange(len(master), dtype=int)
@@ -553,6 +759,49 @@ def run_adjudication_audit(
     training_dir.mkdir(parents=True, exist_ok=True)
     training_path = training_dir / "human_vetting_training_table_adjudicated.csv"
     training.to_csv(training_path, index=False)
+    variable_period_path = audit_dir / "variable_period_audit.csv"
+    variable_columns = [
+        column
+        for column in (
+            "source_uid",
+            "review_id",
+            "tic",
+            "human_label",
+            "human_notes",
+            "adjudicated_period_factor",
+            "note_period_factor",
+            "effective_period_factor",
+            "effective_period_d",
+            "period_factor_source",
+            "period_task",
+        )
+        if column in training
+    ]
+    training.loc[training["period_task"].eq("variable_period_refinement"), variable_columns].to_csv(
+        variable_period_path, index=False
+    )
+    harmonic_targets_path = audit_dir / "transit_harmonic_targets.csv"
+    harmonic_columns = [
+        column
+        for column in (
+            "source_uid",
+            "review_id",
+            "tic",
+            "source_kind",
+            "human_label",
+            "adjudicated_period_factor",
+            "note_period_factor",
+            "effective_period_factor",
+            "effective_period_d",
+            "period_factor_source",
+            "harmonic_target_v1",
+            "harmonic_include_v1",
+        )
+        if column in training
+    ]
+    training.loc[training["period_task"].eq("transit_harmonic"), harmonic_columns].to_csv(
+        harmonic_targets_path, index=False
+    )
     leakage_path = training_dir / "model_input_leakage_columns.json"
     leakage_path.write_text(
         json.dumps({"columns": sorted(ADJUDICATION_LEAKAGE_COLUMNS)}, indent=2, sort_keys=True) + "\n"
@@ -583,12 +832,33 @@ def run_adjudication_audit(
             str(key): int(value)
             for key, value in training["human_label"].fillna("").astype(str).value_counts().sort_index().items()
         },
+        "morphology_target_counts": {
+            str(key): int(value)
+            for key, value in training.loc[
+                _as_bool(training["morphology_include_v1"]), "morphology_target_v1"
+            ].value_counts().sort_index().items()
+        },
+        "morphology_target_counts_by_source": {
+            str(source): {
+                str(key): int(value)
+                for key, value in part.loc[
+                    _as_bool(part["morphology_include_v1"]), "morphology_target_v1"
+                ].value_counts().sort_index().items()
+            }
+            for source, part in training.groupby("source_kind", dropna=False, sort=True)
+        },
+        "n_broad_preserve_only": int(_as_bool(training["broad_preserve_only"]).sum()),
+        "n_transit_harmonic_targets": int(_as_bool(training["harmonic_include_v1"]).sum()),
+        "n_variable_period_audit": int(training["period_task"].eq("variable_period_refinement").sum()),
+        "vet_sheet_version": ADJUDICATION_VET_SHEET_VERSION,
         "outputs": {
             "joined_rows": str(audit_dir / "adjudication_rows_joined_private.csv"),
             "repeat_pairs": str(audit_dir / "blind_repeat_pairs.csv"),
             "unique_sources": str(audit_dir / "adjudicated_unique_sources.csv"),
             "training_table": str(training_path),
             "leakage_columns": str(leakage_path),
+            "variable_period_audit": str(variable_period_path),
+            "transit_harmonic_targets": str(harmonic_targets_path),
         },
     }
     (audit_dir / "summary.json").write_text(
