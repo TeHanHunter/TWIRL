@@ -17,6 +17,7 @@ ROOT="${TWIRL_ADJUDICATION_ROOT:-reports/stage5_validation/s56_label_adjudicatio
 TRAINING="${ROOT}/adjudicated_training_table/human_vetting_training_table_adjudicated.csv"
 RAW_SOURCE="${TWIRL_HARMONIC_RAW_SOURCE_H5:-${ROOT}/native_inputs/s56_tglc_raw_sources.h5}"
 COMPACT_ADP="${TWIRL_HARMONIC_COMPACT_ADP_H5:-data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5}"
+INJECTION_PAIR="${TWIRL_HARMONIC_INJECTION_PAIR_H5:-${ROOT}/native_inputs/s56_adjudicated_injected_adp_pair_v1.h5}"
 FINAL="${TWIRL_HARMONIC_NATIVE_H5:-${ROOT}/native_inputs/s56_adp_raw_pair_v1.h5}"
 N_SHARDS="${TWIRL_HARMONIC_INPUT_SHARDS:-32}"
 RUN_DIR="${ROOT}/native_inputs/shards_${SLURM_JOB_ID}"
@@ -29,11 +30,16 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
+export HDF5_USE_FILE_LOCKING=FALSE
 
 if [[ ! -s "${RAW_SOURCE}" ]]; then
   echo "Missing compact raw/error source: ${RAW_SOURCE}" >&2
   echo "Create it from the PDO TGLC files with export_s56_harmonic_raw_sources.py, then stage only that compact HDF5 here." >&2
   exit 3
+fi
+if [[ ! -s "${INJECTION_PAIR}" ]]; then
+  echo "Missing exact adjudicated injection pair product: ${INJECTION_PAIR}" >&2
+  exit 6
 fi
 if [[ -e "${FINAL}" && "${TWIRL_OVERWRITE_HARMONIC_NATIVE:-0}" != "1" ]]; then
   echo "Refusing to overwrite ${FINAL}; set TWIRL_OVERWRITE_HARMONIC_NATIVE=1 for an intentional rebuild." >&2
@@ -47,11 +53,12 @@ fi
 pids=()
 for ((shard=0; shard<N_SHARDS; shard++)); do
   shard_path="${RUN_DIR}/native_${shard}.h5"
-  srun --exclusive -N1 -n1 -c2 "${PYTHON}" \
+  srun --exclusive --exact -N1 -n1 -c2 --mem=12G "${PYTHON}" \
     scripts/stage5_validation/build_s56_harmonic_native_inputs.py \
     --training-table "${TRAINING}" \
     --raw-source-h5 "${RAW_SOURCE}" \
     --compact-adp-h5 "${COMPACT_ADP}" \
+    --injection-pair-h5 "${INJECTION_PAIR}" \
     --out-h5 "${shard_path}" \
     --repo-root "${REPO}" \
     --n-periods 4096 \

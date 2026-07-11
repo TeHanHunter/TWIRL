@@ -6,11 +6,14 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
+import pytest
 
+from twirl.vetting import harmonic_export
 from twirl.vetting.harmonic_export import (
     RAW_SOURCE_CONTRACT_VERSION,
     align_raw_by_cadence,
     build_raw_pair_export,
+    compact_adp_detector_lookup,
     discover_tglc_paths,
     merge_raw_pair_shards,
     shared_bls_periodogram,
@@ -36,6 +39,26 @@ def test_raw_alignment_is_by_cadence_and_preserves_negative_flux() -> None:
     assert aligned["raw_flux_small"].tolist() == [-5.0, 1.0, 2.0]
 
 
+def test_raw_alignment_accepts_observed_one_point_five_second_orbit_offset() -> None:
+    time = np.asarray([2459825.0, 2459825.1])
+    raw = {
+        "time": time + 1.5 / 86400.0,
+        "cadenceno": np.asarray([10, 11]),
+        "raw_flux_small": np.asarray([1.0, 2.0]),
+    }
+
+    aligned = align_raw_by_cadence(raw, cadenceno=np.asarray([10, 11]), time=time)
+
+    assert np.allclose(aligned["_time_delta_s"], 1.5, atol=5.0e-5)
+    with pytest.raises(ValueError, match="timestamps differ"):
+        align_raw_by_cadence(
+            raw,
+            cadenceno=np.asarray([10, 11]),
+            time=time,
+            max_time_error_s=1.0,
+        )
+
+
 def test_raw_path_discovery_can_recover_missing_detector_metadata(tmp_path: Path) -> None:
     expected = tmp_path / "orbit-119/ffi/cam3/ccd2/LC/42.h5"
     expected.parent.mkdir(parents=True)
@@ -50,6 +73,82 @@ def test_raw_path_discovery_can_recover_missing_detector_metadata(tmp_path: Path
     )
 
     assert found == [expected]
+
+
+def test_compact_adp_detector_lookup_uses_model_facing_product(tmp_path: Path) -> None:
+    path = tmp_path / "compact_adp.h5"
+    with h5py.File(path, "w") as h5:
+        group = h5.create_group("targets/0000000000000042")
+        group.attrs["camera"] = 3
+        group.attrs["ccd"] = 2
+
+    lookup = compact_adp_detector_lookup(path, tics=[42, 99])
+
+    assert lookup == {42: (3, 2)}
+
+
+def test_raw_source_export_uses_compact_detector_and_clears_stale_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    tic = 42
+    training = tmp_path / "training.csv"
+    pd.DataFrame(
+        {
+            "tic": [tic],
+            "cam": [np.nan],
+            "ccd": [np.nan],
+            "morphology_include_v1": [True],
+            "preserve_include_v1": [True],
+            "harmonic_include_v1": [False],
+        }
+    ).to_csv(training, index=False)
+    compact = tmp_path / "compact.h5"
+    with h5py.File(compact, "w") as h5:
+        group = h5.create_group(f"targets/{tic:016d}")
+        group.attrs["camera"] = 3
+        group.attrs["ccd"] = 2
+    raw_root = tmp_path / "raw"
+    paths = []
+    for orbit in (119, 120):
+        path = raw_root / f"orbit-{orbit}/ffi/cam3/ccd2/LC/{tic}.h5"
+        path.parent.mkdir(parents=True)
+        path.touch()
+        paths.append(path)
+    n = 8
+    payload = {
+        "time": 2459825.0 + np.arange(n) * 200.0 / 86400.0,
+        "cadenceno": np.arange(n),
+        "orbitid": np.repeat([119, 120], n // 2),
+        "quality": np.zeros(n),
+        "raw_flux_small": np.ones(n),
+        "raw_flux_err_small": np.ones(n),
+        "raw_flux_primary": np.ones(n),
+        "raw_flux_err_primary": np.ones(n),
+    }
+    observed_paths: list[Path] = []
+
+    def fake_merge(found: list[Path]) -> dict[str, np.ndarray]:
+        observed_paths.extend(found)
+        return payload
+
+    monkeypatch.setattr(harmonic_export, "merge_tglc_raw_paths", fake_merge)
+    output = tmp_path / "raw_sources.h5"
+    output.with_suffix(".failures.csv").write_text("tic,error\n42,stale\n")
+
+    summary = harmonic_export.export_tglc_raw_sources(
+        training_table=training,
+        raw_root=raw_root,
+        out_h5=output,
+        compact_adp_h5=compact,
+    )
+
+    assert summary["n_compact_adp_detectors"] == 1
+    assert observed_paths == paths
+    assert not output.with_suffix(".failures.csv").exists()
+    with h5py.File(output, "r") as h5:
+        group = h5[f"targets/{tic:016d}"]
+        assert (group.attrs["camera"], group.attrs["ccd"]) == (3, 2)
+        assert group.attrs["detector_source"] == "compact_adp_attrs"
 
 
 def test_shared_bls_periodogram_is_finite_for_transit_signal() -> None:
@@ -132,6 +231,7 @@ def test_real_only_raw_pair_export_writes_full_contract(tmp_path: Path) -> None:
         training_table=table,
         raw_source_h5=raw_source,
         compact_adp_h5=adp_source,
+        injection_pair_h5=None,
         out_h5=output,
         repo_root=tmp_path,
         n_periods=64,

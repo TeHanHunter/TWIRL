@@ -22,6 +22,7 @@ from twirl.vetting.harmonic_inputs import (
     HARMONIC_FACTORS,
     build_harmonic_views,
     build_native_channels,
+    native_group_path,
     pad_channel_sequences,
     read_native_light_curve,
 )
@@ -68,27 +69,6 @@ class MetadataNormalization:
     columns: tuple[str, ...]
     center: tuple[float, ...]
     scale: tuple[float, ...]
-
-
-def native_group_path(row: Mapping[str, Any]) -> str:
-    raw_injected = row.get("is_injected_row", "")
-    injected = (
-        bool(raw_injected)
-        if isinstance(raw_injected, (bool, np.bool_))
-        else str(raw_injected).strip().lower() in {"1", "1.0", "true", "t", "yes", "y"}
-    )
-    if not injected:
-        injected = "inject" in str(row.get("source_kind", "")).lower()
-    if injected:
-        injection_id = str(row.get("injection_id", "")).strip()
-        if not injection_id:
-            raise ValueError("injected training row has no injection_id")
-        return f"injections/{injection_id}"
-    try:
-        tic = int(float(row["tic"]))
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError("real training row has no valid TIC") from exc
-    return f"targets/{tic:016d}"
 
 
 def candidate_bls_ephemeris(row: Mapping[str, Any]) -> tuple[float, float, float]:

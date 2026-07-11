@@ -1,0 +1,21 @@
+{
+  "inputs": {
+    "predictions": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/fixed_test_predictions.csv",
+    "selected_profile_histories": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/shape_plus_periodogram_bls/fold_*/history.csv",
+    "summary": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/summary.json"
+  },
+  "locked_test_balanced_accuracy": 0.7496845818456467,
+  "locked_test_ece_recomputed": 0.04846390922744562,
+  "locked_test_macro_f1": 0.7572671801364563,
+  "n_fixed_test_morphology": 428,
+  "n_fixed_test_morphology_injected": 91,
+  "n_fixed_test_morphology_real": 337,
+  "n_fixed_test_planet_injected": 62,
+  "n_fixed_test_planet_real": 2,
+  "n_fixed_test_total": 430,
+  "outputs": {
+    "pdf": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/performance_figure/s56_harmonic_cnn_v1_performance.pdf",
+    "png": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/performance_figure/s56_harmonic_cnn_v1_performance.png"
+  },
+  "selected_profile": "shape_plus_periodogram_bls"
+}

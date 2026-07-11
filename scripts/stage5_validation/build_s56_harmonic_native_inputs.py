@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--training-table", type=Path, required=True)
     parser.add_argument("--raw-source-h5", type=Path, required=True)
     parser.add_argument("--compact-adp-h5", type=Path, required=True)
+    parser.add_argument("--injection-pair-h5", type=Path)
     parser.add_argument("--out-h5", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, default=ROOT)
     parser.add_argument("--n-periods", type=int, default=4096)
@@ -29,6 +30,7 @@ def main() -> None:
         training_table=args.training_table,
         raw_source_h5=args.raw_source_h5,
         compact_adp_h5=args.compact_adp_h5,
+        injection_pair_h5=args.injection_pair_h5,
         out_h5=args.out_h5,
         repo_root=args.repo_root,
         n_periods=args.n_periods,

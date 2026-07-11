@@ -82,6 +82,29 @@ CHANNEL_CONTRACT: Mapping[str, tuple[str, ...]] = {
 }
 
 
+def native_group_path(row: Mapping[str, Any]) -> str:
+    """Return the native HDF5 group for a real or injected training row."""
+
+    raw_injected = row.get("is_injected_row", "")
+    injected = (
+        bool(raw_injected)
+        if isinstance(raw_injected, (bool, np.bool_))
+        else str(raw_injected).strip().lower() in {"1", "1.0", "true", "t", "yes", "y"}
+    )
+    if not injected:
+        injected = "inject" in str(row.get("source_kind", "")).lower()
+    if injected:
+        injection_id = str(row.get("injection_id", "")).strip()
+        if not injection_id:
+            raise ValueError("injected training row has no injection_id")
+        return f"injections/{injection_id}"
+    try:
+        tic = int(float(row["tic"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("real training row has no valid TIC") from exc
+    return f"targets/{tic:016d}"
+
+
 @dataclass(frozen=True)
 class NativeLightCurve:
     """One real or injected two-aperture light curve at native cadence."""
@@ -658,6 +681,7 @@ __all__ = [
     "build_harmonic_views",
     "build_native_channels",
     "injected_raw_uncertainty",
+    "native_group_path",
     "orbital_phase",
     "pad_channel_sequences",
     "read_native_light_curve",
