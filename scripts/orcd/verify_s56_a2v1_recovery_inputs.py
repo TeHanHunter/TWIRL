@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -35,11 +36,36 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _write_fits_checksum_manifest(paths: list[Path], root: Path, out_csv: Path) -> str:
+    tree_digest = hashlib.sha256()
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with out_csv.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=("relative_path", "bytes", "sha256"))
+        writer.writeheader()
+        for index, path in enumerate(paths, start=1):
+            relative = path.relative_to(root).as_posix()
+            sha256 = _sha256(path)
+            size = path.stat().st_size
+            writer.writerow(
+                {"relative_path": relative, "bytes": size, "sha256": sha256}
+            )
+            tree_digest.update(relative.encode("utf-8"))
+            tree_digest.update(b"\0")
+            tree_digest.update(str(size).encode("ascii"))
+            tree_digest.update(b"\0")
+            tree_digest.update(sha256.encode("ascii"))
+            tree_digest.update(b"\n")
+            if index % 500 == 0:
+                print(f"[fits-sha256] {index:,}/{len(paths):,}", flush=True)
+    return tree_digest.hexdigest()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-root", type=Path, required=True)
     parser.add_argument("--out-json", type=Path, required=True)
     parser.add_argument("--hash-large-files", action="store_true")
+    parser.add_argument("--fits-checksum-manifest", type=Path)
     args = parser.parse_args()
 
     root = args.input_root
@@ -98,6 +124,7 @@ def main() -> int:
     if not compact_parity["passed"]:
         failures.extend(compact_parity["failures"])
     hashes = {}
+    fits_checksum_manifest = None
     if args.hash_large_files:
         for path in (
             raw_path,
@@ -107,12 +134,23 @@ def main() -> int:
             validation_path,
         ):
             hashes[path.name] = _sha256(path)
+        fits_checksum_manifest = (
+            args.fits_checksum_manifest or root / "hlsp_s0056_A2v1_sha256_manifest.csv"
+        )
+        hashes["hlsp_s0056_A2v1_tree"] = _write_fits_checksum_manifest(
+            fits,
+            fits_root,
+            fits_checksum_manifest,
+        )
     payload = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "input_root": str(root.resolve()),
         "expected": EXPECTED,
         "observed": observed,
         "hashes": hashes,
+        "fits_checksum_manifest": (
+            str(fits_checksum_manifest.resolve()) if fits_checksum_manifest else None
+        ),
         "compact_rebuild_parity": compact_parity,
         "source_validation_ok": bool(validation.get("ok", False)),
         "passed": not failures,
