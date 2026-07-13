@@ -622,25 +622,22 @@ def build_fresh_injection_schedule(
     bright = eligible.loc[pd.to_numeric(eligible["tessmag"], errors="coerce") < 19.0]
     faint = eligible.loc[pd.to_numeric(eligible["tessmag"], errors="coerce") >= 19.0]
     if len(bright) > config.n_injections:
-        bright = bright.sample(
-            n=config.n_injections,
-            random_state=_seed(config.seed, 0, 53),
-            replace=False,
+        raise ValueError(
+            f"{len(bright):,} eligible hosts have Tmag < 19, which exceeds the "
+            f"locked {config.n_injections:,}-host sample; refusing to discard bright hosts"
         )
-        selected = bright.copy()
-    else:
-        need = config.n_injections - len(bright)
-        selected = pd.concat(
-            [
-                bright,
-                faint.sample(
-                    n=need,
-                    random_state=_seed(config.seed, 0, 59),
-                    replace=False,
-                ),
-            ],
-            ignore_index=True,
-        )
+    need = config.n_injections - len(bright)
+    selected = pd.concat(
+        [
+            bright,
+            faint.sample(
+                n=need,
+                random_state=_seed(config.seed, 0, 59),
+                replace=False,
+            ),
+        ],
+        ignore_index=True,
+    )
     schedule = _assign_cells(selected, config=config)
     physical = pd.DataFrame(
         [_physical_parameters(row, config) for row in schedule.to_dict("records")]
