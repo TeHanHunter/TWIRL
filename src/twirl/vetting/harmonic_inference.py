@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Sequence
@@ -43,6 +44,14 @@ HARMONIC_DISPLAY_LABELS: tuple[str, ...] = (
     "4P",
 )
 HARMONIC_FACTORS: tuple[float, ...] = (0.25, 1.0 / 3.0, 0.5, 1.0, 2.0, 3.0, 4.0)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def rank_planet_enrichment(scored: pd.DataFrame) -> pd.DataFrame:
@@ -393,10 +402,18 @@ def score_harmonic_teacher_ensemble(
             .tolist()
         ),
         "device": str(device),
+        "torch_version": str(torch.__version__),
+        "torch_cuda_version": str(torch.version.cuda),
+        "cuda_device_name": (
+            str(torch.cuda.get_device_name(0)) if device.type == "cuda" else ""
+        ),
         "batch_size": int(batch_size),
         "workers": int(workers),
         "allow_injections": bool(allow_injections),
         "checkpoints": [str(Path(path)) for path in checkpoint_paths],
+        "checkpoint_sha256": {
+            str(Path(path)): _sha256(Path(path)) for path in checkpoint_paths
+        },
         "checkpoint_folds": [int(value["fold"]) for value in checkpoints],
         "metadata_columns_by_fold": [list(value.columns) for value in normalizations],
         "predicted_class_counts": {

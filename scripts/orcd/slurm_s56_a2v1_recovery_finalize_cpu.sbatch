@@ -14,6 +14,8 @@ REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
 OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v1_recovery}"
 FULL="${OUT_ROOT}/full"
+INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1}"
+CHECKPOINT_ROOT="${TWIRL_TEACHER_CHECKPOINT_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/shape_plus_periodogram_bls}"
 
 mkdir -p "${FULL}/final"
 cd "${REPO}"
@@ -29,5 +31,20 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
   --out-dir "${FULL}/final" \
   --expect-injections 20000 \
   --preserve-threshold 0.5
+
+"${PYTHON}" scripts/stage5_validation/write_s56_a2v1_recovery_run_manifest.py \
+  --repo "${REPO}" \
+  --config "${REPO}/configs/injections/s56_a2v1_teacher_v1_recovery_v1.yaml" \
+  --input-verification "${INPUT_ROOT}/input_verification.json" \
+  --schedule-summary "${OUT_ROOT}/schedule/schedule_summary.json" \
+  --teacher-summary "${FULL}/teacher_scores.summary.json" \
+  --final-summary "${FULL}/final/summary.json" \
+  --checkpoints \
+    "${CHECKPOINT_ROOT}/fold_0/teacher.pt" \
+    "${CHECKPOINT_ROOT}/fold_1/teacher.pt" \
+    "${CHECKPOINT_ROOT}/fold_2/teacher.pt" \
+    "${CHECKPOINT_ROOT}/fold_3/teacher.pt" \
+    "${CHECKPOINT_ROOT}/fold_4/teacher.pt" \
+  --out-json "${FULL}/final/run_manifest.json"
 
 echo "[s56-a2rec-final] complete $(date -Is)"
