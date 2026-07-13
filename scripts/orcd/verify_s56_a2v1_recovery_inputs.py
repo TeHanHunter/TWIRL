@@ -12,6 +12,8 @@ from pathlib import Path
 import h5py
 import pandas as pd
 
+from twirl.injections.a2v1_recovery import compare_adp_compact_products
+
 
 EXPECTED = {
     "fits_count": 31_450,
@@ -43,21 +45,23 @@ def main() -> int:
     root = args.input_root
     fits_root = root / "hlsp_s0056_A2v1"
     raw_path = root / "s56_A2v1_tglc_raw_sources.h5"
-    adp_path = root / "s56_A2v1_adp_pair.h5"
+    adp_reference_path = root / "s56_A2v1_adp_pair.h5"
+    adp_active_path = root / "s56_A2v1_adp_pair_rebuilt.h5"
     teacher_path = root / "human_vetting_training_table_adjudicated.csv"
     validation_path = root / "s56_A2v1_validation_full_schema.json"
     fits = sorted(fits_root.rglob("*.fits"))
     fits_bytes = sum(path.stat().st_size for path in fits)
     teacher = pd.read_csv(teacher_path, low_memory=False)
     validation = json.loads(validation_path.read_text())
-    with h5py.File(raw_path, "r") as raw, h5py.File(adp_path, "r") as adp:
+    with h5py.File(raw_path, "r") as raw, h5py.File(adp_reference_path, "r") as adp:
         raw_keys = set(raw["targets"].keys())
         adp_keys = set(adp["targets"].keys())
         observed = {
             "fits_count": len(fits),
             "fits_bytes": fits_bytes,
             "raw_bytes": raw_path.stat().st_size,
-            "adp_bytes": adp_path.stat().st_size,
+            "adp_bytes": adp_reference_path.stat().st_size,
+            "active_adp_bytes": adp_active_path.stat().st_size,
             "raw_targets": len(raw_keys),
             "adp_targets": len(adp_keys),
             "teacher_rows": len(teacher),
@@ -87,9 +91,21 @@ def main() -> int:
         failures.append("ADP HDF5 does not declare the two required apertures")
     if not bool(validation.get("ok", False)):
         failures.append("source A2v1 full-schema validation is not ok")
+    compact_parity = compare_adp_compact_products(
+        adp_reference_path,
+        adp_active_path,
+    )
+    if not compact_parity["passed"]:
+        failures.extend(compact_parity["failures"])
     hashes = {}
     if args.hash_large_files:
-        for path in (raw_path, adp_path, teacher_path, validation_path):
+        for path in (
+            raw_path,
+            adp_reference_path,
+            adp_active_path,
+            teacher_path,
+            validation_path,
+        ):
             hashes[path.name] = _sha256(path)
     payload = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -97,6 +113,7 @@ def main() -> int:
         "expected": EXPECTED,
         "observed": observed,
         "hashes": hashes,
+        "compact_rebuild_parity": compact_parity,
         "source_validation_ok": bool(validation.get("ok", False)),
         "passed": not failures,
         "failures": failures,

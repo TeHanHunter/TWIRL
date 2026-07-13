@@ -35,6 +35,10 @@ case "${ACTION}" in
     probe
     "${SSH[@]}" "sinfo -h -p pg_mki_aryeh -o '%P %D %t %G'"
     ;;
+  rebuild-input)
+    probe >/dev/null
+    "${SSH[@]}" "cd '${REPO}' && sbatch --parsable --export='${SBATCH_EXPORT}' scripts/orcd/slurm_s56_a2v1_recovery_rebuild_compact_cpu.sbatch"
+    ;;
   prepare)
     probe >/dev/null
     "${SSH[@]}" "cd '${REPO}' && sbatch --parsable --export='${SBATCH_EXPORT}' scripts/orcd/slurm_s56_a2v1_recovery_prepare_cpu.sbatch"
@@ -70,7 +74,7 @@ case "${ACTION}" in
     "${SSH[@]}" "find '${OUT_ROOT}' -maxdepth 4 -type f -name '*summary.json' -o -name '*verification.json' 2>/dev/null | sort"
     ;;
   *)
-    echo "usage: $0 {probe|prepare|smoke|smoke-gpu|full|status}" >&2
+    echo "usage: $0 {probe|rebuild-input|prepare|smoke|smoke-gpu|full|status}" >&2
     exit 2
     ;;
 esac

@@ -167,6 +167,131 @@ def _sha256_file(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
+def compare_adp_compact_products(
+    reference_h5: Path,
+    active_h5: Path,
+    *,
+    progress_every: int = 1000,
+) -> dict[str, Any]:
+    """Require cadence and ADP arrays rebuilt from FITS to match the reference."""
+
+    import h5py
+
+    required = (
+        "time",
+        "cadenceno",
+        "quality",
+        "orbitid",
+        *ADP_APERTURES,
+    )
+    mismatch_details: list[dict[str, Any]] = []
+    mismatched_targets: set[str] = set()
+    n_dataset_comparisons = 0
+    with h5py.File(reference_h5, "r") as reference, h5py.File(active_h5, "r") as active:
+        reference_keys = set(reference["targets"].keys())
+        active_keys = set(active["targets"].keys())
+        missing_active = sorted(reference_keys - active_keys)
+        extra_active = sorted(active_keys - reference_keys)
+        for key in sorted(reference_keys & active_keys):
+            reference_group = reference[f"targets/{key}"]
+            active_group = active[f"targets/{key}"]
+            for name in required:
+                n_dataset_comparisons += 1
+                if name not in reference_group or name not in active_group:
+                    mismatched_targets.add(key)
+                    if len(mismatch_details) < 100:
+                        mismatch_details.append(
+                            {
+                                "tic_key": key,
+                                "dataset": name,
+                                "reason": "missing_dataset",
+                                "in_reference": name in reference_group,
+                                "in_active": name in active_group,
+                            }
+                        )
+                    continue
+                reference_dataset = reference_group[name]
+                active_dataset = active_group[name]
+                if (
+                    reference_dataset.shape != active_dataset.shape
+                    or reference_dataset.dtype != active_dataset.dtype
+                ):
+                    mismatched_targets.add(key)
+                    if len(mismatch_details) < 100:
+                        mismatch_details.append(
+                            {
+                                "tic_key": key,
+                                "dataset": name,
+                                "reason": "schema_mismatch",
+                                "reference_shape": reference_dataset.shape,
+                                "active_shape": active_dataset.shape,
+                                "reference_dtype": str(reference_dataset.dtype),
+                                "active_dtype": str(active_dataset.dtype),
+                            }
+                        )
+                    continue
+                reference_values = np.asarray(reference_dataset)
+                active_values = np.asarray(active_dataset)
+                equal = np.array_equal(
+                    reference_values,
+                    active_values,
+                    equal_nan=np.issubdtype(reference_values.dtype, np.inexact),
+                )
+                if not equal:
+                    mismatched_targets.add(key)
+                    if len(mismatch_details) < 100:
+                        detail: dict[str, Any] = {
+                            "tic_key": key,
+                            "dataset": name,
+                            "reason": "value_mismatch",
+                        }
+                        if np.issubdtype(reference_values.dtype, np.number):
+                            delta = np.abs(
+                                reference_values.astype(np.float64)
+                                - active_values.astype(np.float64)
+                            )
+                            finite = delta[np.isfinite(delta)]
+                            detail["max_abs_difference"] = (
+                                float(np.max(finite)) if finite.size else None
+                            )
+                        mismatch_details.append(detail)
+            if (
+                progress_every > 0
+                and n_dataset_comparisons % (progress_every * len(required)) == 0
+            ):
+                print(
+                    f"[compact-parity] compared {n_dataset_comparisons // len(required):,} targets",
+                    flush=True,
+                )
+    failures = []
+    if missing_active:
+        failures.append(
+            f"active compact product is missing {len(missing_active)} targets"
+        )
+    if extra_active:
+        failures.append(f"active compact product has {len(extra_active)} extra targets")
+    if mismatched_targets:
+        failures.append(
+            f"active compact product differs for {len(mismatched_targets)} targets"
+        )
+    return {
+        "reference_h5": str(Path(reference_h5).resolve()),
+        "active_h5": str(Path(active_h5).resolve()),
+        "n_reference_targets": len(reference_keys),
+        "n_active_targets": len(active_keys),
+        "n_targets_compared": len(reference_keys & active_keys),
+        "n_dataset_comparisons": n_dataset_comparisons,
+        "n_missing_active_targets": len(missing_active),
+        "n_extra_active_targets": len(extra_active),
+        "n_mismatched_targets": len(mismatched_targets),
+        "missing_active_examples": missing_active[:20],
+        "extra_active_examples": extra_active[:20],
+        "mismatch_details": mismatch_details,
+        "passed": not failures,
+        "failures": failures,
+    }
+
+
 def _adp_detrend(
     time: np.ndarray,
     raw_flux: np.ndarray,

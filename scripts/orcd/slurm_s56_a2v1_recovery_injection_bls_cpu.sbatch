@@ -16,6 +16,7 @@ PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/p
 INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1}"
 OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v1_recovery}"
 CONFIG="${TWIRL_RECOVERY_CONFIG:-${REPO}/configs/injections/s56_a2v1_teacher_v1_recovery_v1.yaml}"
+ADP_H5="${TWIRL_A2V1_ADP_H5:-${INPUT_ROOT}/s56_A2v1_adp_pair_rebuilt.h5}"
 MODE="${TWIRL_RECOVERY_MODE:-full}"
 SHARD="${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID is required}"
 SHARD_TAG="$(printf '%02d' "${SHARD}")"
@@ -46,7 +47,7 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HDF5_USE_FILE_LOCKING=FALS
 "${PYTHON}" scripts/stage3_injections/run_s56_a2v1_injection_shard.py \
   --config "${CONFIG}" \
   --raw-h5 "${INPUT_ROOT}/s56_A2v1_tglc_raw_sources.h5" \
-  --adp-h5 "${INPUT_ROOT}/s56_A2v1_adp_pair.h5" \
+  --adp-h5 "${ADP_H5}" \
   --schedule "${OUT_ROOT}/schedule/injection_schedule.parquet" \
   --shard-index "${SHARD}" \
   --out-h5 "${PAIR_H5}" \
@@ -83,7 +84,7 @@ if [[ "${MODE}" == "smoke" ]]; then
     --peak-table "${PEAK_TABLE}" \
     --pair-h5 "${PAIR_H5}" \
     --raw-h5 "${INPUT_ROOT}/s56_A2v1_tglc_raw_sources.h5" \
-    --adp-h5 "${INPUT_ROOT}/s56_A2v1_adp_pair.h5" \
+    --adp-h5 "${ADP_H5}" \
     --out-candidates "${STAGE_ROOT}/teacher_inputs/candidates_00.csv" \
     --out-native-h5 "${STAGE_ROOT}/teacher_inputs/native_00.h5" \
     --overwrite

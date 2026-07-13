@@ -12,6 +12,7 @@ from twirl.injections.a2v1_recovery import (
     A2V1RecoveryConfig,
     FRESH_INJECTION_CONTRACT,
     build_fresh_injection_schedule,
+    compare_adp_compact_products,
     run_adp_roundtrip_parity,
     write_fresh_injection_shard,
 )
@@ -155,6 +156,22 @@ def test_adp_roundtrip_parity_uses_unmodified_raw_flux(tmp_path: Path) -> None:
     assert summary["passed"]
     assert metrics["cadence_match"].all()
     assert metrics["median_abs_difference"].max() <= 1.0e-4
+
+
+def test_rebuilt_compact_adp_requires_exact_array_parity(tmp_path: Path) -> None:
+    _, reference = _write_sources(tmp_path)
+    active = tmp_path / "active.h5"
+    active.write_bytes(reference.read_bytes())
+    comparison = compare_adp_compact_products(reference, active, progress_every=0)
+    assert comparison["passed"]
+    assert comparison["n_targets_compared"] == 11
+
+    with h5py.File(active, "r+") as h5:
+        dataset = h5["targets/0000000000010000/DET_FLUX_ADP_SML"]
+        dataset[0] = float(dataset[0]) + 0.01
+    comparison = compare_adp_compact_products(reference, active, progress_every=0)
+    assert not comparison["passed"]
+    assert comparison["n_mismatched_targets"] == 1
 
 
 def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
