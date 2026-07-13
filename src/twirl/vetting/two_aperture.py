@@ -839,6 +839,97 @@ def build_two_aperture_metrics(
     return metrics, payload
 
 
+def measure_two_aperture_candidate_metadata(
+    lc: HLSPLightCurve,
+    *,
+    anchor_peak: dict[str, Any],
+    own_peaks: dict[str, dict[str, Any]],
+    apertures: tuple[str, str],
+) -> dict[str, Any]:
+    """Measure scalar CNN metadata at fixed, already-searched ephemerides.
+
+    Unlike :func:`build_two_aperture_metrics`, this helper never reruns BLS.
+    It is used for large teacher-inference pools whose peak table has already
+    been generated from the active ADP pair.
+    """
+
+    anchor = _finite_peak_dict(anchor_peak)
+    if anchor is None:
+        raise ValueError("anchor_peak has no finite ephemeris")
+    metrics: dict[str, Any] = {
+        "tic": int(lc.tic),
+        "sector": int(lc.sector),
+        "cam": int(lc.cam),
+        "ccd": int(lc.ccd),
+        "tmag": float(lc.tmag),
+        "anchor_aperture": str(apertures[0]),
+        "anchor_period_d": float(anchor["period_d"]),
+        "anchor_t0_bjd": float(anchor["t0_bjd"]),
+        "anchor_duration_min": float(anchor["duration_min"]),
+        "anchor_sde": float(anchor.get("sde", np.nan)),
+        "anchor_source": "precomputed_adp_peak",
+    }
+    for aperture in apertures:
+        if aperture not in lc.flux:
+            continue
+        prefix = _aperture_prefix(aperture)
+        own = _finite_peak_dict(own_peaks.get(aperture))
+        if own is not None:
+            for key, value in own.items():
+                metrics[f"{prefix}_{key}"] = value
+            for key, value in _even_odd_depth_metrics(
+                lc,
+                aperture,
+                period_d=float(own["period_d"]),
+                t0_bjd=float(own["t0_bjd"]),
+                duration_min=float(own["duration_min"]),
+            ).items():
+                metrics[f"{prefix}_own_{key}"] = value
+        depth, snr, n_in = _depth_at_ephemeris(
+            lc,
+            aperture,
+            period_d=float(anchor["period_d"]),
+            t0_bjd=float(anchor["t0_bjd"]),
+            duration_min=float(anchor["duration_min"]),
+        )
+        metrics[f"{prefix}_anchor_depth"] = depth
+        metrics[f"{prefix}_anchor_snr"] = snr
+        metrics[f"{prefix}_anchor_n_in"] = n_in
+        for key, value in _even_odd_depth_metrics(
+            lc,
+            aperture,
+            period_d=float(anchor["period_d"]),
+            t0_bjd=float(anchor["t0_bjd"]),
+            duration_min=float(anchor["duration_min"]),
+        ).items():
+            metrics[f"{prefix}_anchor_{key}"] = value
+        metrics[f"{prefix}_trend_ptp"] = binned_trend_ptp(
+            lc.time, lc.flux[aperture], lc.quality
+        )
+
+    small_prefix = _aperture_prefix(apertures[0])
+    primary_prefix = _aperture_prefix(apertures[1])
+    small_period = float(metrics.get(f"{small_prefix}_period_d", np.nan))
+    primary_period = float(metrics.get(f"{primary_prefix}_period_d", np.nan))
+    metrics["aperture_period_rel_delta"] = (
+        abs(primary_period - small_period) / small_period
+        if np.isfinite(small_period) and small_period > 0 and np.isfinite(primary_period)
+        else np.nan
+    )
+    small_depth = float(metrics.get(f"{small_prefix}_anchor_depth", np.nan))
+    primary_depth = float(metrics.get(f"{primary_prefix}_anchor_depth", np.nan))
+    metrics["aperture_depth_ratio_primary_over_small"] = (
+        primary_depth / small_depth
+        if np.isfinite(primary_depth) and np.isfinite(small_depth) and abs(small_depth) > 0
+        else np.nan
+    )
+    metrics["aperture_disagreement_flag"] = bool(
+        np.isfinite(metrics["aperture_period_rel_delta"])
+        and metrics["aperture_period_rel_delta"] > 0.02
+    )
+    return metrics
+
+
 def render_two_aperture_sheet(
     lc: HLSPLightCurve,
     out_path: Path,

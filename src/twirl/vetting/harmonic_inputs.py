@@ -10,6 +10,7 @@ import numpy as np
 
 
 RAW_PAIR_CONTRACT_VERSION = "s56_adp_raw_pair_v1"
+A2V1_TEACHER_INPUT_CONTRACT = "s56_A2v1_adp_raw_pair_v1"
 RAW_PAIR_APERTURES: tuple[str, str] = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
 HARMONIC_FACTORS: tuple[float, ...] = (0.25, 1.0 / 3.0, 0.5, 1.0, 2.0, 3.0, 4.0)
 HARMONIC_NAMES: tuple[str, ...] = (
@@ -664,6 +665,7 @@ def verify_raw_pair_contract(
 
 
 __all__ = [
+    "A2V1_TEACHER_INPUT_CONTRACT",
     "CHRONOLOGY_SMALL_CHANNELS",
     "CHRONOLOGY_SUPPLEMENTAL_CHANNELS",
     "CHANNEL_CONTRACT",

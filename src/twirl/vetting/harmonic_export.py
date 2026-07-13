@@ -287,11 +287,7 @@ def export_tglc_raw_sources(
     import h5py
 
     rows = pd.read_csv(training_table, low_memory=False)
-    active = (
-        _bool_column(rows, "morphology_include_v1")
-        | _bool_column(rows, "preserve_include_v1")
-        | _bool_column(rows, "harmonic_include_v1")
-    )
+    active = _native_input_mask(rows)
     rows = rows.loc[active]
     required = rows.loc[:, ["tic", "cam", "ccd"]].copy()
     required["_detector_known"] = required[["cam", "ccd"]].notna().all(axis=1)
@@ -401,6 +397,18 @@ def _bool_column(rows: pd.DataFrame, name: str) -> pd.Series:
     return values.fillna("").astype(str).str.lower().isin({"1", "true", "t", "yes", "y"})
 
 
+def _native_input_mask(rows: pd.DataFrame) -> pd.Series:
+    """Select training targets or explicitly requested inference targets."""
+
+    if "native_input_include" in rows:
+        return _bool_column(rows, "native_input_include")
+    return (
+        _bool_column(rows, "morphology_include_v1")
+        | _bool_column(rows, "preserve_include_v1")
+        | _bool_column(rows, "harmonic_include_v1")
+    )
+
+
 def build_raw_pair_export(
     *,
     training_table: Path,
@@ -419,11 +427,7 @@ def build_raw_pair_export(
 
     rows = pd.read_csv(training_table, low_memory=False)
     rows = rows.drop_duplicates("review_id", keep="last") if "review_id" in rows else rows
-    active = (
-        _bool_column(rows, "morphology_include_v1")
-        | _bool_column(rows, "preserve_include_v1")
-        | _bool_column(rows, "harmonic_include_v1")
-    )
+    active = _native_input_mask(rows)
     rows = rows.loc[active].copy()
     rows["native_group_path"] = [native_group_path(row) for row in rows.to_dict("records")]
     if n_shards < 1 or shard_index < 0 or shard_index >= n_shards:

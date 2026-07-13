@@ -704,6 +704,8 @@ def plot_publication_period_radius_recovery_map(
     *,
     sigma_period_dex: float = DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX,
     sigma_radius_dex: float = DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX,
+    recovered_col: str = "any_exact_or_harmonic_recovered",
+    colorbar_label: str = "Kernel-smoothed BLS recovery fraction",
 ) -> dict[str, str]:
     """Write a compact empirical period-radius map for publication drafts.
 
@@ -751,7 +753,9 @@ def plot_publication_period_radius_recovery_map(
         ax = axes.ravel()[idx]
         sub = df[mask].copy()
         min_effective_n = max(2.0, min(8.0, 0.004 * len(sub)))
-        rec_n = int(sub["any_exact_or_harmonic_recovered"].fillna(False).astype(bool).sum()) if len(sub) else 0
+        if recovered_col not in sub:
+            raise KeyError(f"recovery map is missing outcome column: {recovered_col}")
+        rec_n = int(sub[recovered_col].fillna(False).astype(bool).sum()) if len(sub) else 0
         ax.set_title(f"{label}: {rec_n}/{len(sub)} recovered", fontsize=title_fs)
         ax.set_xscale("log")
         ax.set_yscale("log")
@@ -764,7 +768,7 @@ def plot_publication_period_radius_recovery_map(
             sub,
             x_col="truth_period_d",
             y_col="plot_radius_rearth",
-            recovered_col="any_exact_or_harmonic_recovered",
+            recovered_col=recovered_col,
             x_grid=period_centers,
             y_grid=radius_centers,
             sigma_x_dex=sigma_period_dex,
@@ -909,7 +913,7 @@ def plot_publication_period_radius_recovery_map(
     if mesh is not None:
         cax = fig.add_axes([0.885, 0.10, 0.022, 0.82])
         cbar = fig.colorbar(mesh, cax=cax)
-        cbar.set_label("Kernel-smoothed BLS recovery fraction", fontsize=label_fs)
+        cbar.set_label(colorbar_label, fontsize=label_fs)
         cbar.ax.tick_params(direction="in", which="both", labelsize=8.5)
     fig.subplots_adjust(left=0.09, right=0.855, top=0.92, bottom=0.10, wspace=0.08, hspace=0.20)
     out_dir.mkdir(parents=True, exist_ok=True)
