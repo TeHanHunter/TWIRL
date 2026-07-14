@@ -347,13 +347,13 @@ class HarmonicNativeDataset:
         self,
         rows: pd.DataFrame,
         *,
-        native_h5: Path,
+        native_h5: Path | None,
         metadata: np.ndarray,
         cache_size: int = 2048,
         profile: str = "full_combined",
     ) -> None:
         self.rows = rows.reset_index(drop=True).copy()
-        self.native_h5 = Path(native_h5)
+        self.native_h5 = Path(native_h5) if native_h5 is not None else None
         self.metadata = np.asarray(metadata, dtype=np.float32)
         if self.metadata.shape[0] != len(self.rows):
             raise ValueError("metadata row count does not match training rows")
@@ -382,6 +382,8 @@ class HarmonicNativeDataset:
             "preserve_weight": np.float32(row["preserve_weight"]),
             "harmonic_weight": np.float32(row["harmonic_weight"]),
             "pretrain_target": int(row.get("pretrain_target", -1)),
+            "compact_target": int(row.get("compact_target_index", -1)),
+            "compact_weight": np.float32(row.get("compact_weight", 0.0)),
         }
         if self.branches == {"metadata"}:
             sample = {
@@ -400,8 +402,14 @@ class HarmonicNativeDataset:
             if self.cache_size:
                 self._cache[index] = sample
             return sample
+        row_native_h5 = str(row.get("native_h5_path", "")).strip()
+        native_h5 = Path(row_native_h5) if row_native_h5 else self.native_h5
+        if native_h5 is None:
+            raise ValueError(
+                "native_h5 is required unless every row supplies native_h5_path"
+            )
         lc = read_native_light_curve(
-            self.native_h5,
+            native_h5,
             group_path=str(row["native_group_path"]),
             require_errors=True,
         )
@@ -551,6 +559,8 @@ def collate_native_samples(samples: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "preserve_weight": tensor("preserve_weight", torch.float32),
         "harmonic_weight": tensor("harmonic_weight", torch.float32),
         "pretrain_target": tensor("pretrain_target", torch.long),
+        "compact_target": tensor("compact_target", torch.long),
+        "compact_weight": tensor("compact_weight", torch.float32),
     }
 
 

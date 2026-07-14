@@ -122,12 +122,31 @@ def build_peak_table(
     n_peaks: int,
     max_targets: int | None,
     progress_every: int,
+    shard_index: int = 0,
+    n_shards: int = 1,
+    resume: bool = False,
 ) -> dict[str, Any]:
     validate_adp_only_apertures(ADP_ONLY_APERTURES)
     out_dir.mkdir(parents=True, exist_ok=True)
     tics = _target_tics(compact_lc)
     if max_targets is not None:
         tics = tics[: max(0, int(max_targets))]
+    if n_shards < 1 or shard_index < 0 or shard_index >= n_shards:
+        raise ValueError("shard_index must satisfy 0 <= shard_index < n_shards")
+    n_targets_total = len(tics)
+    tics = tics[int(shard_index) :: int(n_shards)]
+    suffix = f"_{int(shard_index):03d}" if int(n_shards) > 1 else ""
+    output_path = out_dir / f"real_adp_bls_peaks{suffix}.parquet"
+    summary_path = out_dir / f"summary{suffix}.json"
+    if resume and output_path.exists() and summary_path.exists():
+        summary = json.loads(summary_path.read_text())
+        if (
+            int(summary.get("shard_index", -1)) == int(shard_index)
+            and int(summary.get("n_shards", -1)) == int(n_shards)
+            and int(summary.get("n_targets", -1)) == len(tics)
+        ):
+            print(json.dumps(summary, indent=2, sort_keys=True))
+            return summary
     cfg_payload = {
         "n_periods": int(n_periods),
         "n_peaks": int(n_peaks),
@@ -156,7 +175,7 @@ def build_peak_table(
             executor.shutdown(wait=True)
 
     peaks = pd.DataFrame(rows)
-    output_path = write_table(peaks, out_dir / "real_adp_bls_peaks.parquet")
+    output_path = write_table(peaks, output_path)
     status = peaks.get("status", pd.Series(dtype=str)).fillna("").astype(str)
     valid = status.eq("ok") & pd.to_numeric(peaks.get("peak_rank"), errors="coerce").gt(0)
     summary = {
@@ -166,11 +185,14 @@ def build_peak_table(
         "out_dir": str(out_dir),
         "apertures": list(ADP_ONLY_APERTURES),
         "n_targets": int(len(tics)),
+        "n_targets_total": int(n_targets_total),
         "n_rows": int(len(peaks)),
         "n_valid_peak_rows": int(valid.sum()),
         "n_periods": int(n_periods),
         "n_peaks": int(n_peaks),
         "workers": int(workers),
+        "shard_index": int(shard_index),
+        "n_shards": int(n_shards),
         "status_counts": {str(k): int(v) for k, v in status.value_counts().sort_index().items()},
         "aperture_counts": {
             str(k): int(v)
@@ -178,10 +200,10 @@ def build_peak_table(
         },
         "outputs": {
             "peak_table": str(output_path),
-            "summary": str(out_dir / "summary.json"),
+            "summary": str(summary_path),
         },
     }
-    (out_dir / "summary.json").write_text(
+    summary_path.write_text(
         json.dumps(summary, indent=2, sort_keys=True, default=json_default) + "\n"
     )
     print(json.dumps(summary, indent=2, sort_keys=True, default=json_default))
@@ -197,6 +219,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--n-peaks", type=int, default=10)
     parser.add_argument("--max-targets", type=int, default=None)
     parser.add_argument("--progress-every", type=int, default=100)
+    parser.add_argument("--shard-index", type=int, default=0)
+    parser.add_argument("--n-shards", type=int, default=1)
+    parser.add_argument("--resume", action="store_true")
     return parser
 
 
@@ -210,6 +235,9 @@ def main(argv: list[str] | None = None) -> int:
         n_peaks=args.n_peaks,
         max_targets=args.max_targets,
         progress_every=args.progress_every,
+        shard_index=args.shard_index,
+        n_shards=args.n_shards,
+        resume=args.resume,
     )
     return 0
 

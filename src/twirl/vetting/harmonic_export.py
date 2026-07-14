@@ -286,7 +286,11 @@ def export_tglc_raw_sources(
 
     import h5py
 
-    rows = pd.read_csv(training_table, low_memory=False)
+    rows = (
+        pd.read_parquet(training_table)
+        if Path(training_table).suffix.lower() == ".parquet"
+        else pd.read_csv(training_table, low_memory=False)
+    )
     active = _native_input_mask(rows)
     rows = rows.loc[active]
     required = rows.loc[:, ["tic", "cam", "ccd"]].copy()
