@@ -929,6 +929,7 @@ def write_fresh_injection_shard(
     config: A2V1RecoveryConfig,
     out_h5: Path,
     limit: int | None = None,
+    selection_mode: str = "shard",
 ) -> dict[str, Any]:
     """Generate one self-contained raw/error/ADP injection shard."""
 
@@ -937,12 +938,21 @@ def write_fresh_injection_shard(
     config.validate()
     if shard_index < 0 or shard_index >= config.n_shards:
         raise ValueError("invalid shard_index")
-    rows = schedule.loc[
-        pd.to_numeric(schedule["shard_index"], errors="coerce").eq(int(shard_index))
-    ].copy()
-    rows = rows.sort_values("injection_index", kind="stable")
-    if limit is not None:
-        rows = rows.head(int(limit))
+    if selection_mode == "shard":
+        rows = schedule.loc[
+            pd.to_numeric(schedule["shard_index"], errors="coerce").eq(
+                int(shard_index)
+            )
+        ].copy()
+        rows = rows.sort_values("injection_index", kind="stable")
+        if limit is not None:
+            rows = rows.head(int(limit))
+    elif selection_mode == "parameter_spanning":
+        if limit is None:
+            raise ValueError("parameter_spanning selection requires limit")
+        rows = select_parameter_spanning_rows(schedule, n_rows=int(limit))
+    else:
+        raise ValueError(f"unsupported selection_mode: {selection_mode}")
     expected = (
         config.rows_per_shard
         if limit is None
@@ -971,6 +981,7 @@ def write_fresh_injection_shard(
             output.attrs["shard_index"] = int(shard_index)
             output.attrs["n_shards"] = int(config.n_shards)
             output.attrs["n_injections"] = int(len(rows))
+            output.attrs["selection_mode"] = str(selection_mode)
             output.attrs["apertures"] = json.dumps(list(ADP_APERTURES))
             root = output.create_group("injections")
             for count, row in enumerate(rows.to_dict("records"), start=1):
@@ -1130,6 +1141,7 @@ def write_fresh_injection_shard(
         "shard_index": int(shard_index),
         "n_injections": int(len(manifest)),
         "n_unique_tics": int(manifest["tic"].nunique()),
+        "selection_mode": str(selection_mode),
         "out_h5": str(out_h5),
         "manifest": str(manifest_path),
         "sha256": _sha256_file(out_h5),
@@ -1140,6 +1152,69 @@ def write_fresh_injection_shard(
     return summary
 
 
+def select_parameter_spanning_rows(
+    schedule: pd.DataFrame,
+    *,
+    n_rows: int,
+) -> pd.DataFrame:
+    """Select a deterministic smoke sample spanning both grid dimensions."""
+
+    required = {"grid_period_bin", "grid_radius_bin", "injection_index", "tic"}
+    missing = sorted(required - set(schedule.columns))
+    if missing:
+        raise KeyError(f"schedule is missing smoke-selection columns: {missing}")
+    if n_rows < 1:
+        raise ValueError("n_rows must be positive")
+
+    frame = schedule.copy()
+    frame["grid_period_bin"] = pd.to_numeric(
+        frame["grid_period_bin"], errors="raise"
+    ).astype(int)
+    frame["grid_radius_bin"] = pd.to_numeric(
+        frame["grid_radius_bin"], errors="raise"
+    ).astype(int)
+    period_bins = sorted(frame["grid_period_bin"].unique().tolist())
+    radius_bins = sorted(frame["grid_radius_bin"].unique().tolist())
+    if not period_bins or not radius_bins:
+        raise ValueError("schedule has no populated period-radius cells")
+
+    # A coprime stride makes each pass a permutation of the radius bins. The
+    # pass offset prevents repeated cells while keeping both marginals even.
+    stride = len(radius_bins) - 1 if len(radius_bins) > 1 else 1
+    while stride > 1 and np.gcd(stride, len(radius_bins)) != 1:
+        stride -= 1
+    groups = {
+        (int(period_bin), int(radius_bin)): group.sort_values(
+            "injection_index", kind="stable"
+        )
+        for (period_bin, radius_bin), group in frame.groupby(
+            ["grid_period_bin", "grid_radius_bin"], sort=False
+        )
+    }
+    selections: list[pd.Series] = []
+    use_count: dict[tuple[int, int], int] = {}
+    for index in range(int(n_rows)):
+        pass_index, period_offset = divmod(index, len(period_bins))
+        period_bin = int(period_bins[period_offset])
+        radius_offset = (stride * period_offset + pass_index) % len(radius_bins)
+        radius_bin = int(radius_bins[radius_offset])
+        key = (period_bin, radius_bin)
+        cell = groups.get(key)
+        if cell is None or cell.empty:
+            raise ValueError(f"schedule is missing required smoke cell {key}")
+        occurrence = use_count.get(key, 0)
+        if occurrence >= len(cell):
+            raise ValueError(
+                f"smoke selection requests more rows than available in cell {key}"
+            )
+        selections.append(cell.iloc[occurrence])
+        use_count[key] = occurrence + 1
+    rows = pd.DataFrame(selections).reset_index(drop=True)
+    if rows["injection_index"].duplicated().any() or rows["tic"].duplicated().any():
+        raise ValueError("parameter-spanning smoke selection is not unique")
+    return rows
+
+
 __all__ = [
     "ADP_APERTURES",
     "A2V1RecoveryConfig",
@@ -1148,5 +1223,6 @@ __all__ = [
     "build_fresh_injection_schedule",
     "load_recovery_config",
     "run_adp_roundtrip_parity",
+    "select_parameter_spanning_rows",
     "write_fresh_injection_shard",
 ]

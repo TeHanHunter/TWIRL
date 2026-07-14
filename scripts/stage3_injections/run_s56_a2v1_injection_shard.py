@@ -17,7 +17,7 @@ from twirl.injections.a2v1_recovery import (
 )
 
 
-def _complete(path: Path, expected: int) -> bool:
+def _complete(path: Path, expected: int, selection_mode: str) -> bool:
     if not path.exists():
         return False
     try:
@@ -25,6 +25,7 @@ def _complete(path: Path, expected: int) -> bool:
             return (
                 str(h5.attrs.get("contract_version", "")) == FRESH_INJECTION_CONTRACT
                 and len(h5["injections"]) == expected
+                and str(h5.attrs.get("selection_mode", "shard")) == selection_mode
             )
     except OSError:
         return False
@@ -39,6 +40,11 @@ def main() -> int:
     parser.add_argument("--shard-index", type=int, required=True)
     parser.add_argument("--out-h5", type=Path, required=True)
     parser.add_argument("--limit", type=int)
+    parser.add_argument(
+        "--selection-mode",
+        choices=("shard", "parameter_spanning"),
+        default="shard",
+    )
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
@@ -48,7 +54,7 @@ def main() -> int:
         if args.limit is None
         else min(config.rows_per_shard, args.limit)
     )
-    if _complete(args.out_h5, expected) and not args.overwrite:
+    if _complete(args.out_h5, expected, args.selection_mode) and not args.overwrite:
         print(f"[a2v1-injection-shard] complete output exists: {args.out_h5}")
         return 0
     if args.out_h5.exists() and not args.overwrite:
@@ -68,6 +74,7 @@ def main() -> int:
         config=config,
         out_h5=args.out_h5,
         limit=args.limit,
+        selection_mode=args.selection_mode,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

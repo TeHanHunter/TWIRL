@@ -24,7 +24,7 @@ SHARD_TAG="$(printf '%02d' "${SHARD}")"
 if [[ "${MODE}" == "smoke" ]]; then
   [[ "${SHARD}" == "0" ]] || { echo "smoke mode requires array task 0" >&2; exit 2; }
   STAGE_ROOT="${OUT_ROOT}/smoke100"
-  LIMIT_ARGS=(--limit 100)
+  LIMIT_ARGS=(--limit 100 --selection-mode parameter_spanning --overwrite)
   MIN_INJECTIONS=100
   MIN_CANDIDATES=1000
 else

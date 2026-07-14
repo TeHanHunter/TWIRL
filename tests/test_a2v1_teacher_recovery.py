@@ -14,6 +14,7 @@ from twirl.injections.a2v1_recovery import (
     build_fresh_injection_schedule,
     compare_adp_compact_products,
     run_adp_roundtrip_parity,
+    select_parameter_spanning_rows,
     write_fresh_injection_shard,
 )
 from twirl.vetting.injection_teacher_recovery import build_teacher_injection_holdout
@@ -132,6 +133,30 @@ def test_fresh_schedule_is_unique_host_disjoint_and_grid_complete(
     assert schedule.groupby("shard_index").size().to_dict() == {0: 4, 1: 4}
     assert qa.loc[qa["tic"].eq(10_000), "qa_reason"].item() == "teacher_tic"
     assert summary["n_teacher_unique_tics"] == 1
+
+
+def test_parameter_spanning_smoke_selection_balances_grid_marginals() -> None:
+    rows = []
+    index = 0
+    for period_bin in range(5):
+        for radius_bin in range(5):
+            for slot in range(2):
+                rows.append(
+                    {
+                        "grid_period_bin": period_bin,
+                        "grid_radius_bin": radius_bin,
+                        "grid_slot": slot,
+                        "injection_index": index,
+                        "tic": 1000 + index,
+                    }
+                )
+                index += 1
+    selected = select_parameter_spanning_rows(pd.DataFrame(rows), n_rows=10)
+    assert len(selected) == 10
+    assert selected["tic"].nunique() == 10
+    assert selected["grid_period_bin"].value_counts().eq(2).all()
+    assert selected["grid_radius_bin"].value_counts().eq(2).all()
+    assert not selected.duplicated(["grid_period_bin", "grid_radius_bin"]).any()
 
 
 def test_adp_roundtrip_parity_uses_unmodified_raw_flux(tmp_path: Path) -> None:
