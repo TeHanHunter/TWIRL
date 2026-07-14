@@ -14,6 +14,7 @@ set -euo pipefail
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
 OUT_ROOT="${TWIRL_TEACHER_V2_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v2}"
+DATA_ROOT="${TWIRL_A2V1_S56_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1}"
 SOURCE_ROOT="${TWIRL_V1_HUMAN_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343}"
 N_SHARDS="${TWIRL_TEACHER_V2_BLS_SHARDS:-40}"
 
@@ -39,6 +40,7 @@ cp -p \
 "${PYTHON}" scripts/stage5_validation/build_s56_a2v1_human_transfer.py \
   --human-table "${OUT_ROOT}/source_snapshots/human_vetting_training_table_adjudicated.csv" \
   --real-bls-peaks "${OUT_ROOT}/real_bls/real_adp_bls_peaks.parquet" \
+  --raw-source-h5 "${DATA_ROOT}/s56_A2v1_tglc_raw_sources.h5" \
   --out-dir "${OUT_ROOT}/human_transfer" \
   --small-peaks 10
 

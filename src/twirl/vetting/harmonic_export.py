@@ -413,6 +413,13 @@ def _native_input_mask(rows: pd.DataFrame) -> pd.Series:
     )
 
 
+def _read_training_table(path: Path) -> pd.DataFrame:
+    path = Path(path)
+    if path.suffix.lower() == ".parquet":
+        return pd.read_parquet(path)
+    return pd.read_csv(path, low_memory=False)
+
+
 def build_raw_pair_export(
     *,
     training_table: Path,
@@ -429,7 +436,7 @@ def build_raw_pair_export(
 
     import h5py
 
-    rows = pd.read_csv(training_table, low_memory=False)
+    rows = _read_training_table(training_table)
     rows = rows.drop_duplicates("review_id", keep="last") if "review_id" in rows else rows
     active = _native_input_mask(rows)
     rows = rows.loc[active].copy()

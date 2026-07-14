@@ -18,6 +18,7 @@ from twirl.vetting.teacher_v2 import (
     freeze_real_tic_workload_threshold,
     injection_recall_at_fold_thresholds,
     join_franklin_labels_to_queue,
+    mark_native_input_availability,
     normalize_franklin_labels,
     normalize_real_adp_candidates,
     transfer_human_labels_to_a2v1_candidates,
@@ -226,12 +227,33 @@ def test_real_workload_pool_excludes_every_registered_host() -> None:
         }
     )
     registry = pd.DataFrame({"tic": [1, 3]})
-    selected, summary = build_s56_real_workload_candidates(
-        candidates, registry, minimum_tics=2
+    candidates = mark_native_input_availability(
+        candidates,
+        available_tics={1, 2, 3},
     )
-    assert set(selected["tic"]) == {2, 4}
-    assert summary["n_workload_tics"] == 2
+    selected, summary = build_s56_real_workload_candidates(
+        candidates, registry, minimum_tics=1
+    )
+    assert set(selected["tic"]) == {2}
+    assert summary["n_workload_tics"] == 1
+    assert summary["n_native_unavailable_tics"] == 1
     assert summary["passed"]
+
+
+def test_native_availability_preserves_upstream_exclusions() -> None:
+    candidates = pd.DataFrame(
+        {
+            "tic": [1, 2, 3],
+            "native_input_include": [True, True, False],
+        }
+    )
+    marked = mark_native_input_availability(candidates, available_tics={1, 3})
+    assert marked["native_input_include"].tolist() == [True, False, False]
+    assert marked["native_input_status"].tolist() == [
+        "available",
+        "missing_raw_source",
+        "excluded_upstream",
+    ]
 
 
 def test_workload_threshold_never_exceeds_budget_when_scores_tie() -> None:

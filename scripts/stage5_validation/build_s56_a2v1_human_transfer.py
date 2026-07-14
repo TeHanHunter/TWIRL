@@ -7,9 +7,11 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
+import h5py
 import pandas as pd
 
 from twirl.vetting.teacher_v2 import (
+    mark_native_input_availability,
     normalize_real_adp_candidates,
     transfer_human_labels_to_a2v1_candidates,
 )
@@ -19,10 +21,18 @@ def _read(path: Path) -> pd.DataFrame:
     return pd.read_parquet(path) if path.suffix.lower() == ".parquet" else pd.read_csv(path, low_memory=False)
 
 
+def _target_tics(path: Path) -> set[int]:
+    with h5py.File(path, "r") as h5:
+        if "targets" not in h5:
+            raise KeyError(f"raw source has no /targets group: {path}")
+        return {int(key) for key in h5["targets"].keys()}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--human-table", type=Path, required=True)
     parser.add_argument("--real-bls-peaks", type=Path, required=True)
+    parser.add_argument("--raw-source-h5", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--small-peaks", type=int, default=10)
     args = parser.parse_args()
@@ -31,8 +41,13 @@ def main() -> int:
     candidates = normalize_real_adp_candidates(
         _read(args.real_bls_peaks), small_peaks_per_tic=args.small_peaks
     )
+    candidates = mark_native_input_availability(
+        candidates,
+        available_tics=_target_tics(args.raw_source_h5),
+    )
+    active_candidates = candidates.loc[candidates["native_input_include"]].copy()
     transferred, compatibility = transfer_human_labels_to_a2v1_candidates(
-        human, candidates
+        human, active_candidates
     )
     args.out_dir.mkdir(parents=True, exist_ok=True)
     candidates.to_parquet(
@@ -58,11 +73,24 @@ def main() -> int:
     )
     summary = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
+        "raw_source_h5": str(args.raw_source_h5.resolve()),
         "n_human_input": int(len(human)),
         "n_real_human_input": int(len(compatibility)),
         "n_candidates": int(len(candidates)),
         "n_top5_candidates": int(len(top5)),
         "n_candidate_tics": int(candidates["tic"].nunique()),
+        "n_native_available_candidate_tics": int(
+            candidates.loc[candidates["native_input_include"], "tic"].nunique()
+        ),
+        "n_native_unavailable_candidate_tics": int(
+            candidates.loc[~candidates["native_input_include"], "tic"].nunique()
+        ),
+        "native_unavailable_tics": sorted(
+            int(value)
+            for value in candidates.loc[
+                ~candidates["native_input_include"], "tic"
+            ].unique()
+        ),
         "n_transferred": int(len(transferred)),
         "transfer_fraction": float(compatibility["a2v1_transfer_ok"].mean()) if len(compatibility) else 0.0,
         "transferred_label_counts": {str(key): int(value) for key, value in label_counts.items()},

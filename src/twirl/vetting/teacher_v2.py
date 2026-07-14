@@ -795,6 +795,34 @@ def normalize_real_adp_candidates(
     return out.sort_values(["tic", "rep_peak_rank"], kind="stable").reset_index(drop=True)
 
 
+def mark_native_input_availability(
+    candidates: pd.DataFrame,
+    *,
+    available_tics: Iterable[int],
+) -> pd.DataFrame:
+    """Mark candidates whose raw/error host exists in the native source."""
+
+    if "tic" not in candidates:
+        raise KeyError("candidate table is missing tic")
+    work = candidates.copy()
+    tic = pd.to_numeric(work["tic"], errors="raise").astype(np.int64)
+    available = frozenset(int(value) for value in available_tics)
+    raw_available = tic.isin(available)
+    upstream_include = (
+        _as_bool(work["native_input_include"])
+        if "native_input_include" in work
+        else pd.Series(True, index=work.index)
+    )
+    work["native_raw_source_available"] = raw_available
+    work["native_input_include"] = upstream_include & raw_available
+    work["native_input_status"] = np.select(
+        [~upstream_include.to_numpy(), ~raw_available.to_numpy()],
+        ["excluded_upstream", "missing_raw_source"],
+        default="available",
+    )
+    return work
+
+
 def _phase_delta_min(first_t0: float, second_t0: float, period_d: float) -> float:
     if not all(np.isfinite([first_t0, second_t0, period_d])) or period_d <= 0:
         return np.nan
@@ -1044,8 +1072,17 @@ def build_s56_real_workload_candidates(
         raise KeyError("global TIC registry is missing tic")
     work = candidates.copy()
     work["tic"] = pd.to_numeric(work["tic"], errors="raise").astype(np.int64)
+    n_input_rows = int(len(work))
+    n_input_tics = int(work["tic"].nunique())
     if work["review_id"].fillna("").astype(str).duplicated().any():
         raise ValueError("S56 real candidates contain duplicate review IDs")
+    native_include = (
+        _as_bool(work["native_input_include"])
+        if "native_input_include" in work
+        else pd.Series(True, index=work.index)
+    )
+    n_native_unavailable_tics = int(work.loc[~native_include, "tic"].nunique())
+    work = work.loc[native_include].copy()
     excluded = frozenset(
         pd.to_numeric(registry["tic"], errors="raise").astype(np.int64)
     )
@@ -1053,8 +1090,9 @@ def build_s56_real_workload_candidates(
     n_tics = int(selected["tic"].nunique())
     passed = n_tics >= int(minimum_tics)
     summary = {
-        "n_input_rows": int(len(work)),
-        "n_input_tics": int(work["tic"].nunique()),
+        "n_input_rows": n_input_rows,
+        "n_input_tics": n_input_tics,
+        "n_native_unavailable_tics": n_native_unavailable_tics,
         "n_registry_tics_excluded": int(work.loc[work["tic"].isin(excluded), "tic"].nunique()),
         "n_workload_rows": int(len(selected)),
         "n_workload_tics": n_tics,
@@ -1251,5 +1289,6 @@ __all__ = [
     "normalize_real_adp_candidates",
     "normalize_franklin_labels",
     "join_franklin_labels_to_queue",
+    "mark_native_input_availability",
     "transfer_human_labels_to_a2v1_candidates",
 ]

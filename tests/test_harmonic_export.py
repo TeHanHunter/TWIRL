@@ -252,6 +252,66 @@ def test_real_only_raw_pair_export_writes_full_contract(tmp_path: Path) -> None:
         assert len(group["bls_sde_small"]) == 64
 
 
+def test_raw_pair_export_accepts_parquet_training_table(tmp_path: Path) -> None:
+    tic = 456
+    n = 220
+    cadence = np.arange(2000, 2000 + n)
+    time = 2459825.0 + np.arange(n) * 200.0 / 86400.0
+    raw_source = tmp_path / "raw.h5"
+    with h5py.File(raw_source, "w") as h5:
+        h5.attrs["contract_version"] = RAW_SOURCE_CONTRACT_VERSION
+        group = h5.create_group(f"targets/{tic:016d}")
+        for name, values in {
+            "time": time,
+            "cadenceno": cadence,
+            "orbitid": np.full(n, 119),
+            "quality": np.zeros(n),
+            "raw_flux_small": np.linspace(-1.0, 5.0, n),
+            "raw_flux_err_small": np.ones(n),
+            "raw_flux_primary": np.linspace(0.0, 7.0, n),
+            "raw_flux_err_primary": np.full(n, 2.0),
+        }.items():
+            group.create_dataset(name, data=values)
+    adp_source = tmp_path / "adp.h5"
+    with h5py.File(adp_source, "w") as h5:
+        group = h5.create_group(f"targets/{tic:016d}")
+        group.attrs["tic"] = tic
+        for name, values in {
+            "time": time - 2457000.0,
+            "cadenceno": cadence,
+            "orbitid": np.full(n, 119),
+            "quality": np.zeros(n),
+            "DET_FLUX_ADP_SML": np.ones(n),
+            "DET_FLUX_ADP": np.ones(n),
+        }.items():
+            group.create_dataset(name, data=values)
+    table = tmp_path / "training.parquet"
+    pd.DataFrame(
+        {
+            "review_id": ["real:456"],
+            "tic": [tic],
+            "source_kind": ["real_candidate"],
+            "native_input_include": [True],
+        }
+    ).to_parquet(table, index=False)
+    output = tmp_path / "native.h5"
+
+    summary = build_raw_pair_export(
+        training_table=table,
+        raw_source_h5=raw_source,
+        compact_adp_h5=adp_source,
+        injection_pair_h5=None,
+        out_h5=output,
+        repo_root=tmp_path,
+        n_periods=32,
+    )
+
+    assert summary["n_real_targets"] == 1
+    assert verify_raw_pair_contract(
+        output, require_errors=True, require_periodograms=True
+    )["passed"]
+
+
 def test_shard_merge_rejects_no_data_loss(tmp_path: Path) -> None:
     shards = []
     for shard_index, tic in enumerate((1, 2)):
