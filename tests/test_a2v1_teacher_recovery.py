@@ -306,6 +306,9 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
     def fake_inject(time, flux, **kwargs):
         model = np.ones(len(time), dtype=float)
         model[::9] = 0.5
+        # This limb-contact value is in transit at float64 precision but rounds
+        # to exactly one in the stored float32 model.
+        model[1] = 1.0 - 2.0e-8
         mask = model < 1.0
         baseline = float(kwargs["baseline"])
         return np.asarray(flux) + baseline * (model - 1.0), mask, model
@@ -355,6 +358,27 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
     assert audit["n_original_copy_failures"] == 0
     assert audit["n_negative_original_points"] >= 2
     assert audit["n_negative_preservation_failures"] == 0
+    assert audit["n_stored_model_count_quantization_differences"] >= 1
+    assert audit["max_stored_model_count_delta"] == 1
+    assert (
+        audit["max_stored_model_absolute_residual"] <= audit["model_absolute_tolerance"]
+    )
+
+    with h5py.File(out_h5, "r+") as h5:
+        group = next(iter(h5["injections"].values()))
+        group["transit_model"][0] = 0.8
+    corrupted = audit_fresh_injection_shards(
+        shard_paths=[out_h5],
+        schedule=shard_schedule,
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        config=_config(),
+    )
+    assert not corrupted["passed"]
+    assert any(
+        failure["kind"] == "transit_model_value_mismatch"
+        for failure in corrupted["failures"]
+    )
 
 
 def test_existing_holdout_helper_excludes_all_teacher_hosts() -> None:

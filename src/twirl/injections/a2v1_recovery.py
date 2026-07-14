@@ -1259,6 +1259,7 @@ def audit_fresh_injection_shards(
     adp_h5: Path,
     config: A2V1RecoveryConfig,
     relative_tolerance: float = 1.0e-6,
+    model_absolute_tolerance: float = 5.0e-7,
 ) -> dict[str, Any]:
     """Audit every stored injection against its immutable source light curve."""
 
@@ -1280,6 +1281,9 @@ def audit_fresh_injection_shards(
     min_good_in_transit = np.inf
     max_raw_equation_relative_residual = 0.0
     max_error_equation_relative_residual = 0.0
+    max_stored_model_absolute_residual = 0.0
+    n_stored_model_count_quantization_differences = 0
+    max_stored_model_count_delta = 0
 
     def record_failure(kind: str, **details: Any) -> None:
         if len(failures) < 200:
@@ -1374,11 +1378,64 @@ def audit_fresh_injection_shards(
                             tic=tic,
                         )
 
-                    model = np.asarray(group["transit_model"], dtype=float)
+                    stored_model = np.asarray(group["transit_model"], dtype=float)
+                    _, _, model = inject_batman_transit(
+                        time,
+                        np.zeros_like(time),
+                        period_d=float(group.attrs["period_d"]),
+                        t0_d=float(group.attrs["t0_d"]),
+                        duration_min=float(group.attrs["duration_min"]),
+                        radius_rstar=float(group.attrs["radius_rwd"]),
+                        a_over_rstar=float(group.attrs["a_over_rwd"]),
+                        impact_b=float(group.attrs["impact_b"]),
+                        baseline=1.0,
+                        exp_time_d=float(group.attrs.get("cadence_s", config.cadence_s))
+                        / 86400.0,
+                    )
+                    model = np.asarray(model, dtype=float)
+                    if model.shape != stored_model.shape:
+                        record_failure(
+                            "transit_model_shape_mismatch",
+                            injection_id=injection_id,
+                            tic=tic,
+                            stored_shape=list(stored_model.shape),
+                            recomputed_shape=list(model.shape),
+                        )
+                        continue
+                    finite_model = np.isfinite(model) & np.isfinite(stored_model)
+                    model_residual = (
+                        float(
+                            np.max(
+                                np.abs(model[finite_model] - stored_model[finite_model])
+                            )
+                        )
+                        if np.any(finite_model)
+                        else np.inf
+                    )
+                    max_stored_model_absolute_residual = max(
+                        max_stored_model_absolute_residual,
+                        model_residual,
+                    )
+                    if (
+                        not np.array_equal(
+                            np.isfinite(model), np.isfinite(stored_model)
+                        )
+                        or model_residual > model_absolute_tolerance
+                    ):
+                        record_failure(
+                            "transit_model_value_mismatch",
+                            injection_id=injection_id,
+                            tic=tic,
+                            max_absolute_residual=model_residual,
+                            limit=model_absolute_tolerance,
+                        )
                     good_transit = (
+                        (quality == 0) & np.isfinite(model) & (model < 1.0 - 1.0e-10)
+                    )
+                    stored_good_transit = (
                         (quality == 0)
-                        & np.isfinite(model)
-                        & (model < 1.0 - 1.0e-10)
+                        & np.isfinite(stored_model)
+                        & (stored_model < 1.0 - 1.0e-10)
                     )
                     for dataset_name in (
                         "RAW_FLUX_Small_original",
@@ -1386,19 +1443,33 @@ def audit_fresh_injection_shards(
                         "RAW_FLUX_Primary_original",
                         "RAW_FLUX_ERR_Primary_original",
                     ):
-                        good_transit &= np.isfinite(
+                        finite_values = np.isfinite(
                             np.asarray(group[dataset_name], dtype=float)
                         )
+                        good_transit &= finite_values
+                        stored_good_transit &= finite_values
                     n_good_in_transit = int(np.count_nonzero(good_transit))
                     min_good_in_transit = min(
                         min_good_in_transit, n_good_in_transit
                     )
-                    if int(group.attrs.get("n_good_in_transit", -1)) != n_good_in_transit:
+                    observed_good_in_transit = int(
+                        group.attrs.get("n_good_in_transit", -1)
+                    )
+                    stored_count_delta = abs(
+                        n_good_in_transit - int(np.count_nonzero(stored_good_transit))
+                    )
+                    if stored_count_delta:
+                        n_stored_model_count_quantization_differences += 1
+                        max_stored_model_count_delta = max(
+                            max_stored_model_count_delta,
+                            stored_count_delta,
+                        )
+                    if observed_good_in_transit != n_good_in_transit:
                         record_failure(
                             "in_transit_count_mismatch",
                             injection_id=injection_id,
                             tic=tic,
-                            observed=int(group.attrs.get("n_good_in_transit", -1)),
+                            observed=observed_good_in_transit,
                             recomputed=n_good_in_transit,
                         )
                     for label, raw_flux_name, raw_error_name, adp_name in (
@@ -1551,6 +1622,12 @@ def audit_fresh_injection_shards(
         ),
         "max_raw_equation_relative_residual": max_raw_equation_relative_residual,
         "max_error_equation_relative_residual": max_error_equation_relative_residual,
+        "max_stored_model_absolute_residual": max_stored_model_absolute_residual,
+        "model_absolute_tolerance": model_absolute_tolerance,
+        "n_stored_model_count_quantization_differences": (
+            n_stored_model_count_quantization_differences
+        ),
+        "max_stored_model_count_delta": max_stored_model_count_delta,
         "relative_tolerance": relative_tolerance,
         "failures": failures,
         "passed": not failures,
