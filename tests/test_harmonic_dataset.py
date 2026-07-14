@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import h5py
 import numpy as np
 import pandas as pd
 
 from twirl.vetting.adjudication_audit import HARMONIC_CNN_TARGET_POLICY
 from twirl.vetting.harmonic_dataset import (
+    HarmonicNativeDataset,
     _cap_injected_task_weights,
     attach_fold_training_weights,
     build_injection_pretraining_rows,
@@ -13,6 +18,72 @@ from twirl.vetting.harmonic_dataset import (
     native_group_path,
     prepare_harmonic_training_rows,
 )
+from twirl.vetting.harmonic_inputs import (
+    CHANNEL_CONTRACT,
+    NATIVE_DATASETS,
+    RAW_PAIR_CONTRACT_VERSION,
+)
+
+
+def _write_native_target(path: Path) -> None:
+    n_cadences = 48
+    with h5py.File(path, "w") as h5:
+        h5.attrs["contract_version"] = RAW_PAIR_CONTRACT_VERSION
+        h5.attrs["time_system"] = "BJD"
+        for name, channels in CHANNEL_CONTRACT.items():
+            h5.attrs[name] = json.dumps(channels)
+        group = h5.create_group("targets/0000000000000001")
+        payload = {
+            "time": 2459825.0 + np.arange(n_cadences) * 200.0 / 86400.0,
+            "cadenceno": np.arange(n_cadences),
+            "orbitid": np.ones(n_cadences, dtype=np.int32),
+            "quality": np.zeros(n_cadences, dtype=np.int32),
+            "raw_flux_small": np.full(n_cadences, 100.0),
+            "raw_flux_err_small": np.full(n_cadences, 2.0),
+            "raw_flux_primary": np.full(n_cadences, 300.0),
+            "raw_flux_err_primary": np.full(n_cadences, 3.0),
+            "det_flux_adp_sml": np.ones(n_cadences),
+            "det_flux_adp": np.ones(n_cadences),
+        }
+        for name in NATIVE_DATASETS:
+            group.create_dataset(name, data=payload[name])
+
+
+def test_native_dataset_reuses_one_hdf5_handle(tmp_path: Path) -> None:
+    path = tmp_path / "native.h5"
+    _write_native_target(path)
+    rows = pd.DataFrame(
+        {
+            "review_id": ["one", "two"],
+            "tic": [1, 1],
+            "native_group_path": ["targets/0000000000000001"] * 2,
+            "period_d": [0.2, 0.3],
+            "t0_bjd": [2459825.01, 2459825.01],
+            "duration_min": [10.0, 10.0],
+            "morphology_target_index": [3, 3],
+            "preserve_target_index": [0, 0],
+            "harmonic_target_index": [-1, -1],
+            "morphology_weight": [1.0, 1.0],
+            "preserve_weight": [1.0, 1.0],
+            "harmonic_weight": [0.0, 0.0],
+        }
+    )
+    dataset = HarmonicNativeDataset(
+        rows,
+        native_h5=path,
+        metadata=np.empty((2, 0), dtype=np.float32),
+        cache_size=0,
+        profile="seven_harmonic_shape",
+    )
+
+    dataset[0]
+    first_handle = dataset._native_handles[str(path)]
+    dataset[1]
+
+    assert dataset._native_handles[str(path)] is first_handle
+    assert first_handle.id.valid
+    dataset.close()
+    assert not first_handle.id.valid
 
 
 def test_candidate_inputs_ignore_human_corrected_periods() -> None:

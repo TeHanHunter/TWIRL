@@ -556,6 +556,38 @@ def _read_group(group: Any, *, paired_prefix: str = "") -> NativeLightCurve:
     )
 
 
+def read_native_light_curve_from_h5(
+    h5: Any,
+    *,
+    group_path: str,
+    require_errors: bool = True,
+) -> NativeLightCurve:
+    """Read one native light curve from an already-open read-only HDF5 file."""
+
+    contract = str(h5.attrs.get("contract_version", ""))
+    if contract != RAW_PAIR_CONTRACT_VERSION:
+        raise ValueError(f"unexpected native input contract {contract!r}")
+    if str(h5.attrs.get("time_system", "")) != "BJD":
+        raise ValueError("native input contract must declare time_system='BJD'")
+    for name, expected in CHANNEL_CONTRACT.items():
+        observed = tuple(json.loads(str(h5.attrs.get(name, "[]"))))
+        if observed != expected:
+            raise ValueError(f"native input {name} does not match the v1 channel contract")
+    if group_path not in h5:
+        raise KeyError(f"missing native input group: {group_path}")
+    group = h5[group_path]
+    lc = _read_group(group)
+    paired_names = [f"paired_original_{name}" for name in NATIVE_DATASETS[4:]]
+    paired = None
+    if any(name in group for name in paired_names):
+        paired = _read_group(group, paired_prefix="paired_original_")
+        object.__setattr__(lc, "paired_original", paired)
+    lc.validate(require_errors=require_errors)
+    if lc.paired_original is not None:
+        lc.paired_original.validate(require_errors=require_errors)
+    return lc
+
+
 def read_native_light_curve(
     path: Path,
     *,
@@ -565,28 +597,11 @@ def read_native_light_curve(
     import h5py
 
     with h5py.File(Path(path), "r") as h5:
-        contract = str(h5.attrs.get("contract_version", ""))
-        if contract != RAW_PAIR_CONTRACT_VERSION:
-            raise ValueError(f"unexpected native input contract {contract!r}")
-        if str(h5.attrs.get("time_system", "")) != "BJD":
-            raise ValueError("native input contract must declare time_system='BJD'")
-        for name, expected in CHANNEL_CONTRACT.items():
-            observed = tuple(json.loads(str(h5.attrs.get(name, "[]"))))
-            if observed != expected:
-                raise ValueError(f"native input {name} does not match the v1 channel contract")
-        if group_path not in h5:
-            raise KeyError(f"missing native input group: {group_path}")
-        group = h5[group_path]
-        lc = _read_group(group)
-        paired_names = [f"paired_original_{name}" for name in NATIVE_DATASETS[4:]]
-        paired = None
-        if any(name in group for name in paired_names):
-            paired = _read_group(group, paired_prefix="paired_original_")
-            object.__setattr__(lc, "paired_original", paired)
-    lc.validate(require_errors=require_errors)
-    if lc.paired_original is not None:
-        lc.paired_original.validate(require_errors=require_errors)
-    return lc
+        return read_native_light_curve_from_h5(
+            h5,
+            group_path=group_path,
+            require_errors=require_errors,
+        )
 
 
 def verify_raw_pair_contract(
@@ -687,5 +702,6 @@ __all__ = [
     "orbital_phase",
     "pad_channel_sequences",
     "read_native_light_curve",
+    "read_native_light_curve_from_h5",
     "verify_raw_pair_contract",
 ]

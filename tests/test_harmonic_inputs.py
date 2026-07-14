@@ -18,6 +18,7 @@ from twirl.vetting.harmonic_inputs import (
     injected_raw_uncertainty,
     pad_channel_sequences,
     read_native_light_curve,
+    read_native_light_curve_from_h5,
     verify_raw_pair_contract,
 )
 
@@ -142,8 +143,14 @@ def test_hdf5_contract_reader_and_verifier(tmp_path: Path) -> None:
 
     verification = verify_raw_pair_contract(path)
     loaded = read_native_light_curve(path, group_path="targets/0000000000000001")
+    with h5py.File(path, "r") as h5:
+        loaded_from_handle = read_native_light_curve_from_h5(
+            h5,
+            group_path="targets/0000000000000001",
+        )
 
     assert verification["passed"], verification["failures"]
     assert verification["counts"] == {"targets": 1, "injections": 0}
     assert np.array_equal(loaded.cadenceno, lc.cadenceno)
     assert np.array_equal(loaded.raw_flux_small, lc.raw_flux_small)
+    assert np.array_equal(loaded_from_handle.raw_flux_small, lc.raw_flux_small)

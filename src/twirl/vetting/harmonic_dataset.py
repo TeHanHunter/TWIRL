@@ -24,7 +24,7 @@ from twirl.vetting.harmonic_inputs import (
     build_native_channels,
     native_group_path,
     pad_channel_sequences,
-    read_native_light_curve,
+    read_native_light_curve_from_h5,
 )
 from twirl.vetting.recovery50_teacher import leakage_columns
 
@@ -359,7 +359,35 @@ class HarmonicNativeDataset:
             raise ValueError("metadata row count does not match training rows")
         self.cache_size = max(0, int(cache_size))
         self._cache: OrderedDict[int, dict[str, Any]] = OrderedDict()
+        self._native_handles: dict[str, Any] = {}
         self.branches = profile_branches(profile)
+
+    def _native_handle(self, path: Path) -> Any:
+        import h5py
+
+        key = str(Path(path))
+        handle = self._native_handles.get(key)
+        if handle is None or not handle.id.valid:
+            handle = h5py.File(key, "r")
+            self._native_handles[key] = handle
+        return handle
+
+    def close(self) -> None:
+        handles = getattr(self, "_native_handles", {})
+        for handle in handles.values():
+            try:
+                handle.close()
+            except (AttributeError, OSError, RuntimeError):
+                pass
+        handles.clear()
+
+    def __getstate__(self) -> dict[str, Any]:
+        state = self.__dict__.copy()
+        state["_native_handles"] = {}
+        return state
+
+    def __del__(self) -> None:
+        self.close()
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -408,8 +436,8 @@ class HarmonicNativeDataset:
             raise ValueError(
                 "native_h5 is required unless every row supplies native_h5_path"
             )
-        lc = read_native_light_curve(
-            native_h5,
+        lc = read_native_light_curve_from_h5(
+            self._native_handle(native_h5),
             group_path=str(row["native_group_path"]),
             require_errors=True,
         )
