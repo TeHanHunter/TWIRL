@@ -43,6 +43,43 @@ EXPECTED_BY_SECTOR = {
     },
 }
 
+EXPECTED_HASHES_BY_SECTOR = {
+    56: {
+        "hlsp_s0056_A2v1_tree": (
+            "a8a9d3f80c1e6b2eb07aa430950c932a96feb6f8f1c6f3495289cb11e2e79789"
+        ),
+        "human_vetting_training_table_adjudicated.csv": (
+            "7b5d71d788c97059ceeccdbc724af2a05bf3643bdcd8f5301b0c467c88f92adc"
+        ),
+        "s56_A2v1_adp_pair.h5": (
+            "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40"
+        ),
+        "s56_A2v1_tglc_raw_sources.h5": (
+            "298d80bb892de0cf81f550b3f634475126cc72318850b059b9a5358a720cd15b"
+        ),
+        "s56_A2v1_validation_full_schema.json": (
+            "896ba49a82e9b476f7777fae78230994c3c8ce6ba2f883f9469280d2197db1ce"
+        ),
+    },
+    57: {
+        "hlsp_s0057_A2v1_tree": (
+            "ec70f83a0f568947f4e75b2e46a2b777616bfa400d38a5cd7c966e07c4841706"
+        ),
+        "human_vetting_training_table_adjudicated.csv": (
+            "7b5d71d788c97059ceeccdbc724af2a05bf3643bdcd8f5301b0c467c88f92adc"
+        ),
+        "s57_A2v1_adp_pair.h5": (
+            "23fe898b906c253a1b137d4cbe96864b448f7ce1fd845c34ce6f46fd18e975ee"
+        ),
+        "s57_A2v1_tglc_raw_sources.h5": (
+            "e14a32978070df248eb50b8303c74ae53dabb27daaa283b8574c4cc1d2829fbc"
+        ),
+        "s57_A2v1_validation_full_schema.json": (
+            "cbba640d8dfd22e922d7aa7d9b339b8d2bf32aa73e091e7d883caf4a14dfd81f"
+        ),
+    },
+}
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -169,6 +206,12 @@ def main() -> int:
             fits_root,
             fits_checksum_manifest,
         )
+        for name, expected_hash in EXPECTED_HASHES_BY_SECTOR[args.sector].items():
+            if hashes.get(name) != expected_hash:
+                failures.append(
+                    f"SHA256 mismatch for {name}: {hashes.get(name)!r}; "
+                    f"expected {expected_hash!r}"
+                )
     payload = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "sector": args.sector,
