@@ -21,10 +21,30 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--filter-manifest", type=Path)
+    parser.add_argument("--filter-key", default="injection_id")
     parser.add_argument("--allow-cpu", action="store_true")
     args = parser.parse_args()
 
-    candidates = pd.read_csv(args.candidates, low_memory=False)
+    candidates = (
+        pd.read_parquet(args.candidates)
+        if args.candidates.suffix.lower() == ".parquet"
+        else pd.read_csv(args.candidates, low_memory=False)
+    )
+    if args.filter_manifest:
+        manifest = (
+            pd.read_parquet(args.filter_manifest)
+            if args.filter_manifest.suffix.lower() == ".parquet"
+            else pd.read_csv(args.filter_manifest, low_memory=False)
+        )
+        if args.filter_key not in candidates or args.filter_key not in manifest:
+            raise KeyError(
+                f"filter key {args.filter_key!r} is absent from candidates or manifest"
+            )
+        allowed = frozenset(manifest[args.filter_key].fillna("").astype(str))
+        candidates = candidates.loc[
+            candidates[args.filter_key].fillna("").astype(str).isin(allowed)
+        ].copy()
     if args.limit is not None:
         candidates = candidates.head(int(args.limit)).copy()
     scores, summary = score_harmonic_teacher_ensemble(

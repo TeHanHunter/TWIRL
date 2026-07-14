@@ -704,7 +704,10 @@ def run_teacher_v2_training(
     ranking = pd.DataFrame(profile_rows).sort_values(
         "fold_selection_score_mean", ascending=False, kind="stable"
     )
-    ranking.to_csv(out_dir / "development_profile_diagnostics.csv", index=False)
+    profile_tag = "__".join(profiles)
+    ranking.to_csv(
+        out_dir / f"development_profile_diagnostics__{profile_tag}.csv", index=False
+    )
     summary = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "model_version": TEACHER_V2_MODEL_VERSION,
@@ -717,7 +720,7 @@ def run_teacher_v2_training(
         "holdout_opened": False,
         "s57_opened": False,
     }
-    (out_dir / "training_summary.json").write_text(
+    (out_dir / f"training_summary__{profile_tag}.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True, allow_nan=True) + "\n"
     )
     return summary

@@ -76,7 +76,8 @@ def main() -> int:
     snapshot_dir = out_dir / "source_snapshots"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     franklin_snapshot = snapshot_dir / "franklin_labels_vetted.csv"
-    shutil.copy2(args.franklin_labels, franklin_snapshot)
+    if args.franklin_labels.resolve() != franklin_snapshot.resolve():
+        shutil.copy2(args.franklin_labels, franklin_snapshot)
 
     s56_schedule = _read(args.s56_schedule)
     s56_candidates = _read(args.s56_candidates)
@@ -149,6 +150,20 @@ def main() -> int:
         "training_rows": _write(training, out_dir / "training_rows.parquet"),
         "s56_injection_role_manifest": _write(
             injection_roles, out_dir / "s56_injection_role_manifest.parquet"
+        ),
+        "s56_injection_development_manifest": _write(
+            injection_roles.loc[
+                injection_roles["teacher_v2_partition"].astype(str).eq("development")
+            ].copy(),
+            out_dir / "s56_injection_development_manifest.parquet",
+        ),
+        "s56_injection_locked_holdout_manifest": _write(
+            injection_roles.loc[
+                injection_roles["teacher_v2_partition"].astype(str).eq(
+                    "locked_holdout"
+                )
+            ].copy(),
+            out_dir / "s56_injection_locked_holdout_manifest.parquet",
         ),
         "s56_human_role_manifest": _write(
             human_rows, out_dir / "s56_human_role_manifest.parquet"
