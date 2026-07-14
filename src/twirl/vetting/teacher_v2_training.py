@@ -80,6 +80,7 @@ DEFAULT_TEACHER_V2_PROFILES: tuple[str, ...] = (
     "shape_plus_periodogram_bls",
     "full_combined",
 )
+DEFAULT_TEACHER_V2_DATASET_CACHE_SIZE = 256
 
 
 def _softmax(values: np.ndarray, *, temperature: float = 1.0) -> np.ndarray:
@@ -416,7 +417,7 @@ def train_teacher_v2_fold(
         weighted,
         native_h5=None,
         metadata=metadata,
-        cache_size=2048,
+        cache_size=DEFAULT_TEACHER_V2_DATASET_CACHE_SIZE,
         profile=profile,
     )
     train_loader = _loader(
