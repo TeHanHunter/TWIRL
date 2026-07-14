@@ -19,6 +19,16 @@ from twirl.injections.a2v1_recovery import (
 from twirl.vetting.recovery50_teacher import leakage_columns
 
 
+CANDIDATE_CSV_ULP_BUDGET = {
+    # Candidate shards pass through two portable CSV round trips. The observed
+    # decimal conversion is bounded to seven spacing units for short periods
+    # and two for BJD epochs; durations are exact integer-minute grid values.
+    "period_d": 8,
+    "t0_bjd": 2,
+    "duration_min": 0,
+}
+
+
 def _json(path: Path) -> dict:
     return json.loads(path.read_text())
 
@@ -220,12 +230,12 @@ def main() -> int:
         == pd.to_numeric(candidate_top5["rep_peak_rank"], errors="coerce").tolist(),
         "Teacher candidate identities differ from the stored ADP-small top five",
     )
-    for column in ("period_d", "t0_bjd", "duration_min"):
+    for column, max_ulps in CANDIDATE_CSV_ULP_BUDGET.items():
         require(
             numeric_arrays_match_with_ulp_budget(
                 pd.to_numeric(small_top5[column], errors="coerce"),
                 pd.to_numeric(candidate_top5[column], errors="coerce"),
-                max_ulps=2,
+                max_ulps=max_ulps,
             ),
             f"Teacher candidate {column} differs from the stored ADP-small top five",
         )
@@ -319,6 +329,7 @@ def main() -> int:
         "n_teacher_score_rows": len(scores),
         "n_outcomes": len(outcomes),
         "n_required_artifacts": len(required_artifacts),
+        "candidate_csv_ulp_budget": CANDIDATE_CSV_ULP_BUDGET,
         "failures": failures,
         "passed": not failures,
     }

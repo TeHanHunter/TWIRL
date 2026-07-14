@@ -450,6 +450,18 @@ def test_numeric_array_comparison_enforces_two_ulp_serialization_budget() -> Non
         max_ulps=2,
     )
 
+    short_period = np.array([0.12308926817736379])
+    seven_ulps = short_period.copy()
+    for _ in range(7):
+        seven_ulps = np.nextafter(seven_ulps, -np.inf)
+    assert numeric_arrays_match_with_ulp_budget(
+        short_period, seven_ulps, max_ulps=8
+    )
+    nine_ulps = np.nextafter(np.nextafter(seven_ulps, -np.inf), -np.inf)
+    assert not numeric_arrays_match_with_ulp_budget(
+        short_period, nine_ulps, max_ulps=8
+    )
+
 
 def test_teacher_inference_requires_explicit_injection_opt_in() -> None:
     candidates = pd.DataFrame(
