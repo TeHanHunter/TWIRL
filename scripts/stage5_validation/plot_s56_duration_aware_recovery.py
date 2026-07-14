@@ -787,6 +787,7 @@ def plot_publication_period_radius_recovery_map(
             vmin=0.0,
             vmax=1.0,
             shading="auto",
+            rasterized=True,
             zorder=0,
         )
         roche_fill_period = np.clip(roche_period, period_edges[0], period_edges[-1])
