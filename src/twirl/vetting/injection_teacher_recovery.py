@@ -505,8 +505,30 @@ def normalize_injection_peak_candidates(
         ",".join(ADP_ONLY_APERTURES),
         ADP_ONLY_APERTURES[0],
     )
+    sectors = (
+        pd.to_numeric(out.get("sector", pd.Series(dtype=float)), errors="coerce")
+        .dropna()
+        .astype(int)
+        .unique()
+    )
+    if len(sectors) != 1:
+        import h5py
+
+        with h5py.File(pair_h5, "r") as h5:
+            sectors = np.unique(
+                [
+                    int(group.attrs.get("sector", -1))
+                    for group in h5["injections"].values()
+                ]
+            )
+    if len(sectors) != 1 or int(sectors[0]) < 56:
+        raise ValueError(
+            "injection candidates must resolve to exactly one A2v1 sector"
+        )
+    sector = int(sectors[0])
+    out["sector"] = sector
     out["review_id"] = [
-        f"s0056-a2v1-eval-{injection_id}-r{rank_value}"
+        f"s{sector:04d}-a2v1-eval-{injection_id}-r{rank_value}"
         for injection_id, rank_value in zip(out["injection_id"], out["rep_peak_rank"])
     ]
     if out["review_id"].duplicated().any():
@@ -519,7 +541,7 @@ def normalize_injection_peak_candidates(
     out["native_group_path"] = [
         native_group_path(row) for row in out.to_dict("records")
     ]
-    out["source_product_tag"] = "S56_A2v1_fresh_eval_v1"
+    out["source_product_tag"] = f"S{sector}_A2v1_fresh_eval_v1"
     out["bls_search_branch"] = "A2v1_ADP_small_top5"
     out["adp_only_contract_version"] = ADP_ONLY_CONTRACT_VERSION
     out["input_contract_version"] = A2V1_TEACHER_INPUT_CONTRACT
@@ -532,7 +554,7 @@ def _pair_lc(group: Any, pair_h5: Path) -> HLSPLightCurve:
     return HLSPLightCurve(
         tic=int(group.attrs["tic"]),
         tmag=float(group.attrs.get("tessmag", np.nan)),
-        sector=int(group.attrs.get("sector", 56)),
+        sector=int(group.attrs["sector"]),
         cam=int(group.attrs.get("camera", -1)),
         ccd=int(group.attrs.get("ccd", -1)),
         ra=float("nan"),

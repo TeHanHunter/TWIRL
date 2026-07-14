@@ -13,7 +13,10 @@ set -euo pipefail
 
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56-torch/bin/python}"
-OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v1_recovery}"
+SECTOR="${TWIRL_RECOVERY_SECTOR:-56}"
+SECTOR_TAG="s${SECTOR}"
+LOG_ROOT="${TWIRL_RECOVERY_LOG_ROOT:-/orcd/data/mki_aryeh/001/twirl/logs/${SECTOR_TAG}_a2v1_recovery}"
+OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/${SECTOR_TAG}_A2v1_teacher_v1_recovery}"
 CHECKPOINT_ROOT="${TWIRL_TEACHER_CHECKPOINT_ROOT:-${REPO}/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/shape_plus_periodogram_bls}"
 MODE="${TWIRL_RECOVERY_MODE:-full}"
 
@@ -31,7 +34,7 @@ else
   LIMIT_ARGS=()
 fi
 
-mkdir -p /orcd/data/mki_aryeh/001/twirl/logs/s56_a2v1_recovery
+mkdir -p "${LOG_ROOT}"
 cd "${REPO}"
 export PYTHONPATH=src
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
@@ -51,4 +54,4 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HDF5_USE_FILE_LOCKING=FALS
   --workers 4 \
   "${LIMIT_ARGS[@]}"
 
-echo "[s56-a2rec-teacher] mode=${MODE} complete $(date -Is)"
+echo "[${SECTOR_TAG}-a2rec-teacher] mode=${MODE} complete $(date -Is)"

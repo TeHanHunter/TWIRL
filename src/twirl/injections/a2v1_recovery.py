@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -25,8 +25,20 @@ from twirl.search.injections import inject_batman_transit
 from twirl.vetting.harmonic_inputs import injected_raw_uncertainty
 
 
-FRESH_INJECTION_CONTRACT = "s56_a2v1_fresh_injection_pair_v1"
-SCHEDULE_CONTRACT = "s56_a2v1_fresh_injection_schedule_v1"
+def fresh_injection_contract(sector: int) -> str:
+    """Return the immutable injection-pair contract for one sector."""
+
+    return f"s{int(sector)}_a2v1_fresh_injection_pair_v1"
+
+
+def schedule_contract(sector: int) -> str:
+    """Return the immutable schedule contract for one sector."""
+
+    return f"s{int(sector)}_a2v1_fresh_injection_schedule_v1"
+
+
+FRESH_INJECTION_CONTRACT = fresh_injection_contract(56)
+SCHEDULE_CONTRACT = schedule_contract(56)
 RAW_SOURCE_CONTRACT = "s56_tglc_raw_pair_v1"
 ADP_APERTURES: tuple[str, str] = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
 T_MAG_EDGES: tuple[float, ...] = (-np.inf, 17.0, 18.0, 19.0, np.inf)
@@ -67,6 +79,8 @@ class A2V1RecoveryConfig:
     parity_scatter_ratio_tolerance: float = 0.01
 
     def validate(self) -> None:
+        if self.sector < 56:
+            raise ValueError("A2v1 recovery sectors must be >= 56")
         if (
             self.n_injections
             != self.period_bins * self.radius_bins * self.repeats_per_cell
@@ -336,7 +350,8 @@ def _host_qa_rows(
     *,
     raw_h5: Path,
     adp_h5: Path,
-    excluded_tics: set[int],
+    teacher_tics: set[int],
+    prior_evaluation_tics: set[int],
     config: A2V1RecoveryConfig,
 ) -> pd.DataFrame:
     import h5py
@@ -354,7 +369,8 @@ def _host_qa_rows(
                 "tic": tic,
                 "in_raw_source": True,
                 "in_adp_reference": True,
-                "teacher_tic_excluded": tic in excluded_tics,
+                "teacher_tic_excluded": tic in teacher_tics,
+                "prior_evaluation_tic_excluded": tic in prior_evaluation_tics,
                 "eligible": False,
                 "qa_reason": "",
             }
@@ -368,8 +384,16 @@ def _host_qa_rows(
                     "source_fits": str(adp.attrs.get("source_fits", "")),
                 }
             )
-            if tic in excluded_tics:
+            if int(record["sector"]) != int(config.sector):
+                record["qa_reason"] = "wrong_sector"
+                rows.append(record)
+                continue
+            if tic in teacher_tics:
                 record["qa_reason"] = "teacher_tic"
+                rows.append(record)
+                continue
+            if tic in prior_evaluation_tics:
+                record["qa_reason"] = "prior_evaluation_tic"
                 rows.append(record)
                 continue
             try:
@@ -452,7 +476,9 @@ def _host_qa_rows(
                     "source_fits": str(adp.attrs.get("source_fits", "")),
                     "in_raw_source": False,
                     "in_adp_reference": True,
-                    "teacher_tic_excluded": int(key) in excluded_tics,
+                    "teacher_tic_excluded": int(key) in teacher_tics,
+                    "prior_evaluation_tic_excluded": int(key)
+                    in prior_evaluation_tics,
                     "eligible": False,
                     "qa_reason": "missing_raw_source",
                 }
@@ -600,17 +626,25 @@ def build_fresh_injection_schedule(
     teacher_table: Path,
     config: A2V1RecoveryConfig,
     out_dir: Path,
+    additional_exclusion_tables: Sequence[Path] = (),
+    host_overlap_audit_tables: Sequence[Path] = (),
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """QA hosts and write the immutable 20k unique-host injection schedule."""
 
     config.validate()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    excluded = _teacher_tics(teacher_table)
+    teacher_tics = _teacher_tics(teacher_table)
+    prior_evaluation_tics: set[int] = set()
+    for path in additional_exclusion_tables:
+        prior_evaluation_tics.update(_teacher_tics(path))
+    prior_evaluation_tics.difference_update(teacher_tics)
+    excluded = teacher_tics | prior_evaluation_tics
     qa = _host_qa_rows(
         raw_h5=Path(raw_h5),
         adp_h5=Path(adp_h5),
-        excluded_tics=excluded,
+        teacher_tics=teacher_tics,
+        prior_evaluation_tics=prior_evaluation_tics,
         config=config,
     )
     eligible = qa.loc[qa["eligible"].fillna(False).astype(bool)].copy()
@@ -643,14 +677,16 @@ def build_fresh_injection_schedule(
         [_physical_parameters(row, config) for row in schedule.to_dict("records")]
     )
     schedule = pd.concat([schedule.reset_index(drop=True), physical], axis=1)
+    injection_contract = fresh_injection_contract(config.sector)
+    locked_schedule_contract = schedule_contract(config.sector)
     schedule["injection_id"] = schedule["injection_index"].map(
-        lambda value: f"s56a2v1_eval_{int(value):06d}"
+        lambda value: f"s{config.sector}a2v1_eval_{int(value):06d}"
     )
     schedule["shard_index"] = (
         schedule["injection_index"] // config.rows_per_shard
     ).astype(np.int16)
     schedule["h5_group"] = "/injections/" + schedule["injection_id"]
-    schedule["schedule_contract"] = SCHEDULE_CONTRACT
+    schedule["schedule_contract"] = locked_schedule_contract
     schedule["evaluation_only"] = True
     schedule["teacher_training_excluded"] = True
     schedule["native_input_include"] = True
@@ -663,7 +699,7 @@ def build_fresh_injection_schedule(
     ):
         raise RuntimeError("fresh schedule reused a host or injection ID")
     if set(schedule["tic"].astype(int)) & excluded:
-        raise RuntimeError("fresh schedule overlaps Teacher-v1 hosts")
+        raise RuntimeError("fresh schedule overlaps an excluded host")
     support = (
         schedule.groupby(["grid_period_bin", "grid_radius_bin"], as_index=False)
         .size()
@@ -681,19 +717,37 @@ def build_fresh_injection_schedule(
         out_dir / "injection_schedule.csv.gz", index=False, compression="gzip"
     )
     support.to_csv(out_dir / "period_radius_support.csv", index=False)
+    selected_tics = set(schedule["tic"].astype(int))
+    host_overlap_audits = []
+    for path in host_overlap_audit_tables:
+        comparison_tics = _teacher_tics(path)
+        host_overlap_audits.append(
+            {
+                "table": str(Path(path).resolve()),
+                "n_comparison_unique_tics": len(comparison_tics),
+                "n_selected_host_overlap": len(selected_tics & comparison_tics),
+            }
+        )
     summary = {
         "created_utc": _utcnow(),
-        "contract": SCHEDULE_CONTRACT,
+        "contract": locked_schedule_contract,
+        "injection_contract": injection_contract,
         "config": asdict(config),
         "raw_h5": str(Path(raw_h5).resolve()),
         "adp_h5": str(Path(adp_h5).resolve()),
         "teacher_table": str(Path(teacher_table).resolve()),
+        "additional_exclusion_tables": [
+            str(Path(path).resolve()) for path in additional_exclusion_tables
+        ],
+        "host_overlap_audits": host_overlap_audits,
         "n_teacher_table_rows": int(
             len(pd.read_csv(teacher_table, low_memory=False))
             if Path(teacher_table).suffix.lower() != ".parquet"
             else len(pd.read_parquet(teacher_table))
         ),
-        "n_teacher_unique_tics": len(excluded),
+        "n_teacher_unique_tics": len(teacher_tics),
+        "n_prior_evaluation_unique_tics": len(prior_evaluation_tics),
+        "n_total_excluded_unique_tics": len(excluded),
         "n_raw_adp_intersection": int(
             qa["in_raw_source"].fillna(False).astype(bool).sum()
         ),
@@ -701,6 +755,7 @@ def build_fresh_injection_schedule(
             (~qa["in_raw_source"].fillna(False).astype(bool)).sum()
         ),
         "n_qa_eligible_after_teacher_exclusion": int(len(eligible)),
+        "n_qa_eligible_after_all_exclusions": int(len(eligible)),
         "n_selected": int(len(schedule)),
         "n_selected_unique_tics": int(schedule["tic"].nunique()),
         "n_cells": int(len(support)),
@@ -936,6 +991,7 @@ def write_fresh_injection_shard(
     import h5py
 
     config.validate()
+    contract = fresh_injection_contract(config.sector)
     if shard_index < 0 or shard_index >= config.n_shards:
         raise ValueError("invalid shard_index")
     if selection_mode == "shard":
@@ -972,7 +1028,7 @@ def write_fresh_injection_shard(
             h5py.File(adp_h5, "r") as adp_file,
             h5py.File(temporary, "w") as output,
         ):
-            output.attrs["contract_version"] = FRESH_INJECTION_CONTRACT
+            output.attrs["contract_version"] = contract
             output.attrs["created_utc"] = _utcnow()
             output.attrs["config"] = json.dumps(asdict(config), sort_keys=True)
             output.attrs["source_raw_h5"] = str(Path(raw_h5).resolve())
@@ -1079,7 +1135,7 @@ def write_fresh_injection_shard(
                     "source_injection_h5": str(out_h5.resolve()),
                     "source_raw_h5": str(Path(raw_h5).resolve()),
                     "source_adp_h5": str(Path(adp_h5).resolve()),
-                    "contract_version": FRESH_INJECTION_CONTRACT,
+                    "contract_version": contract,
                     "raw_adp_time_delta_max_s": float(np.nanmax(delta_s)),
                 }
                 for name, value in attrs.items():
@@ -1136,7 +1192,7 @@ def write_fresh_injection_shard(
     manifest.to_parquet(manifest_path, compression="zstd", index=False)
     summary = {
         "created_utc": _utcnow(),
-        "contract": FRESH_INJECTION_CONTRACT,
+        "contract": contract,
         "config": asdict(config),
         "shard_index": int(shard_index),
         "n_injections": int(len(manifest)),
@@ -1220,6 +1276,8 @@ __all__ = [
     "A2V1RecoveryConfig",
     "FRESH_INJECTION_CONTRACT",
     "SCHEDULE_CONTRACT",
+    "fresh_injection_contract",
+    "schedule_contract",
     "build_fresh_injection_schedule",
     "load_recovery_config",
     "run_adp_roundtrip_parity",

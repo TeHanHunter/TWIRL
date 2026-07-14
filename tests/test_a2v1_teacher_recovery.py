@@ -13,17 +13,23 @@ from twirl.injections.a2v1_recovery import (
     FRESH_INJECTION_CONTRACT,
     build_fresh_injection_schedule,
     compare_adp_compact_products,
+    fresh_injection_contract,
     run_adp_roundtrip_parity,
+    schedule_contract,
     select_parameter_spanning_rows,
     write_fresh_injection_shard,
 )
-from twirl.vetting.injection_teacher_recovery import build_teacher_injection_holdout
+from twirl.vetting.injection_teacher_recovery import (
+    build_teacher_injection_holdout,
+    normalize_injection_peak_candidates,
+)
 from twirl.vetting.harmonic_inference import prepare_inference_rows
 
 
-def _config() -> A2V1RecoveryConfig:
+def _config(sector: int = 56) -> A2V1RecoveryConfig:
     return A2V1RecoveryConfig(
         name="test",
+        sector=sector,
         n_injections=8,
         n_shards=2,
         period_bins=2,
@@ -36,7 +42,11 @@ def _config() -> A2V1RecoveryConfig:
     )
 
 
-def _write_sources(tmp_path: Path, n_targets: int = 11) -> tuple[Path, Path]:
+def _write_sources(
+    tmp_path: Path,
+    n_targets: int = 11,
+    sector: int = 56,
+) -> tuple[Path, Path]:
     raw_path = tmp_path / "raw.h5"
     adp_path = tmp_path / "adp.h5"
     n = 80
@@ -73,7 +83,7 @@ def _write_sources(tmp_path: Path, n_targets: int = 11) -> tuple[Path, Path]:
             adp.attrs.update(
                 {
                     "tic": tic,
-                    "sector": 56,
+                    "sector": sector,
                     "camera": 1,
                     "ccd": 1,
                     "tessmag": 16.5 + 0.35 * index,
@@ -133,6 +143,59 @@ def test_fresh_schedule_is_unique_host_disjoint_and_grid_complete(
     assert schedule.groupby("shard_index").size().to_dict() == {0: 4, 1: 4}
     assert qa.loc[qa["tic"].eq(10_000), "qa_reason"].item() == "teacher_tic"
     assert summary["n_teacher_unique_tics"] == 1
+
+
+def test_sector_57_schedule_has_sector_specific_contracts_and_ids(
+    tmp_path: Path,
+) -> None:
+    raw_h5, adp_h5 = _write_sources(tmp_path, sector=57)
+    teacher = tmp_path / "teacher.csv"
+    prior_sector = tmp_path / "prior_sector.parquet"
+    pd.DataFrame({"tic": [99_999]}).to_csv(teacher, index=False)
+    pd.DataFrame({"tic": [10_000]}).to_parquet(prior_sector, index=False)
+    schedule, _, summary = build_fresh_injection_schedule(
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        teacher_table=teacher,
+        config=_config(57),
+        out_dir=tmp_path / "schedule",
+        host_overlap_audit_tables=[prior_sector],
+    )
+    assert schedule["sector"].eq(57).all()
+    assert schedule["injection_id"].str.match(r"s57a2v1_eval_\d{6}").all()
+    assert schedule["schedule_contract"].eq(schedule_contract(57)).all()
+    assert summary["contract"] == schedule_contract(57)
+    assert summary["injection_contract"] == fresh_injection_contract(57)
+    assert summary["host_overlap_audits"] == [
+        {
+            "table": str(prior_sector.resolve()),
+            "n_comparison_unique_tics": 1,
+            "n_selected_host_overlap": 1,
+        }
+    ]
+
+
+def test_schedule_excludes_prior_sector_evaluation_hosts(tmp_path: Path) -> None:
+    raw_h5, adp_h5 = _write_sources(tmp_path)
+    teacher = tmp_path / "teacher.csv"
+    prior = tmp_path / "prior.parquet"
+    pd.DataFrame({"tic": [10_000]}).to_csv(teacher, index=False)
+    pd.DataFrame({"tic": [10_001, 10_002]}).to_parquet(prior, index=False)
+    schedule, qa, summary = build_fresh_injection_schedule(
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        teacher_table=teacher,
+        config=_config(),
+        out_dir=tmp_path / "schedule",
+        additional_exclusion_tables=[prior],
+    )
+    assert not set(schedule["tic"]) & {10_000, 10_001, 10_002}
+    assert set(
+        qa.loc[qa["qa_reason"].eq("prior_evaluation_tic"), "tic"].astype(int)
+    ) == {10_001, 10_002}
+    assert summary["n_teacher_unique_tics"] == 1
+    assert summary["n_prior_evaluation_unique_tics"] == 2
+    assert summary["n_total_excluded_unique_tics"] == 3
 
 
 def test_parameter_spanning_smoke_selection_balances_grid_marginals() -> None:
@@ -298,3 +361,36 @@ def test_teacher_inference_requires_explicit_injection_opt_in() -> None:
         prepare_inference_rows(candidates)
     rows = prepare_inference_rows(candidates, allow_injections=True)
     assert rows.loc[0, "native_group_path"] == "injections/s56a2v1_eval_000042"
+
+
+def test_sector_57_candidate_ids_and_source_tag_derive_from_pair(tmp_path: Path) -> None:
+    pair_h5 = tmp_path / "pair.h5"
+    with h5py.File(pair_h5, "w") as h5:
+        root = h5.create_group("injections")
+        group = root.create_group("s57a2v1_eval_000001")
+        group.attrs["sector"] = 57
+    rows = []
+    for aperture in ("DET_FLUX_ADP_SML", "DET_FLUX_ADP"):
+        rows.append(
+            {
+                "injection_id": "s57a2v1_eval_000001",
+                "aperture": aperture,
+                "status": "ok",
+                "peak_rank": 1,
+                "period_d": 1.0,
+                "t0_bjd": 2_459_830.0,
+                "duration_min": 5.0,
+                "depth": 0.1,
+                "depth_snr": 10.0,
+                "sde": 12.0,
+                "log_power": 3.0,
+            }
+        )
+    candidates = normalize_injection_peak_candidates(
+        pd.DataFrame(rows), pair_h5=pair_h5
+    )
+    assert candidates["review_id"].tolist() == [
+        "s0057-a2v1-eval-s57a2v1_eval_000001-r1"
+    ]
+    assert candidates["sector"].eq(57).all()
+    assert candidates["source_product_tag"].eq("S57_A2v1_fresh_eval_v1").all()

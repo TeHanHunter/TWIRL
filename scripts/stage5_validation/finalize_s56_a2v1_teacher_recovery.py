@@ -110,6 +110,11 @@ def main() -> int:
         )
     if manifest["tic"].nunique() != args.expect_injections:
         raise ValueError("fresh injection manifests reuse host TICs")
+    sectors = (
+        pd.to_numeric(manifest["sector"], errors="coerce").dropna().astype(int).unique()
+    )
+    if len(sectors) != 1:
+        raise ValueError("fresh injection manifests must contain exactly one sector")
     if scores["review_id"].duplicated().any():
         raise ValueError("Teacher score table has duplicate review_id values")
 
@@ -201,6 +206,7 @@ def main() -> int:
     )
     summary = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
+        "sector": int(sectors[0]),
         "n_injections": int(len(outcomes)),
         "n_unique_tics": int(outcomes["tic"].nunique()),
         "n_peak_rows": int(len(peaks)),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write immutable provenance for the completed S56 A2v1 recovery run."""
+"""Write immutable provenance for a completed sector A2v1 recovery run."""
 
 from __future__ import annotations
 
@@ -81,7 +81,8 @@ def main() -> int:
     )
     payload = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
-        "workflow": "s56_a2v1_teacher_v1_recovery_v1",
+        "workflow": str(config["name"]),
+        "sector": int(config["sector"]),
         "evaluation_only": True,
         "teacher_retraining_allowed": False,
         "code": {
@@ -110,9 +111,12 @@ def main() -> int:
             for key in (
                 "n_teacher_table_rows",
                 "n_teacher_unique_tics",
+                "n_prior_evaluation_unique_tics",
+                "n_total_excluded_unique_tics",
                 "n_raw_adp_intersection",
                 "n_adp_without_raw",
                 "n_qa_eligible_after_teacher_exclusion",
+                "n_qa_eligible_after_all_exclusions",
                 "n_selected",
                 "n_selected_unique_tics",
                 "n_cells",
@@ -120,6 +124,7 @@ def main() -> int:
                 "cell_support_max",
                 "tmag_counts",
                 "qa_reason_counts",
+                "host_overlap_audits",
             )
         },
         "bls": {

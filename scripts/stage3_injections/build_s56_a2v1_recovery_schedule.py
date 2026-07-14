@@ -22,6 +22,20 @@ def main() -> int:
     parser.add_argument("--raw-h5", type=Path, required=True)
     parser.add_argument("--adp-h5", type=Path, required=True)
     parser.add_argument("--teacher-table", type=Path, required=True)
+    parser.add_argument(
+        "--additional-exclusion-table",
+        type=Path,
+        action="append",
+        default=[],
+        help="Optional prior evaluation table whose TICs must also be excluded.",
+    )
+    parser.add_argument(
+        "--host-overlap-audit-table",
+        type=Path,
+        action="append",
+        default=[],
+        help="Optional table whose TIC overlap is reported but not excluded.",
+    )
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
@@ -37,6 +51,8 @@ def main() -> int:
             teacher_table=args.teacher_table,
             config=load_recovery_config(args.config),
             out_dir=args.out_dir,
+            additional_exclusion_tables=args.additional_exclusion_table,
+            host_overlap_audit_tables=args.host_overlap_audit_table,
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
 

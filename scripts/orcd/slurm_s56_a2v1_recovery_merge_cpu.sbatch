@@ -12,7 +12,9 @@ set -euo pipefail
 
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
-OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v1_recovery}"
+SECTOR="${TWIRL_RECOVERY_SECTOR:-56}"
+SECTOR_TAG="s${SECTOR}"
+OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/${SECTOR_TAG}_A2v1_teacher_v1_recovery}"
 FULL="${OUT_ROOT}/full"
 
 mkdir -p "${FULL}/teacher_inputs"
@@ -28,4 +30,4 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
   --out-native-h5 "${FULL}/teacher_inputs/native_top5.h5" \
   --maximum-injections 20000
 
-echo "[s56-a2rec-merge] complete $(date -Is)"
+echo "[${SECTOR_TAG}-a2rec-merge] complete $(date -Is)"

@@ -11,19 +11,24 @@ import h5py
 import pandas as pd
 
 from twirl.injections.a2v1_recovery import (
-    FRESH_INJECTION_CONTRACT,
+    fresh_injection_contract,
     load_recovery_config,
     write_fresh_injection_shard,
 )
 
 
-def _complete(path: Path, expected: int, selection_mode: str) -> bool:
+def _complete(
+    path: Path,
+    expected: int,
+    selection_mode: str,
+    contract: str,
+) -> bool:
     if not path.exists():
         return False
     try:
         with h5py.File(path, "r") as h5:
             return (
-                str(h5.attrs.get("contract_version", "")) == FRESH_INJECTION_CONTRACT
+                str(h5.attrs.get("contract_version", "")) == contract
                 and len(h5["injections"]) == expected
                 and str(h5.attrs.get("selection_mode", "shard")) == selection_mode
             )
@@ -49,12 +54,16 @@ def main() -> int:
     args = parser.parse_args()
 
     config = load_recovery_config(args.config)
+    contract = fresh_injection_contract(config.sector)
     expected = (
         config.rows_per_shard
         if args.limit is None
         else min(config.rows_per_shard, args.limit)
     )
-    if _complete(args.out_h5, expected, args.selection_mode) and not args.overwrite:
+    if (
+        _complete(args.out_h5, expected, args.selection_mode, contract)
+        and not args.overwrite
+    ):
         print(f"[a2v1-injection-shard] complete output exists: {args.out_h5}")
         return 0
     if args.out_h5.exists() and not args.overwrite:

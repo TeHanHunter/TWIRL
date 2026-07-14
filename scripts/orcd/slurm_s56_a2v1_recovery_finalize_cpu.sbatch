@@ -12,9 +12,12 @@ set -euo pipefail
 
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
-OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v1_recovery}"
+SECTOR="${TWIRL_RECOVERY_SECTOR:-56}"
+SECTOR_TAG="s${SECTOR}"
+OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/${SECTOR_TAG}_A2v1_teacher_v1_recovery}"
 FULL="${OUT_ROOT}/full"
-INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1}"
+INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/${SECTOR_TAG}_A2v1}"
+CONFIG="${TWIRL_RECOVERY_CONFIG:-${REPO}/configs/injections/${SECTOR_TAG}_a2v1_teacher_v1_recovery_v1.yaml}"
 CHECKPOINT_ROOT="${TWIRL_TEACHER_CHECKPOINT_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/shape_plus_periodogram_bls}"
 
 mkdir -p "${FULL}/final"
@@ -34,7 +37,7 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 
 "${PYTHON}" scripts/stage5_validation/write_s56_a2v1_recovery_run_manifest.py \
   --repo "${REPO}" \
-  --config "${REPO}/configs/injections/s56_a2v1_teacher_v1_recovery_v1.yaml" \
+  --config "${CONFIG}" \
   --input-verification "${INPUT_ROOT}/input_verification.json" \
   --schedule-summary "${OUT_ROOT}/schedule/schedule_summary.json" \
   --teacher-summary "${FULL}/teacher_scores.summary.json" \
@@ -47,4 +50,4 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
     "${CHECKPOINT_ROOT}/fold_4/teacher.pt" \
   --out-json "${FULL}/final/run_manifest.json"
 
-echo "[s56-a2rec-final] complete $(date -Is)"
+echo "[${SECTOR_TAG}-a2rec-final] complete $(date -Is)"
