@@ -396,6 +396,7 @@ def test_fresh_manifest_truth_normalization_uses_established_radius_name() -> No
     assert normalized.loc[0, "truth_period_d"] == 1.5
     assert normalized.loc[0, "truth_radius_rearth"] == 2.25
     assert normalized.loc[0, "plot_radius_rearth"] == 2.25
+    assert normalized.loc[0, "plot_total_transit_min"] == 144.0
     assert normalized.loc[0, "truth_duration_min"] == 8.0
     assert normalized.loc[0, "truth_n_good_in_transit"] == 4
     assert normalized.loc[0, "tmag"] == 18.2

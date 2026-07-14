@@ -1636,8 +1636,10 @@ def audit_fresh_injection_shards(
 
 def normalize_fresh_injection_manifest_truth(
     manifest: pd.DataFrame,
+    *,
+    reference_sector_baseline_d: float = 27.0,
 ) -> pd.DataFrame:
-    """Expose fresh-injection parameters under the truth-audit schema."""
+    """Expose fresh-injection parameters under the truth and plot schemas."""
 
     renames = {
         "period_d": "truth_period_d",
@@ -1658,6 +1660,11 @@ def normalize_fresh_injection_manifest_truth(
     out = manifest.rename(columns=renames).copy()
     out["plot_radius_rearth"] = pd.to_numeric(
         out["truth_radius_rearth"], errors="coerce"
+    )
+    out["plot_total_transit_min"] = (
+        float(reference_sector_baseline_d)
+        * pd.to_numeric(out["truth_duration_min"], errors="coerce")
+        / pd.to_numeric(out["truth_period_d"], errors="coerce")
     )
     return out
 
