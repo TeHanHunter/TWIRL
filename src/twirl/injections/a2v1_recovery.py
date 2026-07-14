@@ -63,6 +63,7 @@ class A2V1RecoveryConfig:
     seed: int = 560201
     n_injections: int = 20_000
     n_shards: int = 40
+    shard_assignment: str = "contiguous_grid"
     period_bins: int = 50
     radius_bins: int = 50
     repeats_per_cell: int = 8
@@ -90,6 +91,8 @@ class A2V1RecoveryConfig:
             )
         if self.n_injections % self.n_shards:
             raise ValueError("n_injections must divide evenly across n_shards")
+        if self.shard_assignment not in {"contiguous_grid", "balanced_random"}:
+            raise ValueError("unsupported shard_assignment")
         if not 0 < self.period_min_d < self.period_max_d:
             raise ValueError("invalid period range")
         if not 0 < self.radius_min_rearth < self.radius_max_rearth:
@@ -541,6 +544,25 @@ def _a_over_rwd(period_d: float) -> float:
     return float((G_SI * rho_kg_m3 * period_s**2 / (3.0 * np.pi)) ** (1.0 / 3.0))
 
 
+def _assign_shards(
+    schedule: pd.DataFrame,
+    *,
+    config: A2V1RecoveryConfig,
+) -> np.ndarray:
+    if config.shard_assignment == "contiguous_grid":
+        return (
+            pd.to_numeric(schedule["injection_index"], errors="raise")
+            // config.rows_per_shard
+        ).to_numpy(dtype=np.int16)
+    rng = np.random.default_rng(_seed(config.seed, 0, 83))
+    order = rng.permutation(len(schedule))
+    assignments = np.empty(len(schedule), dtype=np.int16)
+    assignments[order] = np.repeat(
+        np.arange(config.n_shards, dtype=np.int16), config.rows_per_shard
+    )
+    return assignments
+
+
 def _circle_overlap_depth(radius_ratio: float, impact_b: float) -> float:
     r = float(radius_ratio)
     d = float(impact_b)
@@ -682,9 +704,7 @@ def build_fresh_injection_schedule(
     schedule["injection_id"] = schedule["injection_index"].map(
         lambda value: f"s{config.sector}a2v1_eval_{int(value):06d}"
     )
-    schedule["shard_index"] = (
-        schedule["injection_index"] // config.rows_per_shard
-    ).astype(np.int16)
+    schedule["shard_index"] = _assign_shards(schedule, config=config)
     schedule["h5_group"] = "/injections/" + schedule["injection_id"]
     schedule["schedule_contract"] = locked_schedule_contract
     schedule["evaluation_only"] = True
@@ -717,6 +737,24 @@ def build_fresh_injection_schedule(
         out_dir / "injection_schedule.csv.gz", index=False, compression="gzip"
     )
     support.to_csv(out_dir / "period_radius_support.csv", index=False)
+    shard_support = (
+        schedule.groupby("shard_index", as_index=False)
+        .agg(
+            n_injections=("injection_id", "size"),
+            n_period_bins=("grid_period_bin", "nunique"),
+            n_radius_bins=("grid_radius_bin", "nunique"),
+            period_min_d=("period_d", "min"),
+            period_max_d=("period_d", "max"),
+            radius_min_rearth=("radius_rearth", "min"),
+            radius_max_rearth=("radius_rearth", "max"),
+        )
+        .sort_values("shard_index")
+    )
+    if len(shard_support) != config.n_shards:
+        raise RuntimeError("schedule does not populate every configured shard")
+    if not shard_support["n_injections"].eq(config.rows_per_shard).all():
+        raise RuntimeError("schedule does not balance rows across shards")
+    shard_support.to_csv(out_dir / "shard_support.csv", index=False)
     selected_tics = set(schedule["tic"].astype(int))
     host_overlap_audits = []
     for path in host_overlap_audit_tables:
@@ -761,6 +799,11 @@ def build_fresh_injection_schedule(
         "n_cells": int(len(support)),
         "cell_support_min": int(support["n_injections"].min()),
         "cell_support_max": int(support["n_injections"].max()),
+        "shard_assignment": config.shard_assignment,
+        "shard_period_bin_support_min": int(shard_support["n_period_bins"].min()),
+        "shard_period_bin_support_max": int(shard_support["n_period_bins"].max()),
+        "shard_radius_bin_support_min": int(shard_support["n_radius_bins"].min()),
+        "shard_radius_bin_support_max": int(shard_support["n_radius_bins"].max()),
         "tmag_counts": {
             str(key): int(value)
             for key, value in _tmag_bin(schedule["tessmag"])

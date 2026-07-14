@@ -3,6 +3,7 @@ sector: 57
 seed: 570201
 n_injections: 20000
 n_shards: 40
+shard_assignment: balanced_random
 period_bins: 50
 radius_bins: 50
 repeats_per_cell: 8

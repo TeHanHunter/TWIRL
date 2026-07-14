@@ -27,12 +27,16 @@ from twirl.vetting.injection_teacher_recovery import (
 from twirl.vetting.harmonic_inference import prepare_inference_rows
 
 
-def _config(sector: int = 56) -> A2V1RecoveryConfig:
+def _config(
+    sector: int = 56,
+    shard_assignment: str = "contiguous_grid",
+) -> A2V1RecoveryConfig:
     return A2V1RecoveryConfig(
         name="test",
         sector=sector,
         n_injections=8,
         n_shards=2,
+        shard_assignment=shard_assignment,
         period_bins=2,
         radius_bins=2,
         repeats_per_cell=2,
@@ -158,7 +162,7 @@ def test_sector_57_schedule_has_sector_specific_contracts_and_ids(
         raw_h5=raw_h5,
         adp_h5=adp_h5,
         teacher_table=teacher,
-        config=_config(57),
+        config=_config(57, "balanced_random"),
         out_dir=tmp_path / "schedule",
         host_overlap_audit_tables=[prior_sector],
     )
@@ -167,6 +171,9 @@ def test_sector_57_schedule_has_sector_specific_contracts_and_ids(
     assert schedule["schedule_contract"].eq(schedule_contract(57)).all()
     assert summary["contract"] == schedule_contract(57)
     assert summary["injection_contract"] == fresh_injection_contract(57)
+    assert summary["shard_assignment"] == "balanced_random"
+    assert schedule.groupby("shard_index").size().eq(4).all()
+    assert not schedule["shard_index"].is_monotonic_increasing
     assert summary["host_overlap_audits"] == [
         {
             "table": str(prior_sector.resolve()),
