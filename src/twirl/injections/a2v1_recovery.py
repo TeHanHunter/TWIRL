@@ -1669,6 +1669,38 @@ def normalize_fresh_injection_manifest_truth(
     return out
 
 
+def numeric_arrays_match_with_ulp_budget(
+    left: np.ndarray | pd.Series,
+    right: np.ndarray | pd.Series,
+    *,
+    max_ulps: int = 2,
+) -> bool:
+    """Compare float64 arrays within an explicit serialization ULP budget."""
+
+    if max_ulps < 0:
+        raise ValueError("max_ulps must be non-negative")
+    left_values = np.asarray(left, dtype=np.float64)
+    right_values = np.asarray(right, dtype=np.float64)
+    if left_values.shape != right_values.shape:
+        return False
+    same_nan = np.isnan(left_values) & np.isnan(right_values)
+    same_infinite = (
+        np.isinf(left_values)
+        & np.isinf(right_values)
+        & (np.signbit(left_values) == np.signbit(right_values))
+    )
+    finite = np.isfinite(left_values) & np.isfinite(right_values)
+    if not np.all(same_nan | same_infinite | finite):
+        return False
+    if not np.any(finite):
+        return True
+    finite_left = left_values[finite]
+    finite_right = right_values[finite]
+    scale = np.maximum(np.abs(finite_left), np.abs(finite_right))
+    tolerance = float(max_ulps) * np.spacing(scale)
+    return bool(np.all(np.abs(finite_left - finite_right) <= tolerance))
+
+
 def select_parameter_spanning_rows(
     schedule: pd.DataFrame,
     *,
@@ -1742,6 +1774,7 @@ __all__ = [
     "build_fresh_injection_schedule",
     "audit_fresh_injection_shards",
     "load_recovery_config",
+    "numeric_arrays_match_with_ulp_budget",
     "run_adp_roundtrip_parity",
     "select_parameter_spanning_rows",
     "write_fresh_injection_shard",

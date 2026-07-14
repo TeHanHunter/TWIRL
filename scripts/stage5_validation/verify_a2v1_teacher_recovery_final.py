@@ -11,7 +11,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from twirl.injections.a2v1_recovery import load_recovery_config, schedule_contract
+from twirl.injections.a2v1_recovery import (
+    load_recovery_config,
+    numeric_arrays_match_with_ulp_budget,
+    schedule_contract,
+)
 from twirl.vetting.recovery50_teacher import leakage_columns
 
 
@@ -218,12 +222,10 @@ def main() -> int:
     )
     for column in ("period_d", "t0_bjd", "duration_min"):
         require(
-            np.allclose(
+            numeric_arrays_match_with_ulp_budget(
                 pd.to_numeric(small_top5[column], errors="coerce"),
                 pd.to_numeric(candidate_top5[column], errors="coerce"),
-                rtol=0.0,
-                atol=1.0e-10,
-                equal_nan=True,
+                max_ulps=2,
             ),
             f"Teacher candidate {column} differs from the stored ADP-small top five",
         )

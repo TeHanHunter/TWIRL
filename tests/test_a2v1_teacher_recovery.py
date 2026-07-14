@@ -16,6 +16,7 @@ from twirl.injections.a2v1_recovery import (
     compare_adp_compact_products,
     fresh_injection_contract,
     normalize_fresh_injection_manifest_truth,
+    numeric_arrays_match_with_ulp_budget,
     run_adp_roundtrip_parity,
     schedule_contract,
     select_parameter_spanning_rows,
@@ -432,6 +433,22 @@ def test_existing_holdout_helper_excludes_all_teacher_hosts() -> None:
     )
     assert set(retained["tic"]) == {1, 3, 4}
     assert summary["n_retained_on_any_teacher_table_host"] == 0
+
+
+def test_numeric_array_comparison_enforces_two_ulp_serialization_budget() -> None:
+    values = np.array([2_459_830.123456789, 13.0, np.nan, np.inf, -np.inf])
+    two_ulps = values.copy()
+    two_ulps[0] = np.nextafter(np.nextafter(values[0], np.inf), np.inf)
+    assert numeric_arrays_match_with_ulp_budget(values, two_ulps, max_ulps=2)
+
+    three_ulps = two_ulps.copy()
+    three_ulps[0] = np.nextafter(three_ulps[0], np.inf)
+    assert not numeric_arrays_match_with_ulp_budget(values, three_ulps, max_ulps=2)
+    assert not numeric_arrays_match_with_ulp_budget(
+        values,
+        values + np.array([1.0e-8, 0.0, 0.0, 0.0, 0.0]),
+        max_ulps=2,
+    )
 
 
 def test_teacher_inference_requires_explicit_injection_opt_in() -> None:
