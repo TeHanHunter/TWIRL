@@ -8,13 +8,27 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from twirl.injections.a2v1_recovery import load_recovery_config, schedule_contract
+from twirl.vetting.recovery50_teacher import leakage_columns
 
 
 def _json(path: Path) -> dict:
     return json.loads(path.read_text())
+
+
+def _bool_series(values: pd.Series) -> pd.Series:
+    if values.dtype == bool:
+        return values.fillna(False)
+    return (
+        values.fillna("")
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .isin({"1", "1.0", "true", "t", "yes", "y"})
+    )
 
 
 def main() -> int:
@@ -40,9 +54,11 @@ def main() -> int:
     outcomes = pd.read_parquet(final / "injection_recovery_outcomes.parquet")
     input_verification = _json(args.input_verification)
     parity = _json(root / "schedule/adp_roundtrip_parity_summary.json")
+    schedule_summary = _json(root / "schedule/schedule_summary.json")
     product_audit = _json(final / "injection_product_audit.json")
     summary = _json(final / "summary.json")
     run_manifest = _json(final / "run_manifest.json")
+    teacher_summary = _json(full / "teacher_scores.summary.json")
     failures: list[str] = []
 
     def require(condition: bool, message: str) -> None:
@@ -56,6 +72,34 @@ def main() -> int:
         "input verification sector mismatch",
     )
     require(bool(parity.get("passed")), "ADP no-injection parity failed")
+    require(
+        int(input_verification.get("compact_rebuild_parity", {}).get("n_mismatched_targets", -1))
+        == 0,
+        "rebuilt compact product has target-level mismatches",
+    )
+    expected_hash_names = {
+        f"hlsp_s{config.sector:04d}_A2v1_tree",
+        "human_vetting_training_table_adjudicated.csv",
+        f"s{config.sector}_A2v1_adp_pair.h5",
+        f"s{config.sector}_A2v1_tglc_raw_sources.h5",
+        f"s{config.sector}_A2v1_validation_full_schema.json",
+    }
+    input_hashes = input_verification.get("hashes", {})
+    require(
+        expected_hash_names.issubset(input_hashes),
+        "input verification is missing locked source hashes",
+    )
+    require(
+        all(
+            len(str(input_hashes.get(name, ""))) == 64
+            and all(
+                value in "0123456789abcdef"
+                for value in str(input_hashes.get(name, "")).lower()
+            )
+            for name in expected_hash_names
+        ),
+        "input verification contains an invalid source SHA256",
+    )
     require(bool(product_audit.get("passed")), "full injection-product audit failed")
     require(len(schedule) == expected, "schedule row count mismatch")
     require(schedule["tic"].nunique() == expected, "schedule reuses host TICs")
@@ -82,6 +126,22 @@ def main() -> int:
         support.eq(config.repeats_per_cell).all(),
         "schedule has incorrect per-cell support",
     )
+    shard_support = schedule.groupby("shard_index").agg(
+        n_injections=("injection_id", "size"),
+        n_period_bins=("grid_period_bin", "nunique"),
+        n_radius_bins=("grid_radius_bin", "nunique"),
+    )
+    require(len(shard_support) == config.n_shards, "schedule shard count mismatch")
+    require(
+        shard_support["n_injections"].eq(config.rows_per_shard).all(),
+        "schedule rows are not balanced across shards",
+    )
+    if config.shard_assignment == "balanced_random":
+        require(
+            shard_support["n_period_bins"].eq(config.period_bins).all()
+            and shard_support["n_radius_bins"].eq(config.radius_bins).all(),
+            "balanced schedule shards do not span both grid axes",
+        )
     teacher_tics = set(
         pd.to_numeric(teacher["tic"], errors="coerce").dropna().astype(int)
     )
@@ -94,6 +154,23 @@ def main() -> int:
         and bool(schedule["teacher_training_excluded"].all()),
         "schedule is not locked evaluation-only",
     )
+    host_qa = pd.read_csv(root / "schedule/host_qa.csv.gz", low_memory=False)
+    eligible_bright = host_qa.loc[
+        _bool_series(host_qa["eligible"])
+        & pd.to_numeric(host_qa["tessmag"], errors="coerce").lt(19.0),
+        "tic",
+    ]
+    require(
+        set(pd.to_numeric(eligible_bright, errors="raise").astype(int)).issubset(
+            set(schedule["tic"].astype(int))
+        ),
+        "schedule does not include every eligible Tmag < 19 host",
+    )
+    if config.sector > 56:
+        require(
+            bool(schedule_summary.get("host_overlap_audits")),
+            "later-sector schedule has no prior-sector host-overlap audit",
+        )
     require(
         int(product_audit.get("n_groups", -1)) == expected,
         "product audit group count mismatch",
@@ -125,12 +202,56 @@ def main() -> int:
         candidates.groupby("injection_id").size().eq(5).all(),
         "Teacher candidate table does not have five candidates/injection",
     )
+    small_top5 = peaks.loc[
+        peaks["aperture"].astype(str).eq("DET_FLUX_ADP_SML")
+        & pd.to_numeric(peaks["peak_rank"], errors="coerce").between(1, 5)
+    ].sort_values(["injection_id", "peak_rank"], kind="stable")
+    candidate_top5 = candidates.sort_values(
+        ["injection_id", "rep_peak_rank"], kind="stable"
+    )
+    require(
+        small_top5["injection_id"].astype(str).tolist()
+        == candidate_top5["injection_id"].astype(str).tolist()
+        and pd.to_numeric(small_top5["peak_rank"], errors="coerce").tolist()
+        == pd.to_numeric(candidate_top5["rep_peak_rank"], errors="coerce").tolist(),
+        "Teacher candidate identities differ from the stored ADP-small top five",
+    )
+    for column in ("period_d", "t0_bjd", "duration_min"):
+        require(
+            np.allclose(
+                pd.to_numeric(small_top5[column], errors="coerce"),
+                pd.to_numeric(candidate_top5[column], errors="coerce"),
+                rtol=0.0,
+                atol=1.0e-10,
+                equal_nan=True,
+            ),
+            f"Teacher candidate {column} differs from the stored ADP-small top five",
+        )
+    require(
+        _bool_series(small_top5["is_injected_signal_peak"]).tolist()
+        == _bool_series(candidate_top5["is_injected_signal_peak"]).tolist(),
+        "Teacher candidate truth-match audit flags differ from the stored top five",
+    )
     require(len(scores) == expected_candidate_rows, "Teacher score row count mismatch")
     require(scores["review_id"].is_unique, "Teacher score review IDs are duplicated")
     require(
         candidates["review_id"].astype(str).tolist()
         == scores["review_id"].astype(str).tolist(),
         "Teacher scores do not preserve the candidate set and order",
+    )
+    metadata_by_fold = teacher_summary.get("metadata_columns_by_fold", [])
+    require(
+        len(metadata_by_fold) == 5,
+        "Teacher summary does not contain five metadata feature contracts",
+    )
+    metadata_columns = {
+        str(column)
+        for columns in metadata_by_fold
+        for column in columns
+    }
+    require(
+        not leakage_columns(metadata_columns),
+        "Teacher checkpoint metadata contains truth or provenance leakage",
     )
     require(len(outcomes) == expected, "final outcome row count mismatch")
     require(outcomes["injection_id"].is_unique, "final outcomes are duplicated")
