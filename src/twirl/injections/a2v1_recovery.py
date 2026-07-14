@@ -1337,9 +1337,27 @@ def audit_fresh_injection_shards(
                         & np.isfinite(model)
                         & (model < 1.0 - 1.0e-10)
                     )
+                    for dataset_name in (
+                        "RAW_FLUX_Small_original",
+                        "RAW_FLUX_ERR_Small_original",
+                        "RAW_FLUX_Primary_original",
+                        "RAW_FLUX_ERR_Primary_original",
+                    ):
+                        good_transit &= np.isfinite(
+                            np.asarray(group[dataset_name], dtype=float)
+                        )
+                    n_good_in_transit = int(np.count_nonzero(good_transit))
                     min_good_in_transit = min(
-                        min_good_in_transit, int(np.count_nonzero(good_transit))
+                        min_good_in_transit, n_good_in_transit
                     )
+                    if int(group.attrs.get("n_good_in_transit", -1)) != n_good_in_transit:
+                        record_failure(
+                            "in_transit_count_mismatch",
+                            injection_id=injection_id,
+                            tic=tic,
+                            observed=int(group.attrs.get("n_good_in_transit", -1)),
+                            recomputed=n_good_in_transit,
+                        )
                     for label, raw_flux_name, raw_error_name, adp_name in (
                         (
                             "Small",
