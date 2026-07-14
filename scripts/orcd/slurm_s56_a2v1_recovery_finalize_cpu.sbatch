@@ -59,4 +59,11 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
     "${CHECKPOINT_ROOT}/fold_4/teacher.pt" \
   --out-json "${FULL}/final/run_manifest.json"
 
+"${PYTHON}" scripts/stage5_validation/verify_a2v1_teacher_recovery_final.py \
+  --config "${CONFIG}" \
+  --recovery-root "${OUT_ROOT}" \
+  --input-verification "${INPUT_ROOT}/input_verification.json" \
+  --teacher-table "${INPUT_ROOT}/human_vetting_training_table_adjudicated.csv" \
+  --out-json "${FULL}/final/acceptance.json"
+
 echo "[${SECTOR_TAG}-a2rec-final] complete $(date -Is)"
