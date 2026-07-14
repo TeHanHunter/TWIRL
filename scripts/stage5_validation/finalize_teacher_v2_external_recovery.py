@@ -17,6 +17,7 @@ from twirl.vetting.teacher_v2_recovery import (
     aggregate_compact_recovery,
     bls_topk_recovery_table,
     compare_recovery_models,
+    period_radius_tmag_support,
 )
 
 
@@ -177,6 +178,7 @@ def main() -> int:
         raise ValueError("external recovery manifest must contain exactly one sector")
 
     base = normalize_fresh_injection_manifest_truth(manifest)
+    support = period_radius_tmag_support(base)
     topk = bls_topk_recovery_table(base, candidates)
     v2_outcomes, v2_summary = aggregate_compact_recovery(
         base,
@@ -199,6 +201,7 @@ def main() -> int:
         args.out_dir / "injection_recovery_outcomes.parquet", compression="zstd", index=False
     )
     topk.to_csv(args.out_dir / "bls_recovery_at_1_3_5.csv", index=False)
+    support.to_csv(args.out_dir / "period_radius_tmag_support.csv", index=False)
     _unsmoothed_grid(
         v2_outcomes,
         ("bls_top1_recovered", "bls_top3_recovered", "bls_top5_recovered", "teacher_v2_compact_recovered"),
@@ -318,6 +321,7 @@ def main() -> int:
         "n_candidates": int(len(candidates)),
         "frozen_selection": frozen,
         "teacher_v2": v2_summary,
+        "tmag_support": support.to_dict("records"),
         "n_strict_planet_truth_match_rows": int(len(strict_planet)),
         "model_comparison": comparison.to_dict("records"),
         "acceptance": acceptance,

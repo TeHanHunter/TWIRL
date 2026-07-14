@@ -39,6 +39,7 @@ from twirl.vetting.teacher_v2_selection import freeze_teacher_v2_selection
 from twirl.vetting.teacher_v2_recovery import (
     aggregate_compact_recovery,
     bls_topk_recovery_table,
+    period_radius_tmag_support,
 )
 
 
@@ -254,6 +255,27 @@ def test_native_availability_preserves_upstream_exclusions() -> None:
         "missing_raw_source",
         "excluded_upstream",
     ]
+
+
+def test_tmag_support_audit_flags_sparse_bright_cells_without_host_reuse() -> None:
+    manifest = pd.DataFrame(
+        {
+            "injection_id": ["a", "b", "c", "d"],
+            "tic": [1, 2, 3, 4],
+            "tmag": [16.5, 17.5, 19.5, 19.7],
+            "grid_cell_id": ["cell0", "cell1", "cell2", "cell3"],
+        }
+    )
+
+    support = period_radius_tmag_support(manifest).set_index("tmag_bin")
+
+    assert support.loc["Tmag < 17", "n_unique_hosts"] == 1
+    assert support.loc["Tmag < 17", "cell_coverage_fraction"] == 0.25
+    assert bool(support.loc["Tmag < 17", "bright_enrichment_recommended"])
+    assert support.loc["Tmag >= 19", "host_reuse_factor"] == 1.0
+    assert not bool(
+        support.loc["Tmag >= 19", "bright_enrichment_recommended"]
+    )
 
 
 def test_workload_threshold_never_exceeds_budget_when_scores_tie() -> None:

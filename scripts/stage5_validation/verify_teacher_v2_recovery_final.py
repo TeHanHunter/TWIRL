@@ -64,6 +64,7 @@ def main() -> int:
 
     required = [
         root / "bls_recovery_at_1_3_5.csv",
+        root / "period_radius_tmag_support.csv",
         root / "teacher_retention_by_tmag.csv",
         root / "period_radius_recovery_unsmoothed.csv",
         root / "teacher_v2_strict_planet_truth_matches.parquet",

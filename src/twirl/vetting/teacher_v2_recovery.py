@@ -8,6 +8,14 @@ import numpy as np
 import pandas as pd
 
 
+TMAG_SUPPORT_LABELS: tuple[str, ...] = (
+    "Tmag < 17",
+    "17 <= Tmag < 18",
+    "18 <= Tmag < 19",
+    "Tmag >= 19",
+)
+
+
 def _as_bool(values: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(values):
         return values.fillna(False).astype(bool)
@@ -121,6 +129,67 @@ def bls_topk_recovery_table(
     return pd.DataFrame(rows).drop_duplicates("top_k").sort_values("top_k")
 
 
+def period_radius_tmag_support(manifest: pd.DataFrame) -> pd.DataFrame:
+    """Summarize host and grid support without smoothing or host reuse."""
+
+    required = {"tic", "tmag", "grid_cell_id", "injection_id"}
+    missing = sorted(required - set(manifest.columns))
+    if missing:
+        raise KeyError(f"injection support manifest is missing columns: {missing}")
+    work = manifest.copy()
+    work["tic"] = pd.to_numeric(work["tic"], errors="raise").astype(np.int64)
+    work["tmag"] = pd.to_numeric(work["tmag"], errors="coerce")
+    if work["tmag"].isna().any():
+        raise ValueError("injection support manifest contains invalid Tmag values")
+    work["tmag_bin"] = pd.cut(
+        work["tmag"],
+        [-np.inf, 17.0, 18.0, 19.0, np.inf],
+        right=False,
+        labels=TMAG_SUPPORT_LABELS,
+    )
+    cells = pd.Index(sorted(work["grid_cell_id"].astype(str).unique()))
+    rows: list[dict[str, Any]] = []
+    for label in TMAG_SUPPORT_LABELS:
+        subset = work.loc[work["tmag_bin"].astype(str).eq(label)].copy()
+        support = (
+            subset.assign(grid_cell_id=subset["grid_cell_id"].astype(str))
+            .groupby("grid_cell_id")
+            .size()
+            .reindex(cells, fill_value=0)
+            .to_numpy(dtype=int)
+        )
+        represented = int(np.count_nonzero(support))
+        n_injections = int(len(subset))
+        n_hosts = int(subset["tic"].nunique())
+        coverage = float(represented / len(cells)) if len(cells) else 0.0
+        rows.append(
+            {
+                "tmag_bin": label,
+                "n_injections": n_injections,
+                "n_unique_hosts": n_hosts,
+                "host_reuse_factor": (
+                    float(n_injections / n_hosts) if n_hosts else np.nan
+                ),
+                "n_expected_cells": int(len(cells)),
+                "n_represented_cells": represented,
+                "cell_coverage_fraction": coverage,
+                "cell_support_min": int(support.min()) if len(support) else 0,
+                "cell_support_p10": (
+                    float(np.quantile(support, 0.10)) if len(support) else 0.0
+                ),
+                "cell_support_median": (
+                    float(np.median(support)) if len(support) else 0.0
+                ),
+                "cell_support_max": int(support.max()) if len(support) else 0,
+                "bright_enrichment_recommended": bool(
+                    label != "Tmag >= 19" and coverage < 0.90
+                ),
+                "sampling_role": "primary_host_disjoint",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def compare_recovery_models(
     outcomes: Mapping[str, pd.DataFrame],
     *,
@@ -162,4 +231,5 @@ __all__ = [
     "aggregate_compact_recovery",
     "bls_topk_recovery_table",
     "compare_recovery_models",
+    "period_radius_tmag_support",
 ]
