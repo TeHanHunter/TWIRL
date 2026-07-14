@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p pg_mki_aryeh
 #SBATCH --job-name=s56-t2-frozen-score
-#SBATCH --array=0-9%1
+#SBATCH --array=0-8%1
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 16
@@ -127,12 +127,6 @@ case "${TASK}" in
   8)
     v1_score "${HUMAN_CANDIDATES}" "${REAL_NATIVE}" "" \
       "${OUT_ROOT}/frozen_scores/s56_human_teacher_v1.parquet"
-    ;;
-  9)
-    v2_score "${SELECTED_PROFILE}" \
-      "${OUT_ROOT}/roles/franklin_current_a2v1_audit_candidates.parquet" \
-      "${REAL_NATIVE}" "" \
-      "${OUT_ROOT}/frozen_scores/franklin_current_a2v1_teacher_v2.parquet"
     ;;
   *)
     echo "Unknown frozen-score task ${TASK}" >&2

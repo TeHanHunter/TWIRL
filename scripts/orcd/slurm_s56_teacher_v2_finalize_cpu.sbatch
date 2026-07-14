@@ -65,11 +65,6 @@ human_status=0
   --teacher-v1-scores "${OUT_ROOT}/frozen_scores/s56_human_teacher_v1.parquet" \
   --out-dir "${OUT_ROOT}/human_holdout" || human_status=$?
 
-"${PYTHON}" scripts/stage5_validation/summarize_franklin_teacher_v2_audit.py \
-  --scores "${OUT_ROOT}/frozen_scores/franklin_current_a2v1_teacher_v2.parquet" \
-  --frozen-selection "${FROZEN}" \
-  --out-dir "${OUT_ROOT}/franklin_score_audit"
-
 "${PYTHON}" scripts/stage5_validation/verify_teacher_v2_recovery_final.py \
   --root "${OUT_ROOT}/s56_locked_holdout_recovery" \
   --role-summary "${OUT_ROOT}/roles/role_summary.json" \

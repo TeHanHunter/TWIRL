@@ -1082,6 +1082,18 @@ macro F1 `0.757`, and ECE `0.048`. The model passes its configured smoke gates,
 but the real Planet-like test support is only `2/2`; keep it restricted to
 active-learning enrichment until real-planet and rare-harmonic support grows.
 
+Status (`2026-07-14`, Teacher-v2 training in progress): the hybrid v2 path uses
+fresh S56 injections only when ADP-small BLS proposes a top-five candidate that
+truth-matches the injected ephemeris; those rows supervise compact-transit and
+harmonic recognition, while the adjudicated real set retains responsibility
+for Planet/EB/Variable/Other morphology and preserve/reject. Franklin's labels
+are preserved as audit provenance and their TICs remain excluded from the S57
+external test, but transfer re-review and Franklin scoring are deferred off the
+training critical path. The primary S57 result remains the frozen,
+host-disjoint external test. If its bright Tmag panels are locally sparse, a
+separate equal-Tmag, host-clustered enrichment evaluation may be added after
+model/threshold freeze; it must not replace or tune the primary metrics.
+
 Pre-human-labeling path:
 
 1. Use the accepted S56 pilot light-curve product as the baseline, with the

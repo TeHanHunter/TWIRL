@@ -21,6 +21,7 @@ from twirl.vetting.teacher_v2 import (
     build_s56_real_workload_candidates,
     build_s57_external_role_manifest,
     join_franklin_labels_to_queue,
+    normalize_franklin_labels,
     transfer_human_labels_to_a2v1_candidates,
 )
 
@@ -54,7 +55,16 @@ def main() -> int:
     parser.add_argument("--human-a2v1-compatibility", type=Path)
     parser.add_argument("--s56-real-candidates", type=Path, required=True)
     parser.add_argument("--franklin-labels", type=Path, required=True)
-    parser.add_argument("--franklin-queue", type=Path, required=True)
+    parser.add_argument("--franklin-queue", type=Path)
+    parser.add_argument(
+        "--prepare-franklin-transfer-audit",
+        action="store_true",
+        help=(
+            "Opt in to the deferred Franklin A2v1 transfer/re-review audit. "
+            "Initial Teacher-v2 training only snapshots his labels and excludes "
+            "their TICs from evaluation partitions."
+        ),
+    )
     parser.add_argument("--s57-schedule", type=Path, required=True)
     parser.add_argument("--s57-candidates", type=Path, required=True)
     parser.add_argument("--s57-native-h5", type=Path, required=True)
@@ -70,11 +80,16 @@ def main() -> int:
         "human_native_h5": args.human_native_h5,
         "s56_real_candidates": args.s56_real_candidates,
         "franklin_labels": args.franklin_labels,
-        "franklin_queue": args.franklin_queue,
         "s57_schedule": args.s57_schedule,
         "s57_candidates": args.s57_candidates,
         "s57_native_h5": args.s57_native_h5,
     }
+    if args.prepare_franklin_transfer_audit:
+        if args.franklin_queue is None:
+            parser.error(
+                "--prepare-franklin-transfer-audit requires --franklin-queue"
+            )
+        sources["franklin_queue"] = args.franklin_queue
     if args.human_prior_splits:
         sources["human_prior_splits"] = args.human_prior_splits
     if args.human_a2v1_compatibility:
@@ -132,10 +147,7 @@ def main() -> int:
         native_h5=args.human_native_h5,
         compatibility=compatibility,
     )
-    franklin = join_franklin_labels_to_queue(
-        _read(args.franklin_labels),
-        pd.read_csv(args.franklin_queue, dtype=str, keep_default_na=False),
-    )
+    franklin = normalize_franklin_labels(_read(args.franklin_labels))
     s57_schedule = _read(args.s57_schedule)
     registry = build_global_tic_split_registry(
         s56_injection_roles=injection_roles,
@@ -150,29 +162,72 @@ def main() -> int:
     real_workload, real_workload_summary = build_s56_real_workload_candidates(
         real_candidates, registry
     )
-    franklin_for_transfer = franklin.copy()
-    franklin_for_transfer["source_uid"] = franklin_for_transfer["franklin_identity"]
-    franklin_for_transfer["review_id"] = franklin_for_transfer[
-        "franklin_queue_review_id"
-    ]
-    franklin_for_transfer["human_label"] = franklin_for_transfer["label"]
-    franklin_for_transfer["is_injected_row"] = False
-    franklin_a2v1, franklin_compatibility = transfer_human_labels_to_a2v1_candidates(
-        franklin_for_transfer,
-        real_candidates,
-    )
-    franklin_a2v1["teacher_v2_role"] = "franklin_a2v1_audit_only"
-    franklin_a2v1["teacher_v2_training_include"] = False
-    franklin_public, franklin_private, franklin_rereview_summary = (
-        build_franklin_a2v1_rereview_queue(franklin, real_candidates)
-    )
-    franklin_current_a2v1, franklin_current_a2v1_summary = (
-        build_franklin_current_a2v1_audit_candidates(
-            franklin,
-            real_candidates,
-            franklin_compatibility,
+    franklin_outputs: dict[str, Path] = {}
+    franklin_a2v1 = pd.DataFrame()
+    franklin_compatibility = pd.DataFrame()
+    franklin_rereview_summary: dict[str, object] = {
+        "status": "deferred_not_on_teacher_v2_critical_path"
+    }
+    franklin_current_a2v1_summary: dict[str, object] = {
+        "status": "deferred_not_on_teacher_v2_critical_path"
+    }
+    if args.prepare_franklin_transfer_audit:
+        franklin = join_franklin_labels_to_queue(
+            _read(args.franklin_labels),
+            pd.read_csv(args.franklin_queue, dtype=str, keep_default_na=False),
         )
-    )
+        franklin_for_transfer = franklin.copy()
+        franklin_for_transfer["source_uid"] = franklin_for_transfer[
+            "franklin_identity"
+        ]
+        franklin_for_transfer["review_id"] = franklin_for_transfer[
+            "franklin_queue_review_id"
+        ]
+        franklin_for_transfer["human_label"] = franklin_for_transfer["label"]
+        franklin_for_transfer["is_injected_row"] = False
+        franklin_a2v1, franklin_compatibility = (
+            transfer_human_labels_to_a2v1_candidates(
+                franklin_for_transfer,
+                real_candidates,
+            )
+        )
+        franklin_a2v1["teacher_v2_role"] = "franklin_a2v1_audit_only"
+        franklin_a2v1["teacher_v2_training_include"] = False
+        franklin_public, franklin_private, franklin_rereview_summary = (
+            build_franklin_a2v1_rereview_queue(franklin, real_candidates)
+        )
+        franklin_current_a2v1, franklin_current_a2v1_summary = (
+            build_franklin_current_a2v1_audit_candidates(
+                franklin,
+                real_candidates,
+                franklin_compatibility,
+            )
+        )
+        franklin_rereview_csv = out_dir / "franklin_a2v1_rereview_queue.csv"
+        franklin_public.to_csv(franklin_rereview_csv, index=False)
+        franklin_outputs = {
+            "franklin_a2v1_audit_candidates": _write(
+                franklin_a2v1,
+                out_dir / "franklin_a2v1_audit_candidates.parquet",
+            ),
+            "franklin_a2v1_compatibility": _write(
+                franklin_compatibility,
+                out_dir / "franklin_a2v1_compatibility.parquet",
+            ),
+            "franklin_current_a2v1_audit_candidates": _write(
+                franklin_current_a2v1,
+                out_dir / "franklin_current_a2v1_audit_candidates.parquet",
+            ),
+            "franklin_a2v1_rereview_queue": _write(
+                franklin_public,
+                out_dir / "franklin_a2v1_rereview_queue.parquet",
+            ),
+            "franklin_a2v1_rereview_queue_csv": franklin_rereview_csv,
+            "franklin_a2v1_rereview_private_manifest": _write(
+                franklin_private,
+                out_dir / "franklin_a2v1_rereview_private_manifest.parquet",
+            ),
+        }
     if not s57_summary["passed"] and not args.allow_incomplete_s57:
         raise RuntimeError(
             "existing S57 schedule fails the external-test support gate; regenerate it"
@@ -188,8 +243,6 @@ def main() -> int:
     if set(s57_external["tic"]) & (training_tics | holdout_tics):
         raise RuntimeError("Teacher-v2 S57 external TICs overlap S56 partitions")
 
-    franklin_rereview_csv = out_dir / "franklin_a2v1_rereview_queue.csv"
-    franklin_public.to_csv(franklin_rereview_csv, index=False)
     outputs = {
         "training_rows": _write(training, out_dir / "training_rows.parquet"),
         "s56_injection_role_manifest": _write(
@@ -215,26 +268,6 @@ def main() -> int:
         "franklin_audit_rows": _write(
             franklin, out_dir / "franklin_audit_rows.parquet"
         ),
-        "franklin_a2v1_audit_candidates": _write(
-            franklin_a2v1, out_dir / "franklin_a2v1_audit_candidates.parquet"
-        ),
-        "franklin_a2v1_compatibility": _write(
-            franklin_compatibility,
-            out_dir / "franklin_a2v1_compatibility.parquet",
-        ),
-        "franklin_current_a2v1_audit_candidates": _write(
-            franklin_current_a2v1,
-            out_dir / "franklin_current_a2v1_audit_candidates.parquet",
-        ),
-        "franklin_a2v1_rereview_queue": _write(
-            franklin_public,
-            out_dir / "franklin_a2v1_rereview_queue.parquet",
-        ),
-        "franklin_a2v1_rereview_queue_csv": franklin_rereview_csv,
-        "franklin_a2v1_rereview_private_manifest": _write(
-            franklin_private,
-            out_dir / "franklin_a2v1_rereview_private_manifest.parquet",
-        ),
         "global_tic_split_registry": _write(
             registry, out_dir / "global_tic_split_registry.parquet"
         ),
@@ -244,6 +277,7 @@ def main() -> int:
         "s56_real_workload_candidates": _write(
             real_workload, out_dir / "s56_real_workload_candidates.parquet"
         ),
+        **franklin_outputs,
     }
     source_sha256 = {name: _sha256(path) for name, path in sources.items() if path.is_file()}
     summary = {
@@ -260,6 +294,11 @@ def main() -> int:
             str(key): int(value) for key, value in training["fixed_split"].value_counts().items()
         },
         "n_franklin_rows": int(len(franklin)),
+        "franklin_transfer_audit_status": (
+            "prepared"
+            if args.prepare_franklin_transfer_audit
+            else "deferred_not_on_teacher_v2_critical_path"
+        ),
         "n_franklin_a2v1_compatible": int(len(franklin_a2v1)),
         "franklin_a2v1_transfer_fraction": (
             float(franklin_compatibility["a2v1_transfer_ok"].mean())
