@@ -62,6 +62,13 @@ def main() -> int:
     parser.add_argument("--teacher-summary", type=Path, required=True)
     parser.add_argument("--final-summary", type=Path, required=True)
     parser.add_argument("--product-audit", type=Path, required=True)
+    parser.add_argument(
+        "--producer-git-sha",
+        help=(
+            "Commit used to generate the injection/BLS/Teacher products. "
+            "Defaults to the finalizer checkout commit."
+        ),
+    )
     parser.add_argument("--checkpoints", type=Path, nargs=5, required=True)
     parser.add_argument("--out-json", type=Path, required=True)
     args = parser.parse_args()
@@ -74,6 +81,12 @@ def main() -> int:
     final = _json(args.final_summary)
     product_audit = _json(args.product_audit)
     config = yaml.safe_load(args.config.read_text())
+    finalizer_git_sha = _git_output(args.repo, "rev-parse", "HEAD")
+    producer_git_sha = str(args.producer_git_sha or finalizer_git_sha).strip()
+    if len(producer_git_sha) != 40 or any(
+        value not in "0123456789abcdef" for value in producer_git_sha.lower()
+    ):
+        raise ValueError(f"invalid producer Git SHA: {producer_git_sha!r}")
     tracked_clean = (
         subprocess.run(["git", "diff", "--quiet"], cwd=args.repo).returncode == 0
         and subprocess.run(
@@ -89,7 +102,9 @@ def main() -> int:
         "teacher_retraining_allowed": False,
         "code": {
             "repo": str(args.repo.resolve()),
-            "git_sha": _git_output(args.repo, "rev-parse", "HEAD"),
+            "git_sha": finalizer_git_sha,
+            "finalizer_git_sha": finalizer_git_sha,
+            "producer_git_sha": producer_git_sha,
             "git_describe": _git_output(args.repo, "describe", "--always", "--dirty"),
             "tracked_code_clean": tracked_clean,
         },

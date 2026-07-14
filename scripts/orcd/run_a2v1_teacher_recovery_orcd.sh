@@ -85,6 +85,7 @@ case "${ACTION}" in
     prepare_submit_root
     require_remote_file "${OUT_ROOT}/smoke100/teacher_scores_128.summary.json"
     "${SSH[@]}" "cd '${REPO}' && '${PYTHON}' scripts/stage5_validation/verify_s56_a2v1_recovery_smoke.py --recovery-root '${OUT_ROOT}' --input-verification '${INPUT_VERIFICATION}' --out-json '${OUT_ROOT}/smoke100/smoke_acceptance.json'"
+    "${SSH[@]}" "cd '${REPO}' && git rev-parse HEAD > '${OUT_ROOT}/schedule/producer_git_sha.txt'"
     INJECT_JOB="$("${SSH[@]}" "cd '${REPO}' && sbatch --parsable --job-name='${SECTOR_TAG}-a2rec-bls' --output='${LOG_ROOT}/%x-%A_%a.out' --error='${LOG_ROOT}/%x-%A_%a.err' --export='${SBATCH_EXPORT},TWIRL_RECOVERY_MODE=full' scripts/orcd/slurm_s56_a2v1_recovery_injection_bls_cpu.sbatch")"
     NATIVE_JOB="$("${SSH[@]}" "cd '${REPO}' && sbatch --parsable --job-name='${SECTOR_TAG}-a2rec-native' --output='${LOG_ROOT}/%x-%A_%a.out' --error='${LOG_ROOT}/%x-%A_%a.err' --dependency=afterok:${INJECT_JOB} --export='${SBATCH_EXPORT}' scripts/orcd/slurm_s56_a2v1_recovery_teacher_prepare_cpu.sbatch")"
     MERGE_JOB="$("${SSH[@]}" "cd '${REPO}' && sbatch --parsable --job-name='${SECTOR_TAG}-a2rec-merge' --output='${LOG_ROOT}/%x-%j.out' --error='${LOG_ROOT}/%x-%j.err' --dependency=afterok:${NATIVE_JOB} --export='${SBATCH_EXPORT}' scripts/orcd/slurm_s56_a2v1_recovery_merge_cpu.sbatch")"

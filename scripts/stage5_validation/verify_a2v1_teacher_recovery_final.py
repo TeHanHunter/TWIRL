@@ -155,6 +155,12 @@ def main() -> int:
         bool(run_manifest.get("code", {}).get("tracked_code_clean")),
         "run manifest reports a dirty tracked checkout",
     )
+    for field in ("producer_git_sha", "finalizer_git_sha"):
+        sha = str(run_manifest.get("code", {}).get(field, "")).lower()
+        require(
+            len(sha) == 40 and all(value in "0123456789abcdef" for value in sha),
+            f"run manifest has no valid {field}",
+        )
     required_artifacts = (
         final / "bls_recovery_at_1_3_5.csv",
         final / "teacher_retention_by_tmag.csv",

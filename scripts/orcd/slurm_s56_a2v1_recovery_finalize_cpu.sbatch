@@ -19,6 +19,7 @@ FULL="${OUT_ROOT}/full"
 INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/${SECTOR_TAG}_A2v1}"
 CONFIG="${TWIRL_RECOVERY_CONFIG:-${REPO}/configs/injections/${SECTOR_TAG}_a2v1_teacher_v1_recovery_v1.yaml}"
 CHECKPOINT_ROOT="${TWIRL_TEACHER_CHECKPOINT_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/shape_plus_periodogram_bls}"
+PRODUCER_SHA_FILE="${OUT_ROOT}/schedule/producer_git_sha.txt"
 
 mkdir -p "${FULL}/final"
 cd "${REPO}"
@@ -26,6 +27,7 @@ export PYTHONPATH=src
 export MPLBACKEND=Agg
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+test -s "${PRODUCER_SHA_FILE}"
 
 "${PYTHON}" scripts/stage5_validation/audit_a2v1_recovery_products.py \
   --config "${CONFIG}" \
@@ -51,6 +53,7 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
   --teacher-summary "${FULL}/teacher_scores.summary.json" \
   --final-summary "${FULL}/final/summary.json" \
   --product-audit "${FULL}/final/injection_product_audit.json" \
+  --producer-git-sha "$(tr -d '[:space:]' < "${PRODUCER_SHA_FILE}")" \
   --checkpoints \
     "${CHECKPOINT_ROOT}/fold_0/teacher.pt" \
     "${CHECKPOINT_ROOT}/fold_1/teacher.pt" \
