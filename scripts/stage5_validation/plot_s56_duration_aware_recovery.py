@@ -17,7 +17,10 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from twirl.plotting.style import apply_twirl_style  # noqa: E402
+from twirl.plotting.style import (  # noqa: E402
+    apply_twirl_style,
+    safe_log_contour_label_position,
+)
 
 
 DEFAULT_BLS_CSV = (
@@ -859,6 +862,14 @@ def plot_publication_period_radius_recovery_map(
                     alpha=0.88,
                     zorder=5,
                 )
+                safe_label_position = safe_log_contour_label_position(
+                    dcont,
+                    preferred_xy=label_position,
+                    xlim=ax.get_xlim(),
+                    ylim=ax.get_ylim(),
+                )
+                if safe_label_position is None:
+                    continue
                 labels = ax.clabel(
                     dcont,
                     fmt={level: f"{level:g} min"},
@@ -866,7 +877,7 @@ def plot_publication_period_radius_recovery_map(
                     inline=True,
                     inline_spacing=4,
                     colors=["white"],
-                    manual=[label_position],
+                    manual=[safe_label_position],
                 )
                 for text in labels:
                     text.set_zorder(7)

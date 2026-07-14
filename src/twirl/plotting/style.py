@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+import numpy as np
+
 try:
     import seaborn as sns
 except ModuleNotFoundError:  # PDO QLP/TGLC envs do not always include seaborn.
@@ -108,3 +110,64 @@ def apply_twirl_style(template_name: str = "column") -> dict[str, float]:
         plt.rcParams.update(rc)
         plt.rcParams["axes.grid"] = True
     return template
+
+
+def safe_log_contour_label_position(
+    contour_set,
+    *,
+    preferred_xy: tuple[float, float],
+    xlim: tuple[float, float],
+    ylim: tuple[float, float],
+    x_margin_fraction: float = 0.12,
+    y_margin_fraction: float = 0.08,
+) -> tuple[float, float] | None:
+    """Return the nearest interior contour vertex for a log-log label."""
+
+    if not (
+        0.0 <= x_margin_fraction < 0.5
+        and 0.0 <= y_margin_fraction < 0.5
+    ):
+        raise ValueError("contour label margins must be in [0, 0.5)")
+    if min(*xlim, *ylim, *preferred_xy) <= 0:
+        raise ValueError("log contour label coordinates and limits must be positive")
+    segments = [
+        np.asarray(segment, dtype=float)
+        for level in getattr(contour_set, "allsegs", [])
+        for segment in level
+        if np.asarray(segment).ndim == 2 and np.asarray(segment).shape[1] == 2
+    ]
+    if not segments:
+        return None
+    vertices = np.concatenate(segments, axis=0)
+    finite = np.isfinite(vertices).all(axis=1) & (vertices > 0).all(axis=1)
+    vertices = vertices[finite]
+    if not len(vertices):
+        return None
+
+    log_x_limits = np.log10(np.asarray(xlim, dtype=float))
+    log_y_limits = np.log10(np.asarray(ylim, dtype=float))
+    x_fraction = (
+        np.log10(vertices[:, 0]) - log_x_limits[0]
+    ) / np.diff(log_x_limits)[0]
+    y_fraction = (
+        np.log10(vertices[:, 1]) - log_y_limits[0]
+    ) / np.diff(log_y_limits)[0]
+    interior = (
+        (x_fraction >= x_margin_fraction)
+        & (x_fraction <= 1.0 - x_margin_fraction)
+        & (y_fraction >= y_margin_fraction)
+        & (y_fraction <= 1.0 - y_margin_fraction)
+    )
+    vertices = vertices[interior]
+    if not len(vertices):
+        return None
+
+    preferred_log = np.log10(np.asarray(preferred_xy, dtype=float))
+    vertex_log = np.log10(vertices)
+    distance = (
+        (vertex_log[:, 0] - preferred_log[0]) / np.diff(log_x_limits)[0]
+    ) ** 2 + (
+        (vertex_log[:, 1] - preferred_log[1]) / np.diff(log_y_limits)[0]
+    ) ** 2
+    selected = vertices[int(np.argmin(distance))]
+    return float(selected[0]), float(selected[1])
