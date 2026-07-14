@@ -15,7 +15,7 @@ from twirl.vetting.harmonic_training import classification_metrics, expected_cal
 from twirl.vetting.teacher_v2 import (
     TEACHER_V2_MODEL_VERSION,
     freeze_real_tic_workload_threshold,
-    injection_recall_at_threshold,
+    injection_recall_at_fold_thresholds,
 )
 from twirl.vetting.teacher_v2_training import compact_metrics
 
@@ -42,7 +42,7 @@ def _read(path: Path) -> pd.DataFrame:
 def _profile_development_metrics(
     predictions: pd.DataFrame,
     *,
-    threshold: float,
+    fold_thresholds: Mapping[int, float],
 ) -> dict[str, Any]:
     if predictions["review_id"].duplicated().any():
         raise ValueError("development OOF predictions contain duplicate review IDs")
@@ -66,9 +66,9 @@ def _profile_development_metrics(
     compact_calibration = expected_calibration_error(
         compact_truth[active], compact_probability
     )
-    injection = injection_recall_at_threshold(
+    injection = injection_recall_at_fold_thresholds(
         predictions,
-        threshold=threshold,
+        thresholds=fold_thresholds,
         partition="development",
     )
     macro_f1 = float(morphology["macro_f1"])
@@ -116,8 +116,19 @@ def freeze_teacher_v2_selection(
         threshold = freeze_real_tic_workload_threshold(
             real_scores, max_fraction=max_real_tic_fraction
         )
+        fold_workloads = {
+            fold: freeze_real_tic_workload_threshold(
+                real_scores,
+                score_column=f"member_{fold}_p_compact_transit",
+                max_fraction=max_real_tic_fraction,
+            )
+            for fold in range(5)
+        }
         metrics = _profile_development_metrics(
-            predictions, threshold=threshold.threshold
+            predictions,
+            fold_thresholds={
+                fold: workload.threshold for fold, workload in fold_workloads.items()
+            },
         )
         morphology = metrics["real_human_morphology"]
         row = {
@@ -137,6 +148,10 @@ def freeze_teacher_v2_selection(
         rows.append(row)
         details[profile] = {
             "workload_threshold": asdict(threshold),
+            "oof_fold_workload_thresholds": {
+                str(fold): asdict(workload)
+                for fold, workload in fold_workloads.items()
+            },
             "development_metrics": metrics,
             "development_prediction_paths": [
                 str(Path(path)) for path in profile_prediction_paths[profile]

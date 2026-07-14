@@ -15,6 +15,7 @@ set -euo pipefail
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
 PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56-torch/bin/python}"
 OUT_ROOT="${TWIRL_TEACHER_V2_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v2}"
+S56_RECOVERY="${TWIRL_S56_RECOVERY_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery}"
 
 mkdir -p /orcd/data/mki_aryeh/001/twirl/logs/s56_teacher_v2 "${OUT_ROOT}/cuda_smoke"
 cd "${REPO}"
@@ -35,6 +36,20 @@ start_epoch=$(date +%s)
   --batch-size 32 \
   --workers 4 \
   --max-development-rows 128
+
+checkpoint_args=()
+for fold in 0 1 2 3 4; do
+  checkpoint_args+=(--checkpoint "${OUT_ROOT}/cuda_smoke/full_combined/fold_${fold}/teacher_v2.pt")
+done
+"${PYTHON}" scripts/stage5_validation/score_teacher_v2_candidates.py \
+  --candidates "${S56_RECOVERY}/full/teacher_inputs/candidates_top5.csv" \
+  --native-h5 "${S56_RECOVERY}/full/teacher_inputs/native_top5.h5" \
+  "${checkpoint_args[@]}" \
+  --profile full_combined \
+  --out-path "${OUT_ROOT}/cuda_smoke/inference_128.parquet" \
+  --batch-size 32 \
+  --workers 4 \
+  --limit 128
 end_epoch=$(date +%s)
 printf 'start_epoch=%s\nend_epoch=%s\nelapsed_s=%s\n' \
   "${start_epoch}" "${end_epoch}" "$((end_epoch-start_epoch))" \

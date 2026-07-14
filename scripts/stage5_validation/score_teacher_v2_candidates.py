@@ -26,6 +26,7 @@ def main() -> int:
     parser.add_argument("--filter-key", default="injection_id")
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--limit", type=int)
     parser.add_argument("--allow-cpu", action="store_true")
     args = parser.parse_args()
 
@@ -38,6 +39,8 @@ def main() -> int:
         candidates = candidates.loc[
             candidates[args.filter_key].fillna("").astype(str).isin(allowed)
         ].copy()
+    if args.limit is not None:
+        candidates = candidates.head(max(0, int(args.limit))).copy()
     scored, summary = score_teacher_v2_ensemble(
         candidates=candidates,
         native_h5=args.native_h5,

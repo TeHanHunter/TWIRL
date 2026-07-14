@@ -53,7 +53,7 @@ for fold in 0 1 2 3 4; do
   checkpoint_args+=(--checkpoint "${TRAIN_ROOT}/${PROFILE}/fold_${fold}/teacher_v2.pt")
 done
 "${PYTHON}" scripts/stage5_validation/score_teacher_v2_candidates.py \
-  --candidates "${OUT_ROOT}/human_transfer/s56_a2v1_real_candidates_top5.parquet" \
+  --candidates "${OUT_ROOT}/roles/s56_real_workload_candidates.parquet" \
   --native-h5 "${OUT_ROOT}/real_native/s56_a2v1_real_native.h5" \
   "${checkpoint_args[@]}" \
   --profile "${PROFILE}" \

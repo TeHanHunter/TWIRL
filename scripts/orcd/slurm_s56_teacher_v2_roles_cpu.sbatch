@@ -18,6 +18,7 @@ S56_RECOVERY="${TWIRL_S56_RECOVERY_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWI
 S57_RECOVERY="${TWIRL_S57_RECOVERY_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_a2v1_recovery_1090f011/reports/stage5_validation/s57_A2v1_teacher_v1_recovery}"
 N_SHARDS="${TWIRL_TEACHER_V2_NATIVE_SHARDS:-32}"
 FINAL_NATIVE="${OUT_ROOT}/real_native/s56_a2v1_real_native.h5"
+FRANKLIN_QUEUE="${TWIRL_FRANKLIN_SOURCE_QUEUE:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_franklin_real5k_handoff/franklin_review_queue_5k_real.csv}"
 
 mkdir -p /orcd/data/mki_aryeh/001/twirl/logs/s56_teacher_v2 "${OUT_ROOT}/roles"
 cd "${REPO}"
@@ -25,6 +26,9 @@ export PYTHONPATH=src
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 export HDF5_USE_FILE_LOCKING=FALSE
+
+cp -p "${FRANKLIN_QUEUE}" "${OUT_ROOT}/source_snapshots/franklin_review_queue_5k_real.csv"
+FRANKLIN_QUEUE="${OUT_ROOT}/source_snapshots/franklin_review_queue_5k_real.csv"
 
 shards=()
 for ((index=0; index<N_SHARDS; index++)); do
@@ -41,9 +45,13 @@ done
   --s56-injection-native-h5 "${S56_RECOVERY}/full/teacher_inputs/native_top5.h5" \
   --human-table "${OUT_ROOT}/human_transfer/human_a2v1_transferred_training_rows.csv" \
   --human-native-h5 "${FINAL_NATIVE}" \
+  --s56-real-candidates "${OUT_ROOT}/human_transfer/s56_a2v1_real_candidates_top5.parquet" \
   --human-prior-splits "${OUT_ROOT}/source_snapshots/training_rows_with_fixed_splits.csv" \
   --franklin-labels "${OUT_ROOT}/source_snapshots/franklin_labels_vetted.csv" \
+  --franklin-queue "${FRANKLIN_QUEUE}" \
   --s57-schedule "${S57_RECOVERY}/schedule/injection_schedule.parquet" \
+  --s57-candidates "${S57_RECOVERY}/full/teacher_inputs/candidates_top5.csv" \
+  --s57-native-h5 "${S57_RECOVERY}/full/teacher_inputs/native_top5.h5" \
   --out-dir "${OUT_ROOT}/roles" \
   --allow-incomplete-s57
 

@@ -11,9 +11,13 @@ from twirl.vetting.teacher_v2 import (
     assert_teacher_v2_feature_columns,
     assign_s56_injection_roles,
     build_global_tic_split_registry,
+    build_franklin_a2v1_rereview_queue,
     build_s56_injection_training_rows,
     build_s57_external_role_manifest,
+    build_s56_real_workload_candidates,
     freeze_real_tic_workload_threshold,
+    injection_recall_at_fold_thresholds,
+    join_franklin_labels_to_queue,
     normalize_franklin_labels,
     normalize_real_adp_candidates,
     transfer_human_labels_to_a2v1_candidates,
@@ -133,6 +137,61 @@ def test_franklin_identity_ignores_legacy_row_id() -> None:
     assert not normalized["teacher_v2_training_include"].any()
 
 
+def test_franklin_candidate_key_join_and_blinded_rereview_queue() -> None:
+    queue = pd.DataFrame(
+        {
+            "review_id": ["real:10", "real:11"],
+            "tic": ["10", "11"],
+            "sector": ["56", "56"],
+            "period_d": ["1.25", "2.5"],
+            "t0_bjd": ["2459000.25", "2459001.5"],
+            "duration_min": ["10", "12"],
+        }
+    )
+    labels = pd.DataFrame(
+        {
+            "row_id": [99, 99],
+            "candidate_key": [
+                "real:10|10|56|1.25|2459000.25",
+                "real:11|11|56|2.5|2459001.5",
+            ],
+            "tic": [10, 11],
+            "sector": [56, 56],
+            "label": ["stellar_variability", "uncertain"],
+            "label_source": ["human", "human"],
+            "labeler": ["franklin", "franklin"],
+            "notes": ["", ""],
+            "updated_utc": ["2026-01-01", "2026-01-01"],
+        }
+    )
+    joined = join_franklin_labels_to_queue(labels, queue)
+    assert joined["franklin_queue_review_id"].tolist() == ["real:10", "real:11"]
+    assert joined["legacy_row_id"].tolist() == [99, 99]
+    candidates = pd.DataFrame(
+        {
+            "tic": [10, 11],
+            "sector": [56, 56],
+            "review_id": ["a2-10", "a2-11"],
+            "rep_peak_rank": [1, 1],
+            "period_d": [1.2, 2.4],
+            "t0_bjd": [2_459_000.2, 2_459_001.4],
+            "duration_min": [10.0, 12.0],
+            "source_kind": ["real_candidate", "real_candidate"],
+        }
+    )
+    public, private, summary = build_franklin_a2v1_rereview_queue(
+        joined,
+        candidates,
+        n_controls=1,
+        expected_signal_rows=1,
+    )
+    assert len(public) == 2
+    assert len(private) == 2
+    assert summary["n_signal_rows"] == 1
+    assert "label" not in public
+    assert not any("franklin" in column.lower() for column in public)
+
+
 def test_s57_manifest_excludes_every_registered_s56_or_franklin_tic() -> None:
     injection_roles = pd.DataFrame(
         {"tic": [10, 11], "teacher_v2_partition": ["development", "locked_holdout"]}
@@ -159,6 +218,22 @@ def test_s57_manifest_excludes_every_registered_s56_or_franklin_tic() -> None:
     assert summary["cell_support_min"] == 1
 
 
+def test_real_workload_pool_excludes_every_registered_host() -> None:
+    candidates = pd.DataFrame(
+        {
+            "tic": [1, 1, 2, 3, 4],
+            "review_id": ["1a", "1b", "2a", "3a", "4a"],
+        }
+    )
+    registry = pd.DataFrame({"tic": [1, 3]})
+    selected, summary = build_s56_real_workload_candidates(
+        candidates, registry, minimum_tics=2
+    )
+    assert set(selected["tic"]) == {2, 4}
+    assert summary["n_workload_tics"] == 2
+    assert summary["passed"]
+
+
 def test_workload_threshold_never_exceeds_budget_when_scores_tie() -> None:
     scores = pd.DataFrame(
         {
@@ -170,6 +245,27 @@ def test_workload_threshold_never_exceeds_budget_when_scores_tie() -> None:
     assert frozen.max_pass_tics == 5
     assert frozen.n_pass_tics == 0
     assert frozen.threshold > 0.9
+
+
+def test_oof_injection_recall_uses_each_rows_fold_threshold() -> None:
+    scores = pd.DataFrame(
+        {
+            "injection_id": ["a", "b"],
+            "teacher_v2_partition": ["development", "development"],
+            "teacher_v2_role": ["compact_positive", "compact_positive"],
+            "is_injected_signal_peak": [True, True],
+            "p_compact_transit": [0.8, 0.8],
+            "cv_fold": [0, 1],
+        }
+    )
+    result = injection_recall_at_fold_thresholds(
+        scores,
+        thresholds={0: 0.7, 1: 0.9, 2: 0.5, 3: 0.5, 4: 0.5},
+        partition="development",
+    )
+    assert result["n_injections"] == 2
+    assert result["n_recovered"] == 1
+    assert result["recovery_fraction"] == pytest.approx(0.5)
 
 
 def test_teacher_v2_leakage_guard_rejects_truth_and_roles() -> None:
@@ -356,6 +452,7 @@ def test_teacher_v2_selection_freezes_threshold_before_holdout(tmp_path: Path) -
                 "real_human_morphology",
             ],
             "teacher_v2_partition": ["development"] * 3,
+            "cv_fold": [0, 1, 2],
             "injection_id": ["inj-1", "inj-2", ""],
             "is_injected_signal_peak": [True, False, False],
             "compact_target": [1, 0, -1],
@@ -372,6 +469,10 @@ def test_teacher_v2_selection_freezes_threshold_before_holdout(tmp_path: Path) -
     real_scores = pd.DataFrame(
         {"tic": np.arange(20), "p_compact_transit": np.linspace(0.0, 0.9, 20)}
     )
+    for fold in range(5):
+        real_scores[f"member_{fold}_p_compact_transit"] = np.linspace(
+            0.0, 0.9, 20
+        )
     real_path = tmp_path / "real.parquet"
     real_scores.to_parquet(real_path, index=False)
     checkpoints = []

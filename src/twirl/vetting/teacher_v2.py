@@ -28,6 +28,7 @@ from twirl.vetting.adjudication_audit import (
 )
 from twirl.vetting.harmonic_cnn import PRESERVE_CLASSES, build_grouped_test_and_cv_folds
 from twirl.vetting.harmonic_inputs import native_group_path
+from twirl.vetting.label_io import candidate_key as current_candidate_key
 from twirl.vetting.recovery50_teacher import leakage_columns
 
 
@@ -129,6 +130,295 @@ def normalize_franklin_labels(labels: pd.DataFrame) -> pd.DataFrame:
     work["teacher_v2_role"] = "franklin_audit_only"
     work["teacher_v2_training_include"] = False
     return work.reset_index(drop=True)
+
+
+def join_franklin_labels_to_queue(
+    labels: pd.DataFrame,
+    queue: pd.DataFrame,
+) -> pd.DataFrame:
+    """Recover Franklin queue metadata by exact app-written candidate key."""
+
+    normalized = normalize_franklin_labels(labels)
+    required = {"review_id", "tic", "sector", "period_d", "t0_bjd", "duration_min"}
+    missing = sorted(required - set(queue.columns))
+    if missing:
+        raise KeyError(f"Franklin source queue is missing columns: {missing}")
+    source = queue.copy()
+    for column in required:
+        source[column] = source[column].fillna("").astype(str)
+    source["_franklin_candidate_key"] = source.apply(
+        lambda row: "|".join(
+            str(row[column])
+            for column in ("review_id", "tic", "sector", "period_d", "t0_bjd")
+        ),
+        axis=1,
+    )
+    _require_unique(
+        source,
+        "_franklin_candidate_key",
+        name="Franklin source queue",
+    )
+    metadata_columns = [
+        column
+        for column in source.columns
+        if column
+        not in {
+            "row_id",
+            "candidate_key",
+            "label",
+            "label_source",
+            "labeler",
+            "notes",
+            "updated_utc",
+        }
+    ]
+    metadata = source[metadata_columns].rename(
+        columns={
+            "_franklin_candidate_key": "candidate_key",
+            "review_id": "franklin_queue_review_id",
+        }
+    )
+    joined = normalized.merge(
+        metadata,
+        on="candidate_key",
+        how="left",
+        validate="one_to_one",
+        suffixes=("", "_queue"),
+        indicator=True,
+    )
+    missing_identity = joined["_merge"].ne("both")
+    if missing_identity.any():
+        keys = joined.loc[missing_identity, "candidate_key"].head(5).tolist()
+        raise ValueError(
+            f"{int(missing_identity.sum())} Franklin labels do not match candidate_key; "
+            f"first={keys}"
+        )
+    joined = joined.drop(columns=["_merge"])
+    for column in ("period_d", "t0_bjd", "duration_min"):
+        joined[column] = pd.to_numeric(joined[column], errors="raise")
+    if "tic_queue" in joined:
+        queue_tic = pd.to_numeric(joined["tic_queue"], errors="raise").astype(np.int64)
+        if not queue_tic.equals(joined["tic"].astype(np.int64)):
+            raise ValueError("Franklin candidate_key join changed TIC identity")
+        joined = joined.drop(columns=["tic_queue"])
+    if "sector_queue" in joined:
+        queue_sector = pd.to_numeric(joined["sector_queue"], errors="raise").astype(np.int16)
+        if not queue_sector.equals(joined["sector"].astype(np.int16)):
+            raise ValueError("Franklin candidate_key join changed sector identity")
+        joined = joined.drop(columns=["sector_queue"])
+    joined["teacher_v2_training_include"] = False
+    joined["teacher_v2_role"] = "franklin_audit_only"
+    return joined.reset_index(drop=True)
+
+
+def build_franklin_a2v1_rereview_queue(
+    franklin: pd.DataFrame,
+    candidates: pd.DataFrame,
+    *,
+    seed: int = 56,
+    n_controls: int = 100,
+    expected_signal_rows: int = 34,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    """Build a blinded current-A2v1 queue for Franklin-label transfer QA."""
+
+    current = candidates.sort_values(
+        ["tic", "rep_peak_rank"], kind="stable"
+    ).drop_duplicates("tic", keep="first")
+    current = current.copy()
+    current["tic"] = pd.to_numeric(current["tic"], errors="raise").astype(np.int64)
+    prior = franklin.rename(
+        columns={"candidate_key": "franklin_candidate_key"}
+    ).copy()
+    prior["tic"] = pd.to_numeric(prior["tic"], errors="raise").astype(np.int64)
+    joined = prior.merge(
+        current,
+        on="tic",
+        how="left",
+        validate="many_to_one",
+        suffixes=("_franklin", ""),
+        indicator=True,
+    )
+    signal_labels = {
+        "planet_like",
+        "eclipsing_binary_or_pceb",
+        "stellar_variability",
+        "wide_transit_like",
+    }
+    control_labels = {"instrumental_or_systematic", "uncertain", "no_visible_signal"}
+    signals = joined.loc[joined["label"].isin(signal_labels)].copy()
+    if len(signals) != int(expected_signal_rows):
+        raise ValueError(
+            f"Franklin re-review expected {expected_signal_rows} signal rows, got {len(signals)}"
+        )
+    missing_signals = signals["_merge"].ne("both")
+    if missing_signals.any():
+        raise ValueError(
+            f"{int(missing_signals.sum())} Franklin signal rows have no current A2v1 candidate"
+        )
+    controls = joined.loc[
+        joined["label"].isin(control_labels) & joined["_merge"].eq("both")
+    ].copy()
+    if len(controls) < int(n_controls):
+        raise ValueError(
+            f"Franklin re-review has only {len(controls)} eligible controls; "
+            f"requested={n_controls}"
+        )
+    controls = controls.sample(n=int(n_controls), random_state=int(seed))
+    selected = pd.concat([signals, controls], ignore_index=True, sort=False)
+    selected = selected.sample(frac=1.0, random_state=int(seed)).reset_index(drop=True)
+    selected["source_a2v1_review_id"] = selected["review_id"].astype(str)
+    selected["review_id"] = selected["franklin_identity"].map(
+        lambda value: "s0056-a2v1-franklin-rereview-"
+        + _stable_digest(str(value), seed=seed)[:20]
+    )
+    selected.insert(0, "row_id", np.arange(len(selected), dtype=np.int64))
+    selected["source_kind"] = "real_candidate"
+    selected["source_bucket"] = ""
+    selected["candidate_key"] = selected.apply(current_candidate_key, axis=1)
+    selected["vet_sheet_version"] = "S56-ADP-HV1"
+    selected["twirl_vet_sheet_name"] = (
+        selected["review_id"].str.replace(":", "_", regex=False)
+        + "_twirl_twoap_current_a2v1_adp.png"
+    )
+    selected["twirl_vet_sheet_pdf_name"] = ""
+    private_columns = [
+        "row_id",
+        "review_id",
+        "candidate_key",
+        "franklin_identity",
+        "franklin_candidate_key",
+        "franklin_queue_review_id",
+        "label",
+        "label_source",
+        "labeler",
+        "notes",
+        "updated_utc",
+        "source_a2v1_review_id",
+        "tic",
+        "period_d",
+        "t0_bjd",
+        "duration_min",
+        "period_d_franklin",
+        "t0_bjd_franklin",
+        "duration_min_franklin",
+    ]
+    private_columns = [column for column in private_columns if column in selected]
+    private = selected[private_columns].copy()
+    hidden_tokens = ("label", "franklin", "legacy", "prior", "truth", "recovery")
+    public_columns = [
+        column
+        for column in (
+            "row_id",
+            "review_id",
+            "tic",
+            "sector",
+            "cam",
+            "ccd",
+            "tmag",
+            "source_kind",
+            "source_bucket",
+            "period_d",
+            "t0_bjd",
+            "duration_min",
+            "depth",
+            "depth_snr",
+            "sde_max",
+            "rep_aperture",
+            "rep_peak_rank",
+            "n_apertures_agree",
+            "apertures_agree",
+            "aperture_period_rel_delta",
+            "aperture_disagreement_flag",
+            "candidate_key",
+            "vet_sheet_version",
+            "twirl_vet_sheet_name",
+            "twirl_vet_sheet_pdf_name",
+        )
+        if column in selected
+    ]
+    public = selected[public_columns].copy()
+    if any(any(token in column.lower() for token in hidden_tokens) for column in public):
+        raise RuntimeError("Franklin public re-review queue exposes hidden provenance")
+    summary = {
+        "n_rows": int(len(public)),
+        "n_signal_rows": int(len(signals)),
+        "n_control_rows": int(len(controls)),
+        "n_unique_tics": int(public["tic"].nunique()),
+        "seed": int(seed),
+        "prior_labels_hidden": True,
+        "vet_sheet_version": "S56-ADP-HV1",
+    }
+    return public, private, summary
+
+
+def build_franklin_current_a2v1_audit_candidates(
+    franklin: pd.DataFrame,
+    candidates: pd.DataFrame,
+    compatibility: pd.DataFrame,
+    *,
+    seed: int = 56,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Attach every Franklin row to the current A2v1 top peak for score audit."""
+
+    current = candidates.sort_values(
+        ["tic", "rep_peak_rank"], kind="stable"
+    ).drop_duplicates("tic", keep="first")
+    current = current.copy()
+    current["tic"] = pd.to_numeric(current["tic"], errors="raise").astype(np.int64)
+    prior_columns = [
+        column
+        for column in (
+            "franklin_identity",
+            "tic",
+            "label",
+            "label_source",
+            "labeler",
+            "notes",
+            "updated_utc",
+            "candidate_key",
+            "franklin_queue_review_id",
+        )
+        if column in franklin
+    ]
+    prior = franklin[prior_columns].rename(
+        columns={
+            "label": "legacy_human_label",
+            "label_source": "legacy_label_source",
+            "labeler": "legacy_labeler",
+            "notes": "legacy_notes",
+            "updated_utc": "legacy_updated_utc",
+            "candidate_key": "franklin_candidate_key",
+        }
+    )
+    prior["tic"] = pd.to_numeric(prior["tic"], errors="raise").astype(np.int64)
+    joined = prior.merge(current, on="tic", how="left", validate="many_to_one", indicator=True)
+    missing = joined["_merge"].ne("both")
+    audit = joined.loc[~missing].drop(columns=["_merge"]).copy().reset_index(drop=True)
+    audit["source_a2v1_review_id"] = audit["review_id"].astype(str)
+    audit["review_id"] = audit["franklin_identity"].map(
+        lambda value: "s0056-a2v1-franklin-audit-"
+        + _stable_digest(str(value), seed=seed)[:20]
+    )
+    compatibility_key = (
+        "source_uid" if "source_uid" in compatibility else "franklin_identity"
+    )
+    transfer = compatibility[
+        [compatibility_key, "a2v1_transfer_ok", "a2v1_match_review_id"]
+    ].rename(columns={compatibility_key: "franklin_identity"})
+    audit = audit.merge(transfer, on="franklin_identity", how="left", validate="one_to_one")
+    audit["a2v1_transfer_ok"] = _as_bool(audit["a2v1_transfer_ok"])
+    audit["teacher_v2_role"] = "franklin_current_a2v1_score_audit_only"
+    audit["teacher_v2_training_include"] = False
+    audit["is_injected_row"] = False
+    summary = {
+        "n_franklin_rows": int(len(franklin)),
+        "n_current_a2v1_rows": int(len(audit)),
+        "n_missing_current_a2v1": int(missing.sum()),
+        "n_ephemeris_compatible": int(audit["a2v1_transfer_ok"].sum()),
+        "training_include": False,
+        "legacy_labels_are_descriptive_not_active_targets": True,
+    }
+    return audit, summary
 
 
 def assign_s56_injection_roles(
@@ -738,6 +1028,48 @@ def build_s57_external_role_manifest(
     return selected, summary
 
 
+def build_s56_real_workload_candidates(
+    candidates: pd.DataFrame,
+    registry: pd.DataFrame,
+    *,
+    minimum_tics: int = 1_000,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Build a real workload pool disjoint from every registered model/audit host."""
+
+    required_candidates = {"tic", "review_id"}
+    missing = sorted(required_candidates - set(candidates.columns))
+    if missing:
+        raise KeyError(f"S56 real candidates are missing columns: {missing}")
+    if "tic" not in registry:
+        raise KeyError("global TIC registry is missing tic")
+    work = candidates.copy()
+    work["tic"] = pd.to_numeric(work["tic"], errors="raise").astype(np.int64)
+    if work["review_id"].fillna("").astype(str).duplicated().any():
+        raise ValueError("S56 real candidates contain duplicate review IDs")
+    excluded = frozenset(
+        pd.to_numeric(registry["tic"], errors="raise").astype(np.int64)
+    )
+    selected = work.loc[~work["tic"].isin(excluded)].copy().reset_index(drop=True)
+    n_tics = int(selected["tic"].nunique())
+    passed = n_tics >= int(minimum_tics)
+    summary = {
+        "n_input_rows": int(len(work)),
+        "n_input_tics": int(work["tic"].nunique()),
+        "n_registry_tics_excluded": int(work.loc[work["tic"].isin(excluded), "tic"].nunique()),
+        "n_workload_rows": int(len(selected)),
+        "n_workload_tics": n_tics,
+        "minimum_tics": int(minimum_tics),
+        "passed": bool(passed),
+        "host_disjoint_from_s56_injections_human_franklin_and_s57": True,
+    }
+    if not passed:
+        raise ValueError(
+            f"untouched S56 real workload pool has only {n_tics} TICs; "
+            f"minimum={minimum_tics}"
+        )
+    return selected, summary
+
+
 def assert_teacher_v2_feature_columns(columns: Iterable[str]) -> tuple[str, ...]:
     """Reject truth, target, provenance, and adjudication columns as inputs."""
 
@@ -844,6 +1176,60 @@ def injection_recall_at_threshold(
     }
 
 
+def injection_recall_at_fold_thresholds(
+    scores: pd.DataFrame,
+    *,
+    thresholds: Mapping[int, float],
+    partition: str,
+) -> dict[str, Any]:
+    """Measure OOF injection recall at fold-matched real-workload thresholds."""
+
+    required = {
+        "injection_id",
+        "teacher_v2_partition",
+        "is_injected_signal_peak",
+        "p_compact_transit",
+        "cv_fold",
+    }
+    missing = sorted(required - set(scores.columns))
+    if missing:
+        raise KeyError(f"injection OOF score table is missing columns: {missing}")
+    expected = set(range(5))
+    supplied = {int(key) for key in thresholds}
+    if supplied != expected:
+        raise ValueError(f"fold thresholds must cover 0..4; got {sorted(supplied)}")
+    selected = scores.loc[
+        scores["teacher_v2_partition"].astype(str).eq(partition)
+    ].copy()
+    if "teacher_v2_role" in selected:
+        selected = selected.loc[
+            ~selected["teacher_v2_role"].astype(str).eq("paired_pre_injection")
+        ].copy()
+    fold = pd.to_numeric(selected["cv_fold"], errors="coerce")
+    if fold.isna().any() or not fold.between(0, 4).all():
+        raise ValueError("development OOF injection scores require cv_fold in 0..4")
+    selected["_truth_match"] = _as_bool(selected["is_injected_signal_peak"])
+    selected["_threshold"] = fold.astype(int).map(
+        {int(key): float(value) for key, value in thresholds.items()}
+    )
+    selected["_pass"] = pd.to_numeric(
+        selected["p_compact_transit"], errors="coerce"
+    ).ge(selected["_threshold"])
+    selected["_success"] = selected["_truth_match"] & selected["_pass"]
+    per_injection = selected.groupby("injection_id", sort=False)["_success"].any()
+    return {
+        "partition": partition,
+        "fold_thresholds": {
+            str(key): float(value) for key, value in sorted(thresholds.items())
+        },
+        "n_injections": int(len(per_injection)),
+        "n_recovered": int(per_injection.sum()),
+        "recovery_fraction": (
+            float(per_injection.mean()) if len(per_injection) else np.nan
+        ),
+    }
+
+
 __all__ = [
     "COMPACT_CLASSES",
     "FRANKLIN_ACTIVE_LABELS",
@@ -853,12 +1239,17 @@ __all__ = [
     "assert_teacher_v2_feature_columns",
     "assign_s56_injection_roles",
     "build_global_tic_split_registry",
+    "build_franklin_a2v1_rereview_queue",
+    "build_franklin_current_a2v1_audit_candidates",
     "build_real_human_training_rows",
     "build_s56_injection_training_rows",
     "build_s57_external_role_manifest",
+    "build_s56_real_workload_candidates",
     "freeze_real_tic_workload_threshold",
     "injection_recall_at_threshold",
+    "injection_recall_at_fold_thresholds",
     "normalize_real_adp_candidates",
     "normalize_franklin_labels",
+    "join_franklin_labels_to_queue",
     "transfer_human_labels_to_a2v1_candidates",
 ]
