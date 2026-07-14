@@ -27,6 +27,14 @@ export MPLBACKEND=Agg
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 
+"${PYTHON}" scripts/stage5_validation/audit_a2v1_recovery_products.py \
+  --config "${CONFIG}" \
+  --schedule "${OUT_ROOT}/schedule/injection_schedule.parquet" \
+  --shards "${FULL}"/injection_shards/injections_*.h5 \
+  --raw-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_tglc_raw_sources.h5" \
+  --adp-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_adp_pair_rebuilt.h5" \
+  --out-json "${FULL}/final/injection_product_audit.json"
+
 "${PYTHON}" scripts/stage5_validation/finalize_s56_a2v1_teacher_recovery.py \
   --manifests "${FULL}"/injection_shards/injections_*_manifest.parquet \
   --peak-tables "${FULL}"/peak_shards/peaks_*.parquet \
@@ -42,6 +50,7 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
   --schedule-summary "${OUT_ROOT}/schedule/schedule_summary.json" \
   --teacher-summary "${FULL}/teacher_scores.summary.json" \
   --final-summary "${FULL}/final/summary.json" \
+  --product-audit "${FULL}/final/injection_product_audit.json" \
   --checkpoints \
     "${CHECKPOINT_ROOT}/fold_0/teacher.pt" \
     "${CHECKPOINT_ROOT}/fold_1/teacher.pt" \

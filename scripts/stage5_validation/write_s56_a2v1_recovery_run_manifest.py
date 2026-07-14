@@ -61,6 +61,7 @@ def main() -> int:
     parser.add_argument("--schedule-summary", type=Path, required=True)
     parser.add_argument("--teacher-summary", type=Path, required=True)
     parser.add_argument("--final-summary", type=Path, required=True)
+    parser.add_argument("--product-audit", type=Path, required=True)
     parser.add_argument("--checkpoints", type=Path, nargs=5, required=True)
     parser.add_argument("--out-json", type=Path, required=True)
     args = parser.parse_args()
@@ -71,6 +72,7 @@ def main() -> int:
     schedule = _json(args.schedule_summary)
     teacher = _json(args.teacher_summary)
     final = _json(args.final_summary)
+    product_audit = _json(args.product_audit)
     config = yaml.safe_load(args.config.read_text())
     tracked_clean = (
         subprocess.run(["git", "diff", "--quiet"], cwd=args.repo).returncode == 0
@@ -141,6 +143,7 @@ def main() -> int:
             "publication_top_k": 5,
         },
         "teacher": teacher,
+        "injection_product_audit": product_audit,
         "final_summary": final,
     }
     args.out_json.parent.mkdir(parents=True, exist_ok=True)

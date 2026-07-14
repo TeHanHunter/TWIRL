@@ -1208,6 +1208,294 @@ def write_fresh_injection_shard(
     return summary
 
 
+def audit_fresh_injection_shards(
+    *,
+    shard_paths: Sequence[Path],
+    schedule: pd.DataFrame,
+    raw_h5: Path,
+    adp_h5: Path,
+    config: A2V1RecoveryConfig,
+    relative_tolerance: float = 1.0e-6,
+) -> dict[str, Any]:
+    """Audit every stored injection against its immutable source light curve."""
+
+    import h5py
+
+    config.validate()
+    paths = sorted(Path(path) for path in shard_paths)
+    expected_contract = fresh_injection_contract(config.sector)
+    expected_ids = set(schedule["injection_id"].astype(str))
+    expected_tics = set(pd.to_numeric(schedule["tic"], errors="raise").astype(int))
+    seen_ids: set[str] = set()
+    seen_tics: set[int] = set()
+    failures: list[dict[str, Any]] = []
+    n_groups = 0
+    n_alignment_failures = 0
+    n_original_copy_failures = 0
+    n_negative_original_points = 0
+    n_negative_preservation_failures = 0
+    min_good_in_transit = np.inf
+    max_raw_equation_relative_residual = 0.0
+    max_error_equation_relative_residual = 0.0
+
+    def record_failure(kind: str, **details: Any) -> None:
+        if len(failures) < 200:
+            failures.append({"kind": kind, **details})
+
+    with h5py.File(raw_h5, "r") as raw_file, h5py.File(adp_h5, "r") as adp_file:
+        for path in paths:
+            with h5py.File(path, "r") as shard:
+                observed_contract = str(shard.attrs.get("contract_version", ""))
+                if observed_contract != expected_contract:
+                    record_failure(
+                        "contract_mismatch",
+                        path=str(path),
+                        observed=observed_contract,
+                        expected=expected_contract,
+                    )
+                if "injections" not in shard:
+                    record_failure("missing_injections_group", path=str(path))
+                    continue
+                for injection_id, group in shard["injections"].items():
+                    n_groups += 1
+                    if injection_id in seen_ids:
+                        record_failure(
+                            "duplicate_injection_id", injection_id=injection_id
+                        )
+                    seen_ids.add(injection_id)
+                    tic = int(group.attrs.get("tic", -1))
+                    if tic in seen_tics:
+                        record_failure("duplicate_host_tic", tic=tic)
+                    seen_tics.add(tic)
+                    if int(group.attrs.get("sector", -1)) != config.sector:
+                        record_failure(
+                            "sector_mismatch", injection_id=injection_id, tic=tic
+                        )
+                    key = f"{tic:016d}"
+                    if key not in raw_file["targets"] or key not in adp_file["targets"]:
+                        record_failure(
+                            "missing_source_target", injection_id=injection_id, tic=tic
+                        )
+                        continue
+                    raw = raw_file[f"targets/{key}"]
+                    adp = adp_file[f"targets/{key}"]
+                    try:
+                        cadence = np.asarray(group["cadenceno"], dtype=np.int64)
+                        quality = np.asarray(group["quality"], dtype=np.int32)
+                        orbitid = np.asarray(group["orbitid"], dtype=np.int32)
+                        time = np.asarray(group["time"], dtype=float)
+                    except KeyError as exc:
+                        record_failure(
+                            "missing_alignment_dataset",
+                            injection_id=injection_id,
+                            dataset=str(exc),
+                        )
+                        n_alignment_failures += 1
+                        continue
+                    aligned = (
+                        np.array_equal(
+                            cadence, np.asarray(raw["cadenceno"], dtype=np.int64)
+                        )
+                        and np.array_equal(
+                            cadence, np.asarray(adp["cadenceno"], dtype=np.int64)
+                        )
+                        and np.array_equal(
+                            quality, np.asarray(raw["quality"], dtype=np.int32)
+                        )
+                        and np.array_equal(
+                            quality, np.asarray(adp["quality"], dtype=np.int32)
+                        )
+                        and np.array_equal(
+                            orbitid, np.asarray(adp["orbitid"], dtype=np.int32)
+                        )
+                        and np.allclose(
+                            _absolute_bjd(time),
+                            _absolute_bjd(np.asarray(raw["time"], dtype=float)),
+                            rtol=0.0,
+                            atol=config.max_time_error_s / 86400.0,
+                            equal_nan=True,
+                        )
+                        and np.allclose(
+                            time,
+                            _relative_bjd(np.asarray(adp["time"], dtype=float)),
+                            rtol=0.0,
+                            atol=config.max_time_error_s / 86400.0,
+                            equal_nan=True,
+                        )
+                    )
+                    if not aligned:
+                        n_alignment_failures += 1
+                        record_failure(
+                            "source_alignment_mismatch",
+                            injection_id=injection_id,
+                            tic=tic,
+                        )
+
+                    model = np.asarray(group["transit_model"], dtype=float)
+                    good_transit = (
+                        (quality == 0)
+                        & np.isfinite(model)
+                        & (model < 1.0 - 1.0e-10)
+                    )
+                    min_good_in_transit = min(
+                        min_good_in_transit, int(np.count_nonzero(good_transit))
+                    )
+                    for label, raw_flux_name, raw_error_name, adp_name in (
+                        (
+                            "Small",
+                            "raw_flux_small",
+                            "raw_flux_err_small",
+                            ADP_APERTURES[0],
+                        ),
+                        (
+                            "Primary",
+                            "raw_flux_primary",
+                            "raw_flux_err_primary",
+                            ADP_APERTURES[1],
+                        ),
+                    ):
+                        original = np.asarray(
+                            group[f"RAW_FLUX_{label}_original"], dtype=float
+                        )
+                        injected = np.asarray(
+                            group[f"RAW_FLUX_{label}_injected"], dtype=float
+                        )
+                        original_error = np.asarray(
+                            group[f"RAW_FLUX_ERR_{label}_original"], dtype=float
+                        )
+                        injected_error = np.asarray(
+                            group[f"RAW_FLUX_ERR_{label}_injected"], dtype=float
+                        )
+                        source_flux = np.asarray(raw[raw_flux_name], dtype=float)
+                        source_error = np.asarray(raw[raw_error_name], dtype=float)
+                        source_adp = np.asarray(adp[adp_name], dtype=float)
+                        stored_adp = np.asarray(
+                            group[f"{adp_name}_original"], dtype=float
+                        )
+                        if not (
+                            np.array_equal(original, source_flux, equal_nan=True)
+                            and np.array_equal(
+                                original_error, source_error, equal_nan=True
+                            )
+                            and np.array_equal(stored_adp, source_adp, equal_nan=True)
+                        ):
+                            n_original_copy_failures += 1
+                            record_failure(
+                                "original_copy_mismatch",
+                                injection_id=injection_id,
+                                tic=tic,
+                                aperture=label,
+                            )
+                        baseline = float(
+                            group.attrs[f"injection_baseline_{label}"]
+                        )
+                        expected_flux = original + baseline * (model - 1.0)
+                        finite_flux = np.isfinite(injected) & np.isfinite(expected_flux)
+                        if np.any(finite_flux):
+                            residual = float(
+                                np.nanmax(
+                                    np.abs(injected[finite_flux] - expected_flux[finite_flux])
+                                )
+                                / max(abs(baseline), 1.0)
+                            )
+                            max_raw_equation_relative_residual = max(
+                                max_raw_equation_relative_residual, residual
+                            )
+                        source_variance = baseline / config.cadence_s
+                        fixed_floor = np.maximum(
+                            original_error**2 - source_variance, 0.0
+                        )
+                        expected_error = np.sqrt(
+                            fixed_floor + model * source_variance
+                        )
+                        finite_error = np.isfinite(injected_error) & np.isfinite(
+                            expected_error
+                        )
+                        if np.any(finite_error):
+                            error_residual = float(
+                                np.nanmax(
+                                    np.abs(
+                                        injected_error[finite_error]
+                                        - expected_error[finite_error]
+                                    )
+                                )
+                                / max(float(np.nanmedian(original_error[finite_error])), 1.0)
+                            )
+                            max_error_equation_relative_residual = max(
+                                max_error_equation_relative_residual, error_residual
+                            )
+                        negative = np.isfinite(original) & (original < 0)
+                        n_negative_original_points += int(np.count_nonzero(negative))
+                        negative_failures = negative & ~(injected < 0)
+                        if np.any(negative_failures):
+                            count = int(np.count_nonzero(negative_failures))
+                            n_negative_preservation_failures += count
+                            record_failure(
+                                "negative_flux_not_preserved",
+                                injection_id=injection_id,
+                                tic=tic,
+                                aperture=label,
+                                n_points=count,
+                            )
+
+    missing_ids = sorted(expected_ids - seen_ids)
+    extra_ids = sorted(seen_ids - expected_ids)
+    missing_tics = sorted(expected_tics - seen_tics)
+    extra_tics = sorted(seen_tics - expected_tics)
+    if missing_ids:
+        record_failure("missing_injection_ids", examples=missing_ids[:20])
+    if extra_ids:
+        record_failure("extra_injection_ids", examples=extra_ids[:20])
+    if missing_tics:
+        record_failure("missing_host_tics", examples=missing_tics[:20])
+    if extra_tics:
+        record_failure("extra_host_tics", examples=extra_tics[:20])
+    if min_good_in_transit < config.min_in_transit:
+        record_failure(
+            "insufficient_in_transit_cadences",
+            observed=int(min_good_in_transit),
+            required=config.min_in_transit,
+        )
+    if max_raw_equation_relative_residual > relative_tolerance:
+        record_failure(
+            "raw_injection_equation_residual",
+            observed=max_raw_equation_relative_residual,
+            limit=relative_tolerance,
+        )
+    if max_error_equation_relative_residual > relative_tolerance:
+        record_failure(
+            "uncertainty_equation_residual",
+            observed=max_error_equation_relative_residual,
+            limit=relative_tolerance,
+        )
+    return {
+        "created_utc": _utcnow(),
+        "contract": expected_contract,
+        "sector": config.sector,
+        "n_shards": len(paths),
+        "n_schedule_rows": len(schedule),
+        "n_groups": n_groups,
+        "n_unique_injection_ids": len(seen_ids),
+        "n_unique_host_tics": len(seen_tics),
+        "n_missing_injection_ids": len(missing_ids),
+        "n_extra_injection_ids": len(extra_ids),
+        "n_missing_host_tics": len(missing_tics),
+        "n_extra_host_tics": len(extra_tics),
+        "n_alignment_failures": n_alignment_failures,
+        "n_original_copy_failures": n_original_copy_failures,
+        "n_negative_original_points": n_negative_original_points,
+        "n_negative_preservation_failures": n_negative_preservation_failures,
+        "minimum_good_in_transit_cadences": (
+            int(min_good_in_transit) if np.isfinite(min_good_in_transit) else 0
+        ),
+        "max_raw_equation_relative_residual": max_raw_equation_relative_residual,
+        "max_error_equation_relative_residual": max_error_equation_relative_residual,
+        "relative_tolerance": relative_tolerance,
+        "failures": failures,
+        "passed": not failures,
+    }
+
+
 def select_parameter_spanning_rows(
     schedule: pd.DataFrame,
     *,
@@ -1279,6 +1567,7 @@ __all__ = [
     "fresh_injection_contract",
     "schedule_contract",
     "build_fresh_injection_schedule",
+    "audit_fresh_injection_shards",
     "load_recovery_config",
     "run_adp_roundtrip_parity",
     "select_parameter_spanning_rows",

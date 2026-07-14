@@ -3,6 +3,7 @@
 from twirl.injections.a2v1_recovery import (
     A2V1RecoveryConfig,
     FRESH_INJECTION_CONTRACT,
+    audit_fresh_injection_shards,
     build_fresh_injection_schedule,
     compare_adp_compact_products,
     fresh_injection_contract,
@@ -15,6 +16,7 @@ from twirl.injections.a2v1_recovery import (
 __all__ = [
     "A2V1RecoveryConfig",
     "FRESH_INJECTION_CONTRACT",
+    "audit_fresh_injection_shards",
     "build_fresh_injection_schedule",
     "compare_adp_compact_products",
     "fresh_injection_contract",

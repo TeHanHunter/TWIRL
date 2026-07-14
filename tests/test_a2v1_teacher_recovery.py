@@ -11,6 +11,7 @@ import twirl.injections.a2v1_recovery as recovery
 from twirl.injections.a2v1_recovery import (
     A2V1RecoveryConfig,
     FRESH_INJECTION_CONTRACT,
+    audit_fresh_injection_shards,
     build_fresh_injection_schedule,
     compare_adp_compact_products,
     fresh_injection_contract,
@@ -314,6 +315,20 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
             original + float(group.attrs["injection_baseline_Small"]) * (model - 1.0),
         )
         assert np.all(injected_error[model < 1.0] <= original_error[model < 1.0])
+    shard_schedule = schedule.loc[schedule["shard_index"].eq(shard_index)].copy()
+    audit = audit_fresh_injection_shards(
+        shard_paths=[out_h5],
+        schedule=shard_schedule,
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        config=_config(),
+    )
+    assert audit["passed"]
+    assert audit["n_groups"] == 4
+    assert audit["n_alignment_failures"] == 0
+    assert audit["n_original_copy_failures"] == 0
+    assert audit["n_negative_original_points"] >= 2
+    assert audit["n_negative_preservation_failures"] == 0
 
 
 def test_existing_holdout_helper_excludes_all_teacher_hosts() -> None:
