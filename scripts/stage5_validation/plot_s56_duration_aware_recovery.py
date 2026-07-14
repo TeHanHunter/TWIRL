@@ -726,7 +726,7 @@ def plot_publication_period_radius_recovery_map(
         ("Tmag < 17", df["tmag"] < 17.0),
         ("17 <= Tmag < 18", (df["tmag"] >= 17.0) & (df["tmag"] < 18.0)),
         ("18 <= Tmag < 19", (df["tmag"] >= 18.0) & (df["tmag"] < 19.0)),
-        ("Tmag > 19", df["tmag"] >= 19.0),
+        ("Tmag >= 19", df["tmag"] >= 19.0),
     ]
     period_edges = np.geomspace(0.12, 13.0, 92)
     radius_edges = np.geomspace(0.18, 18.0, 86)
