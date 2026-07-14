@@ -1634,6 +1634,34 @@ def audit_fresh_injection_shards(
     }
 
 
+def normalize_fresh_injection_manifest_truth(
+    manifest: pd.DataFrame,
+) -> pd.DataFrame:
+    """Expose fresh-injection parameters under the truth-audit schema."""
+
+    renames = {
+        "period_d": "truth_period_d",
+        "radius_rearth": "truth_radius_rearth",
+        "duration_min": "truth_duration_min",
+        "n_good_in_transit": "truth_n_good_in_transit",
+        "tessmag": "tmag",
+    }
+    missing = sorted(set(renames) - set(manifest.columns))
+    if missing:
+        raise KeyError(f"fresh injection manifest is missing columns: {missing}")
+    collisions = sorted(set(renames.values()) & set(manifest.columns))
+    if collisions:
+        raise ValueError(
+            "fresh injection manifest already contains derived truth columns: "
+            f"{collisions}"
+        )
+    out = manifest.rename(columns=renames).copy()
+    out["plot_radius_rearth"] = pd.to_numeric(
+        out["truth_radius_rearth"], errors="coerce"
+    )
+    return out
+
+
 def select_parameter_spanning_rows(
     schedule: pd.DataFrame,
     *,

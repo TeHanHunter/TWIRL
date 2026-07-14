@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from plot_s56_duration_aware_recovery import plot_publication_period_radius_recovery_map
+from twirl.injections.a2v1_recovery import normalize_fresh_injection_manifest_truth
 from twirl.vetting.injection_teacher_recovery import (
     aggregate_teacher_injection_recovery,
 )
@@ -122,18 +123,7 @@ def main() -> int:
         args.out_dir / "adp_bls_top10_peaks.parquet", compression="zstd", index=False
     )
     topk = _topk_table(manifest, peaks)
-    base = manifest.rename(
-        columns={
-            "period_d": "truth_period_d",
-            "radius_reearth": "truth_radius_reearth",
-            "duration_min": "truth_duration_min",
-            "n_good_in_transit": "truth_n_good_in_transit",
-            "tessmag": "tmag",
-        }
-    ).copy()
-    base["plot_radius_rearth"] = pd.to_numeric(
-        base["truth_radius_reearth"], errors="coerce"
-    )
+    base = normalize_fresh_injection_manifest_truth(manifest)
     base = base.merge(topk, on="injection_id", how="left", validate="one_to_one")
     outcomes, teacher_summary = aggregate_teacher_injection_recovery(
         base,

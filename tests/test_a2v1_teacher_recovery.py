@@ -15,6 +15,7 @@ from twirl.injections.a2v1_recovery import (
     build_fresh_injection_schedule,
     compare_adp_compact_products,
     fresh_injection_contract,
+    normalize_fresh_injection_manifest_truth,
     run_adp_roundtrip_parity,
     schedule_contract,
     select_parameter_spanning_rows,
@@ -379,6 +380,30 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
         failure["kind"] == "transit_model_value_mismatch"
         for failure in corrupted["failures"]
     )
+
+
+def test_fresh_manifest_truth_normalization_uses_established_radius_name() -> None:
+    manifest = pd.DataFrame(
+        {
+            "period_d": [1.5],
+            "radius_rearth": [2.25],
+            "duration_min": [8.0],
+            "n_good_in_transit": [4],
+            "tessmag": [18.2],
+        }
+    )
+    normalized = normalize_fresh_injection_manifest_truth(manifest)
+    assert normalized.loc[0, "truth_period_d"] == 1.5
+    assert normalized.loc[0, "truth_radius_rearth"] == 2.25
+    assert normalized.loc[0, "plot_radius_rearth"] == 2.25
+    assert normalized.loc[0, "truth_duration_min"] == 8.0
+    assert normalized.loc[0, "truth_n_good_in_transit"] == 4
+    assert normalized.loc[0, "tmag"] == 18.2
+
+    with pytest.raises(KeyError, match="radius_rearth"):
+        normalize_fresh_injection_manifest_truth(
+            manifest.rename(columns={"radius_rearth": "radius_reearth"})
+        )
 
 
 def test_existing_holdout_helper_excludes_all_teacher_hosts() -> None:
