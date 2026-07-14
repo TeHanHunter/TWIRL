@@ -230,6 +230,25 @@ def test_parameter_spanning_smoke_selection_balances_grid_marginals() -> None:
     assert not selected.duplicated(["grid_period_bin", "grid_radius_bin"]).any()
 
 
+def test_balanced_full_schedule_spans_every_grid_axis_per_shard() -> None:
+    config = A2V1RecoveryConfig(sector=57, seed=570201, shard_assignment="balanced_random")
+    schedule = pd.DataFrame({"injection_index": range(config.n_injections)})
+    schedule["grid_cell_index"] = (
+        schedule["injection_index"] // config.repeats_per_cell
+    )
+    schedule["grid_period_bin"] = (
+        schedule["grid_cell_index"] // config.radius_bins
+    )
+    schedule["grid_radius_bin"] = (
+        schedule["grid_cell_index"] % config.radius_bins
+    )
+    schedule["shard_index"] = recovery._assign_shards(schedule, config=config)
+    grouped = schedule.groupby("shard_index")
+    assert grouped.size().eq(config.rows_per_shard).all()
+    assert grouped["grid_period_bin"].nunique().eq(config.period_bins).all()
+    assert grouped["grid_radius_bin"].nunique().eq(config.radius_bins).all()
+
+
 def test_adp_roundtrip_parity_uses_unmodified_raw_flux(tmp_path: Path) -> None:
     raw_h5, adp_h5 = _write_sources(tmp_path)
     teacher = tmp_path / "teacher.csv"
