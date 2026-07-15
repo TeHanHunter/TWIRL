@@ -98,7 +98,7 @@ def _plot_difference_map(
         mask = part.pivot(index="period_d", columns="radius_rearth", values="masked_for_low_support").reindex(
             index=periods, columns=radii
         )
-        values = pivot.to_numpy(dtype=float)
+        values = pivot.to_numpy(dtype=float, copy=True)
         values[mask.to_numpy(dtype=bool)] = np.nan
         mesh = ax.pcolormesh(
             periods,
