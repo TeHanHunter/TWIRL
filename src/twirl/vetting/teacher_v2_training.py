@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -650,6 +651,70 @@ def write_teacher_v2_native_verification_cache(
     return cache_path
 
 
+def seed_teacher_v2_native_verification_cache(
+    cache_path: Path,
+    native_summary_pairs: Sequence[tuple[Path, Path]],
+) -> Path:
+    """Seed fingerprints from authoritative post-merge full-scan summaries."""
+
+    if not native_summary_pairs:
+        raise ValueError("at least one native HDF5 and verification-summary pair is required")
+    verifications: dict[str, dict[str, Any]] = {}
+    for native_value, summary_value in native_summary_pairs:
+        native_path = Path(native_value).resolve()
+        summary_path = Path(summary_value).resolve()
+        if not native_path.is_file():
+            raise FileNotFoundError(native_path)
+        if not summary_path.is_file():
+            raise FileNotFoundError(summary_path)
+        native_stat = native_path.stat()
+        summary_stat = summary_path.stat()
+        if summary_stat.st_mtime_ns < native_stat.st_mtime_ns:
+            raise RuntimeError(
+                f"verification summary predates native input: {summary_path}"
+            )
+        payload = json.loads(summary_path.read_text())
+        merge = payload.get("merge")
+        verification = payload.get("verification")
+        expected_counts = payload.get("expected_counts")
+        if not isinstance(merge, Mapping) or not isinstance(verification, Mapping):
+            raise ValueError(f"invalid native verification summary: {summary_path}")
+        if not isinstance(expected_counts, Mapping):
+            raise ValueError(f"summary lacks expected counts: {summary_path}")
+        merged_path = Path(str(merge.get("out_h5", ""))).resolve()
+        if merged_path != native_path:
+            raise ValueError(
+                f"summary native path mismatch: {merged_path} != {native_path}"
+            )
+        expected = {str(key): int(value) for key, value in expected_counts.items()}
+        observed = {
+            str(key): int(value)
+            for key, value in dict(verification.get("counts", {})).items()
+        }
+        merged = {
+            str(key): int(value) for key, value in dict(merge.get("counts", {})).items()
+        }
+        if observed != expected or merged != expected:
+            raise RuntimeError(
+                f"native verification counts do not match expected counts: {summary_path}"
+            )
+        if sum(expected.values()) <= 0:
+            raise RuntimeError(f"native verification summary is empty: {summary_path}")
+        failures = list(verification.get("failures", []))
+        if not bool(verification.get("passed", False)) or failures:
+            raise RuntimeError(f"native verification failed: {summary_path}")
+        enriched = dict(verification)
+        enriched["verification_source"] = {
+            "kind": "post_merge_full_scan_summary",
+            "path": str(summary_path),
+            "sha256": hashlib.sha256(summary_path.read_bytes()).hexdigest(),
+            "mtime_ns": int(summary_stat.st_mtime_ns),
+            "native_mtime_ns": int(native_stat.st_mtime_ns),
+        }
+        verifications[str(native_path)] = enriched
+    return write_teacher_v2_native_verification_cache(cache_path, verifications)
+
+
 def _cached_native_verification(
     cache: Mapping[str, Any],
     path: Path,
@@ -834,6 +899,7 @@ __all__ = [
     "build_teacher_v2_metadata_matrix",
     "compact_metrics",
     "run_teacher_v2_training",
+    "seed_teacher_v2_native_verification_cache",
     "train_teacher_v2_fold",
     "write_teacher_v2_native_verification_cache",
 ]

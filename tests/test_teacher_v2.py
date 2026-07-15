@@ -39,6 +39,7 @@ from twirl.vetting.teacher_v2_training import (
     attach_teacher_v2_fold_weights,
     build_teacher_v2_metadata_matrix,
     compact_metrics,
+    seed_teacher_v2_native_verification_cache,
     write_teacher_v2_native_verification_cache,
 )
 from twirl.vetting.teacher_v2_inference import prepare_teacher_v2_inference_rows
@@ -568,6 +569,74 @@ def test_teacher_v2_native_verification_cache_invalidates_changed_file(
     assert result["native_verification_cache"]["scanned"] == [
         str(native_h5.resolve())
     ]
+
+
+def test_teacher_v2_native_verification_cache_seeds_from_fresh_merge_summary(
+    tmp_path: Path,
+) -> None:
+    native_h5 = tmp_path / "native.h5"
+    summary_path = tmp_path / "native.summary.json"
+    cache_path = tmp_path / "verification.json"
+    _teacher_v2_fingerprint_h5(native_h5)
+    counts = {"targets": 1, "injections": 0}
+    summary_path.write_text(
+        json.dumps(
+            {
+                "merge": {"counts": counts, "out_h5": str(native_h5.resolve())},
+                "verification": {
+                    "passed": True,
+                    "failures": [],
+                    "counts": counts,
+                },
+                "expected_counts": counts,
+            }
+        )
+    )
+
+    seed_teacher_v2_native_verification_cache(
+        cache_path, [(native_h5, summary_path)]
+    )
+    cache = json.loads(cache_path.read_text())
+    entry = cache["entries"][str(native_h5.resolve())]
+
+    assert entry["verification"]["passed"]
+    source = entry["verification"]["verification_source"]
+    assert source["kind"] == "post_merge_full_scan_summary"
+    assert source["path"] == str(summary_path.resolve())
+    assert len(source["sha256"]) == 64
+
+
+def test_teacher_v2_native_verification_cache_rejects_stale_merge_summary(
+    tmp_path: Path,
+) -> None:
+    native_h5 = tmp_path / "native.h5"
+    summary_path = tmp_path / "native.summary.json"
+    cache_path = tmp_path / "verification.json"
+    _teacher_v2_fingerprint_h5(native_h5)
+    counts = {"targets": 1, "injections": 0}
+    summary_path.write_text(
+        json.dumps(
+            {
+                "merge": {"counts": counts, "out_h5": str(native_h5.resolve())},
+                "verification": {
+                    "passed": True,
+                    "failures": [],
+                    "counts": counts,
+                },
+                "expected_counts": counts,
+            }
+        )
+    )
+    summary_stat = summary_path.stat()
+    os.utime(
+        native_h5,
+        ns=(native_h5.stat().st_atime_ns, summary_stat.st_mtime_ns + 1),
+    )
+
+    with pytest.raises(RuntimeError, match="predates native input"):
+        seed_teacher_v2_native_verification_cache(
+            cache_path, [(native_h5, summary_path)]
+        )
 
 
 def test_teacher_v2_inference_rows_have_no_active_targets() -> None:

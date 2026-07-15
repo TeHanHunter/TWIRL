@@ -50,6 +50,15 @@ done
   --out-dir "${OUT_ROOT}/roles" \
   --allow-incomplete-s57
 
+"${PYTHON}" scripts/stage5_validation/seed_teacher_v2_native_verification_cache.py \
+  --native-summary \
+    "${S56_RECOVERY}/full/teacher_inputs/native_top5.h5" \
+    "${S56_RECOVERY}/full/teacher_inputs/native_top5.merge_summary.json" \
+  --native-summary \
+    "${FINAL_NATIVE}" \
+    "${FINAL_NATIVE%.h5}.summary.json" \
+  --out-cache "${OUT_ROOT}/roles/native_contract_verification_cache.json"
+
 "${PYTHON}" -c \
   'import json,sys; p=json.load(open(sys.argv[1])); assert p["s57_external"]["passed"], p["s57_external"]' \
   "${OUT_ROOT}/roles/role_summary.json"
