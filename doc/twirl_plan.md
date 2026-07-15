@@ -1082,21 +1082,19 @@ macro F1 `0.757`, and ECE `0.048`. The model passes its configured smoke gates,
 but the real Planet-like test support is only `2/2`; keep it restricted to
 active-learning enrichment until real-planet and rare-harmonic support grows.
 
-Status (`2026-07-14`, Teacher-v2 training in progress): the hybrid v2 path uses
-fresh S56 injections only when ADP-small BLS proposes a top-five candidate that
-truth-matches the injected ephemeris; those rows supervise compact-transit and
-harmonic recognition, while the adjudicated real set retains responsibility
-for Planet/EB/Variable/Other morphology and preserve/reject. Franklin's labels
-are preserved as audit provenance and their TICs remain excluded from the S57
-external test, but transfer re-review and Franklin scoring are deferred off the
-training critical path. S56 real BLS, native-input assembly, role construction,
-and host-disjoint S57 support checks are complete. The cache-enabled CUDA smoke
-and strict dependent profile/freeze/external-test chain are running on ORCD;
-the locked holdout and S57 outcomes remain unopened. The primary S57 result
-remains the frozen, host-disjoint external test. If its bright Tmag panels are
-locally sparse, a separate equal-Tmag, host-clustered enrichment evaluation may
-be added after model/threshold freeze; it must not replace or tune the primary
-metrics. See the `2026-07-14` [execution log](twirl_progress_log.md) for job and
+Status (`2026-07-15`, Teacher-v2 external test complete, not promoted): the
+hybrid six-profile run froze Shape + raw chronology at a `5%` real-TIC workload
+threshold before opening either evaluation set. On `14,706` host-disjoint S57
+injections, Teacher v2 retained `77.2%` of BLS-recovered signals, compared with
+`56.2%` for Teacher v1 and `61.9%` for metadata-only. It therefore clears both
+relative-improvement gates but narrowly misses the absolute `80%` gate. The
+same-row real holdout also fails promotion: macro F1 declined by `0.072` and EB
+recall is `0.364`, although Variable and Other recall remain `0.773` and
+`0.991`. Both S56/S57 artifact verifiers pass and the publication figures are
+complete, but student pseudo-labeling remains blocked. Treat S57 as opened and
+diagnostic-only for future work; any revised selector or head-specific ensemble
+must be designed on S56 development data and tested on a fresh external sector.
+See the `2026-07-15` [execution log](twirl_progress_log.md) for full metrics and
 verification details.
 
 Pre-human-labeling path:
