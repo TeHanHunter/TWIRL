@@ -16,6 +16,7 @@ from twirl.vetting.label_io import candidate_key
 
 
 ACTIVE_LEARNING_POLICY_VERSION = "s56_s64_existing_teacher_multi_ranker_v1"
+MIXED_ACTIVE_LEARNING_POLICY_VERSION = "s56_s57_existing_teacher_balanced_v1"
 
 
 @dataclass(frozen=True)
@@ -572,12 +573,194 @@ def write_existing_teacher_enrichment_batch(
     return summary
 
 
+def _scaled_quotas(quotas: EnrichmentQuotas, factor: int) -> EnrichmentQuotas:
+    values = {key: int(value) * int(factor) for key, value in asdict(quotas).items()}
+    return EnrichmentQuotas(**values)
+
+
+def build_mixed_existing_teacher_enrichment_batch(
+    score_tables: Mapping[int, pd.DataFrame],
+    *,
+    batch_index: int,
+    excluded_tables: Sequence[pd.DataFrame] = (),
+    per_sector_quotas: EnrichmentQuotas,
+    double_review_count: int = 100,
+    seed: int = 56,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    """Build a sector-balanced queue with globally unique host TICs."""
+
+    sectors = tuple(sorted(int(sector) for sector in score_tables))
+    if len(sectors) < 2:
+        raise ValueError("mixed enrichment requires at least two sectors")
+    if per_sector_quotas.total <= 0:
+        raise ValueError("per-sector quotas must contain at least one row")
+
+    selected_hidden: list[pd.DataFrame] = []
+    cumulative_exclusions = list(excluded_tables)
+    per_sector_summaries: dict[str, Any] = {}
+    for sector in sectors:
+        _, _, hidden, sector_summary = build_existing_teacher_enrichment_batch(
+            score_tables[sector],
+            sector=sector,
+            batch_index=batch_index,
+            excluded_tables=cumulative_exclusions,
+            quotas=per_sector_quotas,
+            seed=seed,
+        )
+        selected_hidden.append(hidden)
+        cumulative_exclusions.append(hidden.loc[:, ["tic"]].copy())
+        per_sector_summaries[str(sector)] = sector_summary
+
+    hidden = pd.concat(selected_hidden, ignore_index=True, sort=False)
+    hidden = hidden.sample(
+        frac=1.0,
+        random_state=int(seed) + int(batch_index) + sum(sectors),
+    ).reset_index(drop=True)
+    hidden["row_id"] = np.arange(len(hidden), dtype=int)
+    hidden["candidate_key"] = hidden.apply(candidate_key, axis=1)
+    hidden["active_learning_policy_version"] = MIXED_ACTIVE_LEARNING_POLICY_VERSION
+    hidden["double_review"] = False
+
+    n_overlap = min(max(0, int(double_review_count)), len(hidden))
+    overlap_indices = hidden.sample(
+        n=n_overlap,
+        random_state=int(seed) + int(batch_index) + 10_000 + sum(sectors),
+    ).index
+    hidden.loc[overlap_indices, "double_review"] = True
+    queue = hidden.loc[:, [column for column in PUBLIC_COLUMNS if column in hidden]].copy()
+    overlap = queue.loc[overlap_indices].reset_index(drop=True).copy()
+    overlap["row_id"] = np.arange(len(overlap), dtype=int)
+
+    global_quotas = _scaled_quotas(per_sector_quotas, len(sectors))
+    verify_enrichment_batch(
+        queue,
+        overlap,
+        hidden,
+        expected_quotas=global_quotas,
+    )
+    sector_counts = {
+        str(key): int(value)
+        for key, value in queue["sector"].value_counts().sort_index().items()
+    }
+    expected_sector_count = int(per_sector_quotas.total)
+    if sector_counts != {str(sector): expected_sector_count for sector in sectors}:
+        raise ValueError(
+            f"mixed queue sector balance differs: observed={sector_counts}, "
+            f"expected_per_sector={expected_sector_count}"
+        )
+    if queue["tic"].nunique() != len(queue):
+        raise ValueError("mixed queue contains a TIC repeated across sectors")
+
+    summary = {
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "policy_version": MIXED_ACTIVE_LEARNING_POLICY_VERSION,
+        "vet_sheet_version": ADJUDICATION_VET_SHEET_VERSION,
+        "sectors": list(sectors),
+        "batch_index": int(batch_index),
+        "n_rows": int(len(queue)),
+        "n_unique_tics": int(queue["tic"].nunique()),
+        "n_double_review": int(len(overlap)),
+        "n_initial_excluded_tics": int(len(_excluded_tics(excluded_tables))),
+        "per_sector_quotas": asdict(per_sector_quotas),
+        "global_quotas": asdict(global_quotas),
+        "sector_counts": sector_counts,
+        "selection_bucket_counts": {
+            str(key): int(value)
+            for key, value in hidden["selection_bucket"].value_counts().sort_index().items()
+        },
+        "per_sector_summaries": per_sector_summaries,
+        "cross_sector_tic_deduplication": True,
+        "training_performed": False,
+        "compact_ranker": "existing shape_plus_raw_chronology ensemble",
+        "morphology_ranker": "existing shape_plus_periodogram_bls ensemble",
+        "scores_hidden_from_browser": True,
+    }
+    return queue, overlap, hidden, summary
+
+
+def write_mixed_existing_teacher_enrichment_batch(
+    *,
+    sector_score_paths: Mapping[int, tuple[Path, Path]],
+    out_dir: Path,
+    batch_index: int,
+    exclude_paths: Sequence[Path] = (),
+    per_sector_quotas: EnrichmentQuotas,
+    double_review_count: int = 100,
+) -> dict[str, Any]:
+    """Read frozen score products and write one blinded mixed-sector batch."""
+
+    scores: dict[int, pd.DataFrame] = {}
+    score_provenance: dict[str, Any] = {}
+    for sector, (compact_path, morphology_path) in sorted(sector_score_paths.items()):
+        compact_path = Path(compact_path)
+        morphology_path = Path(morphology_path)
+        scores[int(sector)] = combine_existing_ranker_scores(
+            _read_table(compact_path),
+            _read_table(morphology_path),
+        )
+        score_provenance[str(int(sector))] = {
+            "compact_scores_path": str(compact_path),
+            "compact_scores_sha256": _sha256(compact_path),
+            "morphology_scores_path": str(morphology_path),
+            "morphology_scores_sha256": _sha256(morphology_path),
+        }
+    exclusions = [_read_table(path) for path in exclude_paths if Path(path).is_file()]
+    queue, overlap, hidden, summary = build_mixed_existing_teacher_enrichment_batch(
+        scores,
+        batch_index=int(batch_index),
+        excluded_tables=exclusions,
+        per_sector_quotas=per_sector_quotas,
+        double_review_count=int(double_review_count),
+    )
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    queue_path = _write_table(queue, out_dir / "review_queue_1k.csv")
+    overlap_path = _write_table(overlap, out_dir / "double_review_queue_100.csv")
+    hidden_path = _write_table(hidden, out_dir / "hidden_selection_provenance.parquet")
+    sector_queue_paths: dict[str, str] = {}
+    for sector in sorted(scores):
+        sector_queue = queue.loc[queue["sector"].eq(int(sector))].copy()
+        path = _write_table(
+            sector_queue,
+            out_dir / f"sector_{int(sector):04d}_review_queue_{len(sector_queue)}.csv",
+        )
+        sector_queue_paths[str(int(sector))] = str(path)
+
+    global_quotas = _scaled_quotas(per_sector_quotas, len(scores))
+    verify_enrichment_batch(
+        pd.read_csv(queue_path),
+        pd.read_csv(overlap_path),
+        pd.read_parquet(hidden_path),
+        expected_quotas=global_quotas,
+    )
+    summary.update(
+        {
+            "score_provenance": score_provenance,
+            "exclude_paths": [str(path) for path in exclude_paths],
+            "outputs": {
+                "review_queue": str(queue_path),
+                "double_review_queue": str(overlap_path),
+                "hidden_selection_provenance": str(hidden_path),
+                "sector_queues": sector_queue_paths,
+                "summary": str(out_dir / "summary.json"),
+            },
+        }
+    )
+    (out_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n"
+    )
+    return summary
+
+
 __all__ = [
     "ACTIVE_LEARNING_POLICY_VERSION",
     "DEFAULT_ENRICHMENT_QUOTAS",
     "EnrichmentQuotas",
     "build_existing_teacher_enrichment_batch",
+    "build_mixed_existing_teacher_enrichment_batch",
     "combine_existing_ranker_scores",
     "verify_enrichment_batch",
     "write_existing_teacher_enrichment_batch",
+    "write_mixed_existing_teacher_enrichment_batch",
 ]

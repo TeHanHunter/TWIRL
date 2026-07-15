@@ -1,28 +1,38 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from twirl.vetting.teacher_v2_active_learning import (
     DEFAULT_ENRICHMENT_QUOTAS,
+    EnrichmentQuotas,
     build_existing_teacher_enrichment_batch,
+    build_mixed_existing_teacher_enrichment_batch,
     combine_existing_ranker_scores,
     verify_enrichment_batch,
     write_existing_teacher_enrichment_batch,
+    write_mixed_existing_teacher_enrichment_batch,
 )
 
 
-def _score_tables(n_tics: int = 1200) -> tuple[pd.DataFrame, pd.DataFrame]:
-    rng = np.random.default_rng(56)
+def _score_tables(
+    n_tics: int = 1200,
+    *,
+    sector: int = 56,
+    tic_start: int = 10_000,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    rng = np.random.default_rng(56 + sector)
     n_rows = 2 * n_tics
-    tic = np.repeat(np.arange(10_000, 10_000 + n_tics), 2)
+    tic = np.repeat(np.arange(tic_start, tic_start + n_tics), 2)
     peak = np.tile([1, 2], n_tics)
     base = pd.DataFrame(
         {
             "review_id": [f"candidate-{value}-{rank}" for value, rank in zip(tic, peak)],
             "tic": tic,
-            "sector": 56,
+            "sector": sector,
             "period_d": 0.2 + rng.random(n_rows) * 10.0,
             "t0_bjd": 2_459_000.0 + rng.random(n_rows),
             "duration_min": 3.0 + rng.random(n_rows) * 40.0,
@@ -131,3 +141,66 @@ def test_written_queue_candidate_keys_survive_csv_roundtrip(tmp_path) -> None:
         batch_index=0,
     )
     assert summary["n_rows"] == 1000
+
+
+def test_mixed_batch_is_sector_balanced_and_globally_deduplicated() -> None:
+    compact56, morphology56 = _score_tables(180, sector=56, tic_start=10_000)
+    compact57, morphology57 = _score_tables(180, sector=57, tic_start=10_100)
+    scores = {
+        56: combine_existing_ranker_scores(compact56, morphology56),
+        57: combine_existing_ranker_scores(compact57, morphology57),
+    }
+    quotas = EnrichmentQuotas(
+        compact_transit=20,
+        eclipse_contact=15,
+        smooth_variable=10,
+        model_disagreement=10,
+        stratified_control=5,
+    )
+    queue, overlap, hidden, summary = build_mixed_existing_teacher_enrichment_batch(
+        scores,
+        batch_index=0,
+        per_sector_quotas=quotas,
+    )
+    assert len(queue) == 120
+    assert queue["tic"].nunique() == 120
+    assert queue["sector"].value_counts().to_dict() == {56: 60, 57: 60}
+    assert len(overlap) == 100
+    assert summary["cross_sector_tic_deduplication"] is True
+    assert hidden["selection_bucket"].value_counts().to_dict() == {
+        "compact_transit": 40,
+        "eclipse_contact": 30,
+        "smooth_variable": 20,
+        "model_disagreement": 20,
+        "stratified_control": 10,
+    }
+    assert not any(
+        column.startswith(("p_", "std_p_", "member_", "selection_", "model_"))
+        for column in queue
+    )
+
+
+def test_written_mixed_queue_survives_csv_roundtrip(tmp_path) -> None:
+    paths: dict[int, tuple[Path, Path]] = {}
+    for sector, tic_start in ((56, 10_000), (57, 20_000)):
+        compact, morphology = _score_tables(180, sector=sector, tic_start=tic_start)
+        compact_path = tmp_path / f"compact_{sector}.parquet"
+        morphology_path = tmp_path / f"morphology_{sector}.parquet"
+        compact.to_parquet(compact_path, index=False)
+        morphology.to_parquet(morphology_path, index=False)
+        paths[sector] = (compact_path, morphology_path)
+    summary = write_mixed_existing_teacher_enrichment_batch(
+        sector_score_paths=paths,
+        out_dir=tmp_path / "mixed",
+        batch_index=0,
+        per_sector_quotas=EnrichmentQuotas(
+            compact_transit=20,
+            eclipse_contact=15,
+            smooth_variable=10,
+            model_disagreement=10,
+            stratified_control=5,
+        ),
+    )
+    queue = pd.read_csv(tmp_path / "mixed/review_queue_1k.csv")
+    assert summary["n_rows"] == 120
+    assert queue["sector"].value_counts().to_dict() == {56: 60, 57: 60}
