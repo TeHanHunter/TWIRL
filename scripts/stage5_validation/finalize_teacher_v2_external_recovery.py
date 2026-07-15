@@ -18,6 +18,7 @@ from twirl.vetting.teacher_v2_recovery import (
     bls_topk_recovery_table,
     compare_recovery_models,
     period_radius_tmag_support,
+    select_role_scoped_injection_truth,
 )
 
 
@@ -145,7 +146,19 @@ def _verify_candidate_identity(candidates: pd.DataFrame, scores: pd.DataFrame, *
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        required=True,
+        help="Derived role manifest defining the locked/external injection IDs.",
+    )
+    parser.add_argument(
+        "--truth-manifests",
+        type=Path,
+        nargs="+",
+        required=True,
+        help="Immutable post-injection shard manifests containing physical truth.",
+    )
     parser.add_argument("--candidates", type=Path, required=True)
     parser.add_argument("--teacher-v2-scores", type=Path, required=True)
     parser.add_argument("--frozen-selection", type=Path, required=True)
@@ -161,7 +174,18 @@ def main() -> int:
     if not frozen.get("architecture_frozen") or not frozen.get("threshold_frozen"):
         raise RuntimeError("Teacher-v2 architecture and threshold must be frozen before external evaluation")
     threshold = float(frozen["frozen_compact_threshold"])
-    manifest = _read(args.manifest)
+    role_manifest = _read(args.manifest)
+    missing_truth_manifests = [path for path in args.truth_manifests if not path.exists()]
+    if missing_truth_manifests:
+        raise FileNotFoundError(
+            f"missing immutable injection truth manifests: {missing_truth_manifests}"
+        )
+    truth_manifest = pd.concat(
+        [_read(path) for path in args.truth_manifests],
+        ignore_index=True,
+        sort=False,
+    )
+    manifest = select_role_scoped_injection_truth(role_manifest, truth_manifest)
     candidates = _read(args.candidates)
     allowed_ids = frozenset(manifest["injection_id"].astype(str))
     candidates = candidates.loc[candidates["injection_id"].astype(str).isin(allowed_ids)].copy()
@@ -328,6 +352,8 @@ def main() -> int:
         "acceptance_passed": all(acceptance.values()),
         "figures": {"bls": bls_figures, "teacher_v2": v2_figures, **baseline_figures},
         "candidate_set_identity_verified": True,
+        "role_manifest": str(args.manifest),
+        "truth_manifests": [str(path) for path in args.truth_manifests],
     }
     (args.out_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True, allow_nan=True) + "\n"

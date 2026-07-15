@@ -49,6 +49,7 @@ from twirl.vetting.teacher_v2_recovery import (
     aggregate_compact_recovery,
     bls_topk_recovery_table,
     period_radius_tmag_support,
+    select_role_scoped_injection_truth,
 )
 
 
@@ -285,6 +286,59 @@ def test_tmag_support_audit_flags_sparse_bright_cells_without_host_reuse() -> No
     assert not bool(
         support.loc["Tmag >= 19", "bright_enrichment_recommended"]
     )
+
+
+def test_recovery_uses_immutable_truth_scoped_by_derived_roles() -> None:
+    roles = pd.DataFrame(
+        {
+            "injection_id": ["b", "a"],
+            "tic": [2, 1],
+            "sector": [56, 56],
+            "grid_cell_id": ["cell-b", "cell-a"],
+            "teacher_v2_partition": ["locked_holdout", "locked_holdout"],
+        }
+    )
+    truth = pd.DataFrame(
+        {
+            "injection_id": ["a", "b", "c"],
+            "tic": [1, 2, 3],
+            "sector": [56, 56, 56],
+            "grid_cell_id": ["cell-a", "cell-b", "cell-c"],
+            "period_d": [1.0, 2.0, 3.0],
+            "radius_rearth": [1.0, 2.0, 3.0],
+            "duration_min": [5.0, 6.0, 7.0],
+            "n_good_in_transit": [3, 4, 5],
+            "tessmag": [18.0, 19.0, 20.0],
+        }
+    )
+
+    selected = select_role_scoped_injection_truth(roles, truth)
+
+    assert set(selected["injection_id"]) == {"a", "b"}
+    assert selected.set_index("injection_id").loc["b", "n_good_in_transit"] == 4
+    assert selected["teacher_v2_partition"].eq("locked_holdout").all()
+
+
+def test_recovery_rejects_role_truth_identity_mismatch() -> None:
+    roles = pd.DataFrame(
+        {
+            "injection_id": ["a"],
+            "tic": [2],
+            "sector": [56],
+            "grid_cell_id": ["cell-a"],
+        }
+    )
+    truth = pd.DataFrame(
+        {
+            "injection_id": ["a"],
+            "tic": [1],
+            "sector": [56],
+            "grid_cell_id": ["cell-a"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="disagree on tic"):
+        select_role_scoped_injection_truth(roles, truth)
 
 
 def test_workload_threshold_never_exceeds_budget_when_scores_tie() -> None:

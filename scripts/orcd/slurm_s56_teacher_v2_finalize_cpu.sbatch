@@ -36,6 +36,7 @@ METADATA_THRESHOLD=$("${PYTHON}" -c \
 
 "${PYTHON}" scripts/stage5_validation/finalize_teacher_v2_external_recovery.py \
   --manifest "${OUT_ROOT}/roles/s56_injection_locked_holdout_manifest.parquet" \
+  --truth-manifests "${S56_RECOVERY}"/full/injection_shards/injections_*_manifest.parquet \
   --candidates "${S56_RECOVERY}/full/teacher_inputs/candidates_top5.csv" \
   --teacher-v2-scores "${OUT_ROOT}/frozen_scores/s56_holdout_teacher_v2.parquet" \
   --teacher-v1-scores "${OUT_ROOT}/frozen_scores/s56_holdout_teacher_v1.parquet" \
@@ -48,6 +49,7 @@ METADATA_THRESHOLD=$("${PYTHON}" -c \
 
 "${PYTHON}" scripts/stage5_validation/finalize_teacher_v2_external_recovery.py \
   --manifest "${OUT_ROOT}/roles/s57_external_role_manifest.parquet" \
+  --truth-manifests "${S57_RECOVERY}"/full/injection_shards/injections_*_manifest.parquet \
   --candidates "${S57_RECOVERY}/full/teacher_inputs/candidates_top5.csv" \
   --teacher-v2-scores "${OUT_ROOT}/frozen_scores/s57_external_teacher_v2.parquet" \
   --teacher-v1-scores "${OUT_ROOT}/frozen_scores/s57_external_teacher_v1.parquet" \

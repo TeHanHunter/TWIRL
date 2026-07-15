@@ -24,6 +24,100 @@ def _as_bool(values: pd.Series) -> pd.Series:
     )
 
 
+def select_role_scoped_injection_truth(
+    role_manifest: pd.DataFrame,
+    truth_manifest: pd.DataFrame,
+) -> pd.DataFrame:
+    """Select immutable injection truth for exactly the derived role IDs.
+
+    Schedule-derived role tables intentionally do not duplicate post-injection
+    measurements such as ``n_good_in_transit``. Recovery accounting therefore
+    uses the role table only as an ID filter and keeps the shard manifests as
+    the authority for injection truth.
+    """
+
+    for name, frame in (
+        ("role manifest", role_manifest),
+        ("truth manifest", truth_manifest),
+    ):
+        if "injection_id" not in frame:
+            raise KeyError(f"{name} is missing injection_id")
+        if frame["injection_id"].fillna("").astype(str).duplicated().any():
+            raise ValueError(f"{name} contains duplicate injection IDs")
+
+    roles = role_manifest.copy()
+    truth = truth_manifest.copy()
+    roles["injection_id"] = roles["injection_id"].astype(str)
+    truth["injection_id"] = truth["injection_id"].astype(str)
+    role_ids = set(roles["injection_id"])
+    truth_ids = set(truth["injection_id"])
+    missing = sorted(role_ids - truth_ids)
+    if missing:
+        raise ValueError(
+            "role manifest contains injections absent from immutable truth; "
+            f"first={missing[:5]}"
+        )
+
+    selected = truth.loc[truth["injection_id"].isin(role_ids)].copy()
+    identity_columns = [
+        column
+        for column in ("tic", "sector", "grid_cell_id")
+        if column in roles and column in selected
+    ]
+    if identity_columns:
+        identity = selected[["injection_id", *identity_columns]].merge(
+            roles[["injection_id", *identity_columns]],
+            on="injection_id",
+            how="inner",
+            suffixes=("_truth", "_role"),
+            validate="one_to_one",
+        )
+        for column in identity_columns:
+            if column in {"tic", "sector"}:
+                truth_values = pd.to_numeric(
+                    identity[f"{column}_truth"], errors="coerce"
+                )
+                role_values = pd.to_numeric(
+                    identity[f"{column}_role"], errors="coerce"
+                )
+                mismatch = truth_values.isna() | role_values.isna() | truth_values.ne(
+                    role_values
+                )
+            else:
+                truth_values = identity[f"{column}_truth"].fillna("").astype(str)
+                role_values = identity[f"{column}_role"].fillna("").astype(str)
+                mismatch = truth_values.ne(role_values)
+            if mismatch.any():
+                examples = identity.loc[
+                    mismatch,
+                    [
+                        "injection_id",
+                        f"{column}_truth",
+                        f"{column}_role",
+                    ],
+                ].head(5)
+                raise ValueError(
+                    f"role and truth manifests disagree on {column}; "
+                    f"first={examples.to_dict('records')}"
+                )
+
+    role_only_columns = [
+        column
+        for column in roles.columns
+        if column != "injection_id" and column not in selected.columns
+    ]
+    if role_only_columns:
+        selected = selected.merge(
+            roles[["injection_id", *role_only_columns]],
+            on="injection_id",
+            how="left",
+            validate="one_to_one",
+        )
+    if len(selected) != len(roles):
+        raise RuntimeError("role-scoped truth selection changed the role row count")
+    return selected.reset_index(drop=True)
+
+
 def aggregate_compact_recovery(
     manifest: pd.DataFrame,
     scored_candidates: pd.DataFrame,
@@ -232,4 +326,5 @@ __all__ = [
     "bls_topk_recovery_table",
     "compare_recovery_models",
     "period_radius_tmag_support",
+    "select_role_scoped_injection_truth",
 ]
