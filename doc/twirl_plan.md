@@ -1107,9 +1107,16 @@ compact, `300` Eclipse/contact, `100` Smooth variable, `100` model-disagreement,
 and `100` controls), with `100` rows assigned for cross-review. Release later
 S57-S64 batches sequentially after measuring the preceding batch's per-bucket
 yield; do not retrain between sectors unless the yield audit demonstrates a
-clear failure. S56-S64 become the active-learning/training pool, so reserve an
-unopened sector at or beyond S65 as the next external test. Student
-pseudo-labeling remains blocked.
+clear failure. The focused S56 compact/Planet revisit is complete: it recovered
+`11` new Planet-like labels among `400` compact-ranker rows (`2.75%`), while the
+main mixed 1k queue remains a separate `177/1000` checkpoint. S56-S64 become
+the active-learning/training pool, so reserve an unopened sector at or beyond
+S65 as the next external test. Student pseudo-labeling remains blocked.
+Preserve completed S56 enrichment evidence as
+`S56-ADP-HV1`; starting with S57, render `S56-ADP-HV2` sheets with one robust
+normalized-flux y-axis range shared by both apertures and every light-curve
+panel, plus identical phase-bin spacing and raw-point density in the review
+and odd/even folds.
 
 Pre-human-labeling path:
 

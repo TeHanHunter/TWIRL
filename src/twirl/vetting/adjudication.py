@@ -17,6 +17,7 @@ from twirl.vetting.label_io import (
     normalize_review_queue,
     validate_label_records,
 )
+from twirl.vetting.two_aperture import TWO_APERTURE_VET_SHEET_VERSION
 
 
 SIGNAL_LABELS: frozenset[str] = frozenset(
@@ -39,7 +40,7 @@ REPEAT_QUOTAS: Mapping[str, int] = {
 ORIGINAL_1K = "s56_recovery50_teacher_queue"
 NEXT4K_SLICE = "s56_recovery50_teacher_queue_next4k"
 ADP_APERTURES = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
-ADJUDICATION_VET_SHEET_VERSION = "S56-ADP-HV1"
+ADJUDICATION_VET_SHEET_VERSION = TWO_APERTURE_VET_SHEET_VERSION
 
 PUBLIC_QUEUE_COLUMNS: tuple[str, ...] = (
     "row_id",

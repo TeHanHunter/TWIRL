@@ -5,7 +5,7 @@ from dataclasses import asdict
 import os
 from pathlib import Path
 import tempfile
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 
@@ -36,6 +36,12 @@ DEFAULT_TWO_APERTURE_APERTURES: tuple[str, str] = (
     _ADP015_COLUMNS["small"],
     _ADP015_COLUMNS["primary"],
 )
+TWO_APERTURE_VET_SHEET_VERSION = "S56-ADP-HV2"
+
+_FOLD_RAW_MARKER_SIZE = 5.2
+_FOLD_RAW_ALPHA = 0.34
+_FOLD_BIN_MARKER_SIZE = 4.6
+_FOLD_BIN_LINE_WIDTH = 0.78
 
 
 def _aperture_prefix(aperture: str) -> str:
@@ -363,7 +369,17 @@ def _duration_days_text(duration_min: float | None) -> str:
     return f"{float(duration_min) / 1440.0:.6g} d"
 
 
-def _set_fold_ylim(ax: Any, y: np.ndarray, sel: np.ndarray, *, depth: float | None = None) -> None:
+def _set_fold_ylim(
+    ax: Any,
+    y: np.ndarray,
+    sel: np.ndarray,
+    *,
+    depth: float | None = None,
+    shared_ylim: tuple[float, float] | None = None,
+) -> None:
+    if shared_ylim is not None:
+        ax.set_ylim(*shared_ylim)
+        return
     if np.count_nonzero(sel) < 3:
         return
     vals = np.asarray(y[sel], dtype=float)
@@ -381,6 +397,60 @@ def _set_fold_ylim(ax: Any, y: np.ndarray, sel: np.ndarray, *, depth: float | No
         hi = max(float(hi), 1.0 + 0.25 * float(depth))
     span = max(float(hi - lo), 0.02)
     ax.set_ylim(float(lo) - 0.12 * span, float(hi) + 0.12 * span)
+
+
+def _shared_light_curve_ylim(
+    lcs: Mapping[str, HLSPLightCurve],
+    peaks: Mapping[str, Mapping[str, Any]],
+) -> tuple[float, float]:
+    """Return one robust normalized-flux scale for every LC panel on a sheet."""
+
+    lows: list[float] = []
+    highs: list[float] = []
+    for aperture, blc in lcs.items():
+        if aperture not in blc.flux:
+            continue
+        y = _norm_flux(blc, aperture)
+        keep = quality_mask(blc, aperture) & np.isfinite(y)
+        if np.count_nonzero(keep) < 3:
+            continue
+        lo, hi = np.nanpercentile(y[keep], [1.0, 99.5])
+        peak = peaks.get(aperture, {})
+        period_d = float(peak.get("period_d", np.nan))
+        t0_bjd = float(peak.get("t0_bjd", np.nan))
+        duration_min = float(peak.get("duration_min", np.nan))
+        if (
+            np.isfinite(period_d)
+            and period_d > 0
+            and np.isfinite(t0_bjd)
+            and np.isfinite(duration_min)
+            and duration_min > 0
+        ):
+            phase = _phase_cycle(blc.time, period_d=period_d, t0_bjd=t0_bjd)
+            half_phase = 0.5 * duration_min / (period_d * 1440.0)
+            primary = keep & (np.abs(phase) <= half_phase)
+            secondary = keep & (np.abs(np.abs(phase) - 0.5) <= half_phase)
+            event = primary | secondary
+            n_event = int(np.count_nonzero(event))
+            if n_event:
+                event_qlo = 0.0 if n_event < 4 else 0.5
+                event_lo, event_hi = np.nanpercentile(y[event], [event_qlo, 99.5])
+                lo = min(float(lo), float(event_lo))
+                hi = max(float(hi), float(event_hi))
+            depth = float(peak.get("depth", np.nan))
+            if np.isfinite(depth) and depth > 0:
+                lo = min(float(lo), 1.0 - 1.30 * depth)
+                hi = max(float(hi), 1.0 + 0.30 * depth)
+        lows.append(float(lo))
+        highs.append(float(hi))
+
+    if not lows or not highs:
+        return 0.95, 1.05
+    lo = float(np.nanmin(lows))
+    hi = float(np.nanmax(highs))
+    span = max(hi - lo, 0.05)
+    pad = 0.05 * span
+    return lo - pad, hi + pad
 
 
 def _annotate_fold_period(
@@ -414,11 +484,12 @@ def _plot_full_lc(
     *,
     branch_name: str,
     peak: dict[str, float],
+    shared_ylim: tuple[float, float] | None = None,
 ) -> None:
     y = _norm_flux(blc, aperture)
     keep = quality_mask(blc, aperture)
     ax.scatter(blc.time[keep], y[keep], s=3.0, c="0.12", alpha=0.58, linewidths=0, rasterized=True)
-    if keep.any():
+    if keep.any() and shared_ylim is None:
         finite_keep = keep & np.isfinite(y)
         lo, hi = np.nanpercentile(y[finite_keep], [1.0, 99.5])
         period_d = float(peak.get("period_d", np.nan))
@@ -439,7 +510,10 @@ def _plot_full_lc(
                 hi = max(float(hi), 1.0 + 0.30 * depth)
         pad = 0.05 * max(float(hi - lo), 0.05)
         ax.set_ylim(float(lo) - pad, float(hi) + pad)
+    if keep.any():
         ax.set_xlim(float(np.nanmin(blc.time[keep])), float(np.nanmax(blc.time[keep])))
+    if shared_ylim is not None:
+        ax.set_ylim(*shared_ylim)
     if np.isfinite(peak.get("period_d", np.nan)) and np.isfinite(peak.get("t0_bjd", np.nan)):
         _mark_transit_windows(
             ax,
@@ -462,6 +536,7 @@ def _plot_full_phase_fold(
     duration_min: float,
     depth: float | None = None,
     title: str,
+    shared_ylim: tuple[float, float] | None = None,
 ) -> None:
     y = _norm_flux(blc, aperture)
     keep = quality_mask(blc, aperture)
@@ -489,7 +564,7 @@ def _plot_full_phase_fold(
         ax.axvspan(-half, half, color="#d24b32", alpha=0.14, lw=0)
     ax.axvline(0.0, color="#9b2f25", lw=0.9, alpha=0.78)
     ax.set_xlim(-0.5, 0.5)
-    _set_fold_ylim(ax, y, sel, depth=depth)
+    _set_fold_ylim(ax, y, sel, depth=depth, shared_ylim=shared_ylim)
     ylo, yhi = ax.get_ylim()
     ypad = 0.04 * max(float(yhi - ylo), 1.0e-6)
     box_y0 = float(ylo) + ypad
@@ -519,6 +594,7 @@ def _plot_harmonic_fold(
     depth: float | None,
     title: str,
     show_ylabel: bool,
+    shared_ylim: tuple[float, float] | None = None,
 ) -> None:
     """Plot one raw-plus-binned full-cycle harmonic view."""
 
@@ -549,7 +625,7 @@ def _plot_harmonic_fold(
     ax.axvline(0.5, color="#1f4e79", lw=0.90, ls="--", alpha=0.82)
     ax.set_xlim(-0.25, 0.75)
     ax.set_xticks([-0.25, 0.0, 0.25, 0.5, 0.75])
-    _set_fold_ylim(ax, y, sel, depth=depth)
+    _set_fold_ylim(ax, y, sel, depth=depth, shared_ylim=shared_ylim)
     ax.set_title(title, loc="left", fontsize=8.4)
     ax.set_xlabel("phase", fontsize=8.0)
     ax.set_ylabel("relative flux" if show_ylabel else "", fontsize=8.0)
@@ -617,6 +693,7 @@ def _plot_folded_bins(
     title: str,
     show_duration_days: bool = False,
     phase_shift: float = 0.0,
+    shared_ylim: tuple[float, float] | None = None,
 ) -> None:
     y = _norm_flux(blc, aperture)
     keep = quality_mask(blc, aperture)
@@ -624,7 +701,15 @@ def _plot_folded_bins(
     phase = _phase_cycle(blc.time, period_d=period_d, t0_bjd=shifted_t0)
     window, window_min = _fold_window_phase(period_d, duration_min)
     sel = keep & np.isfinite(y) & np.isfinite(phase) & (np.abs(phase) <= window)
-    ax.scatter(phase[sel], y[sel], s=5.2, c="0.55", alpha=0.34, linewidths=0, rasterized=True)
+    ax.scatter(
+        phase[sel],
+        y[sel],
+        s=_FOLD_RAW_MARKER_SIZE,
+        c="0.55",
+        alpha=_FOLD_RAW_ALPHA,
+        linewidths=0,
+        rasterized=True,
+    )
     n_bins = _fold_bin_count(window_min, duration_min)
     bx, by, be, bn = _bin_stats(phase[sel], y[sel], n_bins=n_bins, x_min=-window, x_max=window, min_count=1)
     good_err = np.isfinite(be) & (be > 0)
@@ -634,8 +719,8 @@ def _plot_folded_bins(
         by,
         yerr=yerr,
         fmt="o",
-        ms=4.6,
-        lw=0.78,
+        ms=_FOLD_BIN_MARKER_SIZE,
+        lw=_FOLD_BIN_LINE_WIDTH,
         color="#1f4e79",
         ecolor="#1f4e79",
         alpha=0.92,
@@ -646,7 +731,7 @@ def _plot_folded_bins(
     ax.axvspan(-half, half, color="#d24b32", alpha=0.13, lw=0)
     ax.axvline(0.0, color="#9b2f25", lw=0.9, alpha=0.80)
     ax.set_xlim(-window, window)
-    _set_fold_ylim(ax, y, sel, depth=depth)
+    _set_fold_ylim(ax, y, sel, depth=depth, shared_ylim=shared_ylim)
     if phase_shift:
         title_bits = [title, r"$\phi=0.5$"]
     else:
@@ -670,6 +755,7 @@ def _plot_even_odd_bins(
     metrics: dict[str, Any],
     prefix: str,
     metric_scope: str = "own",
+    shared_ylim: tuple[float, float] | None = None,
 ) -> None:
     y = _norm_flux(blc, aperture)
     keep = quality_mask(blc, aperture)
@@ -677,10 +763,18 @@ def _plot_even_odd_bins(
     event_no = _event_numbers(blc.time, period_d=period_d, t0_bjd=t0_bjd)
     window, window_min = _fold_window_phase(period_d, duration_min)
     sel = keep & np.isfinite(y) & np.isfinite(phase) & (np.abs(phase) <= window)
-    ax.scatter(phase[sel], y[sel], s=4.6, c="0.60", alpha=0.28, linewidths=0, rasterized=True)
+    ax.scatter(
+        phase[sel],
+        y[sel],
+        s=_FOLD_RAW_MARKER_SIZE,
+        c="0.55",
+        alpha=_FOLD_RAW_ALPHA,
+        linewidths=0,
+        rasterized=True,
+    )
     colors = {"even": "#1f4e79", "odd": "#c05a27"}
     markers = {"even": "o", "odd": "s"}
-    n_bins = max(12, _fold_bin_count(window_min, duration_min) // 2)
+    n_bins = _fold_bin_count(window_min, duration_min)
     for name, parity in (("even", 0), ("odd", 1)):
         part = sel & ((event_no % 2) == parity)
         bx, by, be, _ = _bin_stats(phase[part], y[part], n_bins=n_bins, x_min=-window, x_max=window, min_count=1)
@@ -689,11 +783,11 @@ def _plot_even_odd_bins(
             by,
             yerr=np.where(np.isfinite(be) & (be > 0), be, np.nan),
             fmt=markers[name],
-            ms=4.4,
-            lw=0.75,
+            ms=_FOLD_BIN_MARKER_SIZE,
+            lw=_FOLD_BIN_LINE_WIDTH,
             color=colors[name],
             ecolor=colors[name],
-            alpha=0.90,
+            alpha=0.92,
             capsize=0,
             linestyle="none",
         )
@@ -701,7 +795,7 @@ def _plot_even_odd_bins(
     ax.axvspan(-half, half, color="#d24b32", alpha=0.11, lw=0)
     ax.axvline(0.0, color="#9b2f25", lw=0.9, alpha=0.75)
     ax.set_xlim(-window, window)
-    _set_fold_ylim(ax, y, sel)
+    _set_fold_ylim(ax, y, sel, shared_ylim=shared_ylim)
     ax.set_title(title, loc="left", fontsize=10.2)
     sigma_delta = metrics.get(f"{prefix}_{metric_scope}_even_odd_sigma_delta", np.nan)
     if np.isfinite(sigma_delta):
@@ -998,17 +1092,13 @@ def render_two_aperture_sheet(
     anchor_t0 = metrics.get("anchor_t0_bjd", np.nan)
     anchor_dur = metrics.get("anchor_duration_min", np.nan)
 
-    for col, ap in enumerate(apertures):
-        if col > 1:
-            break
-        offset = 0 if col == 0 else 2
-        blc: HLSPLightCurve = payload["lcs"][ap]
+    plot_peaks: dict[str, dict[str, float]] = {}
+    for ap in apertures[:2]:
         peak = _best_peak_dict(payload["results"][ap])
         prefix = _aperture_prefix(ap)
         anchor_depth = metrics.get(f"{prefix}_anchor_depth", np.nan)
-        plot_peak = peak
         if use_row_ephemeris and np.isfinite(anchor_period) and np.isfinite(anchor_t0) and np.isfinite(anchor_dur):
-            plot_peak = {
+            peak = {
                 "period_d": float(anchor_period),
                 "t0_bjd": float(anchor_t0),
                 "duration_min": float(anchor_dur),
@@ -1016,11 +1106,36 @@ def render_two_aperture_sheet(
                 "depth_snr": metrics.get(f"{prefix}_anchor_snr", np.nan),
                 "sde": metrics.get("anchor_sde", np.nan),
             }
+        plot_peaks[ap] = peak
+    shared_ylim = _shared_light_curve_ylim(
+        {ap: payload["lcs"][ap] for ap in apertures[:2]},
+        plot_peaks,
+    )
+    metrics["vet_sheet_version"] = TWO_APERTURE_VET_SHEET_VERSION
+    metrics["shared_flux_ymin"] = float(shared_ylim[0])
+    metrics["shared_flux_ymax"] = float(shared_ylim[1])
+    metrics["matched_review_odd_even_sampling"] = True
+
+    for col, ap in enumerate(apertures):
+        if col > 1:
+            break
+        offset = 0 if col == 0 else 2
+        blc: HLSPLightCurve = payload["lcs"][ap]
+        peak = _best_peak_dict(payload["results"][ap])
+        prefix = _aperture_prefix(ap)
+        plot_peak = plot_peaks[ap]
         plot_title = "Review fold" if use_row_ephemeris else "Own fold"
         metric_scope = "anchor" if use_row_ephemeris else "own"
 
         ax = fig.add_subplot(gs[0, offset : offset + 2])
-        _plot_full_lc(ax, blc, ap, branch_name=branch.name, peak=plot_peak)
+        _plot_full_lc(
+            ax,
+            blc,
+            ap,
+            branch_name=branch.name,
+            peak=plot_peak,
+            shared_ylim=shared_ylim,
+        )
 
         ax = fig.add_subplot(gs[1, offset : offset + 2])
         if np.isfinite(plot_peak["period_d"]):
@@ -1033,6 +1148,7 @@ def render_two_aperture_sheet(
                 duration_min=float(plot_peak["duration_min"]),
                 depth=float(plot_peak["depth"]) if np.isfinite(plot_peak.get("depth", np.nan)) else None,
                 title="Full phase fold",
+                shared_ylim=shared_ylim,
             )
         else:
             ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
@@ -1059,6 +1175,7 @@ def render_two_aperture_sheet(
                 sde=float(plot_peak["sde"]) if np.isfinite(plot_peak.get("sde", np.nan)) else None,
                 title=plot_title,
                 show_duration_days=True,
+                shared_ylim=shared_ylim,
             )
             ax.set_xlabel("")
         else:
@@ -1078,6 +1195,7 @@ def render_two_aperture_sheet(
                 sde=float(plot_peak["sde"]) if np.isfinite(plot_peak.get("sde", np.nan)) else None,
                 title="Secondary fold",
                 phase_shift=0.5,
+                shared_ylim=shared_ylim,
             )
         else:
             ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
@@ -1096,6 +1214,7 @@ def render_two_aperture_sheet(
                 metrics=metrics,
                 prefix=prefix,
                 metric_scope=metric_scope,
+                shared_ylim=shared_ylim,
             )
         else:
             ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")
@@ -1116,6 +1235,7 @@ def render_two_aperture_sheet(
                         depth=float(plot_peak["depth"]) if np.isfinite(plot_peak.get("depth", np.nan)) else None,
                         title=f"{ap}: {_harmonic_factor_label(factor)} ({harmonic_period:.5g} d)",
                         show_ylabel=factor_index == 0,
+                        shared_ylim=shared_ylim,
                     )
                 else:
                     ax.text(0.5, 0.5, "No finite review ephemeris", ha="center", va="center")

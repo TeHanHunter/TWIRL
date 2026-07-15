@@ -30,6 +30,7 @@ from twirl.vetting.harmonic_cnn import PRESERVE_CLASSES, build_grouped_test_and_
 from twirl.vetting.harmonic_inputs import native_group_path
 from twirl.vetting.label_io import candidate_key as current_candidate_key
 from twirl.vetting.recovery50_teacher import leakage_columns
+from twirl.vetting.two_aperture import TWO_APERTURE_VET_SHEET_VERSION
 
 
 TEACHER_V2_MODEL_VERSION = "s56_harmonic_cnn_teacher_v2"
@@ -275,7 +276,7 @@ def build_franklin_a2v1_rereview_queue(
     selected["source_kind"] = "real_candidate"
     selected["source_bucket"] = ""
     selected["candidate_key"] = selected.apply(current_candidate_key, axis=1)
-    selected["vet_sheet_version"] = "S56-ADP-HV1"
+    selected["vet_sheet_version"] = TWO_APERTURE_VET_SHEET_VERSION
     selected["twirl_vet_sheet_name"] = (
         selected["review_id"].str.replace(":", "_", regex=False)
         + "_twirl_twoap_current_a2v1_adp.png"
@@ -346,7 +347,7 @@ def build_franklin_a2v1_rereview_queue(
         "n_unique_tics": int(public["tic"].nunique()),
         "seed": int(seed),
         "prior_labels_hidden": True,
-        "vet_sheet_version": "S56-ADP-HV1",
+        "vet_sheet_version": TWO_APERTURE_VET_SHEET_VERSION,
     }
     return public, private, summary
 

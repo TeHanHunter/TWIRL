@@ -79,7 +79,7 @@ def _unique_source_rows() -> pd.DataFrame:
 
 
 def test_adjudication_sheet_version_is_stable() -> None:
-    assert ADJUDICATION_VET_SHEET_VERSION == "S56-ADP-HV1"
+    assert ADJUDICATION_VET_SHEET_VERSION == "S56-ADP-HV2"
 
 
 def test_fixed_queue_layout_has_343_rows_and_hidden_repeats() -> None:
