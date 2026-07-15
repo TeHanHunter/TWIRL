@@ -763,7 +763,13 @@ def test_teacher_v2_selection_freezes_threshold_before_holdout(tmp_path: Path) -
 
 
 def test_teacher_v2_recovery_uses_only_truth_matched_candidate_scores() -> None:
-    manifest = pd.DataFrame({"injection_id": ["a", "b", "c"]})
+    manifest = pd.DataFrame(
+        {
+            "injection_id": ["a", "b", "c"],
+            "bls_top5_recovered": [False, False, True],
+            "teacher_v2_compact_recovered": [False, True, True],
+        }
+    )
     candidates = pd.DataFrame(
         {
             "injection_id": ["a", "a", "b", "c"],
@@ -779,6 +785,8 @@ def test_teacher_v2_recovery_uses_only_truth_matched_candidate_scores() -> None:
     assert bool(by_id.loc["a", "teacher_v2_compact_recovered"])
     assert not bool(by_id.loc["b", "teacher_v2_compact_recovered"])
     assert not bool(by_id.loc["c", "teacher_v2_compact_recovered"])
+    assert "bls_top5_recovered_x" not in outcomes
+    assert "teacher_v2_compact_recovered_x" not in outcomes
     assert summary["n_bls_top5_recovered"] == 2
     assert summary["n_compact_recovered"] == 1
     topk = bls_topk_recovery_table(manifest, candidates)

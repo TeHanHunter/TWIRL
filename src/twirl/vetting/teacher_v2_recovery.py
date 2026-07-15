@@ -169,9 +169,17 @@ def aggregate_compact_recovery(
                 ),
             }
         )
-    outcome = pd.DataFrame(rows)
-    result = manifest.merge(outcome, on="injection_id", how="left", validate="one_to_one")
     compact_column = f"{outcome_prefix}_compact_recovered"
+    recomputed_columns = (
+        "n_scored_candidates",
+        "n_truth_matched_candidates",
+        "bls_top5_recovered",
+        compact_column,
+        "matched_compact_score_max",
+    )
+    base = manifest.drop(columns=list(recomputed_columns), errors="ignore")
+    outcome = pd.DataFrame(rows)
+    result = base.merge(outcome, on="injection_id", how="left", validate="one_to_one")
     for column in ("bls_top5_recovered", compact_column):
         result[column] = result[column].fillna(False).astype(bool)
     result["n_scored_candidates"] = result["n_scored_candidates"].fillna(0).astype(int)
