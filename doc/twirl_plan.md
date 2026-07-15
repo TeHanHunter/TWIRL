@@ -1097,6 +1097,20 @@ must be designed on S56 development data and tested on a fresh external sector.
 See the `2026-07-15` [execution log](twirl_progress_log.md) for full metrics and
 verification details.
 
+Status (`2026-07-15`, existing-teacher enrichment ready): do not spend another
+multi-day cycle training Teacher v2.1 before collecting more real labels. Use
+the two already trained five-member ensembles as complementary rankers:
+Shape + raw chronology for compact-transit enrichment, and Shape +
+periodogram/BLS for Eclipse/contact and Smooth-variable enrichment. The first
+blinded S56 batch contains `1,000` unique, previously unused TICs (`400`
+compact, `300` Eclipse/contact, `100` Smooth variable, `100` model-disagreement,
+and `100` controls), with `100` rows assigned for cross-review. Release later
+S57-S64 batches sequentially after measuring the preceding batch's per-bucket
+yield; do not retrain between sectors unless the yield audit demonstrates a
+clear failure. S56-S64 become the active-learning/training pool, so reserve an
+unopened sector at or beyond S65 as the next external test. Student
+pseudo-labeling remains blocked.
+
 Pre-human-labeling path:
 
 1. Use the accepted S56 pilot light-curve product as the baseline, with the
@@ -1380,6 +1394,6 @@ A publishable null result still requires:
 5. Define the consolidated HDF5-to-TWIRL index format and attach QA metrics.
 6. Audit Gaia-first target support and decide what MIT fork changes are needed for targets without TIC IDs.
 7. Build the transparent periodic and dip-search baselines before committing to an ML-heavy workflow.
-8. Build the S56 self-training vetting loop on top of the verified mixed teacher pool: human labels, injection truth, teacher pseudo-labels, student scores, and targeted follow-up review queues.
+8. Run the frozen Teacher-v2 compact and morphology rankers as a sequential S56-S64 human-label enrichment loop; audit Planet/EB/Variable yield after each `1,000`-TIC batch before releasing the next sector, and keep a later sector unopened for external testing.
 9. Stage compact regenerated ADP/ADP015 exports for ORCD and run S56 equivalence tests before scaling H200 injection-recovery or search jobs.
 10. Lock down follow-up readiness and coordination only after the candidate-validation criteria are stable.
