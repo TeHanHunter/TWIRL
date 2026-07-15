@@ -13,6 +13,7 @@ import pandas as pd
 
 from twirl.vetting.teacher_v2 import (
     TEACHER_V2_ROLE_POLICY,
+    attach_prior_human_splits,
     build_global_tic_split_registry,
     build_franklin_a2v1_rereview_queue,
     build_franklin_current_a2v1_audit_candidates,
@@ -117,26 +118,7 @@ def main() -> int:
     human = _read(args.human_table)
     if args.human_prior_splits:
         prior = _read(args.human_prior_splits)
-        split_columns = prior[["review_id", "fixed_split", "cv_fold"]].drop_duplicates(
-            "review_id", keep="last"
-        )
-        human = human.drop(columns=["fixed_split", "cv_fold"], errors="ignore")
-        if "source_review_id" in human:
-            split_columns = split_columns.rename(columns={"review_id": "source_review_id"})
-            human = human.merge(
-                split_columns,
-                on="source_review_id",
-                how="left",
-                validate="one_to_one",
-            )
-        else:
-            human = human.merge(
-                split_columns, on="review_id", how="left", validate="one_to_one"
-            )
-        if human[["fixed_split", "cv_fold"]].isna().any().any():
-            raise RuntimeError(
-                "A2v1 human transfers are missing prior Teacher-v1 grouped splits"
-            )
+        human = attach_prior_human_splits(human, prior)
     compatibility = (
         _read(args.human_a2v1_compatibility)
         if args.human_a2v1_compatibility

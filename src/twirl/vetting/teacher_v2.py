@@ -823,6 +823,61 @@ def mark_native_input_availability(
     return work
 
 
+def attach_prior_human_splits(
+    human_rows: pd.DataFrame,
+    prior_rows: pd.DataFrame,
+) -> pd.DataFrame:
+    """Restore Teacher-v1 grouped splits for trainable A2v1 human rows.
+
+    Rows labeled ``skip`` are retained as provenance but are excluded by the
+    human-training builder, so they do not require a historical split. Every
+    row that can supervise a task must match exactly.
+    """
+
+    required = {"review_id", "fixed_split", "cv_fold"}
+    missing = sorted(required - set(prior_rows.columns))
+    if missing:
+        raise KeyError(f"prior human split table is missing columns: {missing}")
+    work = human_rows.drop(columns=["fixed_split", "cv_fold"], errors="ignore").copy()
+    split_columns = prior_rows[
+        ["review_id", "fixed_split", "cv_fold"]
+    ].drop_duplicates("review_id", keep="last")
+    if "source_review_id" in work:
+        split_columns = split_columns.rename(columns={"review_id": "source_review_id"})
+        work = work.merge(
+            split_columns,
+            on="source_review_id",
+            how="left",
+            validate="one_to_one",
+        )
+    elif "review_id" in work:
+        work = work.merge(
+            split_columns,
+            on="review_id",
+            how="left",
+            validate="one_to_one",
+        )
+    else:
+        raise KeyError("A2v1 human rows have no review identity for prior splits")
+    label = work.get("human_label", pd.Series("", index=work.index)).fillna("").astype(str)
+    trainable = ~label.isin({"", "skip"})
+    missing_split = work[["fixed_split", "cv_fold"]].isna().any(axis=1)
+    if (trainable & missing_split).any():
+        examples = work.loc[
+            trainable & missing_split,
+            [
+                column
+                for column in ("review_id", "source_review_id", "tic", "human_label")
+                if column in work
+            ],
+        ].head(5)
+        raise RuntimeError(
+            "A2v1 trainable human transfers are missing prior Teacher-v1 grouped splits; "
+            f"first={examples.to_dict('records')}"
+        )
+    return work
+
+
 def _phase_delta_min(first_t0: float, second_t0: float, period_d: float) -> float:
     if not all(np.isfinite([first_t0, second_t0, period_d])) or period_d <= 0:
         return np.nan
@@ -1276,6 +1331,7 @@ __all__ = [
     "WorkloadThreshold",
     "assert_teacher_v2_feature_columns",
     "assign_s56_injection_roles",
+    "attach_prior_human_splits",
     "build_global_tic_split_registry",
     "build_franklin_a2v1_rereview_queue",
     "build_franklin_current_a2v1_audit_candidates",

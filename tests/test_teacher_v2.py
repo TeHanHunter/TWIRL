@@ -10,6 +10,7 @@ from twirl.vetting.harmonic_cnn import HarmonicModelConfig
 from twirl.vetting.teacher_v2 import (
     assert_teacher_v2_feature_columns,
     assign_s56_injection_roles,
+    attach_prior_human_splits,
     build_global_tic_split_registry,
     build_franklin_a2v1_rereview_queue,
     build_s56_injection_training_rows,
@@ -610,3 +611,49 @@ def test_locked_human_holdout_rejects_missing_model_row() -> None:
     )
     with pytest.raises(ValueError, match="missing 1 locked holdout"):
         evaluate_locked_human_holdout(human, empty, empty)
+
+
+def test_prior_human_splits_allow_unmatched_skip_provenance() -> None:
+    human = pd.DataFrame(
+        {
+            "review_id": ["new-active", "new-skip"],
+            "source_review_id": ["old-active", "old-skip"],
+            "tic": [1, 2],
+            "human_label": ["planet_like", "skip"],
+        }
+    )
+    prior = pd.DataFrame(
+        {
+            "review_id": ["old-active"],
+            "fixed_split": ["development"],
+            "cv_fold": [3],
+        }
+    )
+
+    attached = attach_prior_human_splits(human, prior)
+
+    assert attached.loc[0, "fixed_split"] == "development"
+    assert attached.loc[0, "cv_fold"] == 3
+    assert pd.isna(attached.loc[1, "fixed_split"])
+    assert pd.isna(attached.loc[1, "cv_fold"])
+
+
+def test_prior_human_splits_reject_unmatched_trainable_row() -> None:
+    human = pd.DataFrame(
+        {
+            "review_id": ["new-active"],
+            "source_review_id": ["missing-old-active"],
+            "tic": [1],
+            "human_label": ["planet_like"],
+        }
+    )
+    prior = pd.DataFrame(
+        {
+            "review_id": ["different-row"],
+            "fixed_split": ["development"],
+            "cv_fold": [0],
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="trainable human transfers"):
+        attach_prior_human_splits(human, prior)
