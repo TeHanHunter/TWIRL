@@ -9,6 +9,7 @@ from twirl.vetting.teacher_v2_active_learning import (
     build_existing_teacher_enrichment_batch,
     combine_existing_ranker_scores,
     verify_enrichment_batch,
+    write_existing_teacher_enrichment_batch,
 )
 
 
@@ -114,3 +115,19 @@ def test_enrichment_batch_excludes_prior_tics() -> None:
     )
     assert set(queue["tic"]).isdisjoint(set(excluded["tic"]))
     assert summary["n_excluded_tics"] == 50
+
+
+def test_written_queue_candidate_keys_survive_csv_roundtrip(tmp_path) -> None:
+    compact, morphology = _score_tables()
+    compact_path = tmp_path / "compact.parquet"
+    morphology_path = tmp_path / "morphology.parquet"
+    compact.to_parquet(compact_path, index=False)
+    morphology.to_parquet(morphology_path, index=False)
+    summary = write_existing_teacher_enrichment_batch(
+        compact_scores_path=compact_path,
+        morphology_scores_path=morphology_path,
+        out_dir=tmp_path / "batch",
+        sector=56,
+        batch_index=0,
+    )
+    assert summary["n_rows"] == 1000

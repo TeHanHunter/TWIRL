@@ -98,7 +98,7 @@ def _read_table(path: Path) -> pd.DataFrame:
 def _write_table(frame: pd.DataFrame, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix.lower() == ".csv":
-        frame.to_csv(path, index=False)
+        frame.to_csv(path, index=False, float_format="%.15g")
     elif path.suffix.lower() == ".parquet":
         frame.to_parquet(path, compression="zstd", index=False)
     else:
@@ -433,7 +433,7 @@ def build_existing_teacher_enrichment_batch(
     hidden["candidate_key"] = hidden.apply(candidate_key, axis=1)
     hidden["vet_sheet_version"] = ADJUDICATION_VET_SHEET_VERSION
     hidden["twirl_vet_sheet_name"] = (
-        hidden["review_id"] + "_twirl_twoap_current_a2v1_adp.png"
+        hidden["review_id"] + "_twirl_twoap_current_adp.png"
     )
     hidden["twirl_vet_sheet_pdf_name"] = ""
     hidden["active_learning_policy_version"] = ACTIVE_LEARNING_POLICY_VERSION
@@ -545,6 +545,12 @@ def write_existing_teacher_enrichment_batch(
     queue_path = _write_table(queue, out_dir / "review_queue_1k.csv")
     overlap_path = _write_table(overlap, out_dir / "double_review_queue_100.csv")
     hidden_path = _write_table(hidden, out_dir / "hidden_selection_provenance.parquet")
+    verify_enrichment_batch(
+        pd.read_csv(queue_path),
+        pd.read_csv(overlap_path),
+        pd.read_parquet(hidden_path),
+        expected_quotas=quotas,
+    )
     summary.update(
         {
             "compact_scores_path": str(compact_scores_path),

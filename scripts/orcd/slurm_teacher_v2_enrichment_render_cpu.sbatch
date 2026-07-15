@@ -47,7 +47,7 @@ fi
   --out-dir "${OUT_ROOT}/twirl_vet_sheets" \
   --metrics-csv "${OUT_ROOT}/twirl_vet_metrics.csv" \
   --summary-json "${OUT_ROOT}/render_summary.json" \
-  --branch-name current_a2v1_adp \
+  --branch-name current_adp \
   --apertures DET_FLUX_ADP_SML DET_FLUX_ADP \
   --workers "${SLURM_CPUS_PER_TASK:-48}" \
   --n-periods 200000 \
