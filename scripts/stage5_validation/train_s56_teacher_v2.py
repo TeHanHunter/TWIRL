@@ -55,6 +55,7 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--seed", type=int, default=56)
     parser.add_argument("--max-development-rows", type=int)
+    parser.add_argument("--native-verification-cache", type=Path)
     parser.add_argument("--allow-cpu", action="store_true")
     args = parser.parse_args()
 
@@ -84,6 +85,7 @@ def main() -> int:
         ),
         workers=int(args.workers),
         require_cuda=not args.allow_cpu,
+        native_verification_cache=args.native_verification_cache,
     )
     print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=True))
     return 0

@@ -35,6 +35,7 @@ start_epoch=$(date +%s)
   --patience 2 \
   --batch-size 32 \
   --workers 4 \
+  --native-verification-cache "${OUT_ROOT}/roles/native_contract_verification_cache.json" \
   --max-development-rows 128
 
 checkpoint_args=()

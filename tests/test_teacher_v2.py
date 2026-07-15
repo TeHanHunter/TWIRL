@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pandas as pd
 import pytest
 
+import twirl.vetting.teacher_v2_training as teacher_v2_training
 from twirl.vetting.harmonic_cnn import HarmonicModelConfig
 from twirl.vetting.teacher_v2 import (
+    TEACHER_V2_ROLE_POLICY,
     assert_teacher_v2_feature_columns,
     assign_s56_injection_roles,
     attach_prior_human_splits,
@@ -30,9 +35,11 @@ from twirl.vetting.teacher_v2_cnn import (
     teacher_v2_multitask_loss,
 )
 from twirl.vetting.teacher_v2_training import (
+    _validate_training_rows,
     attach_teacher_v2_fold_weights,
     build_teacher_v2_metadata_matrix,
     compact_metrics,
+    write_teacher_v2_native_verification_cache,
 )
 from twirl.vetting.teacher_v2_inference import prepare_teacher_v2_inference_rows
 from twirl.vetting.teacher_v2_evaluation import evaluate_locked_human_holdout
@@ -465,6 +472,102 @@ def test_compact_metrics_handles_tied_scores() -> None:
     assert metrics["n"] == 4
     assert metrics["average_precision"] == pytest.approx(5.0 / 6.0)
     assert metrics["roc_auc"] == pytest.approx(0.5)
+
+
+def _teacher_v2_validation_rows(native_h5: Path) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "review_id": ["development-row"],
+            "tic": [42],
+            "teacher_v2_role": ["compact_positive"],
+            "teacher_v2_role_policy": [TEACHER_V2_ROLE_POLICY],
+            "fixed_split": ["development"],
+            "cv_fold": [0],
+            "native_h5_path": [str(native_h5)],
+            "native_group_path": ["targets/0000000000000042"],
+            "morphology_target_index": [-1],
+            "preserve_target_index": [-1],
+            "harmonic_target_index": [3],
+            "compact_target_index": [1],
+        }
+    )
+
+
+def _teacher_v2_fingerprint_h5(path: Path) -> None:
+    with h5py.File(path, "w") as h5:
+        h5.attrs["contract_version"] = teacher_v2_training.RAW_PAIR_CONTRACT_VERSION
+        h5.attrs["time_system"] = "BJD"
+        for name, channels in teacher_v2_training.CHANNEL_CONTRACT.items():
+            h5.attrs[name] = json.dumps(channels)
+
+
+def test_teacher_v2_native_verification_cache_reuses_exact_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    native_h5 = tmp_path / "native.h5"
+    cache_path = tmp_path / "verification.json"
+    _teacher_v2_fingerprint_h5(native_h5)
+    full_verification = {
+        "passed": True,
+        "failures": [],
+        "counts": {"targets": 1, "injections": 0},
+    }
+    write_teacher_v2_native_verification_cache(
+        cache_path, {str(native_h5): full_verification}
+    )
+
+    def unexpected_scan(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("exactly fingerprinted input should not be rescanned")
+
+    monkeypatch.setattr(
+        teacher_v2_training, "verify_raw_pair_contract", unexpected_scan
+    )
+    result = _validate_training_rows(
+        _teacher_v2_validation_rows(native_h5),
+        native_verification_cache=cache_path,
+    )
+
+    assert result["native_verification_cache"]["cache_hits"] == [
+        str(native_h5.resolve())
+    ]
+    assert result["native_verification_cache"]["scanned"] == []
+
+
+def test_teacher_v2_native_verification_cache_invalidates_changed_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    native_h5 = tmp_path / "native.h5"
+    cache_path = tmp_path / "verification.json"
+    _teacher_v2_fingerprint_h5(native_h5)
+    full_verification = {
+        "passed": True,
+        "failures": [],
+        "counts": {"targets": 1, "injections": 0},
+    }
+    write_teacher_v2_native_verification_cache(
+        cache_path, {str(native_h5): full_verification}
+    )
+    stat = native_h5.stat()
+    os.utime(native_h5, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
+    scans: list[Path] = []
+
+    def record_scan(path: Path, **kwargs: object) -> dict[str, object]:
+        scans.append(Path(path))
+        return full_verification
+
+    monkeypatch.setattr(
+        teacher_v2_training, "verify_raw_pair_contract", record_scan
+    )
+    result = _validate_training_rows(
+        _teacher_v2_validation_rows(native_h5),
+        native_verification_cache=cache_path,
+    )
+
+    assert scans == [native_h5]
+    assert result["native_verification_cache"]["cache_hits"] == []
+    assert result["native_verification_cache"]["scanned"] == [
+        str(native_h5.resolve())
+    ]
 
 
 def test_teacher_v2_inference_rows_have_no_active_targets() -> None:

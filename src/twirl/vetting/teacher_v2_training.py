@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -81,6 +82,7 @@ DEFAULT_TEACHER_V2_PROFILES: tuple[str, ...] = (
     "full_combined",
 )
 DEFAULT_TEACHER_V2_DATASET_CACHE_SIZE = 256
+TEACHER_V2_NATIVE_VERIFICATION_CACHE_SCHEMA = "teacher_v2_native_verification_cache_v1"
 
 
 def _softmax(values: np.ndarray, *, temperature: float = 1.0) -> np.ndarray:
@@ -599,7 +601,76 @@ def train_teacher_v2_fold(
     }
 
 
-def _validate_training_rows(rows: pd.DataFrame) -> dict[str, Any]:
+def _native_file_fingerprint(path: Path) -> dict[str, Any]:
+    import h5py
+
+    resolved = Path(path).resolve()
+    stat = resolved.stat()
+    with h5py.File(resolved, "r") as h5:
+        root_contract = {
+            "contract_version": str(h5.attrs.get("contract_version", "")),
+            "time_system": str(h5.attrs.get("time_system", "")),
+            "channel_contract": {
+                name: str(h5.attrs.get(name, "")) for name in CHANNEL_CONTRACT
+            },
+        }
+    return {
+        "path": str(resolved),
+        "size_bytes": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+        **root_contract,
+    }
+
+
+def write_teacher_v2_native_verification_cache(
+    cache_path: Path,
+    verifications: Mapping[str, Mapping[str, Any]],
+) -> Path:
+    """Persist completed full scans for immutable native products."""
+
+    entries: dict[str, Any] = {}
+    for value, verification in sorted(verifications.items()):
+        if not bool(verification.get("passed", False)):
+            raise ValueError(f"cannot cache failed native verification: {value}")
+        fingerprint = _native_file_fingerprint(Path(value))
+        entries[fingerprint["path"]] = {
+            "fingerprint": fingerprint,
+            "verification": dict(verification),
+        }
+    payload = {
+        "schema": TEACHER_V2_NATIVE_VERIFICATION_CACHE_SCHEMA,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "entries": entries,
+    }
+    cache_path = Path(cache_path)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = cache_path.with_name(f".{cache_path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    os.replace(temporary, cache_path)
+    return cache_path
+
+
+def _cached_native_verification(
+    cache: Mapping[str, Any],
+    path: Path,
+) -> dict[str, Any] | None:
+    if cache.get("schema") != TEACHER_V2_NATIVE_VERIFICATION_CACHE_SCHEMA:
+        return None
+    fingerprint = _native_file_fingerprint(path)
+    entry = cache.get("entries", {}).get(fingerprint["path"])
+    if not isinstance(entry, Mapping) or entry.get("fingerprint") != fingerprint:
+        return None
+    verification = entry.get("verification")
+    if not isinstance(verification, Mapping) or not bool(verification.get("passed", False)):
+        return None
+    return dict(verification)
+
+
+def _validate_training_rows(
+    rows: pd.DataFrame,
+    *,
+    native_verification_cache: Path | None = None,
+) -> dict[str, Any]:
     required = {
         "review_id",
         "tic",
@@ -630,18 +701,43 @@ def _validate_training_rows(rows: pd.DataFrame) -> dict[str, Any]:
     )
     if dev_folds.isna().any() or not dev_folds.between(0, 4).all():
         raise ValueError("Teacher-v2 development rows require cv_fold in 0..4")
+    cache: dict[str, Any] = {}
+    if native_verification_cache is not None and Path(native_verification_cache).exists():
+        try:
+            cache = json.loads(Path(native_verification_cache).read_text())
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            cache = {}
     verifications: dict[str, Any] = {}
+    cache_hits: list[str] = []
+    scanned: list[str] = []
     for value in sorted(rows["native_h5_path"].astype(str).unique()):
-        verification = verify_raw_pair_contract(
-            Path(value), require_errors=True, require_periodograms=True
-        )
+        path = Path(value)
+        verification = _cached_native_verification(cache, path) if cache else None
+        if verification is None:
+            verification = verify_raw_pair_contract(
+                path, require_errors=True, require_periodograms=True
+            )
+            scanned.append(str(path.resolve()))
+        else:
+            cache_hits.append(str(path.resolve()))
         if not verification["passed"]:
             raise RuntimeError(f"native input failed verification: {value}")
         verifications[value] = verification
+    if native_verification_cache is not None and scanned:
+        write_teacher_v2_native_verification_cache(
+            Path(native_verification_cache), verifications
+        )
     return {
         "n_rows": int(len(rows)),
         "n_unique_tics": int(pd.to_numeric(rows["tic"], errors="coerce").nunique()),
         "native_inputs": verifications,
+        "native_verification_cache": {
+            "path": str(Path(native_verification_cache).resolve())
+            if native_verification_cache is not None
+            else "",
+            "cache_hits": cache_hits,
+            "scanned": scanned,
+        },
     }
 
 
@@ -653,6 +749,7 @@ def run_teacher_v2_training(
     train_config: TeacherV2TrainConfig = TeacherV2TrainConfig(),
     workers: int = 8,
     require_cuda: bool = True,
+    native_verification_cache: Path | None = None,
 ) -> dict[str, Any]:
     """Train development folds only; holdout and S57 remain unopened."""
 
@@ -664,7 +761,10 @@ def run_teacher_v2_training(
         if Path(training_table).suffix.lower() == ".parquet"
         else pd.read_csv(training_table, low_memory=False)
     )
-    verification = _validate_training_rows(rows)
+    verification = _validate_training_rows(
+        rows,
+        native_verification_cache=native_verification_cache,
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     for profile in profiles:
@@ -735,4 +835,5 @@ __all__ = [
     "compact_metrics",
     "run_teacher_v2_training",
     "train_teacher_v2_fold",
+    "write_teacher_v2_native_verification_cache",
 ]

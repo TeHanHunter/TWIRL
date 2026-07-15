@@ -45,7 +45,8 @@ start_epoch=$(date +%s)
   --epochs 100 \
   --patience 12 \
   --batch-size 32 \
-  --workers 8
+  --workers 8 \
+  --native-verification-cache "${OUT_ROOT}/roles/native_contract_verification_cache.json"
 train_end_epoch=$(date +%s)
 
 checkpoint_args=()
