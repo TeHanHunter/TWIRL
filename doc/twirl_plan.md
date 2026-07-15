@@ -1089,10 +1089,15 @@ harmonic recognition, while the adjudicated real set retains responsibility
 for Planet/EB/Variable/Other morphology and preserve/reject. Franklin's labels
 are preserved as audit provenance and their TICs remain excluded from the S57
 external test, but transfer re-review and Franklin scoring are deferred off the
-training critical path. The primary S57 result remains the frozen,
-host-disjoint external test. If its bright Tmag panels are locally sparse, a
-separate equal-Tmag, host-clustered enrichment evaluation may be added after
-model/threshold freeze; it must not replace or tune the primary metrics.
+training critical path. S56 real BLS, native-input assembly, role construction,
+and host-disjoint S57 support checks are complete. The cache-enabled CUDA smoke
+and strict dependent profile/freeze/external-test chain are running on ORCD;
+the locked holdout and S57 outcomes remain unopened. The primary S57 result
+remains the frozen, host-disjoint external test. If its bright Tmag panels are
+locally sparse, a separate equal-Tmag, host-clustered enrichment evaluation may
+be added after model/threshold freeze; it must not replace or tune the primary
+metrics. See the `2026-07-14` [execution log](twirl_progress_log.md) for job and
+verification details.
 
 Pre-human-labeling path:
 
