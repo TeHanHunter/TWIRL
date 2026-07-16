@@ -13,7 +13,7 @@
 set -euo pipefail
 
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
-PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
+PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56-torch/bin/python}"
 MODEL_ROOT="${TWIRL_TEACHER_V2_MODEL_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v2/training}"
 CANDIDATES="${TWIRL_ENRICH_CANDIDATES:?set TWIRL_ENRICH_CANDIDATES}"
 NATIVE_H5="${TWIRL_ENRICH_NATIVE_H5:?set TWIRL_ENRICH_NATIVE_H5}"
@@ -24,6 +24,10 @@ cd "${REPO}"
 export PYTHONPATH=src
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+export HDF5_USE_FILE_LOCKING=FALSE
+module load cuda/13.1.0 || module load cuda/12.9.1 || true
+nvidia-smi
+"${PYTHON}" -c 'import torch; assert torch.cuda.is_available(), "CUDA is unavailable in the Teacher-v2 scoring environment"'
 
 score_profile() {
   local profile="$1"
