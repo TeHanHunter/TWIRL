@@ -1097,7 +1097,7 @@ must be designed on S56 development data and tested on a fresh external sector.
 See the `2026-07-15` [execution log](twirl_progress_log.md) for full metrics and
 verification details.
 
-Status (`2026-07-15`, existing-teacher enrichment ready): do not spend another
+Status (`2026-07-16`, existing-teacher enrichment in progress): do not spend another
 multi-day cycle training Teacher v2.1 before collecting more real labels. Use
 the two already trained five-member ensembles as complementary rankers:
 Shape + raw chronology for compact-transit enrichment, and Shape +
@@ -1117,6 +1117,13 @@ Preserve completed S56 enrichment evidence as
 normalized-flux y-axis range shared by both apertures and every light-curve
 panel, plus identical phase-bin spacing and raw-point density in the review
 and odd/even folds.
+The first S57 batch is complete: the frozen complementary ensembles scored
+`136,060` candidates over `27,212` real TICs and produced a verified blinded
+queue of `1,000` unique TICs using the same fixed quotas. All `1,000`
+`S56-ADP-HV2` PNG sheets pass the ADP-only, shared-y-axis, and matched-sampling
+checks; there are no PDFs or browser-visible model scores. Label and audit this
+S57 batch before releasing S58, and use its per-bucket yield to decide whether
+later sector quotas need adjustment.
 
 Pre-human-labeling path:
 
