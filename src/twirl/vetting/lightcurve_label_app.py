@@ -584,7 +584,7 @@ class LightCurveVettingApp:
                         if sheet is None:
                             self.send_error(HTTPStatus.NOT_FOUND, "TWIRL vet sheet not found")
                         else:
-                            self._send_file(sheet, "image/png")
+                            self._send_file(sheet, "image/png", cache_seconds=86400)
                     elif parsed.path == "/labels.csv":
                         self._send_file(app.store.labels_out, "text/csv")
                     else:
