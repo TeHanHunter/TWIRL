@@ -40,6 +40,16 @@ INJECTED = 20_000
 BLS_TOP5 = 3_458
 TEACHER_RETAINED = 1_527
 
+TRACKED_FILES = 2_137
+TRACKED_REPORTS = 1_056
+TRACKED_OUTPUTS = 601
+TRACKED_SCRIPTS = 326
+TRACKED_SRC = 60
+TRACKED_TESTS = 56
+TRACKED_MIB = 759.6
+FAST_TESTS_PASSED = 286
+FAST_TESTS_SKIPPED = 3
+
 STAGE_ROWS = (
     {
         "stage": "Stage 1",
@@ -296,7 +306,7 @@ def markdown_text() -> str:
 
         ## Methods
 
-        The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the project fast test suite, and review of the authoritative plan, production protocol, data conventions, and plotting rules. The audit checkpoint contained 1,964 tracked files (955 under `reports/`, 611 under `outputs/`, 271 under `scripts/`, 49 under `src/`, and 48 under `tests/`) and about 740 MiB of tracked working-tree content. The fast suite completed with 246 passed and 2 skipped tests. Code paths were compared with the declared Stage 1-5 contract. We distinguished a Tier-0 integrity gate (schema, coverage, openability, and benchmark checks) from the still-open Tier-1 science QA gate (photometric precision, cadence loss, aperture outliers, injection preservation, and an independent extraction comparison). Generated data and historical binaries were treated as reproducible artifacts unless they were compact evidence needed to interpret a result.
+        The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the project fast test suite, and review of the authoritative plan, production protocol, data conventions, and plotting rules. The integrated audit checkpoint contained {TRACKED_FILES:,} tracked files ({TRACKED_REPORTS:,} under `reports/`, {TRACKED_OUTPUTS:,} under `outputs/`, {TRACKED_SCRIPTS:,} under `scripts/`, {TRACKED_SRC:,} under `src/`, and {TRACKED_TESTS:,} under `tests/`) and {TRACKED_MIB:.1f} MiB of tracked working-tree content. The fast suite completed with {FAST_TESTS_PASSED} passed and {FAST_TESTS_SKIPPED} skipped tests. Code paths were compared with the declared Stage 1-5 contract. We distinguished a Tier-0 integrity gate (schema, coverage, openability, and benchmark checks) from the still-open Tier-1 science QA gate (photometric precision, cadence loss, aperture outliers, injection preservation, and an independent extraction comparison). Generated data and historical binaries were treated as reproducible artifacts unless they were compact evidence needed to interpret a result.
 
         ## Results
 
@@ -304,7 +314,7 @@ def markdown_text() -> str:
 
         **Figure 1.** Audit-assessed engineering maturity and the next evidence gate for each pipeline stage. The readiness scale describes implementation maturity, not scientific performance. Stage 1 and the periodic part of Stage 2 are at pilot maturity; Stage 3 and Stage 5 remain prototypes; the Stage 4 survey-wide inference layer is not yet built.
 
-        The strongest result is separation of the production contract from later analysis: A2v1 generation, validation, compact export, and an interpretable BLS path now have explicit boundaries. The most important weakness is that an integrity-valid sector can still lack the evidence required for scientific readiness. The audit also found a mismatch between the clean forward plan and experimental teacher-v2 and S57 labeling work already present in the repository. These products should be preserved as exploratory evidence, but they should not silently redefine the production baseline or consume the untouched validation holdout.
+        The strongest result is separation of the production contract from later analysis: A2v1 generation, validation, compact export, and an interpretable BLS path now have explicit boundaries. The most important weakness is that an integrity-valid sector can still lack the evidence required for scientific readiness. The audit also found a mismatch between the clean forward plan and experimental teacher-v2 and S57 labeling work already present in the repository. These products should be preserved as exploratory evidence, but they should not silently redefine the production baseline or consume more of the intended validation holdout.
 
         Repository hygiene is acceptable at the source level but weak at the artifact-history boundary. At scan time the Git object store was approximately 14 GiB and dominated by historical generated outputs. The on-disk `reports/` tree was approximately 5.5 GiB because it also contained large ignored or untracked review artifacts, while `src/`, `scripts/`, and `tests/` together occupied only about 15 MiB. Nonportable symlinks, stale caches, large third-party reference bundles, and redundant rendered review material should remain outside versioned survey products. History rewriting is not recommended during the active branch stack; compact manifests and an explicit artifact allowlist are safer immediate controls. The local `.venv` reported NumPy 2.2.6 even though `pyproject.toml` requires `numpy>=1.24,<2.0`; the tests passed, so this is environment drift rather than an observed failure.
 
@@ -585,7 +595,7 @@ def build_pdf(output_dir: Path) -> None:
         [
             para("Methods", "AuditSection"),
             para(
-                "The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the project fast test suite, and review of the authoritative plan, production protocol, data conventions, and plotting rules. The checkpoint contained 1,964 tracked files and about 740 MiB of tracked content; the fast suite completed with 246 passed and 2 skipped tests. We separated a Tier-0 integrity gate (schema, coverage, openability, and benchmark checks) from the still-open Tier-1 science QA gate (photometric precision, cadence loss, aperture outliers, injection preservation, and an independent extraction comparison).",
+                f"The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the project fast test suite, and review of the authoritative plan, production protocol, data conventions, and plotting rules. The integrated checkpoint contained {TRACKED_FILES:,} tracked files and {TRACKED_MIB:.1f} MiB of tracked content; the fast suite completed with {FAST_TESTS_PASSED} passed and {FAST_TESTS_SKIPPED} skipped tests. We separated a Tier-0 integrity gate (schema, coverage, openability, and benchmark checks) from the still-open Tier-1 science QA gate (photometric precision, cadence loss, aperture outliers, injection preservation, and an independent extraction comparison).",
             ),
             para("Pipeline readiness", "AuditSection"),
             Image(str(readiness_path), width=6.92 * inch, height=3.99 * inch),
@@ -594,7 +604,7 @@ def build_pdf(output_dir: Path) -> None:
                 "AuditCaption",
             ),
             para(
-                "The strongest result is separation of the production contract from later analysis. The main weakness is that an integrity-valid sector can still lack the evidence required for scientific readiness. The clean forward plan also diverged from experimental teacher-v2 and S57 labeling work already present. Those products should be preserved with provenance but quarantined from the production baseline and untouched validation claims.",
+                "The strongest result is separation of the production contract from later analysis. The main weakness is that an integrity-valid sector can still lack the evidence required for scientific readiness. The clean forward plan also diverged from experimental teacher-v2 and S57 labeling work already present. Those products should be preserved with provenance but quarantined from the production baseline, and S57 must no longer be described as a pristine holdout.",
             ),
             PageBreak(),
         ]

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p pg_mki_aryeh
 #SBATCH --job-name=twirl-sector-native
-#SBATCH --array=0-31%16
+#SBATCH --array=0-31%32
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 2

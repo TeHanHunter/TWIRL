@@ -37,5 +37,6 @@ echo "[s56-t2-real-bls] host=$(hostname) shard=${SHARD_INDEX}/${N_SHARDS} start=
   --shard-index "${SHARD_INDEX}" \
   --n-shards "${N_SHARDS}" \
   --progress-every 25 \
+  --source-product-tag A2v1 \
   --resume
 echo "[s56-t2-real-bls] shard=${SHARD_INDEX} complete=$(date -Is)"

@@ -152,7 +152,10 @@ bash /pdo/users/tehan/TWIRL/scripts/stage1_lightcurves/run_a2v1_sector_queue_pdo
 The queue uses an HDF5-only gate that opens every nonzero HDF5 as well as
 validating coverage before FITS production. It then validates the full
 HDF5-plus-FITS schema before advancing. It is a production chain, not a status
-monitor; inspect its tmux log manually when needed.
+monitor; inspect its persistent queue log manually when needed. Run it in
+detached tmux with verbose stage output redirected only to that log, not the
+tmux TTY, because a full JSON validation report can otherwise fill the pane's
+output buffer and block the queue.
 
 ## Final product and validation
 

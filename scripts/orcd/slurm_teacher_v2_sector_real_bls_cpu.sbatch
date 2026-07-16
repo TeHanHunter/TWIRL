@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p pg_mki_aryeh
 #SBATCH --job-name=twirl-sector-bls
-#SBATCH --array=0-39%16
+#SBATCH --array=0-39%32
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 8
@@ -37,4 +37,5 @@ export HDF5_USE_FILE_LOCKING=FALSE
   --shard-index "${SLURM_ARRAY_TASK_ID}" \
   --n-shards "${N_SHARDS}" \
   --progress-every 25 \
+  --source-product-tag A2v1 \
   --resume

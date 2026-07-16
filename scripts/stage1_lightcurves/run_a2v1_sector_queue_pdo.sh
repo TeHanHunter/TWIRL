@@ -54,7 +54,9 @@ export NUMEXPR_NUM_THREADS=${NUMEXPR_NUM_THREADS:-1}
 export LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib:/pdo/app/anaconda/anaconda2-4.4.0/lib:${LD_LIBRARY_PATH:-}
 
 stamp() { date '+%Y-%m-%d %H:%M:%S %Z'; }
-log() { echo "[$(stamp)] $*" | tee -a "$QUEUE_LOG"; }
+# Detached tmux panes do not consume unbounded stdout. Keep verbose stage output
+# in the persistent queue log so a JSON report cannot block the queue on tty I/O.
+log() { printf '[%s] %s\n' "$(stamp)" "$*" >> "$QUEUE_LOG"; }
 die() { log "ABORT: $*"; exit 1; }
 
 parse_orbit_spec() {
@@ -112,7 +114,7 @@ validate_h5() {
     --observations "$OBSERVATIONS" \
     --sector "$sector" --orbits "$orbit_one" "$orbit_two" \
     --allow-edge-warn-missing --skip-fits --check-h5-open \
-    --summary-json "$report" | tee -a "$QUEUE_LOG"
+    --summary-json "$report" | tee -a "$QUEUE_LOG" >/dev/null
 }
 
 validate_product() {
@@ -127,7 +129,7 @@ validate_product() {
     --sector "$sector" --orbits "$orbit_one" "$orbit_two" \
     --allow-edge-warn-missing --schema-only --check-h5-open \
     --fits-workers "${TWIRL_A2V1_VALIDATION_WORKERS:-8}" \
-    --summary-json "$report" | tee -a "$QUEUE_LOG"
+    --summary-json "$report" | tee -a "$QUEUE_LOG" >/dev/null
 }
 
 run_h5() {
@@ -141,7 +143,7 @@ run_h5() {
   TWIRL_A2V1_GPU_MAX_PARALLEL="${TWIRL_A2V1_GPU_MAX_PARALLEL:-4}" \
   TWIRL_A2V1_EPSFS_NPROCS="${TWIRL_A2V1_EPSFS_NPROCS:-2}" \
   TWIRL_A2V1_RUN_LABEL="${QUEUE_LABEL}-s${sector}" \
-  bash "$H5_RUNNER" "$sector" "$spec_one" "$spec_two" | tee -a "$QUEUE_LOG"
+  bash "$H5_RUNNER" "$sector" "$spec_one" "$spec_two" | tee -a "$QUEUE_LOG" >/dev/null
 }
 
 run_fits() {
@@ -151,7 +153,7 @@ run_fits() {
   log "starting sector $sector A2v1 FITS production"
   HDF5_USE_FILE_LOCKING=FALSE \
   TWIRL_A2V1_HLSP_WORKERS="${TWIRL_A2V1_HLSP_WORKERS:-8}" \
-  bash "$FITS_RUNNER" "$sector" "$orbit_one" "$orbit_two" | tee -a "$QUEUE_LOG"
+  bash "$FITS_RUNNER" "$sector" "$orbit_one" "$orbit_two" | tee -a "$QUEUE_LOG" >/dev/null
 }
 
 process_sector() {
