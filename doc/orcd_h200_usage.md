@@ -1,10 +1,11 @@
 # ORCD H200 Usage For TWIRL
 
-This note records the initial ORCD/Engaging reconnaissance for the MKI Aryeh
-CPU/GPU nodes and how TWIRL should use them. It is operational guidance, not a
-scientific pipeline decision.
+This note records the ORCD/Engaging operating contract for the MKI Aryeh
+CPU/GPU nodes. It is operational guidance, not a scientific pipeline decision.
+Dated S56 commands and job outcomes are retained as proven examples; consult
+the live plan and progress log before treating them as current work.
 
-Last updated: `2026-07-07`. ORCD access last verified: `2026-06-30`.
+Last updated: `2026-07-13`. ORCD access last verified: `2026-06-30`.
 
 ## Access And Scheduler Names
 
@@ -290,7 +291,7 @@ ORCD should consume compact downstream products:
 - vetting feature tables
 - compact manifests with input paths, checksums, code versions, and sample cuts
 
-Operational boundary as of `2026-07-02`: use PDO only for Stage 1/TGLC/HLSP
+Operational boundary as of `2026-07-13`: use PDO only for Stage 1/TGLC/HLSP
 production and for building compact exports from the PDO-resident light-curve
 tree. Run downstream testing, vetting, injection-recovery, BLS branch audits,
 and model-training experiments on ORCD after those compact products are staged.
@@ -299,14 +300,22 @@ raw-flux detrending-strength audits, and post-ADP vetting diagnostics such as
 ADP+/two-aperture sheets. Run these on ORCD CPU nodes first, not on the H200
 node and not as long PDO tmux jobs.
 
-Current branch name: the July 2026 raw-flux audit promotes
-`twirl-fs-v2-adp015q` (`bkspace_d=0.15 d`, `gap_split_d=0.2 d`, quantile
-knots) as the next S56 search/vetting candidate. Build its compare FITS on PDO
-with `scripts/stage1_lightcurves/run_s56_twirlfs_adp015q_compare_pdo.sh`, then
-stage compact `DET_FLUX_ADP015*` exports to ORCD. Do not emulate this by adding
-a second ADP+ layer to older `DET_FLUX_ADP*` columns.
+The current Stage 1 product contract is A2v1, which preserves both ADP and
+ADP015 for the three apertures. The active harmonic-teacher input is the ADP
+pair (`DET_FLUX_ADP_SML` and `DET_FLUX_ADP`); ADP015 remains available for
+search, signal-preservation, and aperture-method comparisons. ORCD inputs must
+identify their A2v1 product/schema version and may not silently mix older
+TWIRL-FS-v2 exports with A2v1 products.
 
-As of `2026-07-04`, the S56 ADP015 compare FITS tree and compact two-aperture
+### Historical S56 ADP015 comparison handoff
+
+The July 4 commands below established the earlier
+`twirl-fs-v2-adp015q` comparison path before A2v1 was accepted. They are kept
+for provenance and reruns of that named experiment, not as the current sector
+production recipe. New sectors follow the
+[A2v1 production protocol](a2v1_production_protocol.md).
+
+As of `2026-07-04`, the legacy S56 ADP015 compare FITS tree and compact two-aperture
 export have both been built on PDO. The next ORCD action is to stage the compact
 ADP015 export and run full two-aperture BLS/vet-sheet production from that
 export; keep PDO for product generation and short smokes only.
@@ -510,7 +519,11 @@ Use `sbatch --test-only` before submitting a new script:
 sbatch --test-only -p pg_mki_aryeh -t 00:05:00 -c 1 --mem=1G --wrap="hostname"
 ```
 
-## First TWIRL Pilot
+## Established S56 downstream baseline (historical)
+
+This pilot completed and established the PDO-to-ORCD boundary. The listed
+TWIRL-FS-v2 paths are legacy inputs to reproducible June/July experiments; they
+are not substitutes for a versioned A2v1 compact export.
 
 1. Build compact S56 TWIRL-FS v2 export shards on PDO or locally from synced
    products.

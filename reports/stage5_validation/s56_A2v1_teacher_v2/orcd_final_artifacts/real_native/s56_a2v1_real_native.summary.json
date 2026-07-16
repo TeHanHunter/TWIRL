@@ -1,0 +1,23 @@
+{
+  "exact_count_match": true,
+  "expected_counts": {
+    "injections": 0,
+    "targets": 31446
+  },
+  "merge": {
+    "counts": {
+      "injections": 0,
+      "targets": 31446
+    },
+    "n_shards": 32,
+    "out_h5": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_native/s56_a2v1_real_native.h5"
+  },
+  "verification": {
+    "counts": {
+      "injections": 0,
+      "targets": 31446
+    },
+    "failures": [],
+    "passed": true
+  }
+}

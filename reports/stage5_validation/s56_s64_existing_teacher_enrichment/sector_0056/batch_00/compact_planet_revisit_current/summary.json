@@ -1,0 +1,15 @@
+{
+  "created_utc": "2026-07-15T18:53:32.646554+00:00",
+  "n_compact_candidates": 400,
+  "n_human_planet_labels": 7,
+  "n_human_planet_outside_compact_bucket": 7,
+  "n_preloaded_labels": 82,
+  "n_revisit_rows": 407,
+  "original_labels_preserved": true,
+  "scores_hidden_from_browser": true,
+  "source_label_rows": 177,
+  "source_labels": "reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/human_labels_vetted.csv",
+  "source_labels_sha256": "cfa53831212d81e8996162093f080d681be88a14f5eb83cd04d85f29f9bb810b",
+  "source_queue": "reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/review_queue_1k.csv",
+  "working_labels": "reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/compact_planet_revisit_current/human_labels_revisit.csv"
+}

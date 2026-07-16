@@ -1,5 +1,10 @@
 # S56 H200 ML Training Plan
 
+> **Historical snapshot (2026-07-01).** This report captures the compute and
+> model-gating plan at that date. It does not override
+> [`doc/twirl_plan.md`](../../doc/twirl_plan.md) or the
+> [progress log](../../doc/twirl_progress_log.md).
+
 Date: 2026-07-01
 
 ## Decision

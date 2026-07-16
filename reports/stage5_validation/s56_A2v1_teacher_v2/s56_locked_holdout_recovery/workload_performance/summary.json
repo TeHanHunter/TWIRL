@@ -1,0 +1,35 @@
+{
+  "Metadata only": {
+    "actual_workload_fraction_at_5pct": 0.049868766404199474,
+    "conditional_retention_at_5pct": 0.6172985781990521,
+    "end_to_end_recovery_at_5pct": 0.1042,
+    "n_bls_recovered": 844,
+    "n_injections": 5000,
+    "n_model_recovered_at_5pct": 521,
+    "n_real_tics": 6858,
+    "n_real_tics_passed_at_5pct": 342,
+    "threshold_at_5pct": 0.7611949033300025
+  },
+  "Teacher v1": {
+    "actual_workload_fraction_at_5pct": 0.049868766404199474,
+    "conditional_retention_at_5pct": 0.5545023696682464,
+    "end_to_end_recovery_at_5pct": 0.0936,
+    "n_bls_recovered": 844,
+    "n_injections": 5000,
+    "n_model_recovered_at_5pct": 468,
+    "n_real_tics": 6858,
+    "n_real_tics_passed_at_5pct": 342,
+    "threshold_at_5pct": 0.2322776395071712
+  },
+  "Teacher v2": {
+    "actual_workload_fraction_at_5pct": 0.049868766404199474,
+    "conditional_retention_at_5pct": 0.7855450236966824,
+    "end_to_end_recovery_at_5pct": 0.1326,
+    "n_bls_recovered": 844,
+    "n_injections": 5000,
+    "n_model_recovered_at_5pct": 663,
+    "n_real_tics": 6858,
+    "n_real_tics_passed_at_5pct": 342,
+    "threshold_at_5pct": 0.7206404486366045
+  }
+}

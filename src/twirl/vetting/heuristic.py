@@ -41,7 +41,7 @@ DEFAULT_R_WD_RSUN = 0.018  # paired with M=0.4 M_sun via the WD mass-radius
 DEFAULT_R_COMP_MAX_RJUP = 2.0
 DEFAULT_CADENCE_BUFFER_MIN = 3.34  # 200 s ingress+egress smear at TESS FFI cadence
 
-# BLS p_min aliasing wall: with bls_default.yaml's p_min=0.0833 d (2 h), the
+# BLS p_min aliasing wall: with the historical p_min=0.0833 d (2 h), the
 # per-TIC max-SDE peak piles up in [0.083, 0.10) d for ~33% of all S56 WDs.
 # Above this band is also where the fluid-body Roche limit for a Jupiter
 # around a 0.6 M_sun WD sits (~0.45 d for fluid, ~0.10 d for an iron core),

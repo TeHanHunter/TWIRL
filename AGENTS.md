@@ -8,13 +8,15 @@ Before making substantive changes, read:
 
 - `doc/twirl_plan.md`
 - `doc/twirl_progress_log.md`
+- `doc/a2v1_production_protocol.md` before planning or running Stage 1 production
 - `doc/mit_tglc_usage_guide.md`
 - `doc/ideas.md`
+- `doc/science_background.md` before making scientific background or literature claims
 - `doc/local_data.md`
 - `doc/orcd_h200_usage.md` before planning or running ORCD/H200 jobs
 - `doc/plotting_style.md` before making or revising publication-facing figures
 
-Use `doc/twirl_plan.md` as the single forward-looking project plan, `doc/twirl_progress_log.md` for dated execution history and benchmark notes, `doc/ideas.md` for unresolved questions and brainstorming, `doc/local_data.md` for local-only data conventions, and `doc/plotting_style.md` for figure styling.
+Use `doc/twirl_plan.md` as the single forward-looking project plan, `doc/twirl_progress_log.md` for dated execution history and benchmark notes, `doc/a2v1_production_protocol.md` for the accepted Stage 1 production contract, `doc/ideas.md` for unresolved questions and brainstorming, `doc/local_data.md` for local-only data conventions, and `doc/plotting_style.md` for figure styling.
 Use `doc/orcd_h200_usage.md` for ORCD/Engaging partition names, storage, Slurm snippets, and the PDO-vs-ORCD boundary.
 
 Follow the Stage 1-5 pipeline structure defined in `doc/twirl_plan.md`.
@@ -53,9 +55,18 @@ If this file and those docs disagree, treat the docs as authoritative and update
   - `plotting/style.py` is the plotting style authority.
   - `search/` contains BLS/search tooling and candidate consolidation.
   - `vetting/` contains heuristic vetting, LEO-Vetter adapters, and centroid checks.
-- `scripts/stage{1_lightcurves,2_search,3_injections,5_validation}/` should stay as thin CLI drivers over `src/twirl/`.
-- `stage4_search/` is planned but not yet built.
-- Existing scripts add `src/` to `sys.path` directly rather than requiring an editable install; follow that local pattern unless the package setup changes.
+- Add reusable `injections/`, `review/`, or `models/` package boundaries only
+  as coherent workflows migrate out of overloaded Stage 5 drivers; do not
+  create duplicate implementations solely to populate the target layout.
+- `scripts/stage{1_lightcurves,2_search,3_injections,4_search,5_validation}/`
+  is the target driver layout. Stage 4 is not yet built.
+- Existing Stage 5 experiment drivers are migrated incrementally. Preserve their
+  paths while PDO/ORCD workflows depend on them, but put new reusable logic in
+  `src/twirl/` and new full-survey inference drivers in `stage4_search/`.
+- The package is installable from `pyproject.toml`, and pytest resolves `src/`
+  without an environment-specific `PYTHONPATH`. New local code should import
+  the package normally. Preserve direct `sys.path` bootstraps only in active
+  remote/compatibility wrappers until their callers migrate.
 
 ## Local Data Policy
 
@@ -132,7 +143,8 @@ If this file and those docs disagree, treat the docs as authoritative and update
 ## Data Product Expectations
 
 - MIT TGLC outputs HDF5 light curves, not the old FITS products.
-- For TWIRL Stage 1, treat `TGLC end-to-end` as complete at the HDF5 `lightcurves` stage; public-style FITS products belong to the later QLP detrend + HLSP export path.
+- For TGLC extraction, treat the HDF5 `lightcurves` stage as the Stage 1 extraction checkpoint; public-style FITS products belong to the later QLP detrend + HLSP export path.
+- For each completed A2v1 sector, the ADP/ADP015-only sector-level FITS export is required after both orbit HDF5 trees pass coverage and HDF5-openability validation. An HDF5-only state is an intermediate production checkpoint, not an accepted sector product.
 - Downstream TWIRL code should expect decontaminated aperture photometry with `1x1`, `3x3`, and `5x5` apertures.
 - Do not assume old columns such as `cal_psf_flux` or `cal_aper_flux`.
 - TIC IDs are useful metadata and may still matter for the current MIT implementation, but they do not define the scientific sample.
@@ -159,6 +171,7 @@ GaiaEDR3_WD_main.fits (external seed, data_local/)
 Current faint-end LC production planning should prioritize the adaptive TWIRL-FS branches used for human labeling and vetting: ADP (`DET_FLUX_ADP*`) and ADP015 (`DET_FLUX_ADP015*`). Keep canonical/default `DET_FLUX*` only where needed for compatibility or comparison until downstream readers and exports no longer require it.
 The short name for the regenerated production product family is `A2v1`: no TIC magnitude cap (`--max-magnitude 99`), saturated-pixel ePSF masking, and ADP plus ADP015 saved for the `1x1`, `3x3`, and `5x5` apertures only. Use that name when referring to the S56 remake or future sectors following the same production rule.
 To reuse existing prepared source pickles, prefer small `source_tic/source_X_Y.ecsv` TIC overlays plus a TGLC light-curve hook that assigns `source.tic` from the sidecar after unpickling. For requested TWIRL WD target emission, build those overlays from the TWIRL observation table detector coordinates (`--overlay-from-observations`) rather than regenerating max-99 TIC catalogs by default. Use max-99 TIC catalogs only when a broad all-TIC match table is required. Do not rewrite or regenerate large source pickles unless the overlay path fails validation.
+For a queued A2v1 campaign, preserve sector order and require prepared-input preflight, edge-aware HDF5 coverage plus openability validation, FITS production, and full schema validation before advancing to the next sector. Stop the queue on any failed gate; do not silently skip or bypass a failed sector.
 
 ## Safety And Boundaries
 
@@ -197,8 +210,9 @@ To reuse existing prepared source pickles, prefer small `source_tic/source_X_Y.e
 
 ## Validation
 
-- After code changes, run `make test-fast` when that target exists. If it does not exist yet, say so explicitly.
-- For detection changes, also run `make run-detection-sample` when that target exists.
+- After code changes, run `make test-fast`.
+- For detection changes, also run `make run-detection-sample`.
+- After documentation or plan changes, run `make check-docs`.
 - For catalog or index changes, validate the schema and at least one sample target.
 
 ## Outputs
@@ -217,22 +231,12 @@ To reuse existing prepared source pickles, prefer small `source_tic/source_X_Y.e
 - Append a short status marker in parentheses to subsection headings when helpful: `(✓)` done, `(...)` in progress, `(?)` problematic, and nothing if not started.
 - Treat these markers as manually tuned section status labels rather than auto-generated output.
 
-## Current Priorities
+## Current Priority Authority
 
-When choosing what to implement next, prefer this order:
-
-1. Regenerate S56 with the no-magnitude-cap TGLC catalog policy and use the same policy for all remaining production sectors.
-2. Produce and validate the `A2v1` ADP/ADP015-focused TWIRL-FS light-curve product for S56; keep canonical/default detrending only as a temporary compatibility product if still needed.
-3. Run BLS/heuristic/LEO checks on the regenerated S56 ADP/ADP015 products and compare against prior QLP/TWIRL S56 products.
-4. Complete full-product QA for the chosen ADP/ADP015 production product, including cadence retention, RMS/MAD, quality-flag behavior, WD 1856 timing, and injected short-event preservation.
-5. Consolidate the HDF5-to-TWIRL index format and QA reports for the production sectors.
-6. Continue Gaia-first target-support audit and no-TIC bridge characterization.
-7. Build transparent periodic and dip-search baselines before committing to ML-heavy triage.
-8. Complete the blinded `343`-review S56 real-label adjudication queue, resolve discordant repeats, and rebuild the teacher/EB training table before retraining; then continue the broader mixed `10,000`-row teacher pool (`9,000` real plus `1,000` pre-detrend BATMAN injection-recovery rows).
-9. Run pixel-level source-pickle/ePSF injections only as a calibration subset for extraction, crowding, aperture, and centroid effects; keep dense recovery grids on raw-aperture pre-detrend injections until the calibration delta is known.
-10. Build the S56 semi-supervised self-training vetting loop on top of transparent candidate tables, with human labels from the mixed teacher queue, injection truth, pseudo-label provenance, and targeted follow-up review queues.
-11. Export compact regenerated S56 ADP/ADP015 light curves to ORCD/H200-scale storage for LC-level injection-recovery and raw-light-curve training experiments; do not move raw TGLC/TICA trees.
-12. Develop follow-up coordination support after candidate validation criteria are stable.
+Do not duplicate an ordered priority list in this protocol. The sole current
+list is `doc/twirl_plan.md` under `## Immediate implementation priorities`.
+Update that list when priorities change, and update this file only when the
+change alters standing operating rules.
 
 ## Follow-Up Planning Assumptions
 
@@ -248,6 +252,8 @@ When choosing what to implement next, prefer this order:
 ## Code And Repo Conventions
 
 - Prefer pipeline code, scripts, and structured metadata over notebook-only workflows.
+- Treat `pyproject.toml` as the dependency and packaging authority;
+  `requirements.txt` is only a compatibility entrypoint.
 - Follow the staged repo layout in `doc/twirl_plan.md` as the codebase grows.
 - Keep implementation decisions transparent and easy to audit.
 - Prefer small smoke tests on pilot samples before scaling to full production.

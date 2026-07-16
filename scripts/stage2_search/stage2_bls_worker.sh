@@ -4,10 +4,10 @@
 # loop / tmux session can call this once per ready sector.
 #
 # Usage:
-#   stage2_bls_worker.sh <sector> [hlsp_root]
+#   stage2_bls_worker.sh <sector> <validated_a2v1_hlsp_root>
 #
 # Defaults:
-#   hlsp_root  = /pdo/users/tehan/tglc-gpu-production/hlsp_s{NN:04d}
+#   hlsp_root  = required explicitly; no legacy production fallback
 #   workers    = $TWIRL_BLS_WORKERS or 32
 #   out_dir    = $TWIRL_BLS_OUT_DIR or $REPO/data_local/stage2/bls_first_pass
 #
@@ -17,12 +17,12 @@
 
 set -euo pipefail
 
-if [ "${1-}" = "" ]; then
-  echo "usage: stage2_bls_worker.sh <sector> [hlsp_root]" >&2
+if [ "${1-}" = "" ] || [ "${2-}" = "" ]; then
+  echo "usage: stage2_bls_worker.sh <sector> <validated_a2v1_hlsp_root>" >&2
   exit 64
 fi
 SECTOR="$1"
-HLSP_OVERRIDE="${2-}"
+HLSP_ROOT="$2"
 
 REPO="${TWIRL_REPO:-/pdo/users/tehan/TWIRL}"
 WORKERS="${TWIRL_BLS_WORKERS:-32}"
@@ -42,10 +42,13 @@ log() { echo "[$(date '+%F %H:%M:%S')] [stage2-bls] $*"; }
 
 log "sector=$SECTOR workers=$WORKERS out_dir=$OUT_DIR"
 
-ARGS=(--sector "$SECTOR" --workers "$WORKERS" --out-dir "$OUT_DIR")
-if [ -n "$HLSP_OVERRIDE" ]; then
-  ARGS+=(--hlsp-root "$HLSP_OVERRIDE")
-fi
+ARGS=(
+  --sector "$SECTOR"
+  --hlsp-root "$HLSP_ROOT"
+  --config "$REPO/configs/detection/bls_default.yaml"
+  --workers "$WORKERS"
+  --out-dir "$OUT_DIR"
+)
 
 "$PYTHON" -m twirl.search.sector_run "${ARGS[@]}"
 

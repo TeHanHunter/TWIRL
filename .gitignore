@@ -3,9 +3,11 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
 .venv/
 data_local/
 .tmp/
+tmp/
 logs/
 # Large or untracked exploratory outputs under reports/. Tracked artifacts
 # (vet_sheet.pdf/png, candidates.parquet, meta.json) are committed selectively;
@@ -35,6 +37,40 @@ reports/stage5_validation/**/eb_cnn_miner/
 reports/stage5_validation/**/candidate_pool/
 reports/stage5_validation/**/score_chunks/
 reports/stage5_validation/**/*.zip
+# Teacher experiment working payloads. Keep compact summaries, labels, and
+# selected publication figures visible to Git; ignore only regenerable bulk.
+reports/stage5_validation/s56_A2v1_teacher_v1_recovery/**/injection_recovery_outcomes.parquet
+reports/stage5_validation/s56_A2v1_teacher_v1_recovery/**/teacher_v1_strict_planet_truth_matches.parquet
+reports/stage5_validation/s56_A2v1_teacher_v1_recovery/**/*_publication_grid.csv
+reports/stage5_validation/s56_A2v1_teacher_v2/**/_deps/
+reports/stage5_validation/s56_A2v1_teacher_v2/**/workload_inputs/
+reports/stage5_validation/s56_A2v1_teacher_v2/**/shards/
+reports/stage5_validation/s56_A2v1_teacher_v2/**/injection_recovery_outcomes.parquet
+reports/stage5_validation/s56_A2v1_teacher_v2/**/teacher_v2_strict_planet_truth_matches.parquet
+reports/stage5_validation/s56_A2v1_teacher_v2/**/*_publication_grid.csv
+reports/stage5_validation/s56_A2v1_teacher_v2/**/teacher_v2_minus_v1_recovery_grid.csv
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/roles/source_snapshots/
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/source_snapshots/training_rows_with_fixed_splits.csv
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/source_snapshots/human_vetting_training_table_adjudicated.csv
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/human_transfer/*.csv
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/training/metadata_only/fold_*/
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/training/single_period_native_fold/fold_*/
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/training/seven_harmonic_shape/fold_*/
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/training/shape_plus_periodogram_bls/fold_*/
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/training/full_combined/fold_*/
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/cuda_smoke/full_combined/fold_*/
+# The canonical Teacher-v2 result bundle is under ``orcd_final_artifacts``.
+# Keep only the unique workload summary from this byte-identical local copy.
+reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/*
+!reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/render_workload_performance.py
+!reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/workload_performance/
+!reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/workload_performance/**
+# Human-label checkpoints and rendered queue inputs are local recovery aids;
+# the current canonical label tables and compact queue metadata stay visible.
+reports/stage5_validation/s56_s64_existing_teacher_enrichment/**/*_checkpoint_*.csv
+reports/stage5_validation/s56_s64_existing_teacher_enrichment/**/*_completed_*.csv
+reports/stage5_validation/s56_s64_existing_teacher_enrichment/**/source_first_pass_labels_snapshot.csv
+reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/planet_like_revisit_current/
 # These local queue roots contain a deliberately tracked compact checkpoint;
 # ignore additional regenerated audits, split tables, screenshots, and package
 # copies. Use `git add -f` when a new compact artifact is intentionally kept.
@@ -61,6 +97,9 @@ outputs/current_keynote_edit/
 outputs/keynote_recovery/
 outputs/TWIRL_current_edited_*.key
 outputs/TWIRL_final.key
+# Presentation workspaces resolve these dependencies from the local Codex
+# runtime. The symlinks are machine-specific and are never portable outputs.
+outputs/**/node_modules/
 
 # Claude Code state
 .claude/

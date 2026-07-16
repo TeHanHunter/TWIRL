@@ -16,11 +16,27 @@ from twirl.vetting.harmonic_export import (
     compact_adp_detector_lookup,
     discover_tglc_paths,
     merge_raw_pair_shards,
+    read_candidate_table,
     shared_bls_periodogram,
     shared_bls_spectrum,
 )
 from twirl.vetting.harmonic_inputs import verify_raw_pair_contract
 from twirl.vetting.harmonic_inputs import CHANNEL_CONTRACT
+
+
+def _write_table(frame: pd.DataFrame, path: Path) -> None:
+    if path.suffix == ".parquet":
+        frame.to_parquet(path, compression="zstd", index=False)
+    else:
+        frame.to_csv(path, index=False)
+
+
+def test_candidate_table_reader_rejects_unknown_format(tmp_path: Path) -> None:
+    path = tmp_path / "training.json"
+    path.write_text("[]\n")
+
+    with pytest.raises(ValueError, match="unsupported table format"):
+        read_candidate_table(path)
 
 
 def test_raw_alignment_is_by_cadence_and_preserves_negative_flux() -> None:
@@ -87,12 +103,13 @@ def test_compact_adp_detector_lookup_uses_model_facing_product(tmp_path: Path) -
     assert lookup == {42: (3, 2)}
 
 
+@pytest.mark.parametrize("table_suffix", [".csv", ".parquet"])
 def test_raw_source_export_uses_compact_detector_and_clears_stale_failure(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, table_suffix: str
 ) -> None:
     tic = 42
-    training = tmp_path / "training.csv"
-    pd.DataFrame(
+    training = tmp_path / f"training{table_suffix}"
+    training_rows = pd.DataFrame(
         {
             "tic": [tic],
             "cam": [np.nan],
@@ -101,7 +118,8 @@ def test_raw_source_export_uses_compact_detector_and_clears_stale_failure(
             "preserve_include_v1": [True],
             "harmonic_include_v1": [False],
         }
-    ).to_csv(training, index=False)
+    )
+    _write_table(training_rows, training)
     compact = tmp_path / "compact.h5"
     with h5py.File(compact, "w") as h5:
         group = h5.create_group(f"targets/{tic:016d}")
@@ -179,7 +197,10 @@ def test_shared_bls_periodogram_is_finite_for_transit_signal() -> None:
     assert np.isfinite(spectrum["power"]).all()
 
 
-def test_real_only_raw_pair_export_writes_full_contract(tmp_path: Path) -> None:
+@pytest.mark.parametrize("table_suffix", [".csv", ".parquet"])
+def test_real_only_raw_pair_export_writes_full_contract(
+    tmp_path: Path, table_suffix: str
+) -> None:
     tic = 123
     n = 240
     cadence = np.arange(1000, 1000 + n)
@@ -212,8 +233,8 @@ def test_real_only_raw_pair_export_writes_full_contract(tmp_path: Path) -> None:
         group.create_dataset("DET_FLUX_ADP_SML", data=np.ones(n))
         group.create_dataset("DET_FLUX_ADP", data=np.ones(n))
 
-    table = tmp_path / "training.csv"
-    pd.DataFrame(
+    table = tmp_path / f"training{table_suffix}"
+    training_rows = pd.DataFrame(
         [
             {
                 "review_id": "real:123",
@@ -224,7 +245,8 @@ def test_real_only_raw_pair_export_writes_full_contract(tmp_path: Path) -> None:
                 "harmonic_include_v1": False,
             }
         ]
-    ).to_csv(table, index=False)
+    )
+    _write_table(training_rows, table)
     output = tmp_path / "native.h5"
 
     summary = build_raw_pair_export(

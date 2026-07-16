@@ -16,7 +16,7 @@
 # the A2v1 root, links old ePSFs only when the source cutout has an empty mask,
 # then reruns masked ePSFs and lightcurves.
 
-set -uo pipefail
+set -euo pipefail
 
 REPO=${TWIRL_REPO:-/pdo/users/tehan/TWIRL}
 SOURCE_ROOT=${TWIRL_SOURCE_ROOT:-/pdo/users/tehan/tglc-gpu-production}
@@ -202,17 +202,17 @@ require_hook "$TGLC_FORK/tglc/scripts/light_curves.py" "_source_tic_overlay_path
 require_hook "$TGLC_FORK/tglc/scripts/epsfs.py" "source.mask.mask" "saturated-pixel ePSF mask"
 
 if [ "${TWIRL_A2V1_CLEAN_OUTPUTS:-0}" = "1" ]; then
-  clean_selected_outputs
+  clean_selected_outputs || abort "failed to clean selected A2v1 outputs"
 fi
 
 for spec in "${ORBIT_SPECS[@]}"; do
   parse_orbit_spec "$spec"
-  build_overlays "$PARSED_ORBIT"
+  build_overlays "$PARSED_ORBIT" || abort "orbit-$PARSED_ORBIT source_tic overlay failed"
 done
 
 for spec in "${ORBIT_SPECS[@]}"; do
   parse_orbit_spec "$spec"
-  prefill_empty_mask_epsfs "$PARSED_ORBIT"
+  prefill_empty_mask_epsfs "$PARSED_ORBIT" || abort "orbit-$PARSED_ORBIT ePSF prefill failed"
 done
 
 for spec in "${ORBIT_SPECS[@]}"; do

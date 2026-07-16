@@ -1,0 +1,31 @@
+{
+  "created_utc": "2026-07-14T22:34:30.844939+00:00",
+  "minimum_window_overlap": 0.5,
+  "n_candidate_tics": 31446,
+  "n_candidates": 314460,
+  "n_human_input": 2159,
+  "n_native_available_candidate_tics": 31446,
+  "n_native_unavailable_candidate_tics": 0,
+  "n_real_human_input": 1702,
+  "n_top5_candidates": 157230,
+  "n_transferred": 1398,
+  "native_unavailable_tics": [],
+  "outputs": {
+    "candidates": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/human_transfer/s56_a2v1_real_candidates_top10.parquet",
+    "candidates_top5": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/human_transfer/s56_a2v1_real_candidates_top5.parquet",
+    "compatibility": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/human_transfer/human_a2v1_compatibility.csv",
+    "transferred": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/human_transfer/human_a2v1_transferred_training_rows.csv"
+  },
+  "period_tolerance": 0.02,
+  "raw_source_h5": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_tglc_raw_sources.h5",
+  "transfer_fraction": 0.8213866039952996,
+  "transferred_label_counts": {
+    "eclipsing_binary_or_pceb": 51,
+    "instrumental_or_systematic": 285,
+    "planet_like": 12,
+    "skip": 5,
+    "stellar_variability": 105,
+    "uncertain": 928,
+    "wide_transit_like": 12
+  }
+}

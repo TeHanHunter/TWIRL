@@ -1,0 +1,4 @@
+top_k,n_injections,n_recovered,recovery_fraction
+1,5000,768,0.1536
+3,5000,817,0.1634
+5,5000,844,0.1688

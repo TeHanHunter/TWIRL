@@ -1,0 +1,16 @@
+{
+  "figures": {
+    "calibration": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/figures/selected_profile_calibration.png",
+    "external": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/figures/s56_s57_teacher_comparison.png",
+    "human": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/figures/same_row_human_holdout.png",
+    "pipeline": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/figures/teacher_v2_pipeline.png",
+    "profiles": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/figures/development_profile_comparison.png",
+    "tmag": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/figures/tmag_stratified_recovery.png",
+    "training": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/figures/selected_profile_training_curves.png"
+  },
+  "frozen_threshold": 0.7206404486366045,
+  "report_pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_A2v1_teacher_v2/teacher_v2_report/s56_teacher_v2_full_report.pdf",
+  "s56_conditional_retention": 0.7855450236966824,
+  "s57_conditional_retention": 0.7720561757292042,
+  "selected_profile": "shape_plus_raw_chronology"
+}

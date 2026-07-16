@@ -47,3 +47,33 @@ def test_walk_peaks_period_quota_preserves_lower_sde_period_ranges() -> None:
     )
 
     assert [round(peak["period_d"], 2) for peak in peaks] == [0.2, 2.0]
+
+
+def test_walk_peaks_masks_three_to_one_harmonics_when_shorter_period_ranks_first() -> None:
+    period = np.array([1.0, 3.0], dtype=float)
+    sde = np.array([20.0, 10.0], dtype=float)
+
+    peaks = walk_peaks(
+        period=period,
+        sde=sde,
+        extra=_extra(len(period)),
+        n_peaks=2,
+        period_mask_frac=0.001,
+    )
+
+    assert [peak["period_d"] for peak in peaks] == [1.0]
+
+
+def test_walk_peaks_masks_three_to_one_harmonics_when_longer_period_ranks_first() -> None:
+    period = np.array([1.0, 3.0], dtype=float)
+    sde = np.array([10.0, 20.0], dtype=float)
+
+    peaks = walk_peaks(
+        period=period,
+        sde=sde,
+        extra=_extra(len(period)),
+        n_peaks=2,
+        period_mask_frac=0.001,
+    )
+
+    assert [peak["period_d"] for peak in peaks] == [3.0]

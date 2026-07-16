@@ -1,0 +1,76 @@
+{
+  "architecture_selection_frozen": false,
+  "created_utc": "2026-07-15T13:47:40.841456+00:00",
+  "development_diagnostics": [
+    {
+      "fold_compact_ap_mean": 0.9658578965935926,
+      "fold_morphology_macro_f1_mean": 0.8036433642489879,
+      "fold_selection_score_mean": 0.9171930274740696,
+      "profile": "full_combined"
+    }
+  ],
+  "holdout_opened": false,
+  "model_version": "s56_harmonic_cnn_teacher_v2",
+  "profiles": [
+    "full_combined"
+  ],
+  "role_policy": "s56_a2v1_teacher_v2_hybrid_roles_v1",
+  "s57_opened": false,
+  "train_config": {
+    "batch_size": 32,
+    "class_weight_cap": 4.0,
+    "compact_loss_weight": 1.0,
+    "epochs": 100,
+    "harmonic_loss_weight": 0.25,
+    "learning_rate": 0.0003,
+    "morphology_loss_weight": 1.0,
+    "patience": 12,
+    "preserve_loss_weight": 0.5,
+    "seed": 56,
+    "weight_decay": 0.0001
+  },
+  "training_verification": {
+    "n_rows": 25449,
+    "n_unique_tics": 4851,
+    "native_inputs": {
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/teacher_inputs/native_top5.h5": {
+        "counts": {
+          "injections": 20000,
+          "targets": 0
+        },
+        "failures": [],
+        "passed": true,
+        "verification_source": {
+          "kind": "post_merge_full_scan_summary",
+          "mtime_ns": 1784034684963141283,
+          "native_mtime_ns": 1784034643995942128,
+          "path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/teacher_inputs/native_top5.merge_summary.json",
+          "sha256": "a7b81d0f3cee9530285657dde73ac8badc8d1e8ac6e191771ac1aeccb7e831b2"
+        }
+      },
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_native/s56_a2v1_real_native.h5": {
+        "counts": {
+          "injections": 0,
+          "targets": 31446
+        },
+        "failures": [],
+        "passed": true,
+        "verification_source": {
+          "kind": "post_merge_full_scan_summary",
+          "mtime_ns": 1784076134610401752,
+          "native_mtime_ns": 1784075826991172137,
+          "path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_native/s56_a2v1_real_native.summary.json",
+          "sha256": "c7cd061bdeb76358604c81dd5432b7325850a11db8c29b02574dc806b01772bc"
+        }
+      }
+    },
+    "native_verification_cache": {
+      "cache_hits": [
+        "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/teacher_inputs/native_top5.h5",
+        "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_native/s56_a2v1_real_native.h5"
+      ],
+      "path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/native_contract_verification_cache.json",
+      "scanned": []
+    }
+  }
+}

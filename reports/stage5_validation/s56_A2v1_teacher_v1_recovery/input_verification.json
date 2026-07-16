@@ -1,0 +1,61 @@
+{
+  "compact_rebuild_parity": {
+    "active_h5": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair_rebuilt.h5",
+    "extra_active_examples": [],
+    "failures": [],
+    "mismatch_details": [],
+    "missing_active_examples": [],
+    "n_active_targets": 31450,
+    "n_dataset_comparisons": 188700,
+    "n_extra_active_targets": 0,
+    "n_mismatched_targets": 0,
+    "n_missing_active_targets": 0,
+    "n_reference_targets": 31450,
+    "n_targets_compared": 31450,
+    "passed": true,
+    "reference_h5": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair.h5"
+  },
+  "created_utc": "2026-07-14T12:57:49.318134+00:00",
+  "expected": {
+    "adp_bytes": 4379183054,
+    "adp_targets": 31450,
+    "adp_without_raw": 4,
+    "fits_bytes": 27080968320,
+    "fits_count": 31450,
+    "raw_bytes": 7176576282,
+    "raw_targets": 31446,
+    "raw_without_adp": 0,
+    "teacher_rows": 2159,
+    "teacher_unique_tics": 2044
+  },
+  "failures": [],
+  "fits_checksum_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/hlsp_s0056_A2v1_sha256_manifest.csv",
+  "hashes": {
+    "hlsp_s0056_A2v1_tree": "a8a9d3f80c1e6b2eb07aa430950c932a96feb6f8f1c6f3495289cb11e2e79789",
+    "human_vetting_training_table_adjudicated.csv": "7b5d71d788c97059ceeccdbc724af2a05bf3643bdcd8f5301b0c467c88f92adc",
+    "s56_A2v1_adp_pair.h5": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
+    "s56_A2v1_adp_pair_rebuilt.h5": "03f041bc66f09158d7740eaf9116b081d2184b7844720778d74f7ec0cf3b4505",
+    "s56_A2v1_tglc_raw_sources.h5": "298d80bb892de0cf81f550b3f634475126cc72318850b059b9a5358a720cd15b",
+    "s56_A2v1_validation_full_schema.json": "896ba49a82e9b476f7777fae78230994c3c8ce6ba2f883f9469280d2197db1ce"
+  },
+  "input_root": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1",
+  "observed": {
+    "active_adp_bytes": 4379888508,
+    "adp_bytes": 4379183054,
+    "adp_flux_columns": "[\"DET_FLUX_ADP_SML\", \"DET_FLUX_ADP\"]",
+    "adp_sector": 56,
+    "adp_targets": 31450,
+    "adp_without_raw": 4,
+    "fits_bytes": 27080968320,
+    "fits_count": 31450,
+    "raw_bytes": 7176576282,
+    "raw_contract_version": "s56_tglc_raw_pair_v1",
+    "raw_targets": 31446,
+    "raw_without_adp": 0,
+    "teacher_rows": 2159,
+    "teacher_unique_tics": 2044
+  },
+  "passed": true,
+  "sector": 56,
+  "source_validation_ok": true
+}

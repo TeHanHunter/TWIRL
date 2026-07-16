@@ -1,0 +1,25 @@
+{
+  "checkpoint_sha256": {
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_0/teacher_v2.pt": "6faec34326fa76cf1ff6519cb7746ff2ad352b5957d7594af423e650ad11b577",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_1/teacher_v2.pt": "50789670959150dd3421e6a8f7934ab831054a11f01dae6e17a9f3f42d0198b4",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_2/teacher_v2.pt": "8881daf9bb4e7cc87aa9de52e67087f83a0759426ed2c70911af010843afb90a",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_3/teacher_v2.pt": "b8ee38f8493cb44d37c609c1eefbad452b35120d23b8e0c8f7e87c99b2fe694d",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_4/teacher_v2.pt": "d071253ce14652d566ea5da2ba4e61ae7bbd86a578728fe34e04634941d4f901"
+  },
+  "checkpoints": [
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_0/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_1/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_2/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_3/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_4/teacher_v2.pt"
+  ],
+  "created_utc": "2026-07-15T03:20:37.798224+00:00",
+  "cuda_version": "12.8",
+  "device": "cuda:0",
+  "model_version": "s56_harmonic_cnn_teacher_v2",
+  "n_rows": 34290,
+  "n_unique_tics": 6858,
+  "out_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/single_period_native_fold.parquet",
+  "profile": "single_period_native_fold",
+  "torch_version": "2.11.0+cu128"
+}

@@ -1,0 +1,146 @@
+{
+  "acceptance": {
+    "eb_variable_other_recall": false,
+    "macro_f1_non_regression": false,
+    "passed": false
+  },
+  "created_utc": "2026-07-15T15:03:42.902747+00:00",
+  "maximum_allowed_macro_f1_decline": 0.03,
+  "minimum_required_eb_variable_other_recall": 0.6,
+  "n_same_row_locked_human_examples": 268,
+  "real_planet_performance_is_descriptive_only": true,
+  "required_teacher_v2_recall": {
+    "eclipse_contact": 0.36363636363636365,
+    "other": 0.9914163090128756,
+    "smooth_variable": 0.7727272727272727
+  },
+  "teacher_v1": {
+    "accuracy": 0.9402985074626866,
+    "balanced_accuracy": 0.7911626999609832,
+    "confusion_matrix": [
+      [
+        2,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        5,
+        4,
+        0
+      ],
+      [
+        0,
+        2,
+        16,
+        4
+      ],
+      [
+        0,
+        0,
+        4,
+        229
+      ]
+    ],
+    "macro_f1": 0.7251767535402542,
+    "n": 268,
+    "per_class": {
+      "eclipse_contact": {
+        "f1": 0.5555555555555556,
+        "n": 11,
+        "precision": 0.7142857142857143,
+        "recall": 0.45454545454545453
+      },
+      "other": {
+        "f1": 0.9828326180257511,
+        "n": 233,
+        "precision": 0.9828326180257511,
+        "recall": 0.9828326180257511
+      },
+      "planet_like": {
+        "f1": 0.6666666666666666,
+        "n": 2,
+        "precision": 0.5,
+        "recall": 1.0
+      },
+      "smooth_variable": {
+        "f1": 0.6956521739130435,
+        "n": 22,
+        "precision": 0.6666666666666666,
+        "recall": 0.7272727272727273
+      }
+    },
+    "predicted_class_counts": {
+      "eclipse_contact": 7,
+      "other": 233,
+      "planet_like": 4,
+      "smooth_variable": 24
+    }
+  },
+  "teacher_v2": {
+    "accuracy": 0.9440298507462687,
+    "balanced_accuracy": 0.6569449863441279,
+    "confusion_matrix": [
+      [
+        1,
+        0,
+        0,
+        1
+      ],
+      [
+        2,
+        4,
+        5,
+        0
+      ],
+      [
+        0,
+        1,
+        17,
+        4
+      ],
+      [
+        0,
+        1,
+        1,
+        231
+      ]
+    ],
+    "macro_f1": 0.6528046044288361,
+    "n": 268,
+    "per_class": {
+      "eclipse_contact": {
+        "f1": 0.4705882352941177,
+        "n": 11,
+        "precision": 0.6666666666666666,
+        "recall": 0.36363636363636365
+      },
+      "other": {
+        "f1": 0.9850746268656715,
+        "n": 233,
+        "precision": 0.9788135593220338,
+        "recall": 0.9914163090128756
+      },
+      "planet_like": {
+        "f1": 0.4,
+        "n": 2,
+        "precision": 0.3333333333333333,
+        "recall": 0.5
+      },
+      "smooth_variable": {
+        "f1": 0.7555555555555555,
+        "n": 22,
+        "precision": 0.7391304347826086,
+        "recall": 0.7727272727272727
+      }
+    },
+    "predicted_class_counts": {
+      "eclipse_contact": 6,
+      "other": 236,
+      "planet_like": 3,
+      "smooth_variable": 23
+    }
+  },
+  "teacher_v2_minus_v1_macro_f1": -0.0723721491114181
+}

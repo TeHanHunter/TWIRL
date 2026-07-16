@@ -1,0 +1,40 @@
+{
+  "batch_index": 0,
+  "compact_ranker": "existing shape_plus_raw_chronology ensemble",
+  "compact_scores_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/shape_plus_raw_chronology.parquet",
+  "compact_scores_sha256": "b5462a62c35ea279d891e4adebb3362bdf92e1503dc116936a9c1e4e0c9a9a4e",
+  "created_utc": "2026-07-15T16:01:37.287087+00:00",
+  "exclude_paths": [],
+  "morphology_ranker": "existing shape_plus_periodogram_bls ensemble",
+  "morphology_scores_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/shape_plus_periodogram_bls.parquet",
+  "morphology_scores_sha256": "81b8c4b862fca527580384c5082bd4a25193c4509520765fb528504c8806b672",
+  "n_double_review": 100,
+  "n_excluded_tics": 0,
+  "n_rows": 1000,
+  "n_unique_tics": 1000,
+  "outputs": {
+    "double_review_queue": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/double_review_queue_100.csv",
+    "hidden_selection_provenance": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/hidden_selection_provenance.parquet",
+    "review_queue": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/review_queue_1k.csv",
+    "summary": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/summary.json"
+  },
+  "policy_version": "s56_s64_existing_teacher_multi_ranker_v1",
+  "quotas": {
+    "compact_transit": 400,
+    "eclipse_contact": 300,
+    "model_disagreement": 100,
+    "smooth_variable": 100,
+    "stratified_control": 100
+  },
+  "scores_hidden_from_browser": true,
+  "sector": 56,
+  "selection_bucket_counts": {
+    "compact_transit": 400,
+    "eclipse_contact": 300,
+    "model_disagreement": 100,
+    "smooth_variable": 100,
+    "stratified_control": 100
+  },
+  "training_performed": false,
+  "vet_sheet_version": "S56-ADP-HV1"
+}

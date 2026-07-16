@@ -1,4 +1,9 @@
-# TWIRL sector production protocol
+# Legacy TWIRL sector production protocol (superseded)
+
+> **Legacy reference.** This documents the April 2026 canonical-detrending
+> pipeline. New survey sectors use the
+> [A2v1 production protocol](a2v1_production_protocol.md). Do not copy or
+> parameterize the sector-specific post-LC scripts below for new production.
 
 Procedure for producing TGLC + detrend + HLSP outputs for one TESS sector
 (`Sector >= 56`) using the GPU pipeline on PDO. Encodes the working state of

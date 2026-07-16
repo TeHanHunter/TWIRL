@@ -1,0 +1,171 @@
+{
+  "benchmarks": {
+    "wd1856": {
+      "apertures": [
+        {
+          "aperture": "DET_FLUX_ADP_SML",
+          "epoch_residual_min": 0.7529233033289824,
+          "passed": true,
+          "period_d": 1.407882507585553,
+          "period_relative_error": 4.027405018902641e-05,
+          "sde": 65.89554126608228,
+          "t0_bjd": 2459825.4744396363
+        },
+        {
+          "aperture": "DET_FLUX_ADP",
+          "epoch_residual_min": 0.7529233033289824,
+          "passed": true,
+          "period_d": 1.407882507585553,
+          "period_relative_error": 4.027405018902641e-05,
+          "sde": 50.52732448702657,
+          "t0_bjd": 2459825.4744396363
+        }
+      ],
+      "passed": true,
+      "tic": 267574918,
+      "truth_period_d": 1.407939211,
+      "truth_t0_bjd": 2458779.375083
+    }
+  },
+  "contract_version": "a2v1_photometric_qa_v1",
+  "created_utc": "2026-07-13T15:34:40.501755+00:00",
+  "gates": {
+    "aperture_consistency": {
+      "correlation_median": 0.36752696304330046,
+      "difference_mad_ppm_median": 591346.580692902,
+      "passed": true,
+      "primary_to_small_mad_ratio_median": 0.8470952740112538,
+      "valid_correlation_fraction": 1.0
+    },
+    "benchmark": {
+      "apertures": [
+        {
+          "aperture": "DET_FLUX_ADP_SML",
+          "epoch_residual_min": 0.7529233033289824,
+          "passed": true,
+          "period_d": 1.407882507585553,
+          "period_relative_error": 4.027405018902641e-05,
+          "sde": 65.89554126608228,
+          "t0_bjd": 2459825.4744396363
+        },
+        {
+          "aperture": "DET_FLUX_ADP",
+          "epoch_residual_min": 0.7529233033289824,
+          "passed": true,
+          "period_d": 1.407882507585553,
+          "period_relative_error": 4.027405018902641e-05,
+          "sde": 50.52732448702657,
+          "t0_bjd": 2459825.4744396363
+        }
+      ],
+      "passed": true,
+      "tic": 267574918,
+      "truth_period_d": 1.407939211,
+      "truth_t0_bjd": 2458779.375083
+    },
+    "independent_raw_extraction": {
+      "correlation_median": 1.0,
+      "difference_mad_ppm_median": 0.0,
+      "n_expected_comparisons": 1024,
+      "n_valid_comparisons": 616,
+      "passed": true,
+      "separate_file_identity_fraction": 1.0,
+      "valid_comparison_fraction": 0.6015625
+    },
+    "sampled_adp_photometry": {
+      "finite_q0_fraction_median": 1.0,
+      "finite_q0_fraction_p05": 1.0,
+      "mad_ppm_primary_median": 435175.97582767176,
+      "mad_ppm_small_median": 539160.003834614,
+      "n_sampled_targets": 256,
+      "passed": true,
+      "quality0_fraction_median": 0.9484925690021231,
+      "valid_target_fraction": 1.0
+    },
+    "schema_and_completeness": {
+      "n_bad_checked_fits": 0,
+      "n_compact_targets": 31450,
+      "n_fits_targets": 31450,
+      "n_missing_fits_non_edge": 0,
+      "n_missing_h5_non_edge": 0,
+      "n_present_h5": 62935,
+      "passed": true,
+      "sector": 56
+    }
+  },
+  "magnitude_trends": [
+    {
+      "bin": "(15.411000000000001, 19.158]",
+      "finite_q0_fraction_primary_median": 1.0,
+      "finite_q0_fraction_small_median": 1.0,
+      "mad_ppm_primary_median": 308068.5294154977,
+      "mad_ppm_small_median": 295848.3103042304,
+      "n": 52,
+      "tmag_median": 18.615239252300455
+    },
+    {
+      "bin": "(19.158, 19.689]",
+      "finite_q0_fraction_primary_median": 1.0,
+      "finite_q0_fraction_small_median": 1.0,
+      "mad_ppm_primary_median": 520395.20327685575,
+      "mad_ppm_small_median": 512575.1365109177,
+      "n": 51,
+      "tmag_median": 19.523689181126603
+    },
+    {
+      "bin": "(19.689, 19.957]",
+      "finite_q0_fraction_primary_median": 1.0,
+      "finite_q0_fraction_small_median": 1.0,
+      "mad_ppm_primary_median": 549932.637163122,
+      "mad_ppm_small_median": 625962.4878429822,
+      "n": 51,
+      "tmag_median": 19.85685988634057
+    },
+    {
+      "bin": "(19.957, 20.18]",
+      "finite_q0_fraction_primary_median": 1.0,
+      "finite_q0_fraction_small_median": 1.0,
+      "mad_ppm_primary_median": 400965.65692242933,
+      "mad_ppm_small_median": 639875.2367396745,
+      "n": 51,
+      "tmag_median": 20.087921983024223
+    },
+    {
+      "bin": "(20.18, 20.855]",
+      "finite_q0_fraction_primary_median": 1.0,
+      "finite_q0_fraction_small_median": 1.0,
+      "mad_ppm_primary_median": 506590.45442730223,
+      "mad_ppm_small_median": 698358.6714750387,
+      "n": 51,
+      "tmag_median": 20.355737244105296
+    }
+  ],
+  "orbits": [
+    119,
+    120
+  ],
+  "outputs": {
+    "figure": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/photometric_qa/a2v1_photometric_qa.png",
+    "gate_json": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/inputs/s56_A2v1_photometric_qa_gate.json",
+    "raw_comparison": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/photometric_qa/independent_raw_extraction_comparison.csv",
+    "target_metrics": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/photometric_qa/sampled_adp_photometry.csv"
+  },
+  "passed": true,
+  "provenance": {
+    "a2v1_root": "/pdo/users/tehan/tglc-gpu-production-A2v1",
+    "bls_peaks": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/adp_bls/real_adp_bls_peaks.csv",
+    "canonical_det_flux_used": false,
+    "compact_lc": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/inputs/s56_A2v1_adp_pair.h5",
+    "detrended_apertures": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_ADP"
+    ],
+    "reference_qa_summary": null,
+    "reference_raw_root": "/pdo/users/tehan/tglc-gpu-production",
+    "sample_seed": 56,
+    "sample_size": 256,
+    "schema_summary": "/pdo/users/tehan/tglc-gpu-production-A2v1/twirl_logs/s56_A2v1_validation_full_schema.json",
+    "workers": 8
+  },
+  "sector": 56
+}

@@ -1,8 +1,11 @@
-# TWIRL Stage 2 first-pass BLS configuration.
+# TWIRL A2v1 Stage 2 first-pass BLS configuration.
 #
-# Per-sector BLS over WD HLSP FITS. Multi-aperture (SML, MED, LAG) so weak
-# signals that fall in only one aperture (e.g. WD 1856 in S59 cam4/ccd4) still
-# survive cross-aperture consolidation.
+# This file is consumed by ``twirl.search.sector_run --config``. Keep it in
+# exact agreement with ``BLSConfig`` unless a versioned run intentionally
+# overrides a value.
+#
+# Search on the A2v1 ADP small aperture and retain the primary ADP aperture as
+# contamination/aperture-consistency evidence.
 #
 # v2 tuning (2026-05-12):
 #   - p_min_d raised to 0.12 d. The old 2-hour floor produced a sharp ~26%
@@ -19,9 +22,8 @@
 #     candidates after our heuristic vetter; cuts consolidated parquet size
 #     by ~2x.
 apertures:
-  - DET_FLUX_SML
-  - DET_FLUX
-  - DET_FLUX_LAG
+  - DET_FLUX_ADP_SML
+  - DET_FLUX_ADP
 n_periods: 200000      # freq-uniform grid; compute is cheap.
 p_min_d: 0.12          # ~2.9 h; cuts the 2-hour BLS alias wall + sub-cadence regime.
 max_period_fraction: 0.45   # need >=2 transits in baseline
@@ -40,3 +42,7 @@ durations_min:
 n_peaks: 10            # peaks 11-20 contributed no survivors in the v1 run
 period_mask_frac: 0.005     # +-0.5% mask in the peak walk
 min_cadences: 200
+sigma_clip: 5.0
+orbit_edge_trim_d: 0.0
+period_bin_edges: []
+max_peaks_per_period_bin: 0

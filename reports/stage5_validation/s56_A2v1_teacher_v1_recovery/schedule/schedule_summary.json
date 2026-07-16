@@ -1,0 +1,52 @@
+{
+  "adp_h5": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair_rebuilt.h5",
+  "cell_support_max": 8,
+  "cell_support_min": 8,
+  "config": {
+    "cadence_s": 200.0,
+    "max_time_error_s": 2.0,
+    "min_good_cadences": 200,
+    "min_in_transit": 2,
+    "n_injections": 20000,
+    "n_shards": 40,
+    "name": "s56_a2v1_teacher_v1_recovery_v1",
+    "parity_median_abs_limit": 0.0001,
+    "parity_sample_size": 100,
+    "parity_scatter_ratio_tolerance": 0.01,
+    "period_bins": 50,
+    "period_max_d": 13.0,
+    "period_min_d": 0.12,
+    "radius_bins": 50,
+    "radius_max_rearth": 18.0,
+    "radius_min_rearth": 0.18,
+    "repeats_per_cell": 8,
+    "sector": 56,
+    "seed": 560201
+  },
+  "contract": "s56_a2v1_fresh_injection_schedule_v1",
+  "created_utc": "2026-07-14T07:41:00.772627+00:00",
+  "n_adp_without_raw": 4,
+  "n_cells": 2500,
+  "n_qa_eligible_after_teacher_exclusion": 24917,
+  "n_raw_adp_intersection": 31446,
+  "n_selected": 20000,
+  "n_selected_unique_tics": 20000,
+  "n_teacher_table_rows": 2159,
+  "n_teacher_unique_tics": 2044,
+  "qa_reason_counts": {
+    "missing_raw_source": 4,
+    "nonpositive_primary_baseline": 3423,
+    "nonpositive_small_baseline": 1059,
+    "ok": 24917,
+    "quality_mismatch": 4,
+    "teacher_tic": 2043
+  },
+  "raw_h5": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_tglc_raw_sources.h5",
+  "teacher_table": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/human_vetting_training_table_adjudicated.csv",
+  "tmag_counts": {
+    "17 <= Tmag < 18": 797,
+    "18 <= Tmag < 19": 2914,
+    "Tmag < 17": 324,
+    "Tmag >= 19": 15965
+  }
+}

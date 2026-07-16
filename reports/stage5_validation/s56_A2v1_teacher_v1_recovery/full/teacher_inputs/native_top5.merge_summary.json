@@ -1,0 +1,25 @@
+{
+  "expected_counts": {
+    "injections": 20000,
+    "targets": 0
+  },
+  "merge": {
+    "counts": {
+      "injections": 20000,
+      "targets": 0
+    },
+    "n_shards": 40,
+    "out_h5": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/teacher_inputs/native_top5.h5"
+  },
+  "n_candidate_rows": 100000,
+  "n_injections": 20000,
+  "passed": true,
+  "verification": {
+    "counts": {
+      "injections": 20000,
+      "targets": 0
+    },
+    "failures": [],
+    "passed": true
+  }
+}

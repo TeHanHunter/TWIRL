@@ -1,0 +1,568 @@
+{
+  "a2v1_root": "/pdo/users/tehan/tglc-gpu-production-A2v1",
+  "created_utc": "2026-07-13T15:28:20.011920+00:00",
+  "expected_h5_by_ccd": {
+    "o121_cam1_ccd1": 1755,
+    "o121_cam1_ccd2": 1698,
+    "o121_cam1_ccd3": 1368,
+    "o121_cam1_ccd4": 1382,
+    "o121_cam2_ccd1": 1831,
+    "o121_cam2_ccd2": 2277,
+    "o121_cam2_ccd3": 1875,
+    "o121_cam2_ccd4": 2074,
+    "o121_cam3_ccd1": 1530,
+    "o121_cam3_ccd2": 1337,
+    "o121_cam3_ccd3": 1268,
+    "o121_cam3_ccd4": 1678,
+    "o121_cam4_ccd1": 2102,
+    "o121_cam4_ccd2": 1715,
+    "o121_cam4_ccd3": 1590,
+    "o121_cam4_ccd4": 1870,
+    "o122_cam1_ccd1": 1755,
+    "o122_cam1_ccd2": 1698,
+    "o122_cam1_ccd3": 1368,
+    "o122_cam1_ccd4": 1382,
+    "o122_cam2_ccd1": 1831,
+    "o122_cam2_ccd2": 2277,
+    "o122_cam2_ccd3": 1875,
+    "o122_cam2_ccd4": 2074,
+    "o122_cam3_ccd1": 1530,
+    "o122_cam3_ccd2": 1337,
+    "o122_cam3_ccd3": 1268,
+    "o122_cam3_ccd4": 1678,
+    "o122_cam4_ccd1": 2102,
+    "o122_cam4_ccd2": 1715,
+    "o122_cam4_ccd3": 1590,
+    "o122_cam4_ccd4": 1870
+  },
+  "expected_h5_by_orbit": {
+    "121": 27350,
+    "122": 27350
+  },
+  "fits": {
+    "bad_fits_examples": [],
+    "checked_branches": [
+      "ADP,ADP015"
+    ],
+    "checked_methods": [
+      "A2v1"
+    ],
+    "checked_prodtags": [
+      "A2v1"
+    ],
+    "extra_fits_tic_examples": [],
+    "hlsp_root": "/pdo/users/tehan/tglc-gpu-production-A2v1/hlsp_s0057_A2v1",
+    "missing_fits_edge_warn_tic_examples": [
+      357031733,
+      600039000,
+      600053079,
+      600053165,
+      600055878,
+      600495310,
+      600777569,
+      600813654,
+      601799972,
+      602117399,
+      602215683,
+      602401713,
+      603155571,
+      604809363,
+      605789205,
+      606205918,
+      611057249,
+      611057255,
+      611204452,
+      611334927
+    ],
+    "missing_fits_non_edge_tic_examples": [],
+    "missing_fits_tic_examples": [
+      357031733,
+      600039000,
+      600053079,
+      600053165,
+      600055878,
+      600495310,
+      600777569,
+      600813654,
+      601799972,
+      602117399,
+      602215683,
+      602401713,
+      603155571,
+      604809363,
+      605789205,
+      606205918,
+      611057249,
+      611057255,
+      611204452,
+      611334927
+    ],
+    "n_bad_checked_fits": 0,
+    "n_checked_fits": 27213,
+    "n_expected_unique_tics": 27326,
+    "n_extra_fits_tics": 0,
+    "n_fits": 27213,
+    "n_found_unique_tics": 27213,
+    "n_missing_fits_edge_warn_tics": 113,
+    "n_missing_fits_non_edge_tics": 0,
+    "n_missing_fits_tics": 113
+  },
+  "h5": {
+    "missing_h5_by_ccd": {
+      "o121_cam1_ccd1": 10,
+      "o121_cam1_ccd2": 5,
+      "o121_cam1_ccd3": 8,
+      "o121_cam1_ccd4": 8,
+      "o121_cam2_ccd1": 8,
+      "o121_cam2_ccd2": 19,
+      "o121_cam2_ccd3": 3,
+      "o121_cam2_ccd4": 7,
+      "o121_cam3_ccd1": 6,
+      "o121_cam3_ccd2": 6,
+      "o121_cam3_ccd3": 5,
+      "o121_cam3_ccd4": 11,
+      "o121_cam4_ccd1": 7,
+      "o121_cam4_ccd2": 8,
+      "o121_cam4_ccd3": 4,
+      "o121_cam4_ccd4": 7,
+      "o122_cam1_ccd1": 9,
+      "o122_cam1_ccd2": 5,
+      "o122_cam1_ccd3": 8,
+      "o122_cam1_ccd4": 8,
+      "o122_cam2_ccd1": 8,
+      "o122_cam2_ccd2": 19,
+      "o122_cam2_ccd3": 3,
+      "o122_cam2_ccd4": 7,
+      "o122_cam3_ccd1": 6,
+      "o122_cam3_ccd2": 6,
+      "o122_cam3_ccd3": 5,
+      "o122_cam3_ccd4": 11,
+      "o122_cam4_ccd1": 7,
+      "o122_cam4_ccd2": 8,
+      "o122_cam4_ccd3": 4,
+      "o122_cam4_ccd4": 7
+    },
+    "missing_h5_by_orbit": {
+      "121": 122,
+      "122": 121
+    },
+    "missing_h5_edge_warn_examples": [
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd4/LC/2042171878.h5",
+        "tic": 2042171878
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd4/LC/2042171878.h5",
+        "tic": 2042171878
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam1/ccd2/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam1/ccd2/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd3/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd3/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd4/LC/2042168870.h5",
+        "tic": 2042168870
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd4/LC/2042168870.h5",
+        "tic": 2042168870
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd4/LC/2041232728.h5",
+        "tic": 2041232728
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd4/LC/2041232728.h5",
+        "tic": 2041232728
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam3/ccd2/LC/2048012091.h5",
+        "tic": 2048012091
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam3/ccd2/LC/2048012091.h5",
+        "tic": 2048012091
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam3/ccd2/LC/2047870172.h5",
+        "tic": 2047870172
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam3/ccd2/LC/2047870172.h5",
+        "tic": 2047870172
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd2/LC/2042570954.h5",
+        "tic": 2042570954
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd2/LC/2042570954.h5",
+        "tic": 2042570954
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd2/LC/2042001338.h5",
+        "tic": 2042001338
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd2/LC/2042001338.h5",
+        "tic": 2042001338
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd2/LC/2041992955.h5",
+        "tic": 2041992955
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd2/LC/2041992955.h5",
+        "tic": 2041992955
+      }
+    ],
+    "missing_h5_examples": [
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd4/LC/2042171878.h5",
+        "tic": 2042171878
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd4/LC/2042171878.h5",
+        "tic": 2042171878
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam1/ccd2/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam1/ccd2/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd3/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd3/LC/2054319168.h5",
+        "tic": 2054319168
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd4/LC/2042168870.h5",
+        "tic": 2042168870
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd4/LC/2042168870.h5",
+        "tic": 2042168870
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd4/LC/2041232728.h5",
+        "tic": 2041232728
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd4/LC/2041232728.h5",
+        "tic": 2041232728
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam3/ccd2/LC/2048012091.h5",
+        "tic": 2048012091
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam3/ccd2/LC/2048012091.h5",
+        "tic": 2048012091
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam3/ccd2/LC/2047870172.h5",
+        "tic": 2047870172
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam3/ccd2/LC/2047870172.h5",
+        "tic": 2047870172
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd2/LC/2042570954.h5",
+        "tic": 2042570954
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd2/LC/2042570954.h5",
+        "tic": 2042570954
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd2/LC/2042001338.h5",
+        "tic": 2042001338
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd2/LC/2042001338.h5",
+        "tic": 2042001338
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 121,
+        "path": "orbit-121/ffi/cam2/ccd2/LC/2041992955.h5",
+        "tic": 2041992955
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 122,
+        "path": "orbit-122/ffi/cam2/ccd2/LC/2041992955.h5",
+        "tic": 2041992955
+      }
+    ],
+    "missing_h5_non_edge_examples": [],
+    "n_missing_h5": 243,
+    "n_missing_h5_edge_warn": 243,
+    "n_missing_h5_non_edge": 0,
+    "n_present_h5": 54457,
+    "n_zero_byte_h5": 0,
+    "present_h5_by_ccd": {
+      "o121_cam1_ccd1": 1745,
+      "o121_cam1_ccd2": 1693,
+      "o121_cam1_ccd3": 1360,
+      "o121_cam1_ccd4": 1374,
+      "o121_cam2_ccd1": 1823,
+      "o121_cam2_ccd2": 2258,
+      "o121_cam2_ccd3": 1872,
+      "o121_cam2_ccd4": 2067,
+      "o121_cam3_ccd1": 1524,
+      "o121_cam3_ccd2": 1331,
+      "o121_cam3_ccd3": 1263,
+      "o121_cam3_ccd4": 1667,
+      "o121_cam4_ccd1": 2095,
+      "o121_cam4_ccd2": 1707,
+      "o121_cam4_ccd3": 1586,
+      "o121_cam4_ccd4": 1863,
+      "o122_cam1_ccd1": 1746,
+      "o122_cam1_ccd2": 1693,
+      "o122_cam1_ccd3": 1360,
+      "o122_cam1_ccd4": 1374,
+      "o122_cam2_ccd1": 1823,
+      "o122_cam2_ccd2": 2258,
+      "o122_cam2_ccd3": 1872,
+      "o122_cam2_ccd4": 2067,
+      "o122_cam3_ccd1": 1524,
+      "o122_cam3_ccd2": 1331,
+      "o122_cam3_ccd3": 1263,
+      "o122_cam3_ccd4": 1667,
+      "o122_cam4_ccd1": 2095,
+      "o122_cam4_ccd2": 1707,
+      "o122_cam4_ccd3": 1586,
+      "o122_cam4_ccd4": 1863
+    },
+    "present_h5_by_orbit": {
+      "121": 27228,
+      "122": 27229
+    },
+    "zero_byte_h5_examples": []
+  },
+  "n_expected_h5": 54700,
+  "n_expected_h5_edge_warn": 582,
+  "n_expected_unique_tics": 27326,
+  "n_expected_unique_tics_with_any_edge_warn": 283,
+  "observations": "/pdo/users/tehan/TWIRL/data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits",
+  "ok": true,
+  "ok_fits": true,
+  "ok_h5": true,
+  "orbits": [
+    121,
+    122
+  ],
+  "schema": {
+    "allow_edge_warn_missing": true,
+    "expected_method": "A2v1",
+    "expected_prodtag": "A2v1",
+    "fits_workers": 16,
+    "forbidden_columns": [
+      "DET_FLUX",
+      "DET_FLUX_ERR",
+      "DET_FLUX_SML",
+      "DET_FLUX_LAG",
+      "SYS_RM_FLUX"
+    ],
+    "progress_every": 500,
+    "required_a2v1_columns": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_ADP",
+      "DET_FLUX_ADP_LAG",
+      "DET_FLUX_ADP_ERR",
+      "DET_FLUX_ADP015_SML",
+      "DET_FLUX_ADP015",
+      "DET_FLUX_ADP015_LAG",
+      "DET_FLUX_ADP015_ERR"
+    ],
+    "required_base_columns": [
+      "TIME",
+      "CADENCENO",
+      "SAP_FLUX",
+      "QUALITY",
+      "ORBITID",
+      "SAP_X",
+      "SAP_Y",
+      "SAP_BKG",
+      "SAP_BKG_ERR"
+    ],
+    "schema_only": false
+  },
+  "sector": 57
+}

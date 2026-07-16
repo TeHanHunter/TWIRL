@@ -1,0 +1,25 @@
+{
+  "checkpoint_sha256": {
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_0/teacher_v2.pt": "d71754dad141ac0b2b9209bc09172441da4305dc819e20972085b399af1aa2fa",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_1/teacher_v2.pt": "235bd8c62ea258edd6f37914bb5eba927292998919732419f771bd12303d0719",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_2/teacher_v2.pt": "62ce4bb941fe249be77f9f3e1d4fff506ec54826efb0b1a07c6d532055a9bdc2",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_3/teacher_v2.pt": "a687238b66e23a2fcf9760a8adc1998ba2db500cd9d481a6a8571d8c7d4e1008",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_4/teacher_v2.pt": "5f9eb529cd5d4a82d3790ab50b0bcefbb7a6b13d7cf6570fd1fa3e20bfb1d7a4"
+  },
+  "checkpoints": [
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_0/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_1/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_2/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_3/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/full_combined/fold_4/teacher_v2.pt"
+  ],
+  "created_utc": "2026-07-15T01:35:27.136335+00:00",
+  "cuda_version": "12.8",
+  "device": "cuda:0",
+  "model_version": "s56_harmonic_cnn_teacher_v2",
+  "n_rows": 128,
+  "n_unique_tics": 26,
+  "out_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/cuda_smoke/inference_128.parquet",
+  "profile": "full_combined",
+  "torch_version": "2.11.0+cu128"
+}

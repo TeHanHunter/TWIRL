@@ -1,0 +1,50 @@
+{
+  "bls_recovery": {
+    "top_1": {
+      "fraction": 0.1567,
+      "n": 3134
+    },
+    "top_3": {
+      "fraction": 0.1675,
+      "n": 3350
+    },
+    "top_5": {
+      "fraction": 0.1729,
+      "n": 3458
+    }
+  },
+  "candidate_set_identity_verified": true,
+  "created_utc": "2026-07-14T15:23:38.358099+00:00",
+  "figures": {
+    "bls": {
+      "period_radius_empirical_publication_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/final/bls_top5_recovery_map/period_radius_empirical_recovery_publication_grid.csv",
+      "period_radius_empirical_publication_pdf": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/final/bls_top5_recovery_map/period_radius_empirical_recovery_publication.pdf",
+      "period_radius_empirical_publication_png": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/final/bls_top5_recovery_map/period_radius_empirical_recovery_publication.png"
+    },
+    "teacher": {
+      "period_radius_empirical_publication_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/final/teacher_v1_preserve_recovery_map/period_radius_empirical_recovery_publication_grid.csv",
+      "period_radius_empirical_publication_pdf": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/final/teacher_v1_preserve_recovery_map/period_radius_empirical_recovery_publication.pdf",
+      "period_radius_empirical_publication_png": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/final/teacher_v1_preserve_recovery_map/period_radius_empirical_recovery_publication.png"
+    }
+  },
+  "n_injections": 20000,
+  "n_peak_rows": 400000,
+  "n_strict_planet_truth_match_rows": 2168,
+  "n_teacher_candidate_rows": 100000,
+  "n_unique_tics": 20000,
+  "sector": 56,
+  "teacher": {
+    "bls_recovery_fraction": 0.1729,
+    "created_utc": "2026-07-14T15:23:30.214963+00:00",
+    "max_peak_rank": 5,
+    "n_bls_recovered": 3458,
+    "n_injections": 20000,
+    "n_teacher_planet_recovered": 1321,
+    "n_teacher_preserve_recovered": 1527,
+    "policy": "fresh_host_disjoint_a2v1_adp_small_top5",
+    "preserve_threshold": 0.5,
+    "teacher_planet_end_to_end_fraction": 0.06605,
+    "teacher_preserve_conditional_on_bls": 0.4415847310584153,
+    "teacher_preserve_end_to_end_fraction": 0.07635
+  }
+}

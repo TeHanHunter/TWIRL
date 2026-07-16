@@ -1,0 +1,16 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP",
+    "DET_FLUX_ADP_SML"
+  ],
+  "created_utc": "2026-07-14T22:33:52.265095+00:00",
+  "n_rows": 628955,
+  "n_shards": 40,
+  "n_targets": 31450,
+  "out_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_bls/real_adp_bls_peaks.parquet",
+  "passed": true,
+  "status_counts": {
+    "ok": 628950,
+    "too_few_cadences": 5
+  }
+}

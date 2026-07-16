@@ -1,39 +1,46 @@
 # WD Master Catalog
 
-This directory holds repo-tracked documentation for the TWIRL WD master catalog.
-The full built table itself is local-only and should be written under:
+This directory documents the TWIRL WD master catalog. The built catalog is a
+local data product and belongs under:
 
 ```text
 data_local/catalogs/twirl_master_catalog/
 ```
 
-## Current v0 Design
+The external seed is the Gentile Fusillo et al. (2021) Gaia EDR3 white-dwarf
+catalog. Gaia DR3 `source_id` is the authoritative TWIRL target identifier;
+TIC identifiers are operational metadata used by the current MIT extraction
+stack.
 
-- one row per Gaia DR3 WD seed-catalog target
-- preserve all columns from the local Gentile Fusillo et al. (2021) Gaia EDR3 seed file
-- add TWIRL control-plane columns rather than dropping or renaming seed columns
-- keep Gaia DR3 as the authoritative target identifier
-- store multi-visit TESS coverage in a single JSON-string cell per target
+## Current Catalog Design
 
-## Added Columns In The First Builder
+- one row per seed-catalog white-dwarf target;
+- preserve the seed columns rather than silently dropping or renaming them;
+- add auditable TWIRL control-plane columns;
+- keep `Pwd > 0.75` as the high-confidence reference flag, not an implicit
+  final occurrence-rate denominator;
+- store multi-visit TESS coverage as a JSON string per target while retaining
+  the normalized one-row-per-hit observation table for pipeline work.
+
+## Added Columns
 
 - `is_highconf_wd`: `Pwd > 0.75` convenience flag
 - `is_gaia_quality_ok`: provisional Gaia-quality convenience flag
-- `tic_id`: placeholder TIC identifier, `-1` when unresolved
-- `tic_match_status`: placeholder Gaia-to-TIC match status
-- `tic_match_sep_arcsec`: placeholder Gaia-to-TIC angular separation
-- `tmag`: estimated TESS magnitude derived from Gaia photometry
-- `has_tess_200s_coverage`: summary boolean for attached TESS coverage metadata
-- `n_tess_200s_observations`: number of TESS observation records attached
-- `n_tess_200s_sectors`: number of unique sectors represented
-- `n_tess_200s_orbits`: number of unique orbits represented
-- `tess_200s_sector_min`: minimum covered sector, `-1` when none
-- `tess_200s_sector_max`: maximum covered sector, `-1` when none
-- `tess_200s_orbit_min`: minimum covered orbit, `-1` when none
-- `tess_200s_orbit_max`: maximum covered orbit, `-1` when none
-- `tess_observations_json`: JSON array placeholder for per-target TESS observation records
+- `tic_id`: TIC identifier, `-1` when unresolved
+- `tic_match_status`: Gaia-to-TIC match status
+- `tic_match_sep_arcsec`: Gaia-to-TIC angular separation
+- `tmag`: TESS-magnitude estimate derived from Gaia photometry
+- `has_tess_200s_coverage`: whether coverage metadata is attached
+- `n_tess_200s_observations`: number of observation records
+- `n_tess_200s_sectors`: number of unique sectors
+- `n_tess_200s_orbits`: number of unique orbits
+- `tess_200s_sector_min`, `tess_200s_sector_max`: covered sector range, or
+  `-1` when absent
+- `tess_200s_orbit_min`, `tess_200s_orbit_max`: covered orbit range, or `-1`
+  when absent
+- `tess_observations_json`: serialized per-target observation records
 
-Example JSON payload for `tess_observations_json`:
+Example `tess_observations_json` value:
 
 ```json
 [
@@ -42,53 +49,58 @@ Example JSON payload for `tess_observations_json`:
 ]
 ```
 
-## Builder Outputs
+## Build, Coverage, And Promotion
 
-The builder writes two local files:
+[build_wd_master_catalog.py](../../scripts/stage1_lightcurves/build_wd_master_catalog.py)
+writes the FITS master catalog and a JSON provenance manifest.
+[map_tess_sector_coverage.py](../../scripts/stage1_lightcurves/map_tess_sector_coverage.py)
+populates the coverage columns and writes companion products, including:
 
-- a FITS master catalog
-- a JSON sidecar manifest with provenance, build version, and seed-file metadata
+- the coverage-enriched master catalog;
+- `twirl_wd_tess_observations_v0.fits`, with one row per
+  target/orbit/sector/camera/CCD hit;
+- detector and sector summaries;
+- optional per-orbit/camera/CCD ECSV target tables.
 
-The coverage-mapping script
-`scripts/stage1_lcs/map_tess_sector_coverage.py`
-fills the TESS coverage placeholder columns and writes companion sector/orbit products such as:
+If existing products already contain sector/camera/CCD hits, use
+[backfill_tess_orbits.py](../../scripts/stage1_lightcurves/backfill_tess_orbits.py)
+to add orbit rows without repeating the sky-geometry calculation.
 
-- an updated master catalog with populated `tess_observations_json`
-- `twirl_wd_tess_observations_v0.fits`: one row per target-orbit-sector-camera-CCD hit
-- detector and sector summary tables
-- optional per-orbit/camera/ccd TWIRL target tables in ECSV format
-
-If the existing coverage products already contain sector/camera/ccd hits, the incremental script
-`scripts/stage1_lcs/backfill_tess_orbits.py`
-can expand them into orbit-aware products without rerunning the full sky-geometry pass.
-
-Once an intermediate catalog state is accepted, promote it into a canonical versioned release with
-`scripts/stage1_lcs/promote_master_catalog_version.py`.
-Use versioned names such as:
+Once an intermediate catalog state is accepted, promote it with
+[promote_master_catalog_version.py](../../scripts/stage1_lightcurves/promote_master_catalog_version.py).
+Canonical releases use stable versioned names such as:
 
 - `twirl_wd_master_catalog_v1.fits`
 - `twirl_wd_master_catalog_v1_manifest.json`
 - `twirl_wd_tess_observations_v1.fits`
 
-Treat suffix-heavy filenames such as `*_ticmatched.fits` or `*_tesscoverage.fits` as temporary
-intermediate products rather than the long-term canonical catalog names.
+Suffix-heavy names such as `*_ticmatched.fits` and `*_tesscoverage.fits` are
+intermediate products, not long-term release names. Do not duplicate a large
+accepted FITS product solely to make its filename cleaner.
 
-## PDO Match Export
+## PDO Gaia-To-TIC Bridge
 
-When run on PDO, the read-only script
-`scripts/stage1_lcs/export_gaia_dr3_tic_matches.py`
-can export Gaia DR3 to TIC matches for the `source_id` values in a local TWIRL catalog.
+On PDO,
+[export_gaia_dr3_tic_matches.py](../../scripts/stage1_lightcurves/export_gaia_dr3_tic_matches.py)
+reads a TWIRL catalog and exports:
 
-It writes:
+- `gaia_dr3_to_tic_matches.csv`, one row per Gaia DR3-to-TIC match;
+- `gaia_dr3_to_tic_summary.csv`, one row per Gaia DR3 source;
+- `gaia_dr3_to_tic_export_manifest.json`, with provenance and counts.
 
-- `gaia_dr3_to_tic_matches.csv`: one row per Gaia DR3 to TIC match
-- `gaia_dr3_to_tic_summary.csv`: one row per Gaia DR3 source ID with match counts and status
-- `gaia_dr3_to_tic_export_manifest.json`: export metadata and summary counts
+[merge_tic_summary_into_master_catalog.py](../../scripts/stage1_lightcurves/merge_tic_summary_into_master_catalog.py)
+merges the summary conservatively:
 
-After export, the script
-`scripts/stage1_lcs/merge_tic_summary_into_master_catalog.py`
-can merge the summary CSV back into the master catalog. The current merge policy is conservative:
+- fill `tic_match_status` for Gaia rows represented in the summary;
+- fill `tic_id` only for a unique match;
+- retain `tic_id = -1` for ambiguous or unresolved matches.
 
-- fill `tic_match_status` for all Gaia rows present in the summary CSV
-- fill `tic_id` only when the summary indicates a unique TIC match
-- leave ambiguous matches at `tic_id = -1` for later review
+The bridge must not redefine the scientific sample. Unresolved/no-TIC Gaia
+targets remain an explicit support gap to characterize, and production
+magnitude limits must not silently remove requested WD targets. The A2v1 reuse
+path builds requested-TIC overlays from the normalized observation table; a
+future Gaia-first emitter may still be required for scientifically important
+targets with no usable TIC.
+
+See [sector/orbit-map documentation](../sector_orbit_maps/README.md) and the
+[local-data policy](../../doc/local_data.md) for companion products and paths.

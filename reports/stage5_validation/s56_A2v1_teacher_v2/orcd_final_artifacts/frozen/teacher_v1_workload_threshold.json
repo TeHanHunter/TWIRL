@@ -1,0 +1,12 @@
+{
+  "created_utc": "2026-07-15T14:31:40.904271+00:00",
+  "model_name": "teacher_v1_shape_plus_periodogram_bls",
+  "workload_threshold": {
+    "max_pass_tics": 342,
+    "n_pass_tics": 342,
+    "n_tics": 6858,
+    "pass_fraction": 0.049868766404199474,
+    "score_column": "p_preserve",
+    "threshold": 0.2322776395071712
+  }
+}

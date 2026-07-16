@@ -1,0 +1,5 @@
+tmag_bin,n_injections,n_unique_hosts,host_reuse_factor,n_expected_cells,n_represented_cells,cell_coverage_fraction,cell_support_min,cell_support_p10,cell_support_median,cell_support_max,bright_enrichment_recommended,sampling_role
+Tmag < 17,88,88,1.0,2500,88,0.0352,0,0.0,0.0,1,True,primary_host_disjoint
+17 <= Tmag < 18,199,199,1.0,2500,199,0.0796,0,0.0,0.0,1,True,primary_host_disjoint
+18 <= Tmag < 19,732,732,1.0,2500,719,0.2876,0,0.0,0.0,2,True,primary_host_disjoint
+Tmag >= 19,3981,3981,1.0,2500,2431,0.9724,0,1.0,2.0,2,False,primary_host_disjoint

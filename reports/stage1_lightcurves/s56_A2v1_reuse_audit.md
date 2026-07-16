@@ -362,3 +362,37 @@ healthy:
 - orbit `119`: `3086` ePSFs and `27149` HDF5 files;
 - orbit `120`: `2320` reused ePSFs and `0` HDF5 files;
 - A2v1 FITS: `0` files under `hlsp_s0056_A2v1`.
+
+## Final S56 Production Validation
+
+Date: 2026-07-10
+
+The r5 reproduction completed at `2026-07-08 16:55:44 EDT`; the final A2v1
+tree is complete for all non-edge observation rows:
+
+| Product | Orbit 119 | Orbit 120 | Total / status |
+|---|---:|---:|---|
+| ePSFs | 3,136 | 3,136 | all source cutouts covered |
+| HDF5 light curves | 31,467 | 31,468 | 62,935 files; zero zero-byte files |
+| A2v1 FITS | - | - | 31,450 files; 31,450 schemas checked |
+
+The raw S56 observation table has `63,238` orbit-level HDF5 expectations and
+`31,590` unique TIC expectations. Of those, `303` HDF5 rows and `140` FITS
+TICs are absent, but all are `edge_warn=True`: their detector positions are
+within the aperture-edge exclusion region, where TGLC cannot guarantee the
+complete `5x5` aperture required by A2v1. There are **zero non-edge missing
+HDF5 rows and zero non-edge missing FITS TICs**.
+
+The final bounded-parallel schema check opened every emitted FITS product with
+`--schema-only --fits-workers 8`. It found `0` bad files; every product has
+`METHOD=A2v1`, `PRODTAG=A2v1`, `A2V1=True`, and the ADP/ADP015 branch columns,
+while canonical `DET_FLUX*` and `SYS_RM_FLUX` are absent. The durable report is
+[s56_A2v1_validation_full_schema.json](s56_A2v1_validation_full_schema.json).
+
+One HDF5 sample from each orbit also opened with matching cadence and raw-flux
+array lengths across the `1x1`, `3x3`, and `5x5` apertures: `5,638` cadences
+for orbit `119` and `6,137` for orbit `120`.
+
+The validator requires `--allow-edge-warn-missing` to accept this known
+physical exclusion. It still fails on any missing non-edge observation, so the
+same guard applies to future-sector A2v1 productions.

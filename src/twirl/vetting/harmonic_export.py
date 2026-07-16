@@ -48,6 +48,18 @@ DEFAULT_BLS_DURATIONS_MIN: tuple[float, ...] = (
 )
 
 
+def read_candidate_table(path: Path) -> pd.DataFrame:
+    """Read a supported candidate/training table without guessing its format."""
+
+    path = Path(path)
+    suffix = path.suffix.lower()
+    if suffix == ".csv":
+        return pd.read_csv(path, low_memory=False)
+    if suffix == ".parquet":
+        return pd.read_parquet(path)
+    raise ValueError(f"unsupported table format: {path}")
+
+
 def _absolute_bjd(time: np.ndarray) -> np.ndarray:
     values = np.asarray(time, dtype=np.float64)
     finite = values[np.isfinite(values)]
@@ -286,11 +298,7 @@ def export_tglc_raw_sources(
 
     import h5py
 
-    rows = (
-        pd.read_parquet(training_table)
-        if Path(training_table).suffix.lower() == ".parquet"
-        else pd.read_csv(training_table, low_memory=False)
-    )
+    rows = read_candidate_table(training_table)
     active = _native_input_mask(rows)
     rows = rows.loc[active]
     required = rows.loc[:, ["tic", "cam", "ccd"]].copy()
@@ -413,13 +421,6 @@ def _native_input_mask(rows: pd.DataFrame) -> pd.Series:
     )
 
 
-def _read_training_table(path: Path) -> pd.DataFrame:
-    path = Path(path)
-    if path.suffix.lower() == ".parquet":
-        return pd.read_parquet(path)
-    return pd.read_csv(path, low_memory=False)
-
-
 def build_raw_pair_export(
     *,
     training_table: Path,
@@ -436,7 +437,7 @@ def build_raw_pair_export(
 
     import h5py
 
-    rows = _read_training_table(training_table)
+    rows = read_candidate_table(training_table)
     rows = rows.drop_duplicates("review_id", keep="last") if "review_id" in rows else rows
     active = _native_input_mask(rows)
     rows = rows.loc[active].copy()
@@ -701,6 +702,7 @@ __all__ = [
     "export_tglc_raw_sources",
     "merge_tglc_raw_paths",
     "merge_raw_pair_shards",
+    "read_candidate_table",
     "shared_bls_periodogram",
     "shared_bls_spectrum",
 ]

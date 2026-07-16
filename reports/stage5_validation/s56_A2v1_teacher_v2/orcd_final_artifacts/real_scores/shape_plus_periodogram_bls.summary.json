@@ -1,0 +1,25 @@
+{
+  "checkpoint_sha256": {
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_0/teacher_v2.pt": "d91d85b144206c337d12df371b18ce6a781cc332c871a686fab8798207e799da",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_1/teacher_v2.pt": "f1e23fbafc54122acb8941e17a1525659649b89bcd5ad40598607b1085ff7c1b",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_2/teacher_v2.pt": "d55e664861a7feba57f07702d04f4abf40a04a8411799a0b7da577e946a2b8d7",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_3/teacher_v2.pt": "48e62dd21c2e2333161426a10523ef277e2f74b6275bb7daba59c1ea85233934",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_4/teacher_v2.pt": "99b92fc98f99c9a5f2974ffcbcaff822c5a3e7ba7be393a9aa2dbf3b118586cd"
+  },
+  "checkpoints": [
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_0/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_1/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_2/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_3/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_4/teacher_v2.pt"
+  ],
+  "created_utc": "2026-07-15T12:36:38.220918+00:00",
+  "cuda_version": "12.8",
+  "device": "cuda:0",
+  "model_version": "s56_harmonic_cnn_teacher_v2",
+  "n_rows": 34290,
+  "n_unique_tics": 6858,
+  "out_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/shape_plus_periodogram_bls.parquet",
+  "profile": "shape_plus_periodogram_bls",
+  "torch_version": "2.11.0+cu128"
+}

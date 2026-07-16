@@ -1,7 +1,7 @@
 """Per-sector BLS orchestrator for the TWIRL Stage 2 first pass.
 
 Inputs:
-    --hlsp-root  /pdo/users/tehan/tglc-gpu-production/hlsp_s00NN/   (or override)
+    --hlsp-root  explicit accepted A2v1 HLSP root
     --sector     56
 
 Output:
@@ -9,8 +9,8 @@ Output:
     {out_dir}/sector_{NN:04d}/meta.json
     {out_dir}/sector_{NN:04d}/periodograms/tic_{TIC}.npz   (only for --save-periodograms-for)
 
-Designed to be invoked as:
-    OMP_NUM_THREADS=1 python -m twirl.search.sector_run --sector 56 --workers 32
+Designed to be invoked with an explicit, validated product root so a stale
+legacy tree can never be selected implicitly.
 """
 from __future__ import annotations
 
@@ -28,12 +28,12 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import yaml
 
 from twirl.io.hlsp import discover_sector_targets, read_hlsp
 from twirl.search.bls import BLSConfig, run_bls_on_lc, save_periodogram
 from twirl.search.candidates import result_to_rows, write_parquet
 
-DEFAULT_HLSP_ROOT_FMT = "/pdo/users/tehan/tglc-gpu-production/hlsp_s{sector:04d}"
 WD_1856_TIC = 267574918
 DEFAULT_OUT_DIR = "data_local/stage2/bls_first_pass"
 
@@ -56,8 +56,12 @@ def _init_worker(cfg: BLSConfig, periodogram_tics: set[int],
     _WORKER_RUN_CONFIG = dict(run_config or {})
 
 
-def _emit_vet_sheets(sector_out: Path, tics: set[int],
-                      hlsp_paths: list[Path]) -> None:
+def _emit_vet_sheets(
+    sector_out: Path,
+    tics: set[int],
+    hlsp_paths: list[Path],
+    apertures: tuple[str, ...],
+) -> None:
     """Generate a TOI-style vet sheet per TIC with saved periodograms."""
     import pyarrow.parquet as pq
     from twirl.search.diagnostics import plot_vet_sheet
@@ -90,7 +94,7 @@ def _emit_vet_sheets(sector_out: Path, tics: set[int],
 
         spectra: dict[str, dict] = {}
         peaks: dict[str, dict] = {}
-        for ap in ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG"):
+        for ap in apertures:
             npz = pg_dir / f"{ap}.npz"
             if not npz.exists():
                 continue
@@ -116,19 +120,21 @@ def _emit_vet_sheets(sector_out: Path, tics: set[int],
         if lc is None:
             continue
 
-        # Emit one vet sheet per aperture, anchored at THAT aperture's rank-1
+        # Emit one vet sheet per aperture, anchored at that aperture's rank-1
         # (P, T0). Auto-picking a single "best aperture" by max-SDE is
         # unreliable when the loud peak is a systematic (S59 DET_FLUX rank-1 is
         # the 6.4 d alias, not the 1.408 d truth visible in SML). Three sheets
         # let the reviewer compare candidates without prejudice.
         #
-        # The SML-anchored sheet is also written as the canonical `vet_sheet`
-        # at the target dir top: SML has lowest contamination dilution and is
-        # the right default for the LC top row and odd/even EB check on faint
-        # WD targets. MED/LAG remain as supplementary sheets.
+        # The searched small aperture is also written as the canonical
+        # ``vet_sheet`` because it has the lowest contamination dilution.
         sheets_dir = target_dir / "vet_sheets"
         sheets_dir.mkdir(parents=True, exist_ok=True)
-        sml_sheet_path: Path | None = None
+        small_aperture = next(
+            (ap for ap in apertures if ap == "DET_FLUX_SML" or ap.endswith("_SML")),
+            apertures[0] if apertures else None,
+        )
+        small_sheet_path: Path | None = None
         for anchor_ap in peaks:
             cluster_summary = None
             if consol_df is not None and not consol_df.empty:
@@ -142,16 +148,17 @@ def _emit_vet_sheets(sector_out: Path, tics: set[int],
                 plot_vet_sheet(lc, spectra, peaks, anchor_ap, out_path,
                                cluster_summary=cluster_summary)
                 print(f"  [stage2-bls] vet sheet -> {out_path}", flush=True)
-                if anchor_ap == "DET_FLUX_SML":
-                    sml_sheet_path = out_path
+                if anchor_ap == small_aperture:
+                    small_sheet_path = out_path
             except Exception as exc:
                 print(f"  [stage2-bls] vet sheet FAIL for TIC {tic} {anchor_ap}: {exc}",
                       flush=True)
 
-        # Canonical sheet at target dir top: copy of SML if available, else MED.
-        canonical_src = sml_sheet_path
+        # Canonical sheet at target dir top: small aperture first, otherwise
+        # the first successfully rendered searched aperture.
+        canonical_src = small_sheet_path
         if canonical_src is None:
-            for ap in ("DET_FLUX", "DET_FLUX_LAG"):
+            for ap in apertures:
                 cand = sheets_dir / f"vet_{ap}.png"
                 if cand.exists():
                     canonical_src = cand
@@ -263,9 +270,11 @@ def _git_short_sha() -> str:
 
 
 def resolve_hlsp_root(sector: int, override: Path | None) -> Path:
-    if override is not None:
-        return Path(override)
-    return Path(DEFAULT_HLSP_ROOT_FMT.format(sector=sector))
+    if override is None:
+        raise ValueError(
+            "an explicit --hlsp-root is required; use a validated A2v1 product or index"
+        )
+    return Path(override)
 
 
 def run_sector(
@@ -372,7 +381,7 @@ def run_sector(
     # Per-target vet sheets for any TIC with saved periodograms.
     if pg_tics:
         try:
-            _emit_vet_sheets(sector_out, pg_tics, paths)
+            _emit_vet_sheets(sector_out, pg_tics, paths, tuple(cfg.apertures))
         except Exception as exc:
             print(f"  [stage2-bls] vet-sheet emit failed: {exc}", flush=True)
 
@@ -406,10 +415,21 @@ def run_sector(
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
+    defaults = BLSConfig()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--sector", type=int, required=True)
-    ap.add_argument("--hlsp-root", type=Path, default=None,
-                    help="Override default /pdo/users/tehan/tglc-gpu-production/hlsp_s00NN/.")
+    ap.add_argument(
+        "--hlsp-root",
+        type=Path,
+        required=True,
+        help="Explicit root of the validated A2v1 HLSP product to search.",
+    )
+    ap.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Optional YAML BLSConfig values; explicit CLI options override the file.",
+    )
     ap.add_argument("--out-dir", type=Path, default=Path(DEFAULT_OUT_DIR))
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 1) // 2))
     ap.add_argument("--limit", type=int, default=None,
@@ -423,13 +443,17 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                     help="Optional text file with explicit HLSP FITS paths or TIC IDs. "
                          "When supplied, avoids recursive target discovery under "
                          "--hlsp-root.")
-    ap.add_argument("--apertures", type=str,
-                    default="DET_FLUX_SML,DET_FLUX,DET_FLUX_LAG",
-                    help="Comma-separated list of aperture flux columns to search. "
-                         "All three by default — different CCDs/fields favor different "
-                         "apertures (see WD 1856 S59 recovery: SML works, medium fails).")
-    ap.add_argument("--n-periods", type=int, default=200_000)
-    ap.add_argument("--n-peaks", type=int, default=20)
+    ap.add_argument(
+        "--apertures",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated flux columns. Default: "
+            + ",".join(defaults.apertures)
+        ),
+    )
+    ap.add_argument("--n-periods", type=int, default=None)
+    ap.add_argument("--n-peaks", type=int, default=None)
     ap.add_argument(
         "--search-branch",
         type=str,
@@ -439,16 +463,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--period-bin-edges",
         type=str,
-        default="",
+        default=None,
         help="Optional comma-separated period bin edges for peak-quota branches.",
     )
     ap.add_argument(
         "--max-peaks-per-period-bin",
         type=int,
-        default=0,
+        default=None,
         help="Optional maximum peaks from each period bin; 0 disables the quota.",
     )
-    ap.add_argument("--orbit-edge-trim-d", type=float, default=0.0,
+    ap.add_argument("--orbit-edge-trim-d", type=float, default=None,
                     help="Drop cadences within this many days of each orbit's "
                          "first/last cadence (default 0 = no trim).")
     ap.add_argument("--out-suffix", type=str, default="",
@@ -464,22 +488,46 @@ def _parse_float_tuple(raw: str) -> tuple[float, ...]:
     return tuple(float(part.strip()) for part in str(raw).split(",") if part.strip())
 
 
+def _config_from_args(args: argparse.Namespace) -> BLSConfig:
+    """Build one BLSConfig authority from defaults, optional YAML, and CLI."""
+    values = asdict(BLSConfig())
+    if args.config is not None:
+        loaded = yaml.safe_load(Path(args.config).read_text()) or {}
+        if not isinstance(loaded, dict):
+            raise ValueError(f"BLS config must be a YAML mapping: {args.config}")
+        unknown = sorted(set(loaded) - set(values))
+        if unknown:
+            raise ValueError(f"unknown BLS config keys in {args.config}: {unknown}")
+        values.update(loaded)
+
+    if args.apertures is not None:
+        values["apertures"] = tuple(
+            item.strip() for item in args.apertures.split(",") if item.strip()
+        )
+    if args.n_periods is not None:
+        values["n_periods"] = int(args.n_periods)
+    if args.n_peaks is not None:
+        values["n_peaks"] = int(args.n_peaks)
+    if args.period_bin_edges is not None:
+        values["period_bin_edges"] = _parse_float_tuple(args.period_bin_edges)
+    if args.max_peaks_per_period_bin is not None:
+        values["max_peaks_per_period_bin"] = int(args.max_peaks_per_period_bin)
+    if args.orbit_edge_trim_d is not None:
+        values["orbit_edge_trim_d"] = float(args.orbit_edge_trim_d)
+
+    for key in ("apertures", "durations_min", "period_bin_edges"):
+        values[key] = tuple(values[key])
+    return BLSConfig(**values)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
 
-    apertures = tuple(s.strip() for s in args.apertures.split(",") if s.strip())
     pg_tics = [int(s) for s in args.save_periodograms_for.split(",") if s.strip()]
     if WD_1856_TIC not in pg_tics:
         pg_tics.append(WD_1856_TIC)  # always preserve WD 1856 spectrum if present
 
-    cfg = BLSConfig(
-        apertures=apertures,
-        n_periods=int(args.n_periods),
-        n_peaks=int(args.n_peaks),
-        period_bin_edges=_parse_float_tuple(args.period_bin_edges),
-        max_peaks_per_period_bin=int(args.max_peaks_per_period_bin),
-        orbit_edge_trim_d=float(args.orbit_edge_trim_d),
-    )
+    cfg = _config_from_args(args)
     hlsp_root = resolve_hlsp_root(args.sector, args.hlsp_root)
 
     include_tics: set[int] = set()

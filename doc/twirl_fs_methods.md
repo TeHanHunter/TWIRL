@@ -1,10 +1,17 @@
 # TWIRL-FS Detrending Method
 
-## Method Name
+## Method family
 
 Use **TWIRL-FS** for the faint-target flux-space detrending product. The
-method-version tag for the current implementation is `twirl-fs-v2`, short
-for **TWIRL Flux-Spline version 2**.
+base method-version tag is `twirl-fs-v2`, short for **TWIRL Flux-Spline
+version 2**. Current A2v1 products save two adaptive members of this family:
+
+- ADP: `twirl-fs-v2-adp03q`, with `bkspace_d = 0.3 d`;
+- ADP015: `twirl-fs-v2-adp015q`, with `bkspace_d = 0.15 d`.
+
+Both use `gap_split_d = 0.2 d`, quantile knots, and robust-auto subtractive
+relative flux. The older `0.8 d` base branch remains a methods comparison, not
+an A2v1 output column.
 
 ## Motivation
 
@@ -18,7 +25,7 @@ can pass through zero.
 TWIRL-FS therefore detrends in linear flux and writes QLP-compatible HLSP
 columns while preserving negative cadences.
 
-## Current `twirl-fs-v2` Parameters
+## Base `twirl-fs-v2` parameters
 
 - Input flux: TGLC HDF5 `RawFlux` and `RawFluxError`, one sector merged
   across all available orbits.
@@ -60,9 +67,9 @@ removal than 1.2-2.0 day spacings. A separate 3-6 hour stress test kept
 the same configuration above the retention threshold, with worst
 16th-percentile retention about 0.93.
 
-## Product Labeling
+## Product labeling
 
-TWIRL-FS FITS files use:
+Historical TWIRL-FS comparison FITS use:
 
 - Filename prefix: `hlsp_twirlfs_tess_ffi_*`.
 - FITS `PIPELINE`: `TWIRL-FS`.
@@ -71,14 +78,16 @@ TWIRL-FS FITS files use:
   `EDGEPAD`, `GAPSPLIT`, `OUTMODE`, `SCALE`, `MINSNR`, `NSEG`,
   `FITCNT`, `SCALESRC`, and `COTSTAT`.
 
-For the S56 production test, use an output tree named
-`hlsp_s0056_twirl_fs_v2`.
+The accepted production-family tag is now `A2v1`. A2v1 sector trees use names
+such as `hlsp_s0056_A2v1`, carry `METHOD=A2v1`, `PRODTAG=A2v1`, and `A2V1=True`,
+and contain ADP/ADP015 branch columns without canonical `DET_FLUX*` or
+`SYS_RM_FLUX`. See the [production protocol](a2v1_production_protocol.md).
 
-## S56 Compare Columns
+## Historical S56 compare columns
 
-The Franklin/Michelle S56 handoff also has a compare tree named
+The Franklin/Michelle S56 handoff has a historical compare tree named
 `hlsp_s0056_twirl_fs_v2_compare`. In that tree, the normal columns remain
-canonical `twirl-fs-v2` and should be the default search input:
+canonical `twirl-fs-v2`:
 
 - `DET_FLUX`, `DET_FLUX_ERR`, `DET_FLUX_SML`, `DET_FLUX_LAG`.
 
@@ -96,7 +105,7 @@ polynomial path. The corrected compare product records adaptive diagnostics
 in `ADPMETH`, `ADPBKSP`, `ADPGAP`, `ADPKNOT`, `ADPNSEG`, `ADPFIT`,
 `ADPSCAL`, and `ADPCOTS`.
 
-## Candidate S56 Search Branch: `twirl-fs-v2-adp015q`
+## ADP015 branch
 
 The July 2026 raw-flux injection/BLS audit selected a modestly stronger
 small-aperture search branch for continued vetting:
@@ -108,20 +117,22 @@ small-aperture search branch for continued vetting:
 - parameters: `bkspace_d = 0.15` days, `gap_split_d = 0.2` days,
   quantile knots, robust-auto subtractive residuals
 
-This is not yet the canonical survey FITS product. It is the current
-candidate search/vetting branch: use `DET_FLUX_ADP015_SML` as the primary
-BLS search aperture and `DET_FLUX_ADP015` as the two-aperture contamination
-comparison. The existing `twirl-fs-v2-adp03q` columns remain the historical
-S56 compare columns.
+ADP015 is now part of every A2v1 product, but it is not the active harmonic
+teacher input. The current S56 teacher and human-sheet contract uses
+`DET_FLUX_ADP_SML` as the search/morphology channel and `DET_FLUX_ADP` as the
+supplemental contamination channel. ADP015 remains available for transparent
+search/injection comparisons; changing the production search branch requires a
+versioned Stage 2/3 decision rather than silently changing the FITS product.
 
-## Validation Gate Before Production Replacement
+## Validation status and remaining gates
 
-Before replacing the normal QLP detrend path, TWIRL-FS should pass:
+S56 and S57 A2v1 production now pass HDF5/FITS coverage and schema validation,
+and S56 passes the current photometric/WD 1856 gate. The remaining survey-level
+requirements are:
 
-- Full S56 build success with no new cadence-loss mode relative to the TGLC
-  HDF5 inputs.
-- Faint-end QA on negative and near-zero flux light curves.
-- WD 1856 S56 recovery across `1x1`, `3x3`, and `5x5` apertures.
-- Injection preservation for short signals, with explicit checks at about
-  30 minutes and multi-hour durations.
-- BLS and heuristic checks on the labeled TWIRL-FS S56 HLSP tree.
+- Repeatable per-sector photometric QA rather than schema validation alone.
+- A stable A2v1 index and compact-export schema.
+- End-to-end recovery through the frozen periodic/dip, ranker, vetter, and
+  candidate-merging contract.
+- A representative pixel-level calibration of extraction, crowding, aperture,
+  and centroid losses.

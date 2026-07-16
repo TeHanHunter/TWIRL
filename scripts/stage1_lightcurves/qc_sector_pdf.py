@@ -117,8 +117,8 @@ def read_lc(path: Path, drop_bits: int):
     ferr = tglc_mad_error(lc, "DET_FLUX") if "DET_FLUX" in lc.flux else np.full(len(lc.time), np.nan)
     try:
         hdr = fits.getheader(path, ext=0)
-        # QLP uses RA_OBJ / DEC_OBJ; TWIRL v3 HLSPs prior to commit XXXX used
-        # RA / DEC (the writer now emits both, but old files may have only RA).
+        # QLP uses RA_OBJ / DEC_OBJ; early TWIRL v3 HLSPs used RA / DEC (the
+        # writer now emits both, but archived files may have only RA / DEC).
         ra_v = hdr.get("RA_OBJ", hdr.get("RA", np.nan))
         dec_v = hdr.get("DEC_OBJ", hdr.get("DEC", np.nan))
         ra = float(ra_v) if ra_v is not None else np.nan

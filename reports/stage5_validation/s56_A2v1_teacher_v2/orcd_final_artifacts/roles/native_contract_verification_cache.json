@@ -1,0 +1,66 @@
+{
+  "created_utc": "2026-07-15T01:29:28.100521+00:00",
+  "entries": {
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/teacher_inputs/native_top5.h5": {
+      "fingerprint": {
+        "channel_contract": {
+          "chronology_small_channels": "[\"raw_small_centered_scaled\", \"adp_small_relative\", \"raw_error_small_scaled\", \"relative_time\", \"log_time_gap\", \"relative_cadence_number\", \"log_cadence_gap\", \"relative_orbit_index\", \"orbit_boundary\", \"quality_nonzero\"]",
+          "chronology_supplemental_channels": "[\"raw_primary_centered_scaled\", \"adp_primary_relative\", \"raw_error_primary_scaled\", \"raw_primary_minus_small\", \"adp_primary_minus_small\"]",
+          "harmonic_view_channels": "[\"adp_small_relative\", \"adp_primary_relative\", \"adp_primary_minus_small\", \"raw_error_small_scaled\", \"raw_error_primary_scaled\", \"orbital_phase\", \"quality_nonzero\"]",
+          "periodogram_channels": "[\"bls_power_small\", \"bls_sde_small\", \"bls_power_primary\", \"bls_sde_primary\"]"
+        },
+        "contract_version": "s56_adp_raw_pair_v1",
+        "mtime_ns": 1784034643995942128,
+        "path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/teacher_inputs/native_top5.h5",
+        "size_bytes": 13414072936,
+        "time_system": "BJD"
+      },
+      "verification": {
+        "counts": {
+          "injections": 20000,
+          "targets": 0
+        },
+        "failures": [],
+        "passed": true,
+        "verification_source": {
+          "kind": "post_merge_full_scan_summary",
+          "mtime_ns": 1784034684963141283,
+          "native_mtime_ns": 1784034643995942128,
+          "path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/teacher_inputs/native_top5.merge_summary.json",
+          "sha256": "a7b81d0f3cee9530285657dde73ac8badc8d1e8ac6e191771ac1aeccb7e831b2"
+        }
+      }
+    },
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_native/s56_a2v1_real_native.h5": {
+      "fingerprint": {
+        "channel_contract": {
+          "chronology_small_channels": "[\"raw_small_centered_scaled\", \"adp_small_relative\", \"raw_error_small_scaled\", \"relative_time\", \"log_time_gap\", \"relative_cadence_number\", \"log_cadence_gap\", \"relative_orbit_index\", \"orbit_boundary\", \"quality_nonzero\"]",
+          "chronology_supplemental_channels": "[\"raw_primary_centered_scaled\", \"adp_primary_relative\", \"raw_error_primary_scaled\", \"raw_primary_minus_small\", \"adp_primary_minus_small\"]",
+          "harmonic_view_channels": "[\"adp_small_relative\", \"adp_primary_relative\", \"adp_primary_minus_small\", \"raw_error_small_scaled\", \"raw_error_primary_scaled\", \"orbital_phase\", \"quality_nonzero\"]",
+          "periodogram_channels": "[\"bls_power_small\", \"bls_sde_small\", \"bls_power_primary\", \"bls_sde_primary\"]"
+        },
+        "contract_version": "s56_adp_raw_pair_v1",
+        "mtime_ns": 1784075826991172137,
+        "path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_native/s56_a2v1_real_native.h5",
+        "size_bytes": 12366282827,
+        "time_system": "BJD"
+      },
+      "verification": {
+        "counts": {
+          "injections": 0,
+          "targets": 31446
+        },
+        "failures": [],
+        "passed": true,
+        "verification_source": {
+          "kind": "post_merge_full_scan_summary",
+          "mtime_ns": 1784076134610401752,
+          "native_mtime_ns": 1784075826991172137,
+          "path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_native/s56_a2v1_real_native.summary.json",
+          "sha256": "c7cd061bdeb76358604c81dd5432b7325850a11db8c29b02574dc806b01772bc"
+        }
+      }
+    }
+  },
+  "schema": "teacher_v2_native_verification_cache_v1"
+}

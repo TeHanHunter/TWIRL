@@ -1,0 +1,41 @@
+# Normalize source and documentation text without rewriting generated tables.
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+Makefile text eol=lf
+
+# Generated tables can carry producer-specific line endings; keep their bytes
+# stable instead of silently rewriting scientific evidence during staging.
+*.csv -text
+*.tsv -text
+*.ecsv -text
+# Preserve the collaborator-supplied CRLF snapshot byte-for-byte and suppress
+# whitespace diagnostics that would otherwise treat every record terminator
+# as trailing space.
+reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/source_snapshots/franklin_labels_vetted.csv binary
+
+# Scientific data, rendered artifacts, and office documents are binary.
+*.fits binary
+*.fit binary
+*.h5 binary
+*.hdf5 binary
+*.parquet binary
+*.npy binary
+*.npz binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.tif binary
+*.tiff binary
+*.pptx binary
+*.key binary
+*.docx binary
+*.xlsx binary
+*.tar binary
+*.gz binary
+*.zip binary

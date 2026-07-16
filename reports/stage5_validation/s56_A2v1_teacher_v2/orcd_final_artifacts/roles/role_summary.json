@@ -1,0 +1,82 @@
+{
+  "created_utc": "2026-07-15T00:45:25.494938+00:00",
+  "fixed_split_counts": {
+    "development": 19301,
+    "test": 6148
+  },
+  "franklin_a2v1_transfer_fraction": 0.0,
+  "franklin_current_a2v1_score_audit": {
+    "status": "deferred_not_on_teacher_v2_critical_path"
+  },
+  "franklin_label_counts": {
+    "eclipsing_binary_or_pceb": 1,
+    "instrumental_or_systematic": 483,
+    "skip": 4,
+    "stellar_variability": 19,
+    "uncertain": 3322,
+    "wide_transit_like": 14
+  },
+  "franklin_rereview": {
+    "status": "deferred_not_on_teacher_v2_critical_path"
+  },
+  "franklin_snapshot_sha256": "6e5d1c66a6ba1ae4da5bd46fe7e538bb342ff5d971f8556d1dc2279f9b6be3c1",
+  "franklin_transfer_audit_status": "deferred_not_on_teacher_v2_critical_path",
+  "injection_role_counts": {
+    "compact_positive": 6766,
+    "paired_pre_injection": 6766,
+    "same_lc_unmatched_peak": 10524
+  },
+  "n_franklin_a2v1_compatible": 0,
+  "n_franklin_rows": 3843,
+  "n_human_rows": 1393,
+  "n_injection_rows": 24056,
+  "n_training_rows": 25449,
+  "outputs": {
+    "franklin_audit_rows": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/franklin_audit_rows.parquet",
+    "global_tic_split_registry": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/global_tic_split_registry.parquet",
+    "s56_human_role_manifest": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/s56_human_role_manifest.parquet",
+    "s56_injection_development_manifest": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/s56_injection_development_manifest.parquet",
+    "s56_injection_locked_holdout_manifest": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/s56_injection_locked_holdout_manifest.parquet",
+    "s56_injection_role_manifest": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/s56_injection_role_manifest.parquet",
+    "s56_real_workload_candidates": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/s56_real_workload_candidates.parquet",
+    "s57_external_role_manifest": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/s57_external_role_manifest.parquet",
+    "training_rows": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/training_rows.parquet"
+  },
+  "role_policy": "s56_a2v1_teacher_v2_hybrid_roles_v1",
+  "s56_real_workload": {
+    "host_disjoint_from_s56_injections_human_franklin_and_s57": true,
+    "minimum_tics": 1000,
+    "n_input_rows": 157230,
+    "n_input_tics": 31446,
+    "n_native_unavailable_tics": 0,
+    "n_registry_tics_excluded": 24588,
+    "n_workload_rows": 34290,
+    "n_workload_tics": 6858,
+    "passed": true
+  },
+  "s57_external": {
+    "cell_support_max": 8,
+    "cell_support_min": 1,
+    "expected_cells": 2500,
+    "minimum_injections": 10000,
+    "n_cells": 2500,
+    "n_external": 14706,
+    "n_external_unique_tics": 14706,
+    "n_schedule": 20000,
+    "passed": true,
+    "regenerate_required": false
+  },
+  "source_sha256": {
+    "franklin_labels": "6e5d1c66a6ba1ae4da5bd46fe7e538bb342ff5d971f8556d1dc2279f9b6be3c1",
+    "human_native_h5": "3a1ad7911be033ff2fe2f57200b2ec356874155504c7a83fa300a5005be278d9",
+    "human_prior_splits": "0200ac521e8dbc93c74ba27a48b2836c45952242e8fda70029c5cd155a51a774",
+    "human_table": "5b0dc2d813b5fa19dbeef3e91b1b1b83dd2edbb1295833d59879e285b54adf71",
+    "s56_candidates": "14ca167f886ae99a759fdd7242e43c2e57ec5d97f39e06f6bd45c9524e9b5aac",
+    "s56_injection_native_h5": "8f054dc3483668b9bce659e8c8fedc2ae8e65f2c6a67db00742851f9dd975018",
+    "s56_real_candidates": "ebf5dc9b55c48609beb376c5bdf9673703339b1c84952bf799e5eb8540d2866e",
+    "s56_schedule": "e22cc0dc7d6ac4e59d65ab0bc55ae11b1c39e2b85302d7f6813b2b03952262dd",
+    "s57_candidates": "7670e40d42f37a2418dfe15c150eb3adfa16cce5e27ef6f42ae3b00ed1241c0f",
+    "s57_native_h5": "777f0f405b8edf9490bd1e02c8809b81aba14260aeedc127a7f375e15034dc44",
+    "s57_schedule": "8b4cfadc8468f3e575971900623ae6eae2228d775e94557b8019c31349204efa"
+  }
+}

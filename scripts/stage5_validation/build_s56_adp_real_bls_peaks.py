@@ -6,6 +6,7 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -36,6 +37,14 @@ DEFAULT_COMPACT_LC = (
     "s56_twirlfs_v2_adp_lc_export_pdo.h5"
 )
 DEFAULT_OUT_DIR = REPO_ROOT / "reports/stage5_validation/s56_adp_real_bls_peaks"
+
+
+def _sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        while chunk := handle.read(chunk_size):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _target_tics(path: Path) -> list[int]:
@@ -96,6 +105,15 @@ def _process_target(payload: tuple[int, str, dict[str, Any]]) -> list[dict[str, 
         sigma_clip=float(cfg_payload["sigma_clip"]),
         orbit_edge_trim_d=float(cfg_payload["orbit_edge_trim_d"]),
     )
+    config_provenance = {
+        "bls_n_periods": int(cfg.n_periods),
+        "bls_n_peaks": int(cfg.n_peaks),
+        "bls_p_min_d": float(cfg.p_min_d),
+        "bls_p_max_cap_d": float(cfg.p_max_cap_d),
+        "bls_max_period_fraction": float(cfg.max_period_fraction),
+        "bls_sigma_clip": float(cfg.sigma_clip),
+        "bls_orbit_edge_trim_d": float(cfg.orbit_edge_trim_d),
+    }
     lc = read_compact_lc_export(compact_lc, tic=tic, columns=ADP_ONLY_APERTURES)
     if lc is None:
         return [
@@ -104,12 +122,18 @@ def _process_target(payload: tuple[int, str, dict[str, Any]]) -> list[dict[str, 
                 "status": "missing_adp_pair",
                 "bls_search_branch": "current_adp",
                 "adp_only_contract_version": ADP_ONLY_CONTRACT_VERSION,
+                "source_product_tag": str(cfg_payload.get("source_product_tag", "")),
+                **config_provenance,
             }
         ]
     rows: list[dict[str, Any]] = []
     for aperture in ADP_ONLY_APERTURES:
         result = run_bls_on_lc(lc, cfg, aperture=aperture)
-        rows.extend(_result_rows(result))
+        current = _result_rows(result)
+        for row in current:
+            row["source_product_tag"] = str(cfg_payload.get("source_product_tag", ""))
+            row.update(config_provenance)
+        rows.extend(current)
     return rows
 
 
@@ -125,6 +149,7 @@ def build_peak_table(
     shard_index: int = 0,
     n_shards: int = 1,
     resume: bool = False,
+    source_product_tag: str = "",
 ) -> dict[str, Any]:
     validate_adp_only_apertures(ADP_ONLY_APERTURES)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -138,15 +163,6 @@ def build_peak_table(
     suffix = f"_{int(shard_index):03d}" if int(n_shards) > 1 else ""
     output_path = out_dir / f"real_adp_bls_peaks{suffix}.parquet"
     summary_path = out_dir / f"summary{suffix}.json"
-    if resume and output_path.exists() and summary_path.exists():
-        summary = json.loads(summary_path.read_text())
-        if (
-            int(summary.get("shard_index", -1)) == int(shard_index)
-            and int(summary.get("n_shards", -1)) == int(n_shards)
-            and int(summary.get("n_targets", -1)) == len(tics)
-        ):
-            print(json.dumps(summary, indent=2, sort_keys=True))
-            return summary
     cfg_payload = {
         "n_periods": int(n_periods),
         "n_peaks": int(n_peaks),
@@ -155,7 +171,23 @@ def build_peak_table(
         "max_period_fraction": 0.45,
         "sigma_clip": 5.0,
         "orbit_edge_trim_d": 0.0,
+        "source_product_tag": str(source_product_tag),
     }
+    if resume and output_path.exists() and summary_path.exists():
+        summary = json.loads(summary_path.read_text())
+        if (
+            summary.get("contract_version") == ADP_ONLY_CONTRACT_VERSION
+            and summary.get("compact_lc") == str(compact_lc)
+            and int(summary.get("shard_index", -1)) == int(shard_index)
+            and int(summary.get("n_shards", -1)) == int(n_shards)
+            and int(summary.get("n_targets", -1)) == len(tics)
+            and int(summary.get("n_targets_total", -1)) == n_targets_total
+            and summary.get("source_product_tag") == str(source_product_tag)
+            and summary.get("config") == cfg_payload
+            and summary.get("peak_table_sha256") == _sha256(output_path)
+        ):
+            print(json.dumps(summary, indent=2, sort_keys=True))
+            return summary
     payloads = [(tic, str(compact_lc), cfg_payload) for tic in tics]
     rows: list[dict[str, Any]] = []
     workers = max(1, int(workers))
@@ -176,6 +208,7 @@ def build_peak_table(
 
     peaks = pd.DataFrame(rows)
     output_path = write_table(peaks, output_path)
+    output_sha256 = _sha256(output_path)
     status = peaks.get("status", pd.Series(dtype=str)).fillna("").astype(str)
     valid = status.eq("ok") & pd.to_numeric(peaks.get("peak_rank"), errors="coerce").gt(0)
     summary = {
@@ -193,6 +226,9 @@ def build_peak_table(
         "workers": int(workers),
         "shard_index": int(shard_index),
         "n_shards": int(n_shards),
+        "source_product_tag": str(source_product_tag),
+        "peak_table_sha256": output_sha256,
+        "config": cfg_payload,
         "status_counts": {str(k): int(v) for k, v in status.value_counts().sort_index().items()},
         "aperture_counts": {
             str(k): int(v)
@@ -222,6 +258,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--n-shards", type=int, default=1)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--source-product-tag",
+        default="",
+        help="Set to A2v1 when the compact export came from the production A2v1 FITS tree.",
+    )
     return parser
 
 
@@ -238,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
         shard_index=args.shard_index,
         n_shards=args.n_shards,
         resume=args.resume,
+        source_product_tag=args.source_product_tag,
     )
     return 0
 

@@ -1,6 +1,10 @@
-# Plan: Adopt QLP-Ops standard production procedure (WD-only LCs, shareable cutouts/ePSFs)
+# Historical QLP-Ops transition plan (superseded)
 
-*Drafted 2026-04-17. Status: not yet approved for execution — blocked on output-folder decision (see Blocker section).*
+> **Historical plan, superseded.** Drafted `2026-04-17` and never approved for
+> execution. The accepted Stage 1 product is now A2v1; use the
+> [A2v1 production protocol](a2v1_production_protocol.md). This file remains at
+> its original path only for provenance and old links. Its open questions and
+> commands are not current work.
 
 ## Context
 

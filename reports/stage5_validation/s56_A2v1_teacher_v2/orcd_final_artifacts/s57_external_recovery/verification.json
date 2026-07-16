@@ -1,0 +1,14 @@
+{
+  "artifact_integrity_passed": true,
+  "created_utc": "2026-07-15T15:03:43.952980+00:00",
+  "expected_sector": 57,
+  "failures": [],
+  "n_injections": 14706,
+  "root": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s57_external_recovery",
+  "scientific_acceptance": {
+    "improvement_over_metadata_at_least_0p10": true,
+    "improvement_over_teacher_v1_at_least_0p15": true,
+    "s57_bls_conditional_recovery_at_least_0p80": false
+  },
+  "scientific_acceptance_passed": false
+}

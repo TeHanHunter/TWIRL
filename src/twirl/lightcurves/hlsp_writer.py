@@ -114,10 +114,83 @@ def write_twirl_hlsp(
     """
     detrend_config = detrend_config or FluxDetrendConfig()
     out_path = Path(out_path)
+    arrays: dict[str, np.ndarray] = {
+        "time_btjd": np.asarray(time_btjd),
+        "cadenceno": np.asarray(cadenceno),
+        "sap_flux": np.asarray(sap_flux),
+        "det_flux": np.asarray(det_flux),
+        "det_flux_err": np.asarray(det_flux_err),
+        "quality": np.asarray(quality),
+        "orbitid": np.asarray(orbitid),
+        "sap_x": np.asarray(sap_x),
+        "sap_y": np.asarray(sap_y),
+        "sap_bkg": np.asarray(sap_bkg),
+        "sap_bkg_err": np.asarray(sap_bkg_err),
+        "det_flux_sml": np.asarray(det_flux_sml),
+        "det_flux_lag": np.asarray(det_flux_lag),
+    }
+    time_values = arrays["time_btjd"]
+    if time_values.ndim != 1:
+        raise ValueError(
+            f"FITS column 'time_btjd' must be one-dimensional; got shape {time_values.shape}"
+        )
+    n = len(time_values)
+    for name, values in arrays.items():
+        if values.ndim != 1:
+            raise ValueError(
+                f"FITS column {name!r} must be one-dimensional; got shape {values.shape}"
+            )
+        if len(values) != n:
+            raise ValueError(
+                f"FITS column {name!r} has length {len(values)}; expected {n}"
+            )
+
+    validated_extra: dict[str, np.ndarray] = {}
+    if extra_flux_columns:
+        for name, values in extra_flux_columns.items():
+            values = np.asarray(values)
+            if values.ndim != 1:
+                raise ValueError(
+                    f"extra FITS column {name!r} must be one-dimensional; "
+                    f"got shape {values.shape}"
+                )
+            if len(values) != n:
+                raise ValueError(
+                    f"extra FITS column {name!r} has length {len(values)}; expected {n}"
+                )
+            validated_extra[str(name)] = values
+
+    if include_sys_rm_flux:
+        if sys_rm_flux is None:
+            sys_rm_values = np.full(n, np.nan, dtype=np.float32)
+        else:
+            sys_rm_values = np.asarray(sys_rm_flux)
+            if sys_rm_values.ndim != 1:
+                raise ValueError(
+                    "FITS column 'sys_rm_flux' must be one-dimensional; "
+                    f"got shape {sys_rm_values.shape}"
+                )
+            if len(sys_rm_values) != n:
+                raise ValueError(
+                    f"FITS column 'sys_rm_flux' has length {len(sys_rm_values)}; expected {n}"
+                )
+    else:
+        sys_rm_values = None
+
+    time_btjd = arrays["time_btjd"]
+    cadenceno = arrays["cadenceno"]
+    sap_flux = arrays["sap_flux"]
+    det_flux = arrays["det_flux"]
+    det_flux_err = arrays["det_flux_err"]
+    quality = arrays["quality"]
+    orbitid = arrays["orbitid"]
+    sap_x = arrays["sap_x"]
+    sap_y = arrays["sap_y"]
+    sap_bkg = arrays["sap_bkg"]
+    sap_bkg_err = arrays["sap_bkg_err"]
+    det_flux_sml = arrays["det_flux_sml"]
+    det_flux_lag = arrays["det_flux_lag"]
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    n = len(time_btjd)
-    if sys_rm_flux is None:
-        sys_rm_flux = np.full(n, np.nan, dtype=np.float32)
 
     cols = [
         fits.Column(name="TIME", format="D", unit="BJD-2457000, days", array=time_btjd),
@@ -143,19 +216,15 @@ def write_twirl_hlsp(
             fits.Column(name="DET_FLUX_LAG", format="E", array=det_flux_lag.astype(np.float32)),
         ])
     if include_sys_rm_flux:
+        assert sys_rm_values is not None
         cols.append(
-            fits.Column(name="SYS_RM_FLUX", format="E", array=sys_rm_flux.astype(np.float32))
+            fits.Column(name="SYS_RM_FLUX", format="E", array=sys_rm_values.astype(np.float32))
         )
-    if extra_flux_columns:
-        for name, values in extra_flux_columns.items():
-            values = np.asarray(values)
-            if len(values) != n:
-                raise ValueError(
-                    f"extra FITS column {name!r} has length {len(values)}; expected {n}"
-                )
+    if validated_extra:
+        for name, values in validated_extra.items():
             cols.append(
                 fits.Column(
-                    name=str(name),
+                    name=name,
                     format="E",
                     array=values.astype(np.float32),
                 )

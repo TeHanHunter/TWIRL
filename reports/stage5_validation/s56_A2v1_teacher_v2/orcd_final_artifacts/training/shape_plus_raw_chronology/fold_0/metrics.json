@@ -1,0 +1,150 @@
+{
+  "compact_all_roles": {
+    "average_precision": 0.9425853934944083,
+    "n": 3689,
+    "n_positive": 1029,
+    "precision_at_0p5": 0.8522727272727273,
+    "recall_at_0p5": 0.8746355685131195,
+    "roc_auc": 0.9684838919456075
+  },
+  "compact_candidates_only": {
+    "average_precision": 0.9438428474812776,
+    "n": 2660,
+    "n_positive": 1029,
+    "precision_at_0p5": 0.8522727272727273,
+    "recall_at_0p5": 0.8746355685131195,
+    "roc_auc": 0.9524190862295694
+  },
+  "morphology": {
+    "accuracy": 0.9671361502347418,
+    "balanced_accuracy": 0.8741644385026738,
+    "confusion_matrix": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        2,
+        1
+      ],
+      [
+        0,
+        0,
+        15,
+        2
+      ],
+      [
+        0,
+        0,
+        2,
+        185
+      ]
+    ],
+    "macro_f1": 0.8973076923076923,
+    "n": 213,
+    "per_class": {
+      "eclipse_contact": {
+        "f1": 0.7692307692307693,
+        "n": 8,
+        "precision": 1.0,
+        "recall": 0.625
+      },
+      "other": {
+        "f1": 0.9866666666666667,
+        "n": 187,
+        "precision": 0.9840425531914894,
+        "recall": 0.9893048128342246
+      },
+      "planet_like": {
+        "f1": 1.0,
+        "n": 1,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "smooth_variable": {
+        "f1": 0.8333333333333333,
+        "n": 17,
+        "precision": 0.7894736842105263,
+        "recall": 0.8823529411764706
+      }
+    },
+    "predicted_class_counts": {
+      "eclipse_contact": 5,
+      "other": 188,
+      "planet_like": 1,
+      "smooth_variable": 19
+    }
+  },
+  "morphology_calibration": {
+    "bins": [
+      {
+        "high": 0.1,
+        "low": 0.0,
+        "n": 0
+      },
+      {
+        "high": 0.2,
+        "low": 0.1,
+        "n": 0
+      },
+      {
+        "high": 0.30000000000000004,
+        "low": 0.2,
+        "n": 0
+      },
+      {
+        "high": 0.4,
+        "low": 0.30000000000000004,
+        "n": 0
+      },
+      {
+        "accuracy": 0.0,
+        "confidence": 0.48541317537598405,
+        "high": 0.5,
+        "low": 0.4,
+        "n": 2
+      },
+      {
+        "accuracy": 1.0,
+        "confidence": 0.549929224009636,
+        "high": 0.6000000000000001,
+        "low": 0.5,
+        "n": 6
+      },
+      {
+        "accuracy": 0.0,
+        "confidence": 0.6888126018439568,
+        "high": 0.7000000000000001,
+        "low": 0.6000000000000001,
+        "n": 2
+      },
+      {
+        "accuracy": 1.0,
+        "confidence": 0.7454006987483248,
+        "high": 0.8,
+        "low": 0.7000000000000001,
+        "n": 9
+      },
+      {
+        "accuracy": 0.0,
+        "confidence": 0.8817561947951112,
+        "high": 0.9,
+        "low": 0.8,
+        "n": 1
+      },
+      {
+        "accuracy": 0.9896373056994818,
+        "confidence": 0.9905717693166626,
+        "high": 1.0,
+        "low": 0.9,
+        "n": 193
+      }
+    ],
+    "ece": 0.03944778213407577
+  },
+  "paired_original_rejection_at_0p5": 1.0
+}

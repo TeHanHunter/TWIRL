@@ -1,0 +1,25 @@
+{
+  "checkpoint_sha256": {
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_0/teacher_v2.pt": "da64904aa971ce02ac16d9601a214c004b93f45e0858c04d0b5774a7389cc77c",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_1/teacher_v2.pt": "45bda7421d61a7eab4022c80339c3ab0d234a1c19f7eaf97f81e9e508c0c3198",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_2/teacher_v2.pt": "a1d16d09d3bc0516e8af53762c1f0000695a714696f49d2f0ab039a4276554d5",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_3/teacher_v2.pt": "b4f671db68beedafe22b133770e477cfef7f41067397ffac1b25fa64d8e3f0c1",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_4/teacher_v2.pt": "637c32c2e6256ad58eefed14b05fec7e38e21f10d80832eeb70813925854a7ab"
+  },
+  "checkpoints": [
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_0/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_1/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_2/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_3/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_4/teacher_v2.pt"
+  ],
+  "created_utc": "2026-07-15T14:08:23.054595+00:00",
+  "cuda_version": "12.8",
+  "device": "cuda:0",
+  "model_version": "s56_harmonic_cnn_teacher_v2",
+  "n_rows": 73530,
+  "n_unique_tics": 14706,
+  "out_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/frozen_scores/s57_external_metadata_only.parquet",
+  "profile": "metadata_only",
+  "torch_version": "2.11.0+cu128"
+}

@@ -1,0 +1,12 @@
+{
+  "created_utc": "2026-07-14T07:41:03.220043+00:00",
+  "max_median_abs_difference": 0.0,
+  "median_abs_limit": 0.0001,
+  "n_aperture_checks": 200,
+  "n_hosts": 100,
+  "n_passed": 200,
+  "passed": true,
+  "scatter_ratio_max": 1.0000002178475529,
+  "scatter_ratio_min": 0.9999997525655244,
+  "scatter_ratio_tolerance": 0.01
+}

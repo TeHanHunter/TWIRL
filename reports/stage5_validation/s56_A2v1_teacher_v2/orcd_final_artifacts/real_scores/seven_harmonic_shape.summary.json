@@ -1,0 +1,25 @@
+{
+  "checkpoint_sha256": {
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_0/teacher_v2.pt": "f92bfb45d93d03282455d41470cba191df31222ba460fbe8235f6067c52db9e0",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_1/teacher_v2.pt": "65422321c3bc6898b54320de4086cda95d102c70b5f997f6581e6c95f46c4ffe",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_2/teacher_v2.pt": "ffd8c66b518e3534b60e946e94254de51f14f4f014a451dd1a3d1654ace1bd24",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_3/teacher_v2.pt": "1ef201b26efaac85080e4caf4bc5f3e113843074993347466220c348d30acd64",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_4/teacher_v2.pt": "72f6e04a9d91886e8c8f8eaa0baf98730727be67016bb20735408d0aea77cce6"
+  },
+  "checkpoints": [
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_0/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_1/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_2/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_3/teacher_v2.pt",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_4/teacher_v2.pt"
+  ],
+  "created_utc": "2026-07-15T07:48:38.767556+00:00",
+  "cuda_version": "12.8",
+  "device": "cuda:0",
+  "model_version": "s56_harmonic_cnn_teacher_v2",
+  "n_rows": 34290,
+  "n_unique_tics": 6858,
+  "out_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/seven_harmonic_shape.parquet",
+  "profile": "seven_harmonic_shape",
+  "torch_version": "2.11.0+cu128"
+}

@@ -1,0 +1,4 @@
+model,n_common_injections,n_bls_recovered,n_model_recovered,end_to_end_fraction,conditional_on_bls
+teacher_v2,5000,844,663,0.1326,0.7855450236966824
+teacher_v1,5000,844,468,0.0936,0.5545023696682464
+metadata_only,5000,844,521,0.1042,0.6172985781990521

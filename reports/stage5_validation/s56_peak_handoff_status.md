@@ -1,5 +1,10 @@
 # S56 Peak-Ranker Handoff Status
 
+> **Historical snapshot (2026-06-26).** Job states, ETAs, and next actions in
+> this file are preserved evidence, not current instructions. Use
+> [`doc/twirl_plan.md`](../../doc/twirl_plan.md) and the
+> [progress log](../../doc/twirl_progress_log.md) for live status.
+
 Last updated: `2026-06-26`.
 
 ## Live PDO Jobs

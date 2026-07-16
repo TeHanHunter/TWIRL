@@ -1,0 +1,18 @@
+{
+  "candidate_csv_ulp_budget": {
+    "duration_min": 0,
+    "period_d": 8,
+    "t0_bjd": 2
+  },
+  "created_utc": "2026-07-14T15:23:43.512346+00:00",
+  "failures": [],
+  "n_injections": 20000,
+  "n_outcomes": 20000,
+  "n_peak_rows": 400000,
+  "n_required_artifacts": 10,
+  "n_teacher_candidate_rows": 100000,
+  "n_teacher_score_rows": 100000,
+  "passed": true,
+  "sector": 56,
+  "workflow": "s56_a2v1_teacher_v1_recovery_v1"
+}

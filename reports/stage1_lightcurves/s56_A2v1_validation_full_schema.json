@@ -1,0 +1,5336 @@
+{
+  "a2v1_root": "/pdo/users/tehan/tglc-gpu-production-A2v1",
+  "created_utc": "2026-07-10T19:11:29.905881+00:00",
+  "expected_h5_by_ccd": {
+    "o119_cam1_ccd1": 1665,
+    "o119_cam1_ccd2": 1771,
+    "o119_cam1_ccd3": 1493,
+    "o119_cam1_ccd4": 1538,
+    "o119_cam2_ccd1": 2517,
+    "o119_cam2_ccd2": 3495,
+    "o119_cam2_ccd3": 2600,
+    "o119_cam2_ccd4": 2042,
+    "o119_cam3_ccd1": 1765,
+    "o119_cam3_ccd2": 1570,
+    "o119_cam3_ccd3": 1482,
+    "o119_cam3_ccd4": 2572,
+    "o119_cam4_ccd1": 2088,
+    "o119_cam4_ccd2": 1674,
+    "o119_cam4_ccd3": 1617,
+    "o119_cam4_ccd4": 1730,
+    "o120_cam1_ccd1": 1665,
+    "o120_cam1_ccd2": 1771,
+    "o120_cam1_ccd3": 1493,
+    "o120_cam1_ccd4": 1538,
+    "o120_cam2_ccd1": 2517,
+    "o120_cam2_ccd2": 3495,
+    "o120_cam2_ccd3": 2600,
+    "o120_cam2_ccd4": 2042,
+    "o120_cam3_ccd1": 1765,
+    "o120_cam3_ccd2": 1570,
+    "o120_cam3_ccd3": 1482,
+    "o120_cam3_ccd4": 2572,
+    "o120_cam4_ccd1": 2088,
+    "o120_cam4_ccd2": 1674,
+    "o120_cam4_ccd3": 1617,
+    "o120_cam4_ccd4": 1730
+  },
+  "expected_h5_by_orbit": {
+    "119": 31619,
+    "120": 31619
+  },
+  "fits": {
+    "bad_fits_examples": [],
+    "checked_branches": [
+      "ADP,ADP015"
+    ],
+    "checked_methods": [
+      "A2v1"
+    ],
+    "checked_prodtags": [
+      "A2v1"
+    ],
+    "extra_fits_tic_examples": [],
+    "hlsp_root": "/pdo/users/tehan/tglc-gpu-production-A2v1/hlsp_s0056_A2v1",
+    "missing_fits_edge_warn_tic_examples": [
+      266594895,
+      1102414464,
+      1102430669,
+      1102635541,
+      1201222811,
+      1271227364,
+      1271364660,
+      1400720048,
+      1400839491,
+      1400856884,
+      1400941362,
+      1400944810,
+      1400954658,
+      1400966842,
+      1401070389,
+      1401071660,
+      1401087394,
+      1551567730,
+      1551573220,
+      1551574006,
+      1551582148,
+      1551586878,
+      1551588339,
+      1551612092,
+      1551774012,
+      1717268428,
+      1717356068,
+      1717526365,
+      1717673562,
+      1718051121,
+      1718051232,
+      1718285968,
+      1884117646,
+      1884150357,
+      1884541473,
+      1884545911,
+      1952854649,
+      1960879751,
+      1961174769,
+      1961938394,
+      1962146441,
+      1968905291,
+      1969384208,
+      1972680919,
+      1975132146,
+      1976310617,
+      1976438088,
+      1976440376,
+      1977343396,
+      1977406443,
+      1978081211,
+      1978260845,
+      1978931743,
+      1979024170,
+      1979488851,
+      1981280551,
+      1981495284,
+      1981522793,
+      2000729438,
+      2000839948,
+      2000846945,
+      2000847712,
+      2001538314,
+      2001618241,
+      2001634885,
+      2002157471,
+      2002167611,
+      2002184389,
+      2002210476,
+      2002211234,
+      2003004163,
+      2003014004,
+      2003064437,
+      2003405452,
+      2003580209,
+      2003699135,
+      2003740946,
+      2003852813,
+      2004074808,
+      2004075641,
+      2004123900,
+      2004137223,
+      2004146463,
+      2004160309,
+      2004316392,
+      2004328174,
+      2004350349,
+      2004350773,
+      2005343435,
+      2005369460,
+      2005370037,
+      2005406153,
+      2005502447,
+      2005503121,
+      2005541586,
+      2006140699,
+      2006214444,
+      2010239421,
+      2010588637,
+      2011071360,
+      2011113535,
+      2013778734,
+      2013926396,
+      2016599711,
+      2016613544,
+      2019186240,
+      2021255890,
+      2021257192,
+      2021929279,
+      2023017112,
+      2024392169,
+      2025264330,
+      2025427498,
+      2025446550,
+      2025573993,
+      2040425339,
+      2041438196,
+      2041475593,
+      2041494829,
+      2041580523,
+      2043798500,
+      2052903674,
+      2052958668,
+      2053187662,
+      2053311252,
+      2053328474,
+      2053446999,
+      2053447284,
+      2053448468,
+      2053455117,
+      2053469581,
+      2053473823,
+      2053477825,
+      2053527537,
+      2053564427,
+      2054191075,
+      2054200101,
+      2054209180,
+      2054209181,
+      2054210763
+    ],
+    "missing_fits_non_edge_tic_examples": [],
+    "missing_fits_tic_examples": [
+      266594895,
+      1102414464,
+      1102430669,
+      1102635541,
+      1201222811,
+      1271227364,
+      1271364660,
+      1400720048,
+      1400839491,
+      1400856884,
+      1400941362,
+      1400944810,
+      1400954658,
+      1400966842,
+      1401070389,
+      1401071660,
+      1401087394,
+      1551567730,
+      1551573220,
+      1551574006,
+      1551582148,
+      1551586878,
+      1551588339,
+      1551612092,
+      1551774012,
+      1717268428,
+      1717356068,
+      1717526365,
+      1717673562,
+      1718051121,
+      1718051232,
+      1718285968,
+      1884117646,
+      1884150357,
+      1884541473,
+      1884545911,
+      1952854649,
+      1960879751,
+      1961174769,
+      1961938394,
+      1962146441,
+      1968905291,
+      1969384208,
+      1972680919,
+      1975132146,
+      1976310617,
+      1976438088,
+      1976440376,
+      1977343396,
+      1977406443,
+      1978081211,
+      1978260845,
+      1978931743,
+      1979024170,
+      1979488851,
+      1981280551,
+      1981495284,
+      1981522793,
+      2000729438,
+      2000839948,
+      2000846945,
+      2000847712,
+      2001538314,
+      2001618241,
+      2001634885,
+      2002157471,
+      2002167611,
+      2002184389,
+      2002210476,
+      2002211234,
+      2003004163,
+      2003014004,
+      2003064437,
+      2003405452,
+      2003580209,
+      2003699135,
+      2003740946,
+      2003852813,
+      2004074808,
+      2004075641,
+      2004123900,
+      2004137223,
+      2004146463,
+      2004160309,
+      2004316392,
+      2004328174,
+      2004350349,
+      2004350773,
+      2005343435,
+      2005369460,
+      2005370037,
+      2005406153,
+      2005502447,
+      2005503121,
+      2005541586,
+      2006140699,
+      2006214444,
+      2010239421,
+      2010588637,
+      2011071360,
+      2011113535,
+      2013778734,
+      2013926396,
+      2016599711,
+      2016613544,
+      2019186240,
+      2021255890,
+      2021257192,
+      2021929279,
+      2023017112,
+      2024392169,
+      2025264330,
+      2025427498,
+      2025446550,
+      2025573993,
+      2040425339,
+      2041438196,
+      2041475593,
+      2041494829,
+      2041580523,
+      2043798500,
+      2052903674,
+      2052958668,
+      2053187662,
+      2053311252,
+      2053328474,
+      2053446999,
+      2053447284,
+      2053448468,
+      2053455117,
+      2053469581,
+      2053473823,
+      2053477825,
+      2053527537,
+      2053564427,
+      2054191075,
+      2054200101,
+      2054209180,
+      2054209181,
+      2054210763
+    ],
+    "n_bad_checked_fits": 0,
+    "n_checked_fits": 31450,
+    "n_expected_unique_tics": 31590,
+    "n_extra_fits_tics": 0,
+    "n_fits": 31450,
+    "n_found_unique_tics": 31450,
+    "n_missing_fits_edge_warn_tics": 140,
+    "n_missing_fits_non_edge_tics": 0,
+    "n_missing_fits_tics": 140
+  },
+  "h5": {
+    "missing_h5_by_ccd": {
+      "o119_cam1_ccd1": 9,
+      "o119_cam1_ccd2": 10,
+      "o119_cam1_ccd3": 6,
+      "o119_cam1_ccd4": 4,
+      "o119_cam2_ccd1": 13,
+      "o119_cam2_ccd2": 21,
+      "o119_cam2_ccd3": 16,
+      "o119_cam2_ccd4": 7,
+      "o119_cam3_ccd1": 9,
+      "o119_cam3_ccd2": 6,
+      "o119_cam3_ccd3": 5,
+      "o119_cam3_ccd4": 10,
+      "o119_cam4_ccd1": 11,
+      "o119_cam4_ccd2": 12,
+      "o119_cam4_ccd3": 6,
+      "o119_cam4_ccd4": 7,
+      "o120_cam1_ccd1": 9,
+      "o120_cam1_ccd2": 10,
+      "o120_cam1_ccd3": 6,
+      "o120_cam1_ccd4": 4,
+      "o120_cam2_ccd1": 13,
+      "o120_cam2_ccd2": 22,
+      "o120_cam2_ccd3": 16,
+      "o120_cam2_ccd4": 7,
+      "o120_cam3_ccd1": 9,
+      "o120_cam3_ccd2": 6,
+      "o120_cam3_ccd3": 4,
+      "o120_cam3_ccd4": 10,
+      "o120_cam4_ccd1": 11,
+      "o120_cam4_ccd2": 12,
+      "o120_cam4_ccd3": 6,
+      "o120_cam4_ccd4": 6
+    },
+    "missing_h5_by_orbit": {
+      "119": 152,
+      "120": 151
+    },
+    "missing_h5_edge_warn_examples": [
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053311252.h5",
+        "tic": 2053311252
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053311252.h5",
+        "tic": 2053311252
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053328474.h5",
+        "tic": 2053328474
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053328474.h5",
+        "tic": 2053328474
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053187662.h5",
+        "tic": 2053187662
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053187662.h5",
+        "tic": 2053187662
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053527537.h5",
+        "tic": 2053527537
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053527537.h5",
+        "tic": 2053527537
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2054191075.h5",
+        "tic": 2054191075
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2054191075.h5",
+        "tic": 2054191075
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2054200101.h5",
+        "tic": 2054200101
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2054200101.h5",
+        "tic": 2054200101
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053564427.h5",
+        "tic": 2053564427
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053564427.h5",
+        "tic": 2053564427
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053469581.h5",
+        "tic": 2053469581
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053469581.h5",
+        "tic": 2053469581
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2040425339.h5",
+        "tic": 2040425339
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2040425339.h5",
+        "tic": 2040425339
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2054209180.h5",
+        "tic": 2054209180
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2054209180.h5",
+        "tic": 2054209180
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2054209181.h5",
+        "tic": 2054209181
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2054209181.h5",
+        "tic": 2054209181
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053473823.h5",
+        "tic": 2053473823
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053473823.h5",
+        "tic": 2053473823
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2052903674.h5",
+        "tic": 2052903674
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2052903674.h5",
+        "tic": 2052903674
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2052958668.h5",
+        "tic": 2052958668
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2052958668.h5",
+        "tic": 2052958668
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2054210763.h5",
+        "tic": 2054210763
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2054210763.h5",
+        "tic": 2054210763
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053477825.h5",
+        "tic": 2053477825
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053477825.h5",
+        "tic": 2053477825
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2040114056.h5",
+        "tic": 2040114056
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2040114056.h5",
+        "tic": 2040114056
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2041475593.h5",
+        "tic": 2041475593
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2041475593.h5",
+        "tic": 2041475593
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2041438196.h5",
+        "tic": 2041438196
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2041438196.h5",
+        "tic": 2041438196
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053455117.h5",
+        "tic": 2053455117
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053455117.h5",
+        "tic": 2053455117
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2053447284.h5",
+        "tic": 2053447284
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2053447284.h5",
+        "tic": 2053447284
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2053448468.h5",
+        "tic": 2053448468
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2053448468.h5",
+        "tic": 2053448468
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2053446999.h5",
+        "tic": 2053446999
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2053446999.h5",
+        "tic": 2053446999
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2040068151.h5",
+        "tic": 2040068151
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2040068151.h5",
+        "tic": 2040068151
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2041494829.h5",
+        "tic": 2041494829
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2041494829.h5",
+        "tic": 2041494829
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2040072285.h5",
+        "tic": 2040072285
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2040072285.h5",
+        "tic": 2040072285
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2043798500.h5",
+        "tic": 2043798500
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2043798500.h5",
+        "tic": 2043798500
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2041580523.h5",
+        "tic": 2041580523
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2041580523.h5",
+        "tic": 2041580523
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2024392169.h5",
+        "tic": 2024392169
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2024392169.h5",
+        "tic": 2024392169
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2002619465.h5",
+        "tic": 2002619465
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2002619465.h5",
+        "tic": 2002619465
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2002619632.h5",
+        "tic": 2002619632
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2002619632.h5",
+        "tic": 2002619632
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002720451.h5",
+        "tic": 2002720451
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002720451.h5",
+        "tic": 2002720451
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2003405452.h5",
+        "tic": 2003405452
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2003405452.h5",
+        "tic": 2003405452
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2025264330.h5",
+        "tic": 2025264330
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2025264330.h5",
+        "tic": 2025264330
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2025573993.h5",
+        "tic": 2025573993
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2025573993.h5",
+        "tic": 2025573993
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003004163.h5",
+        "tic": 2003004163
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003004163.h5",
+        "tic": 2003004163
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2013926396.h5",
+        "tic": 2013926396
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2013926396.h5",
+        "tic": 2013926396
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002656688.h5",
+        "tic": 2002656688
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002656688.h5",
+        "tic": 2002656688
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003014004.h5",
+        "tic": 2003014004
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003014004.h5",
+        "tic": 2003014004
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2025446550.h5",
+        "tic": 2025446550
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2025446550.h5",
+        "tic": 2025446550
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2003852813.h5",
+        "tic": 2003852813
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2003852813.h5",
+        "tic": 2003852813
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003064437.h5",
+        "tic": 2003064437
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003064437.h5",
+        "tic": 2003064437
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2013778734.h5",
+        "tic": 2013778734
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2013778734.h5",
+        "tic": 2013778734
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2025427498.h5",
+        "tic": 2025427498
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2025427498.h5",
+        "tic": 2025427498
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002638643.h5",
+        "tic": 2002638643
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002638643.h5",
+        "tic": 2002638643
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002638416.h5",
+        "tic": 2002638416
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002638416.h5",
+        "tic": 2002638416
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2003740946.h5",
+        "tic": 2003740946
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2003740946.h5",
+        "tic": 2003740946
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003580209.h5",
+        "tic": 2003580209
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003580209.h5",
+        "tic": 2003580209
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2003699135.h5",
+        "tic": 2003699135
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2003699135.h5",
+        "tic": 2003699135
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2005369460.h5",
+        "tic": 2005369460
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2005369460.h5",
+        "tic": 2005369460
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2005370037.h5",
+        "tic": 2005370037
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2005370037.h5",
+        "tic": 2005370037
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2000839948.h5",
+        "tic": 2000839948
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2000839948.h5",
+        "tic": 2000839948
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005343435.h5",
+        "tic": 2005343435
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005343435.h5",
+        "tic": 2005343435
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2005406153.h5",
+        "tic": 2005406153
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2005406153.h5",
+        "tic": 2005406153
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2021255890.h5",
+        "tic": 2021255890
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2021255890.h5",
+        "tic": 2021255890
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2021257192.h5",
+        "tic": 2021257192
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2021257192.h5",
+        "tic": 2021257192
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005502447.h5",
+        "tic": 2005502447
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005502447.h5",
+        "tic": 2005502447
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005503121.h5",
+        "tic": 2005503121
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005503121.h5",
+        "tic": 2005503121
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2000847712.h5",
+        "tic": 2000847712
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2000847712.h5",
+        "tic": 2000847712
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2000846945.h5",
+        "tic": 2000846945
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2000846945.h5",
+        "tic": 2000846945
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004350773.h5",
+        "tic": 2004350773
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004350773.h5",
+        "tic": 2004350773
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004350349.h5",
+        "tic": 2004350349
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004350349.h5",
+        "tic": 2004350349
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005541586.h5",
+        "tic": 2005541586
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005541586.h5",
+        "tic": 2005541586
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2000729438.h5",
+        "tic": 2000729438
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2000729438.h5",
+        "tic": 2000729438
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004328174.h5",
+        "tic": 2004328174
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004328174.h5",
+        "tic": 2004328174
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2006214444.h5",
+        "tic": 2006214444
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2006214444.h5",
+        "tic": 2006214444
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2010239421.h5",
+        "tic": 2010239421
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2010239421.h5",
+        "tic": 2010239421
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004316392.h5",
+        "tic": 2004316392
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004316392.h5",
+        "tic": 2004316392
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2006140699.h5",
+        "tic": 2006140699
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2006140699.h5",
+        "tic": 2006140699
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004123900.h5",
+        "tic": 2004123900
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004123900.h5",
+        "tic": 2004123900
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004075641.h5",
+        "tic": 2004075641
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004075641.h5",
+        "tic": 2004075641
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004074808.h5",
+        "tic": 2004074808
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004074808.h5",
+        "tic": 2004074808
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004160309.h5",
+        "tic": 2004160309
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004160309.h5",
+        "tic": 2004160309
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2001538314.h5",
+        "tic": 2001538314
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2001538314.h5",
+        "tic": 2001538314
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004137223.h5",
+        "tic": 2004137223
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004137223.h5",
+        "tic": 2004137223
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004146463.h5",
+        "tic": 2004146463
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004146463.h5",
+        "tic": 2004146463
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/266594895.h5",
+        "tic": 266594895
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/266594895.h5",
+        "tic": 266594895
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2021929279.h5",
+        "tic": 2021929279
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2021929279.h5",
+        "tic": 2021929279
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2010588637.h5",
+        "tic": 2010588637
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2010588637.h5",
+        "tic": 2010588637
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2001618241.h5",
+        "tic": 2001618241
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2001618241.h5",
+        "tic": 2001618241
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2001634885.h5",
+        "tic": 2001634885
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2001634885.h5",
+        "tic": 2001634885
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002211234.h5",
+        "tic": 2002211234
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002211234.h5",
+        "tic": 2002211234
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2002184389.h5",
+        "tic": 2002184389
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2002184389.h5",
+        "tic": 2002184389
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2011071360.h5",
+        "tic": 2011071360
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2011071360.h5",
+        "tic": 2011071360
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002210476.h5",
+        "tic": 2002210476
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002210476.h5",
+        "tic": 2002210476
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2011113535.h5",
+        "tic": 2011113535
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2011113535.h5",
+        "tic": 2011113535
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/2019186240.h5",
+        "tic": 2019186240
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/2019186240.h5",
+        "tic": 2019186240
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002167611.h5",
+        "tic": 2002167611
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002167611.h5",
+        "tic": 2002167611
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2016599711.h5",
+        "tic": 2016599711
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2016599711.h5",
+        "tic": 2016599711
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002157471.h5",
+        "tic": 2002157471
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002157471.h5",
+        "tic": 2002157471
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2016613544.h5",
+        "tic": 2016613544
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2016613544.h5",
+        "tic": 2016613544
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/2019163110.h5",
+        "tic": 2019163110
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/2023017112.h5",
+        "tic": 2023017112
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/2023017112.h5",
+        "tic": 2023017112
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1975132146.h5",
+        "tic": 1975132146
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1975132146.h5",
+        "tic": 1975132146
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1952854649.h5",
+        "tic": 1952854649
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1952854649.h5",
+        "tic": 1952854649
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1962146441.h5",
+        "tic": 1962146441
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1962146441.h5",
+        "tic": 1962146441
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/1976438088.h5",
+        "tic": 1976438088
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/1976438088.h5",
+        "tic": 1976438088
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/1976440376.h5",
+        "tic": 1976440376
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/1976440376.h5",
+        "tic": 1976440376
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1961938394.h5",
+        "tic": 1961938394
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1961938394.h5",
+        "tic": 1961938394
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1976310617.h5",
+        "tic": 1976310617
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1976310617.h5",
+        "tic": 1976310617
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1961174769.h5",
+        "tic": 1961174769
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1961174769.h5",
+        "tic": 1961174769
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1960260359.h5",
+        "tic": 1960260359
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/1979488851.h5",
+        "tic": 1979488851
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/1979488851.h5",
+        "tic": 1979488851
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1960879751.h5",
+        "tic": 1960879751
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1960879751.h5",
+        "tic": 1960879751
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1978260845.h5",
+        "tic": 1978260845
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1978260845.h5",
+        "tic": 1978260845
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1968905291.h5",
+        "tic": 1968905291
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1968905291.h5",
+        "tic": 1968905291
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1978081211.h5",
+        "tic": 1978081211
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1978081211.h5",
+        "tic": 1978081211
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1981522793.h5",
+        "tic": 1981522793
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1981522793.h5",
+        "tic": 1981522793
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1978931743.h5",
+        "tic": 1978931743
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1978931743.h5",
+        "tic": 1978931743
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1981495284.h5",
+        "tic": 1981495284
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1981495284.h5",
+        "tic": 1981495284
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1977406443.h5",
+        "tic": 1977406443
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1977406443.h5",
+        "tic": 1977406443
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1981280551.h5",
+        "tic": 1981280551
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1981280551.h5",
+        "tic": 1981280551
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1979024170.h5",
+        "tic": 1979024170
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1979024170.h5",
+        "tic": 1979024170
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1969384208.h5",
+        "tic": 1969384208
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1969384208.h5",
+        "tic": 1969384208
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1977343396.h5",
+        "tic": 1977343396
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1977343396.h5",
+        "tic": 1977343396
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1972680919.h5",
+        "tic": 1972680919
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1972680919.h5",
+        "tic": 1972680919
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/1884318379.h5",
+        "tic": 1884318379
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/1884318379.h5",
+        "tic": 1884318379
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1884150357.h5",
+        "tic": 1884150357
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1884150357.h5",
+        "tic": 1884150357
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1884541473.h5",
+        "tic": 1884541473
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1884541473.h5",
+        "tic": 1884541473
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1884545911.h5",
+        "tic": 1884545911
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1884545911.h5",
+        "tic": 1884545911
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1884117646.h5",
+        "tic": 1884117646
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1884117646.h5",
+        "tic": 1884117646
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1717268428.h5",
+        "tic": 1717268428
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1717268428.h5",
+        "tic": 1717268428
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1717526365.h5",
+        "tic": 1717526365
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1717526365.h5",
+        "tic": 1717526365
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1718285968.h5",
+        "tic": 1718285968
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1718285968.h5",
+        "tic": 1718285968
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1717356068.h5",
+        "tic": 1717356068
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1717356068.h5",
+        "tic": 1717356068
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1717673562.h5",
+        "tic": 1717673562
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1717673562.h5",
+        "tic": 1717673562
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1718051121.h5",
+        "tic": 1718051121
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1718051121.h5",
+        "tic": 1718051121
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1718051232.h5",
+        "tic": 1718051232
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1718051232.h5",
+        "tic": 1718051232
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551582148.h5",
+        "tic": 1551582148
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551582148.h5",
+        "tic": 1551582148
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551586878.h5",
+        "tic": 1551586878
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551586878.h5",
+        "tic": 1551586878
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551588339.h5",
+        "tic": 1551588339
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551588339.h5",
+        "tic": 1551588339
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551567730.h5",
+        "tic": 1551567730
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551567730.h5",
+        "tic": 1551567730
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1551774012.h5",
+        "tic": 1551774012
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1551774012.h5",
+        "tic": 1551774012
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1551612092.h5",
+        "tic": 1551612092
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1551612092.h5",
+        "tic": 1551612092
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551574006.h5",
+        "tic": 1551574006
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551574006.h5",
+        "tic": 1551574006
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551573220.h5",
+        "tic": 1551573220
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551573220.h5",
+        "tic": 1551573220
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1400944810.h5",
+        "tic": 1400944810
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1400944810.h5",
+        "tic": 1400944810
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1400941362.h5",
+        "tic": 1400941362
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1400941362.h5",
+        "tic": 1400941362
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1401087394.h5",
+        "tic": 1401087394
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1401087394.h5",
+        "tic": 1401087394
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1400966842.h5",
+        "tic": 1400966842
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1400966842.h5",
+        "tic": 1400966842
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1401071660.h5",
+        "tic": 1401071660
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1401071660.h5",
+        "tic": 1401071660
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1401070389.h5",
+        "tic": 1401070389
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1401070389.h5",
+        "tic": 1401070389
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1400856884.h5",
+        "tic": 1400856884
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1400856884.h5",
+        "tic": 1400856884
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400845136.h5",
+        "tic": 1400845136
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400839491.h5",
+        "tic": 1400839491
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1400839491.h5",
+        "tic": 1400839491
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400720048.h5",
+        "tic": 1400720048
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1400720048.h5",
+        "tic": 1400720048
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400954658.h5",
+        "tic": 1400954658
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1400954658.h5",
+        "tic": 1400954658
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1271227364.h5",
+        "tic": 1271227364
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1271227364.h5",
+        "tic": 1271227364
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1271364660.h5",
+        "tic": 1271364660
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1271364660.h5",
+        "tic": 1271364660
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1201222811.h5",
+        "tic": 1201222811
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1201222811.h5",
+        "tic": 1201222811
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1102414464.h5",
+        "tic": 1102414464
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1102414464.h5",
+        "tic": 1102414464
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1102430669.h5",
+        "tic": 1102430669
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1102430669.h5",
+        "tic": 1102430669
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1102635541.h5",
+        "tic": 1102635541
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1102635541.h5",
+        "tic": 1102635541
+      }
+    ],
+    "missing_h5_examples": [
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053311252.h5",
+        "tic": 2053311252
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053311252.h5",
+        "tic": 2053311252
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053328474.h5",
+        "tic": 2053328474
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053328474.h5",
+        "tic": 2053328474
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053187662.h5",
+        "tic": 2053187662
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053187662.h5",
+        "tic": 2053187662
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053527537.h5",
+        "tic": 2053527537
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053527537.h5",
+        "tic": 2053527537
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2054191075.h5",
+        "tic": 2054191075
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2054191075.h5",
+        "tic": 2054191075
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2054200101.h5",
+        "tic": 2054200101
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2054200101.h5",
+        "tic": 2054200101
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053564427.h5",
+        "tic": 2053564427
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053564427.h5",
+        "tic": 2053564427
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd4/LC/2053469581.h5",
+        "tic": 2053469581
+      },
+      {
+        "camera": 1,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd4/LC/2053469581.h5",
+        "tic": 2053469581
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2040425339.h5",
+        "tic": 2040425339
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2040425339.h5",
+        "tic": 2040425339
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2054209180.h5",
+        "tic": 2054209180
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2054209180.h5",
+        "tic": 2054209180
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2054209181.h5",
+        "tic": 2054209181
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2054209181.h5",
+        "tic": 2054209181
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053473823.h5",
+        "tic": 2053473823
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053473823.h5",
+        "tic": 2053473823
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2052903674.h5",
+        "tic": 2052903674
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2052903674.h5",
+        "tic": 2052903674
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2052958668.h5",
+        "tic": 2052958668
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2052958668.h5",
+        "tic": 2052958668
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2054210763.h5",
+        "tic": 2054210763
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2054210763.h5",
+        "tic": 2054210763
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053477825.h5",
+        "tic": 2053477825
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053477825.h5",
+        "tic": 2053477825
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2040114056.h5",
+        "tic": 2040114056
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2040114056.h5",
+        "tic": 2040114056
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2041475593.h5",
+        "tic": 2041475593
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2041475593.h5",
+        "tic": 2041475593
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2041438196.h5",
+        "tic": 2041438196
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2041438196.h5",
+        "tic": 2041438196
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2053455117.h5",
+        "tic": 2053455117
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2053455117.h5",
+        "tic": 2053455117
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2053447284.h5",
+        "tic": 2053447284
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2053447284.h5",
+        "tic": 2053447284
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2053448468.h5",
+        "tic": 2053448468
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2053448468.h5",
+        "tic": 2053448468
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2053446999.h5",
+        "tic": 2053446999
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2053446999.h5",
+        "tic": 2053446999
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd1/LC/2040068151.h5",
+        "tic": 2040068151
+      },
+      {
+        "camera": 1,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd1/LC/2040068151.h5",
+        "tic": 2040068151
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2041494829.h5",
+        "tic": 2041494829
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2041494829.h5",
+        "tic": 2041494829
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2040072285.h5",
+        "tic": 2040072285
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2040072285.h5",
+        "tic": 2040072285
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2043798500.h5",
+        "tic": 2043798500
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2043798500.h5",
+        "tic": 2043798500
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2041580523.h5",
+        "tic": 2041580523
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2041580523.h5",
+        "tic": 2041580523
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2024392169.h5",
+        "tic": 2024392169
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2024392169.h5",
+        "tic": 2024392169
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2002619465.h5",
+        "tic": 2002619465
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2002619465.h5",
+        "tic": 2002619465
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2002619632.h5",
+        "tic": 2002619632
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2002619632.h5",
+        "tic": 2002619632
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002720451.h5",
+        "tic": 2002720451
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002720451.h5",
+        "tic": 2002720451
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd4/LC/2003405452.h5",
+        "tic": 2003405452
+      },
+      {
+        "camera": 2,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd4/LC/2003405452.h5",
+        "tic": 2003405452
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2025264330.h5",
+        "tic": 2025264330
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2025264330.h5",
+        "tic": 2025264330
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2025573993.h5",
+        "tic": 2025573993
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2025573993.h5",
+        "tic": 2025573993
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003004163.h5",
+        "tic": 2003004163
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003004163.h5",
+        "tic": 2003004163
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2013926396.h5",
+        "tic": 2013926396
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2013926396.h5",
+        "tic": 2013926396
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002656688.h5",
+        "tic": 2002656688
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002656688.h5",
+        "tic": 2002656688
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003014004.h5",
+        "tic": 2003014004
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003014004.h5",
+        "tic": 2003014004
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2025446550.h5",
+        "tic": 2025446550
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2025446550.h5",
+        "tic": 2025446550
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2003852813.h5",
+        "tic": 2003852813
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2003852813.h5",
+        "tic": 2003852813
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003064437.h5",
+        "tic": 2003064437
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003064437.h5",
+        "tic": 2003064437
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2013778734.h5",
+        "tic": 2013778734
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2013778734.h5",
+        "tic": 2013778734
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd3/LC/2025427498.h5",
+        "tic": 2025427498
+      },
+      {
+        "camera": 1,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd3/LC/2025427498.h5",
+        "tic": 2025427498
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002638643.h5",
+        "tic": 2002638643
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002638643.h5",
+        "tic": 2002638643
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2002638416.h5",
+        "tic": 2002638416
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2002638416.h5",
+        "tic": 2002638416
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2003740946.h5",
+        "tic": 2003740946
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2003740946.h5",
+        "tic": 2003740946
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2003580209.h5",
+        "tic": 2003580209
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2003580209.h5",
+        "tic": 2003580209
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2003699135.h5",
+        "tic": 2003699135
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2003699135.h5",
+        "tic": 2003699135
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2005369460.h5",
+        "tic": 2005369460
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2005369460.h5",
+        "tic": 2005369460
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2005370037.h5",
+        "tic": 2005370037
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2005370037.h5",
+        "tic": 2005370037
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2000839948.h5",
+        "tic": 2000839948
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2000839948.h5",
+        "tic": 2000839948
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005343435.h5",
+        "tic": 2005343435
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005343435.h5",
+        "tic": 2005343435
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2005406153.h5",
+        "tic": 2005406153
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2005406153.h5",
+        "tic": 2005406153
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2021255890.h5",
+        "tic": 2021255890
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2021255890.h5",
+        "tic": 2021255890
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2021257192.h5",
+        "tic": 2021257192
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2021257192.h5",
+        "tic": 2021257192
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005502447.h5",
+        "tic": 2005502447
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005502447.h5",
+        "tic": 2005502447
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005503121.h5",
+        "tic": 2005503121
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005503121.h5",
+        "tic": 2005503121
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2000847712.h5",
+        "tic": 2000847712
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2000847712.h5",
+        "tic": 2000847712
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2000846945.h5",
+        "tic": 2000846945
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2000846945.h5",
+        "tic": 2000846945
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004350773.h5",
+        "tic": 2004350773
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004350773.h5",
+        "tic": 2004350773
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004350349.h5",
+        "tic": 2004350349
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004350349.h5",
+        "tic": 2004350349
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2005541586.h5",
+        "tic": 2005541586
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2005541586.h5",
+        "tic": 2005541586
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam1/ccd2/LC/2000729438.h5",
+        "tic": 2000729438
+      },
+      {
+        "camera": 1,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam1/ccd2/LC/2000729438.h5",
+        "tic": 2000729438
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004328174.h5",
+        "tic": 2004328174
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004328174.h5",
+        "tic": 2004328174
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2006214444.h5",
+        "tic": 2006214444
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2006214444.h5",
+        "tic": 2006214444
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd1/LC/2010239421.h5",
+        "tic": 2010239421
+      },
+      {
+        "camera": 2,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd1/LC/2010239421.h5",
+        "tic": 2010239421
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004316392.h5",
+        "tic": 2004316392
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004316392.h5",
+        "tic": 2004316392
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2006140699.h5",
+        "tic": 2006140699
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2006140699.h5",
+        "tic": 2006140699
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004123900.h5",
+        "tic": 2004123900
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004123900.h5",
+        "tic": 2004123900
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004075641.h5",
+        "tic": 2004075641
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004075641.h5",
+        "tic": 2004075641
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004074808.h5",
+        "tic": 2004074808
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004074808.h5",
+        "tic": 2004074808
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004160309.h5",
+        "tic": 2004160309
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004160309.h5",
+        "tic": 2004160309
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2001538314.h5",
+        "tic": 2001538314
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2001538314.h5",
+        "tic": 2001538314
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2004137223.h5",
+        "tic": 2004137223
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2004137223.h5",
+        "tic": 2004137223
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2004146463.h5",
+        "tic": 2004146463
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2004146463.h5",
+        "tic": 2004146463
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/266594895.h5",
+        "tic": 266594895
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/266594895.h5",
+        "tic": 266594895
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/2021929279.h5",
+        "tic": 2021929279
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/2021929279.h5",
+        "tic": 2021929279
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2010588637.h5",
+        "tic": 2010588637
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2010588637.h5",
+        "tic": 2010588637
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2001618241.h5",
+        "tic": 2001618241
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2001618241.h5",
+        "tic": 2001618241
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2001634885.h5",
+        "tic": 2001634885
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2001634885.h5",
+        "tic": 2001634885
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002211234.h5",
+        "tic": 2002211234
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002211234.h5",
+        "tic": 2002211234
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd3/LC/2002184389.h5",
+        "tic": 2002184389
+      },
+      {
+        "camera": 2,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd3/LC/2002184389.h5",
+        "tic": 2002184389
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2011071360.h5",
+        "tic": 2011071360
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2011071360.h5",
+        "tic": 2011071360
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002210476.h5",
+        "tic": 2002210476
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002210476.h5",
+        "tic": 2002210476
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2011113535.h5",
+        "tic": 2011113535
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2011113535.h5",
+        "tic": 2011113535
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/2019186240.h5",
+        "tic": 2019186240
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/2019186240.h5",
+        "tic": 2019186240
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002167611.h5",
+        "tic": 2002167611
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002167611.h5",
+        "tic": 2002167611
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2016599711.h5",
+        "tic": 2016599711
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2016599711.h5",
+        "tic": 2016599711
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/2002157471.h5",
+        "tic": 2002157471
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/2002157471.h5",
+        "tic": 2002157471
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/2016613544.h5",
+        "tic": 2016613544
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/2016613544.h5",
+        "tic": 2016613544
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/2019163110.h5",
+        "tic": 2019163110
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/2023017112.h5",
+        "tic": 2023017112
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/2023017112.h5",
+        "tic": 2023017112
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1975132146.h5",
+        "tic": 1975132146
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1975132146.h5",
+        "tic": 1975132146
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1952854649.h5",
+        "tic": 1952854649
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1952854649.h5",
+        "tic": 1952854649
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1962146441.h5",
+        "tic": 1962146441
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1962146441.h5",
+        "tic": 1962146441
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/1976438088.h5",
+        "tic": 1976438088
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/1976438088.h5",
+        "tic": 1976438088
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd2/LC/1976440376.h5",
+        "tic": 1976440376
+      },
+      {
+        "camera": 3,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd2/LC/1976440376.h5",
+        "tic": 1976440376
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1961938394.h5",
+        "tic": 1961938394
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1961938394.h5",
+        "tic": 1961938394
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1976310617.h5",
+        "tic": 1976310617
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1976310617.h5",
+        "tic": 1976310617
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1961174769.h5",
+        "tic": 1961174769
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1961174769.h5",
+        "tic": 1961174769
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1960260359.h5",
+        "tic": 1960260359
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/1979488851.h5",
+        "tic": 1979488851
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/1979488851.h5",
+        "tic": 1979488851
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam2/ccd2/LC/1960879751.h5",
+        "tic": 1960879751
+      },
+      {
+        "camera": 2,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam2/ccd2/LC/1960879751.h5",
+        "tic": 1960879751
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1978260845.h5",
+        "tic": 1978260845
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1978260845.h5",
+        "tic": 1978260845
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1968905291.h5",
+        "tic": 1968905291
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1968905291.h5",
+        "tic": 1968905291
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1978081211.h5",
+        "tic": 1978081211
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1978081211.h5",
+        "tic": 1978081211
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1981522793.h5",
+        "tic": 1981522793
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1981522793.h5",
+        "tic": 1981522793
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1978931743.h5",
+        "tic": 1978931743
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1978931743.h5",
+        "tic": 1978931743
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1981495284.h5",
+        "tic": 1981495284
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1981495284.h5",
+        "tic": 1981495284
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1977406443.h5",
+        "tic": 1977406443
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1977406443.h5",
+        "tic": 1977406443
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1981280551.h5",
+        "tic": 1981280551
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1981280551.h5",
+        "tic": 1981280551
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1979024170.h5",
+        "tic": 1979024170
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1979024170.h5",
+        "tic": 1979024170
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd1/LC/1969384208.h5",
+        "tic": 1969384208
+      },
+      {
+        "camera": 3,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd1/LC/1969384208.h5",
+        "tic": 1969384208
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1977343396.h5",
+        "tic": 1977343396
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1977343396.h5",
+        "tic": 1977343396
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1972680919.h5",
+        "tic": 1972680919
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1972680919.h5",
+        "tic": 1972680919
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd3/LC/1884318379.h5",
+        "tic": 1884318379
+      },
+      {
+        "camera": 3,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd3/LC/1884318379.h5",
+        "tic": 1884318379
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1884150357.h5",
+        "tic": 1884150357
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1884150357.h5",
+        "tic": 1884150357
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1884541473.h5",
+        "tic": 1884541473
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1884541473.h5",
+        "tic": 1884541473
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1884545911.h5",
+        "tic": 1884545911
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1884545911.h5",
+        "tic": 1884545911
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1884117646.h5",
+        "tic": 1884117646
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1884117646.h5",
+        "tic": 1884117646
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1717268428.h5",
+        "tic": 1717268428
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1717268428.h5",
+        "tic": 1717268428
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1717526365.h5",
+        "tic": 1717526365
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1717526365.h5",
+        "tic": 1717526365
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1718285968.h5",
+        "tic": 1718285968
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1718285968.h5",
+        "tic": 1718285968
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam3/ccd4/LC/1717356068.h5",
+        "tic": 1717356068
+      },
+      {
+        "camera": 3,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam3/ccd4/LC/1717356068.h5",
+        "tic": 1717356068
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1717673562.h5",
+        "tic": 1717673562
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1717673562.h5",
+        "tic": 1717673562
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1718051121.h5",
+        "tic": 1718051121
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1718051121.h5",
+        "tic": 1718051121
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1718051232.h5",
+        "tic": 1718051232
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1718051232.h5",
+        "tic": 1718051232
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551582148.h5",
+        "tic": 1551582148
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551582148.h5",
+        "tic": 1551582148
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551586878.h5",
+        "tic": 1551586878
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551586878.h5",
+        "tic": 1551586878
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551588339.h5",
+        "tic": 1551588339
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551588339.h5",
+        "tic": 1551588339
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551567730.h5",
+        "tic": 1551567730
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551567730.h5",
+        "tic": 1551567730
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1551774012.h5",
+        "tic": 1551774012
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1551774012.h5",
+        "tic": 1551774012
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1551612092.h5",
+        "tic": 1551612092
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1551612092.h5",
+        "tic": 1551612092
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551574006.h5",
+        "tic": 1551574006
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551574006.h5",
+        "tic": 1551574006
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1551573220.h5",
+        "tic": 1551573220
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1551573220.h5",
+        "tic": 1551573220
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1400944810.h5",
+        "tic": 1400944810
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1400944810.h5",
+        "tic": 1400944810
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1400941362.h5",
+        "tic": 1400941362
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1400941362.h5",
+        "tic": 1400941362
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1401087394.h5",
+        "tic": 1401087394
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1401087394.h5",
+        "tic": 1401087394
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd2/LC/1400966842.h5",
+        "tic": 1400966842
+      },
+      {
+        "camera": 4,
+        "ccd": 2,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd2/LC/1400966842.h5",
+        "tic": 1400966842
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1401071660.h5",
+        "tic": 1401071660
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1401071660.h5",
+        "tic": 1401071660
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1401070389.h5",
+        "tic": 1401070389
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1401070389.h5",
+        "tic": 1401070389
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd1/LC/1400856884.h5",
+        "tic": 1400856884
+      },
+      {
+        "camera": 4,
+        "ccd": 1,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd1/LC/1400856884.h5",
+        "tic": 1400856884
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400845136.h5",
+        "tic": 1400845136
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400839491.h5",
+        "tic": 1400839491
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1400839491.h5",
+        "tic": 1400839491
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400720048.h5",
+        "tic": 1400720048
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1400720048.h5",
+        "tic": 1400720048
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1400954658.h5",
+        "tic": 1400954658
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1400954658.h5",
+        "tic": 1400954658
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1271227364.h5",
+        "tic": 1271227364
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1271227364.h5",
+        "tic": 1271227364
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1271364660.h5",
+        "tic": 1271364660
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1271364660.h5",
+        "tic": 1271364660
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1201222811.h5",
+        "tic": 1201222811
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1201222811.h5",
+        "tic": 1201222811
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd4/LC/1102414464.h5",
+        "tic": 1102414464
+      },
+      {
+        "camera": 4,
+        "ccd": 4,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd4/LC/1102414464.h5",
+        "tic": 1102414464
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1102430669.h5",
+        "tic": 1102430669
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1102430669.h5",
+        "tic": 1102430669
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 119,
+        "path": "orbit-119/ffi/cam4/ccd3/LC/1102635541.h5",
+        "tic": 1102635541
+      },
+      {
+        "camera": 4,
+        "ccd": 3,
+        "edge_warn": true,
+        "orbit": 120,
+        "path": "orbit-120/ffi/cam4/ccd3/LC/1102635541.h5",
+        "tic": 1102635541
+      }
+    ],
+    "missing_h5_non_edge_examples": [],
+    "n_missing_h5": 303,
+    "n_missing_h5_edge_warn": 303,
+    "n_missing_h5_non_edge": 0,
+    "n_present_h5": 62935,
+    "n_zero_byte_h5": 0,
+    "present_h5_by_ccd": {
+      "o119_cam1_ccd1": 1656,
+      "o119_cam1_ccd2": 1761,
+      "o119_cam1_ccd3": 1487,
+      "o119_cam1_ccd4": 1534,
+      "o119_cam2_ccd1": 2504,
+      "o119_cam2_ccd2": 3474,
+      "o119_cam2_ccd3": 2584,
+      "o119_cam2_ccd4": 2035,
+      "o119_cam3_ccd1": 1756,
+      "o119_cam3_ccd2": 1564,
+      "o119_cam3_ccd3": 1477,
+      "o119_cam3_ccd4": 2562,
+      "o119_cam4_ccd1": 2077,
+      "o119_cam4_ccd2": 1662,
+      "o119_cam4_ccd3": 1611,
+      "o119_cam4_ccd4": 1723,
+      "o120_cam1_ccd1": 1656,
+      "o120_cam1_ccd2": 1761,
+      "o120_cam1_ccd3": 1487,
+      "o120_cam1_ccd4": 1534,
+      "o120_cam2_ccd1": 2504,
+      "o120_cam2_ccd2": 3473,
+      "o120_cam2_ccd3": 2584,
+      "o120_cam2_ccd4": 2035,
+      "o120_cam3_ccd1": 1756,
+      "o120_cam3_ccd2": 1564,
+      "o120_cam3_ccd3": 1478,
+      "o120_cam3_ccd4": 2562,
+      "o120_cam4_ccd1": 2077,
+      "o120_cam4_ccd2": 1662,
+      "o120_cam4_ccd3": 1611,
+      "o120_cam4_ccd4": 1724
+    },
+    "present_h5_by_orbit": {
+      "119": 31467,
+      "120": 31468
+    },
+    "zero_byte_h5_examples": []
+  },
+  "n_expected_h5": 63238,
+  "n_expected_h5_edge_warn": 726,
+  "n_expected_unique_tics": 31590,
+  "n_expected_unique_tics_with_any_edge_warn": 363,
+  "observations": "data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits",
+  "ok": true,
+  "ok_fits": true,
+  "ok_h5": true,
+  "orbits": [
+    119,
+    120
+  ],
+  "schema": {
+    "allow_edge_warn_missing": true,
+    "expected_method": "A2v1",
+    "expected_prodtag": "A2v1",
+    "fits_workers": 8,
+    "forbidden_columns": [
+      "DET_FLUX",
+      "DET_FLUX_ERR",
+      "DET_FLUX_SML",
+      "DET_FLUX_LAG",
+      "SYS_RM_FLUX"
+    ],
+    "progress_every": 500,
+    "required_a2v1_columns": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_ADP",
+      "DET_FLUX_ADP_LAG",
+      "DET_FLUX_ADP_ERR",
+      "DET_FLUX_ADP015_SML",
+      "DET_FLUX_ADP015",
+      "DET_FLUX_ADP015_LAG",
+      "DET_FLUX_ADP015_ERR"
+    ],
+    "required_base_columns": [
+      "TIME",
+      "CADENCENO",
+      "SAP_FLUX",
+      "QUALITY",
+      "ORBITID",
+      "SAP_X",
+      "SAP_Y",
+      "SAP_BKG",
+      "SAP_BKG_ERR"
+    ],
+    "schema_only": true
+  },
+  "sector": 56
+}

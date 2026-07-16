@@ -1,5 +1,3 @@
-numpy
-matplotlib
-astropy
-seaborn
-tess-point
+# Compatibility entry point for tools that still expect requirements.txt.
+# Runtime dependency versions are authoritative in pyproject.toml.
+-e .

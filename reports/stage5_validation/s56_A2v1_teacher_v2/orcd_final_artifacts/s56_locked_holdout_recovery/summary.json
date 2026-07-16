@@ -1,0 +1,1549 @@
+{
+  "acceptance": {
+    "improvement_over_metadata_at_least_0p10": true,
+    "improvement_over_teacher_v1_at_least_0p15": true,
+    "s57_bls_conditional_recovery_at_least_0p80": false
+  },
+  "acceptance_passed": false,
+  "candidate_set_identity_verified": true,
+  "created_utc": "2026-07-15T15:02:55.110278+00:00",
+  "figures": {
+    "bls": {
+      "period_radius_empirical_publication_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/bls_top5_recovery_map/period_radius_empirical_recovery_publication_grid.csv",
+      "period_radius_empirical_publication_pdf": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/bls_top5_recovery_map/period_radius_empirical_recovery_publication.pdf",
+      "period_radius_empirical_publication_png": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/bls_top5_recovery_map/period_radius_empirical_recovery_publication.png"
+    },
+    "teacher_v1": {
+      "period_radius_empirical_publication_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v1_workload_matched_recovery_map/period_radius_empirical_recovery_publication_grid.csv",
+      "period_radius_empirical_publication_pdf": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v1_workload_matched_recovery_map/period_radius_empirical_recovery_publication.pdf",
+      "period_radius_empirical_publication_png": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v1_workload_matched_recovery_map/period_radius_empirical_recovery_publication.png"
+    },
+    "teacher_v2": {
+      "period_radius_empirical_publication_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v2_compact_recovery_map/period_radius_empirical_recovery_publication_grid.csv",
+      "period_radius_empirical_publication_pdf": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v2_compact_recovery_map/period_radius_empirical_recovery_publication.pdf",
+      "period_radius_empirical_publication_png": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v2_compact_recovery_map/period_radius_empirical_recovery_publication.png"
+    },
+    "v2_minus_v1": {
+      "grid_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v2_minus_v1_difference_map/teacher_v2_minus_v1_recovery_grid.csv",
+      "pdf": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v2_minus_v1_difference_map/teacher_v2_minus_v1_recovery.pdf",
+      "png": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/s56_locked_holdout_recovery/teacher_v2_minus_v1_difference_map/teacher_v2_minus_v1_recovery.png"
+    }
+  },
+  "frozen_selection": {
+    "architecture_frozen": true,
+    "created_utc": "2026-07-15T13:57:28.093228+00:00",
+    "frozen_compact_threshold": 0.7206404486366045,
+    "frozen_real_tic_workload_fraction": 0.05,
+    "model_version": "s56_harmonic_cnn_teacher_v2",
+    "profile_details": {
+      "full_combined": {
+        "development_metrics": {
+          "compact_calibration": {
+            "bins": [
+              {
+                "high": 0.1,
+                "low": 0.0,
+                "n": 0
+              },
+              {
+                "high": 0.2,
+                "low": 0.1,
+                "n": 0
+              },
+              {
+                "high": 0.30000000000000004,
+                "low": 0.2,
+                "n": 0
+              },
+              {
+                "high": 0.4,
+                "low": 0.30000000000000004,
+                "n": 0
+              },
+              {
+                "high": 0.5,
+                "low": 0.4,
+                "n": 0
+              },
+              {
+                "accuracy": 0.5676691729323309,
+                "confidence": 0.5507413893220143,
+                "high": 0.6000000000000001,
+                "low": 0.5,
+                "n": 532
+              },
+              {
+                "accuracy": 0.6589403973509934,
+                "confidence": 0.6528957867135186,
+                "high": 0.7000000000000001,
+                "low": 0.6000000000000001,
+                "n": 604
+              },
+              {
+                "accuracy": 0.7595375722543353,
+                "confidence": 0.7529445165333929,
+                "high": 0.8,
+                "low": 0.7000000000000001,
+                "n": 865
+              },
+              {
+                "accuracy": 0.8588738417676408,
+                "confidence": 0.8552564504289119,
+                "high": 0.9,
+                "low": 0.8,
+                "n": 1403
+              },
+              {
+                "accuracy": 0.9721704945168632,
+                "confidence": 0.9782331501066944,
+                "high": 1.0,
+                "low": 0.9,
+                "n": 9666
+              }
+            ],
+            "ece": 0.00627669073327342
+          },
+          "compact_candidates_only": {
+            "average_precision": 0.9593647776060151,
+            "n": 13070,
+            "n_positive": 5108,
+            "precision_at_0p5": 0.8791729893778453,
+            "recall_at_0p5": 0.9074001566170713,
+            "roc_auc": 0.9669840316287015
+          },
+          "injection_recall_at_workload": {
+            "fold_thresholds": {
+              "0": 0.9932846537206511,
+              "1": 0.9492523373521056,
+              "2": 0.9922833617044888,
+              "3": 0.9958054057841673,
+              "4": 0.9256249304583577
+            },
+            "n_injections": 2614,
+            "n_recovered": 1776,
+            "partition": "development",
+            "recovery_fraction": 0.6794185156847743
+          },
+          "real_human_morphology": {
+            "accuracy": 0.958670260557053,
+            "balanced_accuracy": 0.8019839562330956,
+            "confusion_matrix": [
+              [
+                8,
+                0,
+                1,
+                1
+              ],
+              [
+                2,
+                25,
+                13,
+                0
+              ],
+              [
+                0,
+                10,
+                66,
+                7
+              ],
+              [
+                0,
+                2,
+                10,
+                968
+              ]
+            ],
+            "macro_f1": 0.8005328702055536,
+            "n": 1113,
+            "per_class": {
+              "eclipse_contact": {
+                "f1": 0.6493506493506493,
+                "n": 40,
+                "precision": 0.6756756756756757,
+                "recall": 0.625
+              },
+              "other": {
+                "f1": 0.9897750511247443,
+                "n": 980,
+                "precision": 0.9918032786885246,
+                "recall": 0.9877551020408163
+              },
+              "planet_like": {
+                "f1": 0.8000000000000002,
+                "n": 10,
+                "precision": 0.8,
+                "recall": 0.8
+              },
+              "smooth_variable": {
+                "f1": 0.7630057803468209,
+                "n": 83,
+                "precision": 0.7333333333333333,
+                "recall": 0.7951807228915663
+              }
+            },
+            "predicted_class_counts": {
+              "eclipse_contact": 37,
+              "other": 976,
+              "planet_like": 10,
+              "smooth_variable": 90
+            }
+          },
+          "selection_score": 0.7534069701861908
+        },
+        "development_prediction_paths": [
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/full_combined/fold_0/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/full_combined/fold_1/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/full_combined/fold_2/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/full_combined/fold_3/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/full_combined/fold_4/validation_predictions.parquet"
+        ],
+        "oof_fold_workload_thresholds": {
+          "0": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 338,
+            "n_tics": 6858,
+            "pass_fraction": 0.04928550597841937,
+            "score_column": "member_0_p_compact_transit",
+            "threshold": 0.9932846537206511
+          },
+          "1": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_1_p_compact_transit",
+            "threshold": 0.9492523373521056
+          },
+          "2": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_2_p_compact_transit",
+            "threshold": 0.9922833617044888
+          },
+          "3": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_3_p_compact_transit",
+            "threshold": 0.9958054057841673
+          },
+          "4": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_4_p_compact_transit",
+            "threshold": 0.9256249304583577
+          }
+        },
+        "real_score_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/full_combined.parquet",
+        "workload_threshold": {
+          "max_pass_tics": 342,
+          "n_pass_tics": 342,
+          "n_tics": 6858,
+          "pass_fraction": 0.049868766404199474,
+          "score_column": "p_compact_transit",
+          "threshold": 0.9539765842873967
+        }
+      },
+      "metadata_only": {
+        "development_metrics": {
+          "compact_calibration": {
+            "bins": [
+              {
+                "high": 0.1,
+                "low": 0.0,
+                "n": 0
+              },
+              {
+                "high": 0.2,
+                "low": 0.1,
+                "n": 0
+              },
+              {
+                "high": 0.30000000000000004,
+                "low": 0.2,
+                "n": 0
+              },
+              {
+                "high": 0.4,
+                "low": 0.30000000000000004,
+                "n": 0
+              },
+              {
+                "high": 0.5,
+                "low": 0.4,
+                "n": 0
+              },
+              {
+                "accuracy": 0.7129728901822637,
+                "confidence": 0.5455822541043475,
+                "high": 0.6000000000000001,
+                "low": 0.5,
+                "n": 6529
+              },
+              {
+                "accuracy": 0.8929496402877698,
+                "confidence": 0.6451551487095571,
+                "high": 0.7000000000000001,
+                "low": 0.6000000000000001,
+                "n": 3475
+              },
+              {
+                "accuracy": 0.9416949152542373,
+                "confidence": 0.7443920341144432,
+                "high": 0.8,
+                "low": 0.7000000000000001,
+                "n": 1475
+              },
+              {
+                "accuracy": 0.9951338199513382,
+                "confidence": 0.8433046115183372,
+                "high": 0.9,
+                "low": 0.8,
+                "n": 1233
+              },
+              {
+                "accuracy": 0.9972067039106145,
+                "confidence": 0.9292695169970165,
+                "high": 1.0,
+                "low": 0.9,
+                "n": 358
+              }
+            ],
+            "ece": 0.18795164481875737
+          },
+          "compact_candidates_only": {
+            "average_precision": 0.8945132794888767,
+            "n": 13070,
+            "n_positive": 5108,
+            "precision_at_0p5": 0.7274519467718088,
+            "recall_at_0p5": 0.8668754894283477,
+            "roc_auc": 0.913010043104118
+          },
+          "injection_recall_at_workload": {
+            "fold_thresholds": {
+              "0": 0.7208778798354732,
+              "1": 0.8097669007671993,
+              "2": 0.77284324136106,
+              "3": 0.9129530999513802,
+              "4": 0.6432345759266289
+            },
+            "n_injections": 2614,
+            "n_recovered": 1431,
+            "partition": "development",
+            "recovery_fraction": 0.5474368783473603
+          },
+          "real_human_morphology": {
+            "accuracy": 0.9478885893980233,
+            "balanced_accuracy": 0.722696397836243,
+            "confusion_matrix": [
+              [
+                6,
+                1,
+                0,
+                3
+              ],
+              [
+                1,
+                21,
+                16,
+                2
+              ],
+              [
+                0,
+                14,
+                65,
+                4
+              ],
+              [
+                0,
+                0,
+                17,
+                963
+              ]
+            ],
+            "macro_f1": 0.7408565759890731,
+            "n": 1113,
+            "per_class": {
+              "eclipse_contact": {
+                "f1": 0.5526315789473685,
+                "n": 40,
+                "precision": 0.5833333333333334,
+                "recall": 0.525
+              },
+              "other": {
+                "f1": 0.9866803278688525,
+                "n": 980,
+                "precision": 0.9907407407407407,
+                "recall": 0.9826530612244898
+              },
+              "planet_like": {
+                "f1": 0.7058823529411764,
+                "n": 10,
+                "precision": 0.8571428571428571,
+                "recall": 0.6
+              },
+              "smooth_variable": {
+                "f1": 0.718232044198895,
+                "n": 83,
+                "precision": 0.6632653061224489,
+                "recall": 0.7831325301204819
+              }
+            },
+            "predicted_class_counts": {
+              "eclipse_contact": 36,
+              "other": 972,
+              "planet_like": 7,
+              "smooth_variable": 98
+            }
+          },
+          "selection_score": 0.6437300167136343
+        },
+        "development_prediction_paths": [
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_0/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_1/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_2/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_3/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/metadata_only/fold_4/validation_predictions.parquet"
+        ],
+        "oof_fold_workload_thresholds": {
+          "0": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 339,
+            "n_tics": 6858,
+            "pass_fraction": 0.049431321084864394,
+            "score_column": "member_0_p_compact_transit",
+            "threshold": 0.7208778798354732
+          },
+          "1": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 340,
+            "n_tics": 6858,
+            "pass_fraction": 0.04957713619130942,
+            "score_column": "member_1_p_compact_transit",
+            "threshold": 0.8097669007671993
+          },
+          "2": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_2_p_compact_transit",
+            "threshold": 0.77284324136106
+          },
+          "3": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 338,
+            "n_tics": 6858,
+            "pass_fraction": 0.04928550597841937,
+            "score_column": "member_3_p_compact_transit",
+            "threshold": 0.9129530999513802
+          },
+          "4": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 339,
+            "n_tics": 6858,
+            "pass_fraction": 0.049431321084864394,
+            "score_column": "member_4_p_compact_transit",
+            "threshold": 0.6432345759266289
+          }
+        },
+        "real_score_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/metadata_only.parquet",
+        "workload_threshold": {
+          "max_pass_tics": 342,
+          "n_pass_tics": 342,
+          "n_tics": 6858,
+          "pass_fraction": 0.049868766404199474,
+          "score_column": "p_compact_transit",
+          "threshold": 0.7611949033300025
+        }
+      },
+      "seven_harmonic_shape": {
+        "development_metrics": {
+          "compact_calibration": {
+            "bins": [
+              {
+                "high": 0.1,
+                "low": 0.0,
+                "n": 0
+              },
+              {
+                "high": 0.2,
+                "low": 0.1,
+                "n": 0
+              },
+              {
+                "high": 0.30000000000000004,
+                "low": 0.2,
+                "n": 0
+              },
+              {
+                "high": 0.4,
+                "low": 0.30000000000000004,
+                "n": 0
+              },
+              {
+                "high": 0.5,
+                "low": 0.4,
+                "n": 0
+              },
+              {
+                "accuracy": 0.5735981308411215,
+                "confidence": 0.5508809636128665,
+                "high": 0.6000000000000001,
+                "low": 0.5,
+                "n": 856
+              },
+              {
+                "accuracy": 0.6256800870511425,
+                "confidence": 0.6499748634402251,
+                "high": 0.7000000000000001,
+                "low": 0.6000000000000001,
+                "n": 919
+              },
+              {
+                "accuracy": 0.7097649186256781,
+                "confidence": 0.7525016870964271,
+                "high": 0.8,
+                "low": 0.7000000000000001,
+                "n": 1106
+              },
+              {
+                "accuracy": 0.7972972972972973,
+                "confidence": 0.8550316194482175,
+                "high": 0.9,
+                "low": 0.8,
+                "n": 1998
+              },
+              {
+                "accuracy": 0.9566597485044561,
+                "confidence": 0.9662198619160635,
+                "high": 1.0,
+                "low": 0.9,
+                "n": 8191
+              }
+            ],
+            "ece": 0.021629665278470992
+          },
+          "compact_candidates_only": {
+            "average_precision": 0.921238900242961,
+            "n": 13070,
+            "n_positive": 5108,
+            "precision_at_0p5": 0.7984886649874056,
+            "recall_at_0p5": 0.8688332028191073,
+            "roc_auc": 0.9367815816396482
+          },
+          "injection_recall_at_workload": {
+            "fold_thresholds": {
+              "0": 0.8220887531384746,
+              "1": 0.9196124427567235,
+              "2": 0.8638140565889033,
+              "3": 0.8883533182058124,
+              "4": 0.936007952491637
+            },
+            "n_injections": 2614,
+            "n_recovered": 1767,
+            "partition": "development",
+            "recovery_fraction": 0.6759755164498852
+          },
+          "real_human_morphology": {
+            "accuracy": 0.9505840071877808,
+            "balanced_accuracy": 0.7191941234325055,
+            "confusion_matrix": [
+              [
+                7,
+                3,
+                0,
+                0
+              ],
+              [
+                2,
+                18,
+                13,
+                7
+              ],
+              [
+                0,
+                8,
+                61,
+                14
+              ],
+              [
+                2,
+                0,
+                6,
+                972
+              ]
+            ],
+            "macro_f1": 0.7305434064953785,
+            "n": 1113,
+            "per_class": {
+              "eclipse_contact": {
+                "f1": 0.5217391304347826,
+                "n": 40,
+                "precision": 0.6206896551724138,
+                "recall": 0.45
+              },
+              "other": {
+                "f1": 0.9853015712113532,
+                "n": 980,
+                "precision": 0.9788519637462235,
+                "recall": 0.9918367346938776
+              },
+              "planet_like": {
+                "f1": 0.6666666666666666,
+                "n": 10,
+                "precision": 0.6363636363636364,
+                "recall": 0.7
+              },
+              "smooth_variable": {
+                "f1": 0.7484662576687117,
+                "n": 83,
+                "precision": 0.7625,
+                "recall": 0.7349397590361446
+              }
+            },
+            "predicted_class_counts": {
+              "eclipse_contact": 29,
+              "other": 993,
+              "planet_like": 11,
+              "smooth_variable": 80
+            }
+          },
+          "selection_score": 0.7292635682541483
+        },
+        "development_prediction_paths": [
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_0/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_1/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_2/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_3/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/seven_harmonic_shape/fold_4/validation_predictions.parquet"
+        ],
+        "oof_fold_workload_thresholds": {
+          "0": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_0_p_compact_transit",
+            "threshold": 0.8220887531384746
+          },
+          "1": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_1_p_compact_transit",
+            "threshold": 0.9196124427567235
+          },
+          "2": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_2_p_compact_transit",
+            "threshold": 0.8638140565889033
+          },
+          "3": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_3_p_compact_transit",
+            "threshold": 0.8883533182058124
+          },
+          "4": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 340,
+            "n_tics": 6858,
+            "pass_fraction": 0.04957713619130942,
+            "score_column": "member_4_p_compact_transit",
+            "threshold": 0.936007952491637
+          }
+        },
+        "real_score_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/seven_harmonic_shape.parquet",
+        "workload_threshold": {
+          "max_pass_tics": 342,
+          "n_pass_tics": 342,
+          "n_tics": 6858,
+          "pass_fraction": 0.049868766404199474,
+          "score_column": "p_compact_transit",
+          "threshold": 0.6968157531380346
+        }
+      },
+      "shape_plus_periodogram_bls": {
+        "development_metrics": {
+          "compact_calibration": {
+            "bins": [
+              {
+                "high": 0.1,
+                "low": 0.0,
+                "n": 0
+              },
+              {
+                "high": 0.2,
+                "low": 0.1,
+                "n": 0
+              },
+              {
+                "high": 0.30000000000000004,
+                "low": 0.2,
+                "n": 0
+              },
+              {
+                "high": 0.4,
+                "low": 0.30000000000000004,
+                "n": 0
+              },
+              {
+                "high": 0.5,
+                "low": 0.4,
+                "n": 0
+              },
+              {
+                "accuracy": 0.5911528150134048,
+                "confidence": 0.5521642335517155,
+                "high": 0.6000000000000001,
+                "low": 0.5,
+                "n": 746
+              },
+              {
+                "accuracy": 0.7447280799112098,
+                "confidence": 0.6519485086783258,
+                "high": 0.7000000000000001,
+                "low": 0.6000000000000001,
+                "n": 901
+              },
+              {
+                "accuracy": 0.8263254113345521,
+                "confidence": 0.7525708297746151,
+                "high": 0.8,
+                "low": 0.7000000000000001,
+                "n": 1094
+              },
+              {
+                "accuracy": 0.905,
+                "confidence": 0.8559583801686239,
+                "high": 0.9,
+                "low": 0.8,
+                "n": 1800
+              },
+              {
+                "accuracy": 0.9740884042677922,
+                "confidence": 0.9758243642288176,
+                "high": 1.0,
+                "low": 0.9,
+                "n": 8529
+              }
+            ],
+            "ece": 0.022681584229677296
+          },
+          "compact_candidates_only": {
+            "average_precision": 0.9569356085331795,
+            "n": 13070,
+            "n_positive": 5108,
+            "precision_at_0p5": 0.8728971962616823,
+            "recall_at_0p5": 0.9142521534847299,
+            "roc_auc": 0.9661342999254289
+          },
+          "injection_recall_at_workload": {
+            "fold_thresholds": {
+              "0": 0.9962838269172225,
+              "1": 0.9804825147895212,
+              "2": 0.9746881088102375,
+              "3": 0.9945342780241266,
+              "4": 0.8982287565910831
+            },
+            "n_injections": 2614,
+            "n_recovered": 1626,
+            "partition": "development",
+            "recovery_fraction": 0.62203519510329
+          },
+          "real_human_morphology": {
+            "accuracy": 0.958670260557053,
+            "balanced_accuracy": 0.8124631177772315,
+            "confusion_matrix": [
+              [
+                9,
+                0,
+                0,
+                1
+              ],
+              [
+                2,
+                24,
+                14,
+                0
+              ],
+              [
+                0,
+                9,
+                63,
+                11
+              ],
+              [
+                0,
+                0,
+                9,
+                971
+              ]
+            ],
+            "macro_f1": 0.8123853306338877,
+            "n": 1113,
+            "per_class": {
+              "eclipse_contact": {
+                "f1": 0.6575342465753425,
+                "n": 40,
+                "precision": 0.7272727272727273,
+                "recall": 0.6
+              },
+              "other": {
+                "f1": 0.9893020886398368,
+                "n": 980,
+                "precision": 0.987792472024415,
+                "recall": 0.9908163265306122
+              },
+              "planet_like": {
+                "f1": 0.8571428571428572,
+                "n": 10,
+                "precision": 0.8181818181818182,
+                "recall": 0.9
+              },
+              "smooth_variable": {
+                "f1": 0.7455621301775147,
+                "n": 83,
+                "precision": 0.7325581395348837,
+                "recall": 0.7590361445783133
+              }
+            },
+            "predicted_class_counts": {
+              "eclipse_contact": 33,
+              "other": 983,
+              "planet_like": 11,
+              "smooth_variable": 86
+            }
+          },
+          "selection_score": 0.72087693136228
+        },
+        "development_prediction_paths": [
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_0/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_1/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_2/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_3/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_periodogram_bls/fold_4/validation_predictions.parquet"
+        ],
+        "oof_fold_workload_thresholds": {
+          "0": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 336,
+            "n_tics": 6858,
+            "pass_fraction": 0.048993875765529306,
+            "score_column": "member_0_p_compact_transit",
+            "threshold": 0.9962838269172225
+          },
+          "1": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 340,
+            "n_tics": 6858,
+            "pass_fraction": 0.04957713619130942,
+            "score_column": "member_1_p_compact_transit",
+            "threshold": 0.9804825147895212
+          },
+          "2": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 339,
+            "n_tics": 6858,
+            "pass_fraction": 0.049431321084864394,
+            "score_column": "member_2_p_compact_transit",
+            "threshold": 0.9746881088102375
+          },
+          "3": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_3_p_compact_transit",
+            "threshold": 0.9945342780241266
+          },
+          "4": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_4_p_compact_transit",
+            "threshold": 0.8982287565910831
+          }
+        },
+        "real_score_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/shape_plus_periodogram_bls.parquet",
+        "workload_threshold": {
+          "max_pass_tics": 342,
+          "n_pass_tics": 342,
+          "n_tics": 6858,
+          "pass_fraction": 0.049868766404199474,
+          "score_column": "p_compact_transit",
+          "threshold": 0.9526283619034185
+        }
+      },
+      "shape_plus_raw_chronology": {
+        "development_metrics": {
+          "compact_calibration": {
+            "bins": [
+              {
+                "high": 0.1,
+                "low": 0.0,
+                "n": 0
+              },
+              {
+                "high": 0.2,
+                "low": 0.1,
+                "n": 0
+              },
+              {
+                "high": 0.30000000000000004,
+                "low": 0.2,
+                "n": 0
+              },
+              {
+                "high": 0.4,
+                "low": 0.30000000000000004,
+                "n": 0
+              },
+              {
+                "high": 0.5,
+                "low": 0.4,
+                "n": 0
+              },
+              {
+                "accuracy": 0.5453333333333333,
+                "confidence": 0.5505771251187466,
+                "high": 0.6000000000000001,
+                "low": 0.5,
+                "n": 750
+              },
+              {
+                "accuracy": 0.6352272727272728,
+                "confidence": 0.6517621719838298,
+                "high": 0.7000000000000001,
+                "low": 0.6000000000000001,
+                "n": 880
+              },
+              {
+                "accuracy": 0.7068965517241379,
+                "confidence": 0.7540170092351317,
+                "high": 0.8,
+                "low": 0.7000000000000001,
+                "n": 1102
+              },
+              {
+                "accuracy": 0.8205438066465257,
+                "confidence": 0.8550425217295357,
+                "high": 0.9,
+                "low": 0.8,
+                "n": 1655
+              },
+              {
+                "accuracy": 0.961879534723022,
+                "confidence": 0.9702634186825149,
+                "high": 1.0,
+                "low": 0.9,
+                "n": 8683
+              }
+            ],
+            "ece": 0.01532539688176
+          },
+          "compact_candidates_only": {
+            "average_precision": 0.9381253703260822,
+            "n": 13070,
+            "n_positive": 5108,
+            "precision_at_0p5": 0.8174386920980926,
+            "recall_at_0p5": 0.8809710258418167,
+            "roc_auc": 0.947888384076517
+          },
+          "injection_recall_at_workload": {
+            "fold_thresholds": {
+              "0": 0.8426941971655436,
+              "1": 0.8276202449515091,
+              "2": 0.9201254282795808,
+              "3": 0.7859221981786475,
+              "4": 0.933120602423504
+            },
+            "n_injections": 2614,
+            "n_recovered": 1855,
+            "partition": "development",
+            "recovery_fraction": 0.7096403978576894
+          },
+          "real_human_morphology": {
+            "accuracy": 0.9523809523809523,
+            "balanced_accuracy": 0.7242562085074994,
+            "confusion_matrix": [
+              [
+                7,
+                2,
+                1,
+                0
+              ],
+              [
+                3,
+                16,
+                17,
+                4
+              ],
+              [
+                0,
+                4,
+                67,
+                12
+              ],
+              [
+                0,
+                0,
+                10,
+                970
+              ]
+            ],
+            "macro_f1": 0.7389282997621398,
+            "n": 1113,
+            "per_class": {
+              "eclipse_contact": {
+                "f1": 0.5161290322580645,
+                "n": 40,
+                "precision": 0.7272727272727273,
+                "recall": 0.4
+              },
+              "other": {
+                "f1": 0.9867751780264497,
+                "n": 980,
+                "precision": 0.9837728194726166,
+                "recall": 0.9897959183673469
+              },
+              "planet_like": {
+                "f1": 0.7,
+                "n": 10,
+                "precision": 0.7,
+                "recall": 0.7
+              },
+              "smooth_variable": {
+                "f1": 0.752808988764045,
+                "n": 83,
+                "precision": 0.7052631578947368,
+                "recall": 0.8072289156626506
+              }
+            },
+            "predicted_class_counts": {
+              "eclipse_contact": 22,
+              "other": 986,
+              "planet_like": 10,
+              "smooth_variable": 95
+            }
+          },
+          "selection_score": 0.7535625808436688
+        },
+        "development_prediction_paths": [
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_0/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_1/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_2/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_3/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_4/validation_predictions.parquet"
+        ],
+        "oof_fold_workload_thresholds": {
+          "0": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_0_p_compact_transit",
+            "threshold": 0.8426941971655436
+          },
+          "1": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_1_p_compact_transit",
+            "threshold": 0.8276202449515091
+          },
+          "2": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 340,
+            "n_tics": 6858,
+            "pass_fraction": 0.04957713619130942,
+            "score_column": "member_2_p_compact_transit",
+            "threshold": 0.9201254282795808
+          },
+          "3": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_3_p_compact_transit",
+            "threshold": 0.7859221981786475
+          },
+          "4": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_4_p_compact_transit",
+            "threshold": 0.933120602423504
+          }
+        },
+        "real_score_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/shape_plus_raw_chronology.parquet",
+        "workload_threshold": {
+          "max_pass_tics": 342,
+          "n_pass_tics": 342,
+          "n_tics": 6858,
+          "pass_fraction": 0.049868766404199474,
+          "score_column": "p_compact_transit",
+          "threshold": 0.7206404486366045
+        }
+      },
+      "single_period_native_fold": {
+        "development_metrics": {
+          "compact_calibration": {
+            "bins": [
+              {
+                "high": 0.1,
+                "low": 0.0,
+                "n": 0
+              },
+              {
+                "high": 0.2,
+                "low": 0.1,
+                "n": 0
+              },
+              {
+                "high": 0.30000000000000004,
+                "low": 0.2,
+                "n": 0
+              },
+              {
+                "high": 0.4,
+                "low": 0.30000000000000004,
+                "n": 0
+              },
+              {
+                "high": 0.5,
+                "low": 0.4,
+                "n": 0
+              },
+              {
+                "accuracy": 0.5502901353965184,
+                "confidence": 0.5493000687694551,
+                "high": 0.6000000000000001,
+                "low": 0.5,
+                "n": 1034
+              },
+              {
+                "accuracy": 0.6070840197693574,
+                "confidence": 0.6522739389253522,
+                "high": 0.7000000000000001,
+                "low": 0.6000000000000001,
+                "n": 1214
+              },
+              {
+                "accuracy": 0.6753246753246753,
+                "confidence": 0.7548422166259127,
+                "high": 0.8,
+                "low": 0.7000000000000001,
+                "n": 1771
+              },
+              {
+                "accuracy": 0.7955882352941176,
+                "confidence": 0.8541484614642456,
+                "high": 0.9,
+                "low": 0.8,
+                "n": 2720
+              },
+              {
+                "accuracy": 0.9418733217501185,
+                "confidence": 0.9538703455100842,
+                "high": 1.0,
+                "low": 0.9,
+                "n": 6331
+              }
+            ],
+            "ece": 0.03304872448349988
+          },
+          "compact_candidates_only": {
+            "average_precision": 0.855817936278092,
+            "n": 13070,
+            "n_positive": 5108,
+            "precision_at_0p5": 0.7398344728319539,
+            "recall_at_0p5": 0.8050117462803446,
+            "roc_auc": 0.8916497229301988
+          },
+          "injection_recall_at_workload": {
+            "fold_thresholds": {
+              "0": 0.7120373469316621,
+              "1": 0.915880362805408,
+              "2": 0.7166163070394989,
+              "3": 0.9040248459024256,
+              "4": 0.8148511458568786
+            },
+            "n_injections": 2614,
+            "n_recovered": 1693,
+            "partition": "development",
+            "recovery_fraction": 0.6476664116296863
+          },
+          "real_human_morphology": {
+            "accuracy": 0.9478885893980233,
+            "balanced_accuracy": 0.7566065281534301,
+            "confusion_matrix": [
+              [
+                8,
+                1,
+                0,
+                1
+              ],
+              [
+                1,
+                23,
+                13,
+                3
+              ],
+              [
+                1,
+                7,
+                55,
+                20
+              ],
+              [
+                0,
+                1,
+                10,
+                969
+              ]
+            ],
+            "macro_f1": 0.7760948048831763,
+            "n": 1113,
+            "per_class": {
+              "eclipse_contact": {
+                "f1": 0.6388888888888888,
+                "n": 40,
+                "precision": 0.71875,
+                "recall": 0.575
+              },
+              "other": {
+                "f1": 0.9822605169792195,
+                "n": 980,
+                "precision": 0.9758308157099698,
+                "recall": 0.9887755102040816
+              },
+              "planet_like": {
+                "f1": 0.8000000000000002,
+                "n": 10,
+                "precision": 0.8,
+                "recall": 0.8
+              },
+              "smooth_variable": {
+                "f1": 0.6832298136645963,
+                "n": 83,
+                "precision": 0.7051282051282052,
+                "recall": 0.6626506024096386
+              }
+            },
+            "predicted_class_counts": {
+              "eclipse_contact": 32,
+              "other": 993,
+              "planet_like": 10,
+              "smooth_variable": 78
+            }
+          },
+          "selection_score": 0.7165529056022402
+        },
+        "development_prediction_paths": [
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_0/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_1/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_2/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_3/validation_predictions.parquet",
+          "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/single_period_native_fold/fold_4/validation_predictions.parquet"
+        ],
+        "oof_fold_workload_thresholds": {
+          "0": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_0_p_compact_transit",
+            "threshold": 0.7120373469316621
+          },
+          "1": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 342,
+            "n_tics": 6858,
+            "pass_fraction": 0.049868766404199474,
+            "score_column": "member_1_p_compact_transit",
+            "threshold": 0.915880362805408
+          },
+          "2": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_2_p_compact_transit",
+            "threshold": 0.7166163070394989
+          },
+          "3": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 341,
+            "n_tics": 6858,
+            "pass_fraction": 0.04972295129775445,
+            "score_column": "member_3_p_compact_transit",
+            "threshold": 0.9040248459024256
+          },
+          "4": {
+            "max_pass_tics": 342,
+            "n_pass_tics": 340,
+            "n_tics": 6858,
+            "pass_fraction": 0.04957713619130942,
+            "score_column": "member_4_p_compact_transit",
+            "threshold": 0.8148511458568786
+          }
+        },
+        "real_score_path": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/real_scores/single_period_native_fold.parquet",
+        "workload_threshold": {
+          "max_pass_tics": 342,
+          "n_pass_tics": 342,
+          "n_tics": 6858,
+          "pass_fraction": 0.049868766404199474,
+          "score_column": "p_compact_transit",
+          "threshold": 0.6385700478156361
+        }
+      }
+    },
+    "profile_ranking": [
+      {
+        "compact_candidate_average_precision": 0.9381253703260822,
+        "compact_ece": 0.01532539688176,
+        "development_injection_recall": 0.7096403978576894,
+        "frozen_threshold": 0.7206404486366045,
+        "profile": "shape_plus_raw_chronology",
+        "real_morphology_macro_f1": 0.7389282997621398,
+        "real_tic_pass_fraction": 0.049868766404199474,
+        "selection_score": 0.7535625808436688
+      },
+      {
+        "compact_candidate_average_precision": 0.9593647776060151,
+        "compact_ece": 0.00627669073327342,
+        "development_injection_recall": 0.6794185156847743,
+        "frozen_threshold": 0.9539765842873967,
+        "profile": "full_combined",
+        "real_morphology_macro_f1": 0.8005328702055536,
+        "real_tic_pass_fraction": 0.049868766404199474,
+        "selection_score": 0.7534069701861908
+      },
+      {
+        "compact_candidate_average_precision": 0.921238900242961,
+        "compact_ece": 0.021629665278470992,
+        "development_injection_recall": 0.6759755164498852,
+        "frozen_threshold": 0.6968157531380346,
+        "profile": "seven_harmonic_shape",
+        "real_morphology_macro_f1": 0.7305434064953785,
+        "real_tic_pass_fraction": 0.049868766404199474,
+        "selection_score": 0.7292635682541483
+      },
+      {
+        "compact_candidate_average_precision": 0.9569356085331795,
+        "compact_ece": 0.022681584229677296,
+        "development_injection_recall": 0.62203519510329,
+        "frozen_threshold": 0.9526283619034185,
+        "profile": "shape_plus_periodogram_bls",
+        "real_morphology_macro_f1": 0.8123853306338877,
+        "real_tic_pass_fraction": 0.049868766404199474,
+        "selection_score": 0.72087693136228
+      },
+      {
+        "compact_candidate_average_precision": 0.855817936278092,
+        "compact_ece": 0.03304872448349988,
+        "development_injection_recall": 0.6476664116296863,
+        "frozen_threshold": 0.6385700478156361,
+        "profile": "single_period_native_fold",
+        "real_morphology_macro_f1": 0.7760948048831763,
+        "real_tic_pass_fraction": 0.049868766404199474,
+        "selection_score": 0.7165529056022402
+      },
+      {
+        "compact_candidate_average_precision": 0.8945132794888767,
+        "compact_ece": 0.18795164481875737,
+        "development_injection_recall": 0.5474368783473603,
+        "frozen_threshold": 0.7611949033300025,
+        "profile": "metadata_only",
+        "real_morphology_macro_f1": 0.7408565759890731,
+        "real_tic_pass_fraction": 0.049868766404199474,
+        "selection_score": 0.6437300167136343
+      }
+    ],
+    "s56_holdout_opened": false,
+    "s57_opened": false,
+    "selected_checkpoint_sha256": {
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_0/teacher_v2.pt": "fba14103ea710724a8c54de5ffedc4b8f4f32baacd604d715efc8bbe2bb9ab70",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_1/teacher_v2.pt": "b73b9462981788da236f54679be7d81dffe5e85d837e0337a927813d2cd45831",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_2/teacher_v2.pt": "8bfcb42fad9014ea85ea584eaa1c5fa977cee4c589e35c20c41905e3fa707f4b",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_3/teacher_v2.pt": "1e01775da239cf90f9826fac3b8ef8a2022fdf6c54ca3746416e2668625bb9b5",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_4/teacher_v2.pt": "0d80f8e886dd60d8aa426815059f3be1ad06a185b3992dd522f851006a1f010c"
+    },
+    "selected_checkpoints": [
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_0/teacher_v2.pt",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_1/teacher_v2.pt",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_2/teacher_v2.pt",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_3/teacher_v2.pt",
+      "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/training/shape_plus_raw_chronology/fold_4/teacher_v2.pt"
+    ],
+    "selected_profile": "shape_plus_raw_chronology",
+    "selection_formula": "0.60*development_injection_recall_at_frozen_real_5pct_workload + 0.25*real_human_morphology_macro_f1 + 0.10*compact_candidate_AP + 0.05*(1-compact_ECE)",
+    "threshold_frozen": true
+  },
+  "model_comparison": [
+    {
+      "conditional_on_bls": 0.7855450236966824,
+      "end_to_end_fraction": 0.1326,
+      "model": "teacher_v2",
+      "n_bls_recovered": 844,
+      "n_common_injections": 5000,
+      "n_model_recovered": 663
+    },
+    {
+      "conditional_on_bls": 0.5545023696682464,
+      "end_to_end_fraction": 0.0936,
+      "model": "teacher_v1",
+      "n_bls_recovered": 844,
+      "n_common_injections": 5000,
+      "n_model_recovered": 468
+    },
+    {
+      "conditional_on_bls": 0.6172985781990521,
+      "end_to_end_fraction": 0.1042,
+      "model": "metadata_only",
+      "n_bls_recovered": 844,
+      "n_common_injections": 5000,
+      "n_model_recovered": 521
+    }
+  ],
+  "n_candidates": 25000,
+  "n_injections": 5000,
+  "n_strict_planet_truth_match_rows": 785,
+  "n_unique_tics": 5000,
+  "role_manifest": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_A2v1_teacher_v2/roles/s56_injection_locked_holdout_manifest.parquet",
+  "sector": 56,
+  "teacher_v2": {
+    "bls_top5_fraction": 0.1688,
+    "compact_conditional_on_bls": 0.7855450236966824,
+    "compact_end_to_end_fraction": 0.1326,
+    "created_utc": "2026-07-15T15:02:42.259281+00:00",
+    "max_peak_rank": 5,
+    "n_bls_top5_recovered": 844,
+    "n_compact_recovered": 663,
+    "n_injections": 5000,
+    "outcome_prefix": "teacher_v2",
+    "score_column": "p_compact_transit",
+    "threshold": 0.7206404486366045
+  },
+  "tmag_support": [
+    {
+      "bright_enrichment_recommended": true,
+      "cell_coverage_fraction": 0.0352,
+      "cell_support_max": 1,
+      "cell_support_median": 0.0,
+      "cell_support_min": 0,
+      "cell_support_p10": 0.0,
+      "host_reuse_factor": 1.0,
+      "n_expected_cells": 2500,
+      "n_injections": 88,
+      "n_represented_cells": 88,
+      "n_unique_hosts": 88,
+      "sampling_role": "primary_host_disjoint",
+      "tmag_bin": "Tmag < 17"
+    },
+    {
+      "bright_enrichment_recommended": true,
+      "cell_coverage_fraction": 0.0796,
+      "cell_support_max": 1,
+      "cell_support_median": 0.0,
+      "cell_support_min": 0,
+      "cell_support_p10": 0.0,
+      "host_reuse_factor": 1.0,
+      "n_expected_cells": 2500,
+      "n_injections": 199,
+      "n_represented_cells": 199,
+      "n_unique_hosts": 199,
+      "sampling_role": "primary_host_disjoint",
+      "tmag_bin": "17 <= Tmag < 18"
+    },
+    {
+      "bright_enrichment_recommended": true,
+      "cell_coverage_fraction": 0.2876,
+      "cell_support_max": 2,
+      "cell_support_median": 0.0,
+      "cell_support_min": 0,
+      "cell_support_p10": 0.0,
+      "host_reuse_factor": 1.0,
+      "n_expected_cells": 2500,
+      "n_injections": 732,
+      "n_represented_cells": 719,
+      "n_unique_hosts": 732,
+      "sampling_role": "primary_host_disjoint",
+      "tmag_bin": "18 <= Tmag < 19"
+    },
+    {
+      "bright_enrichment_recommended": false,
+      "cell_coverage_fraction": 0.9724,
+      "cell_support_max": 2,
+      "cell_support_median": 2.0,
+      "cell_support_min": 0,
+      "cell_support_p10": 1.0,
+      "host_reuse_factor": 1.0,
+      "n_expected_cells": 2500,
+      "n_injections": 3981,
+      "n_represented_cells": 2431,
+      "n_unique_hosts": 3981,
+      "sampling_role": "primary_host_disjoint",
+      "tmag_bin": "Tmag >= 19"
+    }
+  ],
+  "truth_manifests": [
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_00_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_01_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_02_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_03_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_04_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_05_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_06_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_07_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_08_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_09_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_10_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_11_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_12_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_13_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_14_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_15_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_16_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_17_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_18_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_19_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_20_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_21_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_22_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_23_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_24_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_25_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_26_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_27_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_28_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_29_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_30_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_31_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_32_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_33_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_34_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_35_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_36_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_37_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_38_manifest.parquet",
+    "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery/full/injection_shards/injections_39_manifest.parquet"
+  ]
+}

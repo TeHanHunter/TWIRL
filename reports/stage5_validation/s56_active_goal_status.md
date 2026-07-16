@@ -1,5 +1,11 @@
 # S56 Active Goal Status
 
+> **Historical snapshot (2026-07-01).** This file records a past operational
+> state and is not the live project plan. Use
+> [`doc/twirl_plan.md`](../../doc/twirl_plan.md) and the
+> [progress log](../../doc/twirl_progress_log.md) for current gates and next
+> steps.
+
 Date: `2026-07-01`
 
 ## Objective

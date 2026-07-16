@@ -1,6 +1,7 @@
 """Period and duration grid construction for the per-sector BLS first pass.
 
-Grid conventions (locked by `configs/detection/bls_default.yaml`):
+Grid conventions (defined by :class:`twirl.search.bls.BLSConfig` and mirrored
+by the runtime YAML passed to ``sector_run --config``):
 
 - duration grid: 3, 5, 8, 12, 20 minutes (WD transits are minute-scale; the
   TESS 200 s cadence sets a ~1-cadence floor).

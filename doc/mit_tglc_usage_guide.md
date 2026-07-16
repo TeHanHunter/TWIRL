@@ -15,6 +15,11 @@ For TWIRL, this means:
 
 ## Additional PDO Operational References
 
+For current TWIRL production commands and acceptance gates, use the
+[A2v1 production protocol](a2v1_production_protocol.md). The benchmark notes
+later in this guide are retained as historical operating evidence and do not
+override that protocol.
+
 Beyond the `tess-gaia-light-curve` code itself, the MIT Kavli `qlp-ops` wiki contains the current operator-facing PDO workflows around TGLC and downstream QLP processing:
 
 - Photometry roadmap:
@@ -310,7 +315,12 @@ sweep after the benchmark seed CCD was already in place. Do not quote that as a 
 
 ## Known-Good PDO Environment And Benchmark Pattern
 
-The current PDO benchmark work established a concrete, working launch pattern for the MIT fork.
+> **Historical benchmark snapshot (April 2026).** This section records the
+> CPU-oriented environment and timing evidence used during the original S56
+> benchmark. It is not the current A2v1 production recipe; use the
+> [A2v1 protocol](a2v1_production_protocol.md) for live production.
+
+The April PDO benchmark work established a concrete, working launch pattern for the MIT fork.
 
 ### PDO environment notes
 
@@ -332,7 +342,8 @@ That resolved to:
 - `/sw/qlp-environment/.venv/bin/python`
 - `/sw/qlp-environment/.venv/lib/python3.11/site-packages/tglc/__init__.py`
 
-For current PDO work, prefer this shared environment pattern over trying to revive an orbit-local `.venv`.
+For that benchmark generation, the shared environment pattern was preferred
+over trying to revive an orbit-local `.venv`.
 
 Two benchmark-specific runtime caveats found on `2026-04-02`:
 
@@ -342,9 +353,9 @@ Two benchmark-specific runtime caveats found on `2026-04-02`:
   `/pdo/app/anaconda/anaconda2-4.4.0/lib` was added ahead of the Python 3.11 library path so
   `libffi.so.6` can be found
 
-For the current CPU-only benchmark, prefer `pdogpu1` with `--nprocs 16` for `tglc epsfs` unless a
-new timing test changes that default. Do not assume `pdogpu6` is faster for `epsfs` until a
-`cupy`-enabled TGLC environment is available there.
+For the historical CPU-only benchmark, `pdogpu1` with `--nprocs 16` was the
+accepted `tglc epsfs` setting. Do not reuse that recommendation as the live
+A2v1 launch contract without a new timing test and the current protocol.
 
 The validated `pdogpu1` import pattern for the user-owned fork is:
 
@@ -560,9 +571,12 @@ env \
   --tglc-data-dir /pdo/users/tehan/tglc-deep-catalogs
 ```
 
-### Live PDO process hygiene
+### Historical Sector 56 process-hygiene example
 
-When rerunning a benchmark stage after code changes, check for stale stopped jobs before trusting the current outputs.
+The process IDs and temporary permissions in this subsection describe the
+original Sector 56 benchmark, not current live state. The durable rule is to
+check for stale stopped jobs before trusting or replacing outputs after a code
+change.
 
 In this benchmark, a pre-patch orbit `120` `cutouts` process remained stopped in `pts/10`:
 
@@ -578,7 +592,7 @@ PID 91844  STAT Rl+  ... PYTHONPATH=/pdo/users/tehan/tess-gaia-light-curve-twirl
 
 Do not resume stale pre-patch jobs such as the stopped `pts/10` process, because they can overwrite user-owned benchmark products with old code.
 
-For the active benchmark, `pdogpu6` orbit `120` `epsf/` and `LC/` were temporarily made read-only in
+During that benchmark, `pdogpu6` orbit `120` `epsf/` and `LC/` were temporarily made read-only in
 the main benchmark tree so the orbit `119` driver cannot overwrite orbit `120` products while a
 separate `pdogpu1` CPU-only `epsfs` benchmark is running in:
 
@@ -624,9 +638,10 @@ The `lightcurves` subcommand accepts `--tic` IDs. That is useful when:
 
 This only helps at the final stage. Cataloging, cutouts, and ePSF fitting still need the full field model.
 
-### Start with WD 1856+534 and a small pilot sample
+### Retain the WD 1856+534 benchmark smoke
 
-Before launching full production, require the new workflow to:
+The initial A2v1 S56 benchmark has passed. Repeat this bounded gate whenever a
+production rule, extraction branch, or detrending contract changes materially:
 
 1. regenerate a strong single-sector detection of WD 1856+534 b,
 2. process a small sample of quiet WDs,

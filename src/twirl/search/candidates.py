@@ -3,7 +3,7 @@
 A "candidate" is a row in the per-sector candidate table, keyed by
 (tic, sector, aperture, peak_rank). Peaks are extracted by walking the BLS
 SDE spectrum: argmax → mask the peak ± a fractional period window plus its
-1/2× and 2× harmonics → repeat N times.
+1/3×, 1/2×, 2×, and 3× harmonics → repeat N times.
 """
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ def walk_peaks(
     extra: dict[str, np.ndarray],
     n_peaks: int = 10,
     period_mask_frac: float = 0.005,
-    harmonics: tuple[float, ...] = (0.5, 2.0, 3.0),
+    harmonics: tuple[float, ...] = (1.0 / 3.0, 0.5, 2.0, 3.0),
     period_bin_edges: tuple[float, ...] = (),
     max_peaks_per_period_bin: int = 0,
 ) -> list[dict[str, float]]:
@@ -122,7 +122,9 @@ def walk_peaks(
             bin_counts[bin_idx] = bin_counts.get(bin_idx, 0) + 1
             if bin_counts[bin_idx] >= max_peaks_per_period_bin:
                 sde_work[period_bins == bin_idx] = -np.inf
-        # Mask the peak and harmonics in fractional period space.
+        # Mask the peak and harmonics in fractional period space. Keep the
+        # factors reciprocal-symmetric so whether P or 3P ranks first cannot
+        # change how many independent peak slots remain.
         for mult in (1.0, *harmonics):
             target = p * mult
             if target <= 0:

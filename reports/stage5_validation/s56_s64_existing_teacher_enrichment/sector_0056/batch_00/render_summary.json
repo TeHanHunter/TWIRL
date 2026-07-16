@@ -1,0 +1,29 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_ADP"
+  ],
+  "branch_name": "current_adp",
+  "created_utc": "2026-07-15T16:11:54.172236+00:00",
+  "harmonic_factors": [
+    0.25,
+    0.5,
+    1.0,
+    2.0,
+    4.0
+  ],
+  "hlsp_root": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_adp015q_compare",
+  "injection_h5": "",
+  "lc_export_h5": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair_rebuilt.h5",
+  "metrics_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/twirl_vet_metrics.csv",
+  "n_peaks": 10,
+  "n_periods": 200000,
+  "n_rows": 1000,
+  "out_dir": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/twirl_vet_sheets",
+  "queue_csv": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2/reports/stage5_validation/s56_s64_existing_teacher_enrichment/sector_0056/batch_00/review_queue_1k.csv",
+  "status_counts": {
+    "ok": 1000
+  },
+  "use_row_ephemeris": true,
+  "write_pdf": false
+}
