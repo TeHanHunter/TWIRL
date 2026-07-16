@@ -1,0 +1,128 @@
+name: a2v1_tier1_active_search_pair_v1
+contract_version: a2v1_tier1_science_qa_v1
+sector: 56
+scope: active_search_pair
+promotion_enabled: false
+expected_tier0_contract: a2v1_tier0_integrity_qa_v2
+apertures:
+  - DET_FLUX_ADP_SML
+  - DET_FLUX_ADP
+
+# Zero means scan the full compact target population. Figures or later manual
+# review may subsample the written target table, but the gate itself does not.
+sample_size: 0
+sample_seed: 560101
+magnitude_edges: [0.0, 18.0, 19.0, 19.5, 20.0, 20.5, 30.0]
+min_population_targets: 512
+min_targets_per_magnitude_bin: 30
+min_supported_magnitude_bins: 3
+expected_compact_sha256: 703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40
+# Deliberate fail-closed placeholders. Replace both only after building and
+# reviewing the authoritative S56 QLP-quaternion/SPOC cadence artifact.
+expected_cadence_reference_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+expected_cadence_reference_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+
+scatter_pass_finite_fraction: 0.98
+scatter_review_finite_fraction: 0.95
+scatter_pass_slope_min: -0.10
+scatter_pass_slope_max: 0.60
+scatter_review_slope_min: -0.20
+scatter_review_slope_max: 0.80
+scatter_high_residual_dex: 0.50
+scatter_pass_outlier_fraction: 0.05
+scatter_review_outlier_fraction: 0.10
+scatter_envelope_reference_tmag: 18.0
+scatter_envelope_dex_per_mag: 0.25
+scatter_pass_mad_ppm_at_reference: 400000.0
+scatter_review_mad_ppm_at_reference: 700000.0
+scatter_pass_rms5_ppm_at_reference: 600000.0
+scatter_review_rms5_ppm_at_reference: 1000000.0
+
+# This bounded enrichment gate compares every target with a hash-bound table
+# built from the QLP camera quaternion cadence lists and SPOC quality flags.
+cadence_reference_contract_template: "s{sector}_a2v1_cadence_reference_v1"
+cadence_pass_median_loss: 0.005
+cadence_review_median_loss: 0.01
+cadence_pass_p95_loss: 0.02
+cadence_review_p95_loss: 0.05
+finite_pass_median: 0.99
+finite_review_median: 0.95
+finite_pass_p05: 0.95
+finite_review_p05: 0.90
+usable_pass_median: 0.80
+usable_review_median: 0.50
+usable_pass_p05: 0.50
+usable_review_p05: 0.30
+
+aperture_pass_valid_fraction: 0.98
+aperture_review_valid_fraction: 0.95
+aperture_moderate_ratio_low: 0.3333333333333333
+aperture_moderate_ratio_high: 3.0
+aperture_extreme_ratio_low: 0.10
+aperture_extreme_ratio_high: 10.0
+aperture_pass_moderate_outlier_fraction: 0.05
+aperture_review_moderate_outlier_fraction: 0.10
+aperture_pass_extreme_outlier_fraction: 0.005
+aperture_review_extreme_outlier_fraction: 0.01
+aperture_pass_correlation_valid_fraction: 0.98
+aperture_review_correlation_valid_fraction: 0.95
+aperture_pass_correlation_median: 0.10
+aperture_review_correlation_median: 0.0
+aperture_negative_correlation_threshold: -0.20
+aperture_pass_negative_correlation_fraction: 0.05
+aperture_review_negative_correlation_fraction: 0.10
+
+injection_contract_template: "s{sector}_a2v1_fresh_injection_pair_v1"
+injection_selection_mode: full_shard
+injection_required_shard_indices: [0, 13, 26, 39]
+# Deliberate fail-closed placeholders until the exact four source HDF5 shards
+# are rehashed at their accepted evidence location.
+expected_injection_shard_sha256:
+  - "0000000000000000000000000000000000000000000000000000000000000000"
+  - "0000000000000000000000000000000000000000000000000000000000000000"
+  - "0000000000000000000000000000000000000000000000000000000000000000"
+  - "0000000000000000000000000000000000000000000000000000000000000000"
+injection_expected_ids: 2000
+expected_injection_selection_sha256: 8ee40ea7e450d5c19027f2e6c0c02279a78102caa246aeac80e032278ede6c5a
+expected_injection_metadata_sha256: 549968899c236387d65700aa1e6d0d84a45ccff63cdf97d0b647f4d19cef1910
+expected_injection_source_adp_sha256: 03f041bc66f09158d7740eaf9116b081d2184b7844720778d74f7ec0cf3b4505
+expected_injection_parity_report_sha256: f5e98f0e900beda0275d2a1d34ce592e799f5b0690db1490482c34c0f92360f9
+min_faint_injection_ids: 32
+injection_faint_tmag_min: 19.0
+min_injection_detectors: 8
+min_injection_period_ratio: 30.0
+min_injection_duration_ratio: 2.0
+min_injection_depth_ratio: 5.0
+injection_pass_retention_low: 0.85
+injection_pass_retention_high: 1.15
+injection_review_retention_low: 0.70
+injection_review_retention_high: 1.30
+injection_pass_p10: 0.70
+injection_review_p10: 0.50
+injection_inband_low: 0.50
+injection_inband_high: 1.50
+injection_pass_inband_fraction: 0.95
+injection_review_inband_fraction: 0.90
+
+# One truly independent WD 1856 reduction is enough for the enrichment scope.
+# A full-product promotion config must raise detector coverage to all 16 cells.
+independent_contract_template: "s{sector}_a2v1_independent_extraction_v1"
+# Deliberate fail-closed placeholders. Replace only after building and
+# reviewing the real external WD 1856 product and its emitted evidence pair.
+expected_independent_metrics_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+expected_independent_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+expected_independent_reference_product_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+min_independent_targets: 1
+min_independent_detectors: 1
+independent_pass_common_fraction: 0.90
+independent_review_common_fraction: 0.80
+independent_pass_abs_log_scatter_ratio: 0.30
+independent_review_abs_log_scatter_ratio: 0.48
+wd1856_pass_period_relative_error: 0.0001
+wd1856_review_period_relative_error: 0.0005
+wd1856_pass_epoch_residual_min: 5.0
+wd1856_review_epoch_residual_min: 15.0
+wd1856_pass_depth_ratio_low: 0.50
+wd1856_pass_depth_ratio_high: 2.0
+wd1856_review_depth_ratio_low: 0.25
+wd1856_review_depth_ratio_high: 4.0

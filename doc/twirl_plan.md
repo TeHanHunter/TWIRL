@@ -15,8 +15,9 @@ Last reconciled: `2026-07-16`.
 - `A2v1` is the active Stage 1 product family: no TIC-magnitude science cap,
   saturated-pixel ePSF masking, and sector-level ADP/ADP015 FITS products for
   the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS) and S57
-  (`27,213` FITS) pass edge-aware HDF5/FITS validation; the S58-S63 queue
-  resumed after a validated targeted S58 HDF5 repair. See [Stage 1 history](twirl_progress_log.md#stage-1).
+  (`27,213` FITS) pass edge-aware HDF5/FITS validation; S58 now also passes
+  its rebuilt full-product gate, and the queue is producing S59-S63. See
+  [Stage 1 history](twirl_progress_log.md#stage-1).
 - S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
   recovery in both active ADP apertures. Tier 0 verifies product integrity and
   benchmark behavior; it is not the Tier-1 science QA needed for survey
@@ -107,10 +108,9 @@ The operational contract is defined in the
 
 ### Current gate
 
-The S58-S63 serial queue is active. The targeted S58 repair passed edge-aware
-HDF5 coverage and openability validation, and the queue is rebuilding the
-incomplete S58 FITS product before advancing. Do not create sector-specific
-production logic unless the sector is a documented exception.
+The S58-S63 serial queue is active. S58 passed its rebuilt full-product gate,
+and S59 is in HDF5 extraction. Do not create sector-specific production logic
+unless the sector is a documented exception.
 
 ### Exit criteria
 
@@ -146,18 +146,23 @@ exactly six human labels. Preserve all six as explicitly premature
 experimental evidence, pause further S57 holdout consumption, and do not treat
 S57 as a pristine external holdout.
 
-In parallel, implement the missing transparent baseline capabilities:
-
-- a non-periodic/weakly-periodic dip detector;
-- multi-sector light-curve aggregation and candidate merging;
-- a documented false-alarm/background strategy;
-- a candidate-level aperture rule that keeps the small ADP aperture as the
-  search channel and primary ADP aperture as contamination evidence unless
-  injection and real-data tests justify a change.
+The immediate parallel work is to harden the existing S56 periodic/enrichment
+path, not to add search branches. Require the Tier-1 target pass mask, freeze a
+candidate-level aperture rule that keeps the small ADP aperture as the search
+channel and primary ADP aperture as contamination evidence unless injection
+and real-data tests justify a change, complete the bounded S56 review, and
+freeze the resulting candidate/label set. Defer the non-periodic dip detector,
+multi-sector aggregation, and false-alarm/background calibration until this
+path is robust. Those capabilities remain mandatory before the full survey
+search or a science-ready candidate catalog.
 
 ### Model gate
 
 - Use `s56_harmonic_cnn_v1` as the active-learning baseline only.
+- Treat the small real training set as the limiting resource: improve the
+  versioned data/label manifest, TIC-grouped splits, source-separated
+  evaluation, probability calibration, and bootstrap uncertainty before
+  changing model architecture.
 - Reach at least `50` unique real Planet-like labels and pass locked grouped
   real-data performance/calibration gates before student pseudo-labeling.
 - Teacher v2 is an exploratory completed comparison that missed its external-
@@ -267,19 +272,25 @@ never a completeness measurement.
 
 ## Immediate implementation priorities
 
-1. Let the resumed gated S58-S63 A2v1 HDF5/FITS queue finish, then review each
-   Tier-0 report and Tier-1 science QA before science use.
-2. Freeze the A2v1 compact-export/light-curve index schema, TWIRL I sector
-   cutoff/release manifest, and explicit `twirl_parent_sample` freeze criteria.
-3. Ship the transparent dip branch, multi-sector aggregation, and branch-aware
-   false-alarm calibration before adding another model family.
-4. Freeze the Stage 2 candidate contract, recompute A2v1 LC-level
-   candidate-retention recovery, and run the representative pixel-level
-   calibration subset needed for end-to-end completeness.
-5. Complete and audit the bounded S56 enrichment batch with teacher v1; keep
-   S57 labeling and teacher-v2 promotion paused.
-6. Characterize the `764` no-TIC-bridge WDs and decide the S94+ QLP-ingestion
-   boundary before freezing the release manifest.
+1. Let the gated S59-S63 A2v1 HDF5/FITS queue continue with its existing
+   stop-on-failure gates; do not wait for it to finish before hardening S56.
+2. Complete the bounded S56 `active_search_pair` Tier-1 evidence: build the
+   authoritative cadence/quality reference, produce the genuinely independent
+   WD 1856 comparison, rerun the current Tier-0 report, and publish the target
+   QA pass mask. This scope may qualify enrichment but never science release.
+3. Complete and audit the bounded S56 periodic enrichment on the Tier-1 pass
+   set, freeze the candidate/aperture contract, and merge only confidently
+   adjudicated labels into a versioned training set. Keep S57 labeling paused.
+4. Retrain and evaluate teacher v1 on that frozen set with TIC-grouped,
+   source-separated, calibrated metrics and uncertainty intervals. Do not put
+   teacher v2, student pseudo-labels, or another model family on this path.
+5. After the periodic/enrichment path is robust, add the dip branch,
+   multi-sector merging, and branch-aware false-alarm calibration; then rerun
+   frozen-chain candidate-retention and representative pixel-level recovery
+   before survey-wide enrichment or science claims.
+6. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
+   sample criteria; characterize the `764` no-TIC-bridge WDs and the S94+ QLP
+   boundary before the survey release is locked.
 
 When a priority completes, record details in the progress log and retain only
 one to three milestone-level status bullets here.

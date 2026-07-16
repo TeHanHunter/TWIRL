@@ -205,6 +205,49 @@ Production validation and science QA are separate gates:
   preservation, and a genuinely independent extraction comparison. Only a
   Tier-1 pass can promote a sector into a frozen survey release.
 
+The Tier-1 implementation keeps two scopes explicit:
+
+- `active_search_pair` scans the full compact population in
+  `DET_FLUX_ADP_SML` and `DET_FLUX_ADP`, applies fixed magnitude/scatter,
+  hash-bound QLP-quaternion/SPOC cadence and quality checks, aperture-ratio,
+  fresh-injection preservation, and independent-extraction limits, and may set
+  `enrichment_ready=true`. It always leaves `science_ready=false` because it
+  does not audit all six A2v1 flux columns.
+- `full_a2v1_product` is the later release-promotion scope. It must include all
+  ADP/ADP015 `1x1`, `3x3`, and `5x5` channels and detector-stratified
+  independent evidence before promotion is enabled.
+
+Run the bounded scope with
+[`audit_a2v1_tier1_qa.py`](../scripts/stage1_lightcurves/audit_a2v1_tier1_qa.py)
+and the locked
+[`active-search configuration`](../configs/qa/a2v1_tier1_active_search_pair_v1.yaml).
+The command requires the current Tier-0 v2 JSON, the exact compact ADP pair, a
+cadence-reference table bound to the original QLP quaternion and SPOC-quality
+authorities, the frozen four-shard (`2,000` unique-host) injection canary, and
+an independent-extraction metrics table plus manifest. A prior TGLC production
+tree is the same extraction family and does not satisfy the independent gate.
+Build the two external evidence products with
+[`build_a2v1_cadence_reference.py`](../scripts/stage1_lightcurves/build_a2v1_cadence_reference.py)
+and
+[`build_a2v1_independent_extraction.py`](../scripts/stage1_lightcurves/build_a2v1_independent_extraction.py).
+The locked configuration deliberately retains impossible authority, shard,
+and independent-product hashes until the real S56 artifacts are built and
+reviewed; placeholders must not be replaced with inferred values. The fixed-
+injection metric is the fitted slope between `1 - transit_model` and the
+negative injected-minus-original detrended flux; BLS recovery or teacher
+scores do not substitute for this Stage 1 signal-preservation measurement.
+
+Every required gate reports `pass`, `review`, or `fail`; missing evidence,
+contract mismatch, or a stale Tier-0 report fails closed. Overall `pass`
+requires every gate to pass, while any review result keeps the overall state at
+`review`.
+
+The Tier-1 target table is a downstream data contract. Candidate generation,
+enrichment review, and teacher-set assembly must join it by TIC and retain only
+`tier1_target_qa_pass == True`; a sector-level pass does not license failed or
+review-status targets. The published summary includes the complete fixed-
+injection manifest and hashes all input and output evidence.
+
 The TWIRL I release manifest must name each accepted sector's product and QA
 report checksums, the frozen sector cutoff, catalog/index version, and search
 and injection contracts. A sector produced after that cutoff is not silently

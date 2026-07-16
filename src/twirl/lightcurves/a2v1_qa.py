@@ -796,7 +796,9 @@ def run_a2v1_photometric_qa(
         "magnitude_trends": summarize_by_magnitude(target_metrics),
         "provenance": {
             "compact_lc": str(compact_lc),
+            "compact_lc_sha256": file_sha256(compact_lc),
             "schema_summary": str(schema_summary),
+            "schema_summary_sha256": file_sha256(schema_summary),
             "bls_peaks": str(bls_peaks),
             "bls_peaks_sha256": file_sha256(bls_peaks),
             "a2v1_root": str(a2v1_root),

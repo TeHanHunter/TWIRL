@@ -53,7 +53,18 @@ in [the A2v1 protocol](../doc/a2v1_production_protocol.md):
    checks HDF5 coverage and FITS schema/completeness.
 4. [audit_a2v1_photometric_qa.py](stage1_lightcurves/audit_a2v1_photometric_qa.py)
    performs the current Tier-0 integrity/benchmark QA. Tier-1 science QA is a
-   separate open gate and must not be inferred from this script's pass state.
+   separate gate and must not be inferred from this script's pass state.
+5. [audit_a2v1_tier1_qa.py](stage1_lightcurves/audit_a2v1_tier1_qa.py)
+   runs the fail-closed Tier-1 evidence contract. Its initial
+   `active_search_pair` configuration can qualify the two ADP channels for
+   bounded enrichment, but cannot certify the complete six-channel product or
+   set `science_ready=true`.
+6. [build_a2v1_cadence_reference.py](stage1_lightcurves/build_a2v1_cadence_reference.py)
+   builds the detector/orbit cadence authority from all S56 QLP quaternion
+   inputs and hash-bound original SPOC-quality files.
+7. [build_a2v1_independent_extraction.py](stage1_lightcurves/build_a2v1_independent_extraction.py)
+   turns a target- and sector-identified external WD 1856 extraction into the
+   hash-bound independent metrics/manifest required by Tier 1.
 
 HDF5 completion alone is not an accepted sector product. Older generic GPU,
 QLP HLSP, canonical-flux, and TWIRL-FS comparison launchers remain available

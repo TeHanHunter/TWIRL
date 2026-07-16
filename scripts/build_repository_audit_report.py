@@ -40,14 +40,14 @@ INJECTED = 20_000
 BLS_TOP5 = 3_458
 TEACHER_RETAINED = 1_527
 
-TRACKED_FILES = 2_137
+TRACKED_FILES = 2_147
 TRACKED_REPORTS = 1_056
 TRACKED_OUTPUTS = 601
-TRACKED_SCRIPTS = 326
-TRACKED_SRC = 60
-TRACKED_TESTS = 56
-TRACKED_MIB = 759.6
-FAST_TESTS_PASSED = 286
+TRACKED_SCRIPTS = 329
+TRACKED_SRC = 63
+TRACKED_TESTS = 59
+TRACKED_MIB = 759.9
+FAST_TESTS_PASSED = 312
 FAST_TESTS_SKIPPED = 3
 
 STAGE_ROWS = (
@@ -56,14 +56,14 @@ STAGE_ROWS = (
         "scope": "Light curves",
         "level": 2,
         "status": "Pilot",
-        "gate": "Release manifest and Tier-1\nphotometric QA",
+        "gate": "S56 bounded Tier-1 evidence\nand target QA mask",
     },
     {
         "stage": "Stage 2",
         "scope": "Search",
         "level": 2,
         "status": "Pilot",
-        "gate": "Dip branch, multi-sector\naggregation, and false alarms",
+        "gate": "Confident S56 candidate/label\nset and teacher-v1 audit",
     },
     {
         "stage": "Stage 3",
@@ -302,11 +302,11 @@ def markdown_text() -> str:
 
         ## Abstract
 
-        We audited the TWIRL repository as an executable survey pipeline, with emphasis on reproducibility, production safety, validation semantics, generated-artifact hygiene, and alignment between the Stage 1-5 plan and the code that now exists. The repository has a credible pilot foundation: Stage 1 produces validated A2v1 light curves, Stage 2 supports an interpretable periodic search, and the fast validation suite is healthy. It is not yet a survey-complete system. The critical gaps are a frozen release manifest, science-level photometric QA, the non-periodic dip branch, multi-sector aggregation, false-alarm calibration, frozen-product injection recovery, and on-target end-to-end validation. We recommend keeping teacher development as bounded triage work while moving these baseline survey gates onto the critical path.
+        We audited the TWIRL repository as an executable survey pipeline, with emphasis on reproducibility, production safety, validation semantics, generated-artifact hygiene, and alignment between the Stage 1-5 plan and the code that now exists. The repository has a credible pilot foundation: Stage 1 produces validated A2v1 light curves, Stage 2 supports an interpretable periodic search, and the fast validation suite is healthy. It is not yet a survey-complete system. The nearest defensible milestone is an enrichment-ready S56 periodic path: complete the bounded Tier-1 evidence, freeze a confident candidate/label set, and retrain the teacher-v1 baseline while S59-S63 production continues independently. The dip branch, multi-sector merging, false-alarm calibration, frozen-product recovery, and release manifest remain mandatory before a survey-wide science product, but they need not delay this bounded milestone.
 
         ## Methods
 
-        The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the project fast test suite, and review of the authoritative plan, production protocol, data conventions, and plotting rules. The integrated audit checkpoint contained {TRACKED_FILES:,} tracked files ({TRACKED_REPORTS:,} under `reports/`, {TRACKED_OUTPUTS:,} under `outputs/`, {TRACKED_SCRIPTS:,} under `scripts/`, {TRACKED_SRC:,} under `src/`, and {TRACKED_TESTS:,} under `tests/`) and {TRACKED_MIB:.1f} MiB of tracked working-tree content. The fast suite completed with {FAST_TESTS_PASSED} passed and {FAST_TESTS_SKIPPED} skipped tests. Code paths were compared with the declared Stage 1-5 contract. We distinguished a Tier-0 integrity gate (schema, coverage, openability, and benchmark checks) from the still-open Tier-1 science QA gate (photometric precision, cadence loss, aperture outliers, injection preservation, and an independent extraction comparison). Generated data and historical binaries were treated as reproducible artifacts unless they were compact evidence needed to interpret a result.
+        The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the project fast test suite, and review of the authoritative plan, production protocol, data conventions, and plotting rules. The integrated audit checkpoint contained {TRACKED_FILES:,} tracked files ({TRACKED_REPORTS:,} under `reports/`, {TRACKED_OUTPUTS:,} under `outputs/`, {TRACKED_SCRIPTS:,} under `scripts/`, {TRACKED_SRC:,} under `src/`, and {TRACKED_TESTS:,} under `tests/`) and {TRACKED_MIB:.1f} MiB of tracked working-tree content. The fast suite completed with {FAST_TESTS_PASSED} passed and {FAST_TESTS_SKIPPED} skipped tests. Code paths were compared with the declared Stage 1-5 contract. We distinguished Tier-0 integrity (schema, coverage, openability, and benchmark checks) from the bounded Tier-1 enrichment contract (population precision, authoritative cadences, aperture consistency, injection preservation, and an independent extraction comparison) and from the still-future full-product science-release gate. Generated data and historical binaries were treated as reproducible artifacts unless they were compact evidence needed to interpret a result.
 
         ## Results
 
@@ -314,7 +314,7 @@ def markdown_text() -> str:
 
         **Figure 1.** Audit-assessed engineering maturity and the next evidence gate for each pipeline stage. The readiness scale describes implementation maturity, not scientific performance. Stage 1 and the periodic part of Stage 2 are at pilot maturity; Stage 3 and Stage 5 remain prototypes; the Stage 4 survey-wide inference layer is not yet built.
 
-        The strongest result is separation of the production contract from later analysis: A2v1 generation, validation, compact export, and an interpretable BLS path now have explicit boundaries. The most important weakness is that an integrity-valid sector can still lack the evidence required for scientific readiness. The audit also found a mismatch between the clean forward plan and experimental teacher-v2 and S57 labeling work already present in the repository. These products should be preserved as exploratory evidence, but they should not silently redefine the production baseline or consume more of the intended validation holdout.
+        The strongest result is separation of the production contract from later analysis: A2v1 generation, validation, compact export, and an interpretable BLS path now have explicit boundaries. The new fail-closed Tier-1 implementation can qualify the two active S56 ADP channels for bounded enrichment, but it cannot set `science_ready=true`. Its production run remains intentionally blocked until the authoritative cadence product, exact four-shard hashes, and genuinely independent WD 1856 evidence are built and pinned. The audit also found a mismatch between the clean forward plan and experimental teacher-v2 and S57 labeling work already present in the repository. These products should be preserved as exploratory evidence, but they should not silently redefine the production baseline or consume more of the intended validation holdout.
 
         Repository hygiene is acceptable at the source level but weak at the artifact-history boundary. At scan time the Git object store was approximately 14 GiB and dominated by historical generated outputs. The on-disk `reports/` tree was approximately 5.5 GiB because it also contained large ignored or untracked review artifacts, while `src/`, `scripts/`, and `tests/` together occupied only about 15 MiB. Nonportable symlinks, stale caches, large third-party reference bundles, and redundant rendered review material should remain outside versioned survey products. History rewriting is not recommended during the active branch stack; compact manifests and an explicit artifact allowlist are safer immediate controls. The local `.venv` reported NumPy 2.2.6 even though `pyproject.toml` requires `numpy>=1.24,<2.0`; the tests passed, so this is environment drift rather than an observed failure.
 
@@ -334,19 +334,19 @@ def markdown_text() -> str:
 
         ## Recommendations
 
-        1. **Freeze the survey release contract.** Record an explicit TWIRL-I sector cutoff, target/sample version, A2v1 product tag, search configuration, and checksums in a machine-readable release manifest. Without a cutoff, the `Sector >= 56` denominator expands continuously.
-        2. **Complete Tier-1 photometric QA.** Add scatter-versus-magnitude regression, cadence-loss distributions, aperture disagreement thresholds, fixed injection-preservation tests, and a genuinely independent benchmark extraction. Keep Tier-0 integrity status separate.
-        3. **Finish the transparent baseline search before new ML gates.** Implement the non-periodic dip branch, multi-sector candidate consolidation, and an empirical false-alarm strategy. These are required even if teacher ranking remains useful.
-        4. **Calibrate recovery on frozen products.** Run injections through the adopted search, ranker if used, vetter, and merger; include a bounded pixel-level subset to measure detrending and extraction losses.
-        5. **Quarantine exploratory teacher work.** Preserve teacher-v2 and early S57 labels with provenance, mark them exploratory, pause further holdout consumption, and require external-retention and morphology checks before promotion.
-        6. **Control repository growth prospectively.** Version compact summaries, manifests, selected figures, and small label tables. Keep review sheets, dependency bundles, shard payloads, and local literature copies in ignored storage. Defer Git history surgery until every active branch and worktree is clean and pushed.
-        7. **Rebuild and automate the release environment.** Rebuild the local environment from `pyproject.toml` before release validation. Once the dependency or lock strategy is settled, add pull-request CI for `make test-fast` and `make check-docs`. This is a medium-priority engineering safeguard below the science critical path, not evidence of a current test failure.
+        1. **Finish the bounded S56 Tier-1 evidence.** Build and pin the original-SPOC-backed cadence reference, the exact four injection shards, and the external WD 1856 comparison; rerun Tier 0 and publish the TIC-level target pass mask. This qualifies enrichment only, never science release.
+        2. **Freeze a confident S56 candidate and label set.** Apply the target mask, finish the bounded periodic enrichment review, preserve the two-aperture evidence, and merge only adjudicated labels with explicit provenance.
+        3. **Harden teacher v1 around the data.** Keep the accepted model family; improve versioned label manifests, TIC-grouped and source-separated evaluation, calibration, and bootstrap uncertainty. The small real positive set is the limiting factor, not model capacity.
+        4. **Keep production independent.** Let the stop-on-failure S59-S63 queue continue and validate each sector, but do not wait for the queue before completing the S56 enrichment milestone. Keep S57 labels and teacher v2 quarantined as exploratory evidence.
+        5. **Add the deferred survey branches after the periodic path is robust.** Implement the dip branch, multi-sector consolidation, and branch-aware false-alarm strategy, then run the adopted search/ranker/vetter/merger plus a representative pixel-level calibration subset before full-survey enrichment or completeness claims.
+        6. **Freeze the release and artifact boundary.** Record the TWIRL-I sector cutoff, parent/sample version, accepted products, search contracts, and checksums. Version compact summaries, manifests, selected figures, and small tables; keep rendered sheets, dependency bundles, shards, and local literature outside Git.
+        7. **Rebuild and automate the release environment.** Rebuild from `pyproject.toml` before release validation and add pull-request CI for `make test-fast` and `make check-docs` once the lock strategy is settled.
 
-        A practical execution order is: (i) finish the A2v1 queue with Tier-0 gates and compact exports, (ii) freeze the release manifest and implement Tier-1 QA, (iii) complete the dip, multi-sector, and false-alarm baseline, (iv) run frozen-product recovery and pixel calibration, and (v) perform survey-wide inference and on-target validation. Bounded human labeling can proceed in parallel only when it does not delay these gates.
+        A practical execution order is: (i) continue S59-S63 production in parallel, (ii) finish and pin the S56 bounded Tier-1 evidence, (iii) freeze the confident periodic candidate/label set, (iv) retrain and audit teacher v1, (v) add dip, multi-sector, false-alarm, and frozen-chain recovery gates, and only then (vi) perform survey-wide enrichment and science validation.
 
         ## Conclusion
 
-        TWIRL is beyond a collection of experiments: it has a testable pilot pipeline and a clear production contract. The next advance should be evidentiary rather than architectural. Freezing the release, separating integrity from science QA, completing the transparent search branches, and measuring recovery through the whole adopted chain will convert the current pilot into a defensible survey framework. The audit figures and this report are reproducible from [`scripts/build_repository_audit_report.py`](../../scripts/build_repository_audit_report.py); the project plan and detailed execution record remain authoritative in [`doc/twirl_plan.md`](../../doc/twirl_plan.md) and [`doc/twirl_progress_log.md`](../../doc/twirl_progress_log.md).
+        TWIRL is beyond a collection of experiments: it has a testable pilot pipeline and a clear production contract. The best next advance is evidentiary rather than architectural: qualify S56 for bounded enrichment, turn that into a confident candidate/label set, and make teacher v1 auditable around the small real training sample. The deferred search branches and end-to-end calibration remain the boundary between this near-term milestone and a science-ready survey. The audit figures and this report are reproducible from [`scripts/build_repository_audit_report.py`](../../scripts/build_repository_audit_report.py); the project plan and detailed execution record remain authoritative in [`doc/twirl_plan.md`](../../doc/twirl_plan.md) and [`doc/twirl_progress_log.md`](../../doc/twirl_progress_log.md).
         """
     )
 
@@ -546,7 +546,7 @@ def build_pdf(output_dir: Path) -> None:
             para("Abstract", "AuditSection"),
             Spacer(1, 0.07 * inch),
             para(
-                "We audited TWIRL as an executable survey pipeline, emphasizing reproducibility, production safety, validation semantics, generated-artifact hygiene, and alignment between the Stage 1-5 plan and the code that now exists. The repository has a credible pilot foundation: Stage 1 produces validated A2v1 light curves, Stage 2 supports an interpretable periodic search, and the fast validation suite is healthy. It is not yet a survey-complete system. The critical gaps are a frozen release manifest, science-level photometric QA, the non-periodic dip branch, multi-sector aggregation, false-alarm calibration, frozen-product injection recovery, and on-target end-to-end validation. Teacher development should remain bounded triage work while these baseline survey gates move onto the critical path.",
+                "We audited TWIRL as an executable survey pipeline, emphasizing reproducibility, production safety, validation semantics, artifact hygiene, and alignment between the Stage 1-5 plan and the code. The repository has a credible pilot foundation but is not survey-complete. The nearest defensible milestone is an enrichment-ready S56 periodic path: finish the bounded Tier-1 evidence, freeze a confident candidate/label set, and retrain teacher v1 while S59-S63 production continues independently. Dip search, multi-sector merging, false-alarm calibration, frozen recovery, and the release manifest remain mandatory before a survey-wide science product, but need not delay this bounded milestone.",
                 "AuditAbstract",
             ),
             para("Audit scope", "AuditSection"),
@@ -580,7 +580,7 @@ def build_pdf(output_dir: Path) -> None:
             Spacer(1, 0.12 * inch),
             para("Headline findings", "AuditSection"),
             para(
-                "<b>1.</b> A2v1 generation, validation, compact export, and periodic BLS now form a credible pilot path. <b>2.</b> Integrity-valid is not yet science-ready: Tier-1 photometric QA remains open. <b>3.</b> Teacher-v2 and early S57 labels are exploratory evidence and should not silently redefine the baseline or holdout. <b>4.</b> Git history is artifact-heavy; prospective curation is safer than history surgery during the active branch stack.",
+                "<b>1.</b> A2v1 generation, validation, compact export, and periodic BLS form a credible pilot path. <b>2.</b> The fail-closed S56 Tier-1 code is implemented, but real authority artifacts must be pinned before enrichment. <b>3.</b> Teacher-v2 and S57 labels remain exploratory. <b>4.</b> Dip, multi-sector, and false-alarm work is deferred until the bounded periodic path is robust, not waived.",
             ),
             para(
                 "Bottom line: the next advance should be evidentiary rather than architectural.",
@@ -595,7 +595,7 @@ def build_pdf(output_dir: Path) -> None:
         [
             para("Methods", "AuditSection"),
             para(
-                f"The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the project fast test suite, and review of the authoritative plan, production protocol, data conventions, and plotting rules. The integrated checkpoint contained {TRACKED_FILES:,} tracked files and {TRACKED_MIB:.1f} MiB of tracked content; the fast suite completed with {FAST_TESTS_PASSED} passed and {FAST_TESTS_SKIPPED} skipped tests. We separated a Tier-0 integrity gate (schema, coverage, openability, and benchmark checks) from the still-open Tier-1 science QA gate (photometric precision, cadence loss, aperture outliers, injection preservation, and an independent extraction comparison).",
+                f"The scan combined repository-wide inventory, Git/worktree inspection, parser and link checks, shell and Python syntax checks, the fast test suite, and review of the authoritative plan and protocols. The checkpoint contained {TRACKED_FILES:,} tracked files and {TRACKED_MIB:.1f} MiB; the fast suite completed with {FAST_TESTS_PASSED} passed and {FAST_TESTS_SKIPPED} skipped tests. We separated Tier-0 integrity from the bounded Tier-1 enrichment contract and from the still-future full-product science-release gate.",
             ),
             para("Pipeline readiness", "AuditSection"),
             Image(str(readiness_path), width=6.92 * inch, height=3.99 * inch),
@@ -604,7 +604,7 @@ def build_pdf(output_dir: Path) -> None:
                 "AuditCaption",
             ),
             para(
-                "The strongest result is separation of the production contract from later analysis. The main weakness is that an integrity-valid sector can still lack the evidence required for scientific readiness. The clean forward plan also diverged from experimental teacher-v2 and S57 labeling work already present. Those products should be preserved with provenance but quarantined from the production baseline, and S57 must no longer be described as a pristine holdout.",
+                "The strongest result is separation of production from analysis. The bounded Tier-1 implementation can qualify only the active S56 ADP pair and can never set science-ready. It intentionally cannot run until original-SPOC cadence evidence, exact canary-shard hashes, and an external WD 1856 product are pinned. Teacher-v2 and S57 labels should remain quarantined from the accepted baseline.",
             ),
             PageBreak(),
         ]
@@ -655,13 +655,13 @@ def build_pdf(output_dir: Path) -> None:
     # Page 5: prioritized recommendations and conclusion.
     story.extend([para("Recommendations", "AuditSection")])
     recommendations = [
-        ("1 | Freeze the release contract", "Record a TWIRL-I sector cutoff, target/sample version, product tag, search configuration, and checksums in a machine-readable manifest."),
-        ("2 | Complete Tier-1 science QA", "Add precision-versus-magnitude regression, cadence-loss distributions, aperture thresholds, fixed injection preservation, and an independent benchmark extraction."),
-        ("3 | Finish the transparent baseline", "Implement the dip branch, multi-sector consolidation, and empirical false-alarm strategy before adding new ML gates."),
-        ("4 | Calibrate frozen-product recovery", "Run the adopted search, optional ranker, vetter, and merger; include a bounded pixel-level subset to capture extraction and detrending losses."),
-        ("5 | Quarantine exploratory teacher work", "Preserve teacher-v2 and early S57 labels with provenance, pause further holdout use, and require external-retention plus morphology checks before promotion."),
-        ("6 | Control repository growth", "Version compact summaries, manifests, selected figures, and small label tables; ignore rendered sheets, dependency bundles, shards, and local literature copies."),
-        ("7 | Rebuild and automate the environment", "Rebuild from pyproject.toml before release validation. After settling the dependency or lock strategy, add PR CI for make test-fast and make check-docs. This is medium priority below the science gates."),
+        ("1 | Finish bounded S56 Tier-1", "Build and pin the original-SPOC cadence reference, exact four canary shards, and external WD 1856 evidence; publish the TIC-level pass mask."),
+        ("2 | Freeze confident S56 labels", "Apply the target mask, finish the periodic enrichment review, preserve both apertures, and merge only adjudicated candidates with provenance."),
+        ("3 | Harden teacher v1 around data", "Keep the accepted model family; improve label manifests, TIC-grouped/source-separated tests, calibration, and bootstrap uncertainty."),
+        ("4 | Keep production independent", "Let S59-S63 continue behind stop-on-failure gates. Do not wait for the queue before the S56 milestone; quarantine S57 labels and teacher v2."),
+        ("5 | Add deferred survey branches", "After the periodic path is robust, add dip search, multi-sector merging, false-alarm calibration, and frozen-chain plus pixel-level recovery."),
+        ("6 | Freeze release and artifacts", "Record the cutoff, sample, products, contracts, and hashes; version compact evidence and keep large rendered or local payloads outside Git."),
+        ("7 | Rebuild and automate", "Rebuild from pyproject.toml before release validation and add PR CI for make test-fast and make check-docs after settling the lock strategy."),
     ]
     rec_rows = []
     for head, body in recommendations:
@@ -688,11 +688,11 @@ def build_pdf(output_dir: Path) -> None:
             Spacer(1, 0.12 * inch),
             para("Execution order", "AuditSection"),
             para(
-                "Finish the A2v1 queue with Tier-0 gates and compact exports; freeze the release manifest and implement Tier-1 QA; complete dip, multi-sector, and false-alarm baselines; run frozen-product recovery and pixel calibration; then perform survey-wide inference and on-target validation. Bounded labeling may proceed in parallel only when it does not delay these gates.",
+                "Continue S59-S63 production in parallel; finish and pin bounded S56 Tier-1 evidence; freeze the confident periodic candidate/label set; retrain and audit teacher v1; then add dip, multi-sector, false-alarm, and frozen-recovery gates before survey-wide enrichment and science validation.",
             ),
             para("Conclusion", "AuditSection"),
             para(
-                "TWIRL is beyond a collection of experiments: it has a testable pilot pipeline and a clear production contract. Freezing the release, separating integrity from science QA, completing the transparent search branches, and measuring recovery through the whole adopted chain will convert the pilot into a defensible survey framework.",
+                "TWIRL has a testable pilot pipeline and a clear production contract. The best next advance is evidentiary: qualify S56 for bounded enrichment, turn it into a confident candidate/label set, and make teacher v1 auditable around the small real sample. Deferred search branches and full-chain calibration remain the boundary to a science-ready survey.",
             ),
             KeepTogether(
                 [
