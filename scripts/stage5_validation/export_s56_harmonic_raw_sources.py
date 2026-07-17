@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--raw-root", type=Path, required=True)
     parser.add_argument("--out-h5", type=Path, required=True)
     parser.add_argument("--orbits", default="119,120")
+    parser.add_argument("--compact-adp-h5", type=Path)
     args = parser.parse_args()
     orbits = tuple(int(value) for value in args.orbits.split(",") if value.strip())
     summary = export_tglc_raw_sources(
@@ -26,6 +27,7 @@ def main() -> None:
         raw_root=args.raw_root,
         out_h5=args.out_h5,
         orbits=orbits,
+        compact_adp_h5=args.compact_adp_h5,
     )
     summary_path = args.out_h5.with_suffix(".summary.json")
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")

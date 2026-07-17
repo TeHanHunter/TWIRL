@@ -1,0 +1,163 @@
+# A2v1 production protocol
+
+This is the operational protocol for the `A2v1` Stage 1 product on PDO. It
+applies to S56 and later sectors with prepared default TGLC source trees,
+including S94+. It supersedes the legacy production path whenever the target
+product is the no-cap, saturated-mask, ADP/ADP015-only product.
+
+## Product contract
+
+`A2v1` means:
+
+- include every positive TIC in the TWIRL observation table; do not use a
+  TIC-magnitude science cut;
+- retain prepared source-pickle pixel data through symlinks rather than
+  recreating cutouts;
+- use `source_tic/source_X_Y.ecsv` overlays, built from observation-table
+  detector coordinates, to replace the stale embedded TIC tables;
+- reuse an old ePSF only when the source cutout's saturated-pixel mask is
+  empty; recompute ePSFs for every non-empty mask with the masked TGLC hook;
+- write HDF5 first, then one sector-level FITS product per TIC with only
+  ADP and ADP015 branches for the 1x1, 3x3, and 5x5 apertures.
+
+The output root is always `/pdo/users/tehan/tglc-gpu-production-A2v1/`:
+
+```text
+orbit-<orbit>/ffi/cam<camera>/ccd<ccd>/source/      # symlinks to prepared source pickles
+orbit-<orbit>/ffi/cam<camera>/ccd<ccd>/source_tic/  # A2v1 TIC overlays
+orbit-<orbit>/ffi/cam<camera>/ccd<ccd>/epsf/        # links or masked refits
+orbit-<orbit>/ffi/cam<camera>/ccd<ccd>/LC/          # A2v1 HDF5
+hlsp_s<sector4>_A2v1/                                # A2v1-only FITS
+twirl_logs/                                          # run and validation records
+```
+
+The original source tree and all shared `/pdo/qlp-data/` inputs are read-only.
+Never clean or overwrite an existing A2v1 sector while a run is active.
+
+## Required hooks and runtime
+
+Before a production or smoke run, verify the user-owned fork has both hooks:
+
+```bash
+grep -q '_source_tic_overlay_path' \
+  /pdo/users/tehan/tess-gaia-light-curve-twirl/tglc/scripts/light_curves.py
+grep -q 'source.mask.mask' \
+  /pdo/users/tehan/tess-gaia-light-curve-twirl/tglc/scripts/epsfs.py
+```
+
+Use the GPU venv for `tglc epsfs` and `tglc lightcurves`, keep all BLAS thread
+counts at one, and set `HDF5_USE_FILE_LOCKING=FALSE` on PDO storage. The A2v1
+wrapper does this itself; direct smoke commands must do the same.
+
+The no-cap policy is enforced by the observation-table overlays. A2v1 normally
+does not rerun `tglc catalogs`, so `--max-magnitude 99` is a policy invariant,
+not a required CLI argument for the reuse path.
+
+## Pre-flight
+
+For each selected orbit/CCD, require exactly `196` prepared source pickles and
+`196` old ePSFs. Confirm TICA FFIs are present and inspect GPU memory before
+selecting explicit free devices. For example:
+
+```bash
+for orbit in 121 122; do
+  base=/pdo/users/tehan/tglc-gpu-production/orbit-$orbit/ffi/cam4/ccd1
+  find "$base/source" -name 'source_*.pkl' | wc -l
+  find "$base/epsf" -name 'epsf_*.npy' | wc -l
+done
+nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu \
+  --format=csv,noheader
+```
+
+Do not proceed if a selected source tree is incomplete. Repair the original
+prepared tree first; never regenerate it inside the A2v1 output root.
+
+## One-CCD smoke
+
+Use one orbit and one CCD to prove the reuse chain before a new full sector.
+S57's representative smoke is orbit `121`, `cam4/ccd1` (orbit tag `o1`). It
+creates only that CCD's A2v1 source links/sidecars/ePSFs/HDF5s.
+
+```bash
+export REPO=/pdo/users/tehan/TWIRL
+export SOURCE_ROOT=/pdo/users/tehan/tglc-gpu-production
+export A2ROOT=/pdo/users/tehan/tglc-gpu-production-A2v1
+export FORK=/pdo/users/tehan/tess-gaia-light-curve-twirl
+export TGLC_PY=/pdo/users/tehan/twirl-gpu-venv/bin/python
+export QLP_PY=/sw/qlp-environment/.venv/bin/python
+export LOG=$A2ROOT/twirl_logs/s57_A2v1_smoke_o121_cam4ccd1
+
+export HDF5_USE_FILE_LOCKING=FALSE
+export OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=NUMEXPR_NUM_THREADS=1
+export LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib:/pdo/app/anaconda/anaconda2-4.4.0/lib:${LD_LIBRARY_PATH:-}
+export PYTHONPATH=$REPO/src:$FORK:${PYTHONPATH:-}
+
+$QLP_PY $REPO/scripts/stage1_lightcurves/build_source_tic_overlays.py \
+  --source-tglc-data-dir $SOURCE_ROOT \
+  --output-tglc-data-dir $A2ROOT \
+  --orbit 121 --ccd 4,1 --overlay-from-observations --link-sources \
+  --apply --overwrite --summary-json $LOG/overlays.json
+
+$QLP_PY $REPO/scripts/stage1_lightcurves/prefill_epsfs_for_empty_masks.py \
+  --source-tglc-data-dir $SOURCE_ROOT \
+  --output-tglc-data-dir $A2ROOT \
+  --orbit 121 --ccd 4,1 --apply --nprocs 8 --summary-json $LOG/prefill.json
+
+HDF5_USE_FILE_LOCKING=FALSE PYTHONPATH=/sw/qlp-environment/.venv/lib/python3.11/site-packages \
+  $TGLC_PY $REPO/scripts/stage1_lightcurves/run_tglc_orbit_pipeline.py \
+  --orbit 121 --sector 57 --orbit-tag o1 --ccd 4,1 \
+  --tglc-data-dir $A2ROOT --log-dir $LOG --python-bin $TGLC_PY \
+  --fork-path $FORK --ld-library-prefix /sw/python-versions/python-3.11.9/lib \
+  --stages epsfs,lightcurves --epsfs-nprocs 2 --lightcurves-nprocs 16 \
+  --max-parallel-ccd-jobs 1 --gpu-list 0 --run-label s57-a2v1-smoke
+```
+
+The smoke passes when the overlay/prefill summaries have no errors, the driver
+reports `source=196` and `epsf=196`, and it writes HDF5s for requested targets.
+Use a GPU reported free in pre-flight; the `0` above is an example only.
+
+## Full-sector production
+
+After the one-CCD smoke passes, use the generic launcher for both S57 orbits:
+
+```bash
+TWIRL_A2V1_GPU_LIST=0,1,2,3,6,7 \
+TWIRL_A2V1_GPU_MAX_PARALLEL=4 \
+TWIRL_A2V1_EPSFS_NPROCS=2 \
+HDF5_USE_FILE_LOCKING=FALSE \
+bash /pdo/users/tehan/TWIRL/scripts/stage1_lightcurves/run_a2v1_reproduction_pdo.sh \
+  57 121:o1 122:o2
+```
+
+Set `TWIRL_A2V1_PREFILL_EMPTY_MASK_EPSFS=0` only when the prefill has already
+completed successfully. On an ePSF OOM, leave completed files intact and
+resume the affected CCD with fewer ePSF workers; do not delete the A2v1 tree.
+
+## Final product and validation
+
+After both orbits complete, build sector FITS and run the validation report:
+
+```bash
+bash /pdo/users/tehan/TWIRL/scripts/stage1_lightcurves/run_a2v1_hlsp_pdo.sh \
+  57 121 122
+
+cd /pdo/users/tehan/TWIRL
+LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib:/pdo/app/anaconda/anaconda2-4.4.0/lib:${LD_LIBRARY_PATH:-} \
+HDF5_USE_FILE_LOCKING=FALSE /sw/qlp-environment/.venv/bin/python \
+  scripts/stage1_lightcurves/validate_a2v1_product.py \
+  --a2v1-root /pdo/users/tehan/tglc-gpu-production-A2v1 \
+  --sector 57 --orbits 121 122 --allow-edge-warn-missing \
+  --schema-only --fits-workers 8 \
+  --summary-json /pdo/users/tehan/tglc-gpu-production-A2v1/twirl_logs/s57_A2v1_validation_full_schema.json
+```
+
+The validator must report zero missing non-edge HDF5 rows, zero missing
+non-edge FITS TICs, zero zero-byte HDF5s, and zero bad checked FITS files.
+`edge_warn` exclusions remain visible in the report and are accepted only by
+the explicit `--allow-edge-warn-missing` option.
+
+Record the run configuration, coverage counts, any GPU retry, and the final
+validation JSON in `doc/twirl_progress_log.md`. Photometric QA is separate
+from production-completeness validation and remains required before a sector
+is promoted for science analysis.

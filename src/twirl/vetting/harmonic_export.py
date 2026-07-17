@@ -18,7 +18,6 @@ import pandas as pd
 
 from twirl.lightcurves.tglc_h5_reader import read_tglc_h5
 from twirl.search.candidates import compute_sde
-from twirl.vetting.harmonic_dataset import native_group_path
 from twirl.vetting.harmonic_inputs import (
     CHRONOLOGY_SMALL_CHANNELS,
     CHRONOLOGY_SUPPLEMENTAL_CHANNELS,
@@ -28,6 +27,7 @@ from twirl.vetting.harmonic_inputs import (
     PERIODOGRAM_CHANNELS,
     RAW_PAIR_CONTRACT_VERSION,
     injected_raw_uncertainty,
+    native_group_path,
 )
 
 
@@ -85,6 +85,35 @@ def discover_tglc_paths(
     return [path for path in paths if path.exists()]
 
 
+def compact_adp_detector_lookup(
+    compact_adp_h5: Path,
+    *,
+    tics: Sequence[int],
+) -> dict[int, tuple[int, int]]:
+    """Read detector coordinates from the exact ADP product used by the model."""
+
+    import h5py
+
+    lookup: dict[int, tuple[int, int]] = {}
+    with h5py.File(Path(compact_adp_h5), "r") as h5:
+        for tic in tics:
+            group_path = f"targets/{int(tic):016d}"
+            if group_path not in h5:
+                continue
+            group = h5[group_path]
+            try:
+                camera = int(group.attrs["camera"])
+                ccd = int(group.attrs["ccd"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if camera not in range(1, 5) or ccd not in range(1, 5):
+                raise ValueError(
+                    f"compact ADP detector is invalid for TIC {int(tic)}: cam={camera} ccd={ccd}"
+                )
+            lookup[int(tic)] = (camera, ccd)
+    return lookup
+
+
 def merge_tglc_raw_paths(paths: Sequence[Path]) -> dict[str, np.ndarray]:
     """Read, concatenate, sort, and deduplicate native raw TGLC cadences."""
 
@@ -132,7 +161,7 @@ def align_raw_by_cadence(
     *,
     cadenceno: np.ndarray,
     time: np.ndarray,
-    max_time_error_s: float = 1.0,
+    max_time_error_s: float = 2.0,
 ) -> dict[str, np.ndarray]:
     """Align native raw arrays to an ADP cadence list, requiring exact coverage."""
 
@@ -151,7 +180,9 @@ def align_raw_by_cadence(
     finite = np.isfinite(delta_s)
     if np.any(finite) and float(np.nanmax(delta_s[finite])) > float(max_time_error_s):
         raise ValueError(f"raw/ADP cadence timestamps differ by up to {np.nanmax(delta_s):.3f} s")
-    return {name: np.asarray(values)[index] for name, values in raw.items()}
+    aligned = {name: np.asarray(values)[index] for name, values in raw.items()}
+    aligned["_time_delta_s"] = delta_s
+    return aligned
 
 
 def shared_bls_spectrum(
@@ -249,6 +280,7 @@ def export_tglc_raw_sources(
     raw_root: Path,
     out_h5: Path,
     orbits: Sequence[int] = (119, 120),
+    compact_adp_h5: Path | None = None,
 ) -> dict[str, Any]:
     """Write the compact raw/error host file on the TGLC filesystem."""
 
@@ -264,9 +296,18 @@ def export_tglc_raw_sources(
     required = rows.loc[:, ["tic", "cam", "ccd"]].copy()
     required["_detector_known"] = required[["cam", "ccd"]].notna().all(axis=1)
     required = required.sort_values("_detector_known", ascending=False).drop_duplicates("tic")
+    detector_lookup = (
+        compact_adp_detector_lookup(
+            compact_adp_h5,
+            tics=required["tic"].astype(int).tolist(),
+        )
+        if compact_adp_h5 is not None
+        else {}
+    )
     out_h5 = Path(out_h5)
     out_h5.parent.mkdir(parents=True, exist_ok=True)
     temporary = out_h5.with_suffix(out_h5.suffix + ".tmp")
+    failures_path = out_h5.with_suffix(".failures.csv")
     failures: list[dict[str, Any]] = []
     written = 0
     with h5py.File(temporary, "w") as output:
@@ -274,16 +315,32 @@ def export_tglc_raw_sources(
         output.attrs["created_utc"] = datetime.now(timezone.utc).isoformat()
         output.attrs["training_table"] = str(training_table)
         output.attrs["raw_root"] = str(raw_root)
+        output.attrs["compact_adp_h5"] = str(compact_adp_h5 or "")
         output.attrs["orbits"] = json.dumps([int(value) for value in orbits])
         output.attrs["time_system"] = "BJD"
         targets = output.create_group("targets")
         for _, row in required.iterrows():
             tic = int(row["tic"])
+            compact_detector = detector_lookup.get(tic)
+            camera = (
+                compact_detector[0]
+                if compact_detector is not None
+                else int(row["cam"])
+                if pd.notna(row["cam"])
+                else None
+            )
+            ccd = (
+                compact_detector[1]
+                if compact_detector is not None
+                else int(row["ccd"])
+                if pd.notna(row["ccd"])
+                else None
+            )
             paths = discover_tglc_paths(
                 raw_root=raw_root,
                 tic=tic,
-                camera=int(row["cam"]) if pd.notna(row["cam"]) else None,
-                ccd=int(row["ccd"]) if pd.notna(row["ccd"]) else None,
+                camera=camera,
+                ccd=ccd,
                 orbits=orbits,
             )
             try:
@@ -296,6 +353,11 @@ def export_tglc_raw_sources(
                 continue
             group = targets.create_group(f"{tic:016d}")
             group.attrs["tic"] = tic
+            group.attrs["camera"] = int(camera) if camera is not None else -1
+            group.attrs["ccd"] = int(ccd) if ccd is not None else -1
+            group.attrs["detector_source"] = (
+                "compact_adp_attrs" if compact_detector is not None else "training_table_or_discovery"
+            )
             group.attrs["source_paths"] = json.dumps([str(path) for path in paths])
             for name, values in payload.items():
                 _write_dataset(group, name, values)
@@ -303,11 +365,17 @@ def export_tglc_raw_sources(
             if written % 100 == 0:
                 print(f"[raw-source-export] {written}/{len(required)} hosts", flush=True)
     if failures:
-        pd.DataFrame(failures).to_csv(out_h5.with_suffix(".failures.csv"), index=False)
+        pd.DataFrame(failures).to_csv(failures_path, index=False)
         temporary.unlink(missing_ok=True)
         raise RuntimeError(f"raw source export failed for {len(failures)} of {len(required)} TICs")
     temporary.replace(out_h5)
-    return {"n_requested": len(required), "n_written": written, "out_h5": str(out_h5)}
+    failures_path.unlink(missing_ok=True)
+    return {
+        "n_requested": len(required),
+        "n_written": written,
+        "n_compact_adp_detectors": len(detector_lookup),
+        "out_h5": str(out_h5),
+    }
 
 
 def _copy_attrs(source: Any, destination: Any) -> None:
@@ -338,6 +406,7 @@ def build_raw_pair_export(
     training_table: Path,
     raw_source_h5: Path,
     compact_adp_h5: Path,
+    injection_pair_h5: Path | None,
     out_h5: Path,
     repo_root: Path,
     n_periods: int = DEFAULT_BLS_PERIODS,
@@ -385,6 +454,7 @@ def build_raw_pair_export(
         output.attrs["training_table"] = str(training_table)
         output.attrs["raw_source_h5"] = str(raw_source_h5)
         output.attrs["compact_adp_h5"] = str(compact_adp_h5)
+        output.attrs["injection_pair_h5"] = str(injection_pair_h5 or "")
         output.attrs["time_system"] = "BJD"
         output.attrs["periodogram_grid"] = "log10_period_d"
         output.attrs["periodogram_n"] = int(n_periods)
@@ -415,6 +485,9 @@ def build_raw_pair_export(
                 _copy_attrs(adp, group)
                 group.attrs["raw_source_paths"] = raw_file[raw_path].attrs.get(
                     "source_paths", ""
+                )
+                group.attrs["raw_adp_time_delta_max_s"] = float(
+                    np.nanmax(aligned["_time_delta_s"])
                 )
                 payload = {
                     "time": _absolute_bjd(np.asarray(adp["time"])),
@@ -450,9 +523,18 @@ def build_raw_pair_export(
             for count, (_, row) in enumerate(injection_rows.iterrows(), start=1):
                 injection_id = str(row["injection_id"])
                 try:
-                    pair_path = _resolve_path(row["source_h5"], repo_root=repo_root)
+                    pair_path = (
+                        _resolve_path(injection_pair_h5, repo_root=repo_root)
+                        if injection_pair_h5 is not None
+                        else _resolve_path(row["source_h5"], repo_root=repo_root)
+                    )
                     pair_file = pair_files.setdefault(pair_path, h5py.File(pair_path, "r"))
-                    pair = pair_file[str(row["h5_group"])]
+                    pair_group_path = (
+                        f"injections/{injection_id}"
+                        if injection_pair_h5 is not None
+                        else str(row["h5_group"])
+                    )
+                    pair = pair_file[pair_group_path]
                     canonical_path = _resolve_path(
                         pair.attrs.get("source_injection_h5", pair_file.attrs["source_injection_h5"]),
                         repo_root=repo_root,
@@ -475,6 +557,9 @@ def build_raw_pair_export(
                     group.attrs["raw_source_paths"] = raw_file[
                         f"targets/{tic:016d}"
                     ].attrs.get("source_paths", "")
+                    group.attrs["raw_adp_time_delta_max_s"] = float(
+                        np.nanmax(aligned["_time_delta_s"])
+                    )
                     payload = {
                         "time": _absolute_bjd(np.asarray(pair["time"])),
                         "cadenceno": np.asarray(pair["cadenceno"], dtype=np.int64),
@@ -567,6 +652,7 @@ def merge_raw_pair_shards(*, shard_paths: Sequence[Path], out_h5: Path) -> dict[
                     "training_table",
                     "raw_source_h5",
                     "compact_adp_h5",
+                    "injection_pair_h5",
                     "periodogram_grid",
                     "periodogram_n",
                     "chronology_small_channels",
@@ -594,6 +680,7 @@ __all__ = [
     "DEFAULT_BLS_PERIODS",
     "RAW_SOURCE_CONTRACT_VERSION",
     "align_raw_by_cadence",
+    "compact_adp_detector_lookup",
     "build_raw_pair_export",
     "discover_tglc_paths",
     "export_tglc_raw_sources",

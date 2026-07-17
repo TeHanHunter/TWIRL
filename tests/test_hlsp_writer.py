@@ -83,7 +83,7 @@ def _load_a2v1_validator():
     return module
 
 
-def _write_observation_table(path: Path) -> None:
+def _write_observation_table(path: Path, *, edge_warn: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     Table(
         {
@@ -92,6 +92,7 @@ def _write_observation_table(path: Path) -> None:
             "camera": [4, 4],
             "ccd": [1, 1],
             "tic_id": [123456789, 123456789],
+            "edge_warn": [edge_warn, edge_warn],
         }
     ).write(path)
 
@@ -210,3 +211,32 @@ def test_validate_a2v1_product_rejects_canonical_det_flux_columns(tmp_path: Path
     assert summary["fits"]["n_bad_checked_fits"] == 1
     bad = summary["fits"]["bad_fits_examples"][0]
     assert "DET_FLUX" in bad["forbidden_columns_present"]
+
+
+def test_validate_a2v1_product_can_allow_documented_edge_exclusions(tmp_path: Path) -> None:
+    module = _load_a2v1_validator()
+    root = tmp_path / "a2v1"
+    hlsp_root = root / "hlsp_s0056_A2v1"
+    observations = tmp_path / "observations.fits"
+    summary_json = tmp_path / "summary.json"
+    _write_observation_table(observations, edge_warn=True)
+
+    rc = module.main(
+        [
+            "--a2v1-root", str(root),
+            "--hlsp-root", str(hlsp_root),
+            "--observations", str(observations),
+            "--sector", "56",
+            "--orbits", "119", "120",
+            "--allow-edge-warn-missing",
+            "--summary-json", str(summary_json),
+        ]
+    )
+
+    summary = json.loads(summary_json.read_text())
+    assert rc == 0
+    assert summary["ok"] is True
+    assert summary["h5"]["n_missing_h5_edge_warn"] == 2
+    assert summary["h5"]["n_missing_h5_non_edge"] == 0
+    assert summary["fits"]["n_missing_fits_edge_warn_tics"] == 1
+    assert summary["fits"]["n_missing_fits_non_edge_tics"] == 0

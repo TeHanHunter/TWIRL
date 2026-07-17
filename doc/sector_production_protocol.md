@@ -5,6 +5,10 @@ Procedure for producing TGLC + detrend + HLSP outputs for one TESS sector
 the codebase as of `2026-04-30` (after S56 GPU production validated against the
 frozen `tglc-deep-catalogs/hlsp_s0056/` baseline).
 
+For the current no-cap, saturated-mask, ADP/ADP015-only product, use the
+dedicated [A2v1 production protocol](a2v1_production_protocol.md). This page
+remains the legacy canonical-detrending production reference.
+
 ## Time budget per sector
 
 | | clean | real-world |
