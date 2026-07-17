@@ -5,6 +5,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .venv/
+.matplotlib-cache/
+.matplotlib_cache/
+__codex_sync_tmp__/
 data_local/
 .tmp/
 tmp/

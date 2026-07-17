@@ -21,7 +21,7 @@ Usage: run_s56_orcd_pilot.sh [--run] COMMAND [COMMAND ...]
 
 Commands:
   probe          Verify the ORCD control socket and partition are reachable.
-  sync-code      Rsync the current local code checkout to ORCD, preserving data.
+  sync-code      Refresh the clean ORCD checkout from Git.
   stage          Stage the local checkout and compact S56 PDO artifacts.
   stage-balanced Stage only the compact balanced-grid S56 artifacts.
   stage-allhost  Stage only the all-host S56 artifacts and reports.
@@ -157,7 +157,7 @@ submit() {
   local script="$3"
   echo "[orcd-pilot] submit ${name}: ${script}"
   enforce_h200_cap "${script}"
-  orcd "cd '${ORCD_REPO}' && mkdir -p /orcd/data/mki_aryeh/001/twirl/logs && sbatch ${export_arg} '${script}'"
+  orcd "cd '${ORCD_REPO}' && test -z \"\$(git status --porcelain=v1 --untracked-files=all)\" && mkdir -p /orcd/data/mki_aryeh/001/twirl/logs && sbatch ${export_arg} '${script}'"
 }
 
 enforce_h200_cap() {
@@ -191,24 +191,13 @@ cmd_probe() {
 }
 
 cmd_sync_code() {
-  echo "[orcd-pilot] sync current local code to ORCD"
-  local rsync_args=(
-    -az
-    --delete
-    --exclude .git/
-    --exclude .venv/
-    --exclude __pycache__/
-    --exclude .pytest_cache/
-    --exclude .matplotlib_cache/
-    --exclude data_local/
-    --exclude reports/
-    --exclude logs/
-    --exclude outputs/current_keynote_edit/
-  )
+  echo "[orcd-pilot] refresh clean ORCD checkout from Git"
+  run_or_echo "${LOCAL_REPO}/scripts/assert_clean_checkout.sh" "${LOCAL_REPO}"
   if [[ "${DRY_RUN}" == "1" ]]; then
-    rsync_args=(-n "${rsync_args[@]}")
+    print_cmd "${LOCAL_REPO}/scripts/orcd/bootstrap_orcd_git_checkout.sh" --run
+  else
+    "${LOCAL_REPO}/scripts/orcd/bootstrap_orcd_git_checkout.sh" --run
   fi
-  run_or_echo rsync "${rsync_args[@]}" -e "${ORCD_SSH_CMD}" "${LOCAL_REPO}/" "${ORCD_HOST}:${ORCD_REPO}/"
 }
 
 cmd_stage() {

@@ -17,8 +17,8 @@ Bootstraps/refetches the ORCD Git checkout, then stages compact PDO artifacts
 to ORCD. Default mode is dry-run. Use --run only after the ORCD control socket
 is open.
 
-By default code is updated through Git, not rsync. Set
-TWIRL_STAGE_RSYNC_CODE=1 only for an explicit dirty-checkout deployment smoke.
+Code is updated through Git only. The staging helper refuses dirty local and
+ORCD checkouts.
 
 Subsets:
   all       Stage the full compact S56 downstream bundle.
@@ -60,7 +60,6 @@ ORCD_HOST="${ORCD_HOST:-tehan@orcd-login.mit.edu}"
 ORCD_REPO="${ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 ORCD_CONTROL_PATH="${ORCD_CONTROL_PATH:-$HOME/.ssh/cm/%r@%h:%p}"
 ORCD_CONNECT_TIMEOUT="${ORCD_CONNECT_TIMEOUT:-15}"
-TWIRL_STAGE_RSYNC_CODE="${TWIRL_STAGE_RSYNC_CODE:-0}"
 
 ORCD_SSH=(
   ssh
@@ -166,6 +165,9 @@ if [[ "${DRY_RUN}" == "1" ]]; then
   echo "[stage-orcd] dry run. Re-run with --run after the ORCD control socket is open."
 fi
 
+echo "[stage-orcd] checking local Git checkout"
+run_or_echo "${LOCAL_REPO}/scripts/assert_clean_checkout.sh" "${LOCAL_REPO}"
+
 echo "[stage-orcd] ensuring ORCD code checkout is Git-tracked"
 if [[ "${DRY_RUN}" == "1" ]]; then
   run_or_echo "${LOCAL_REPO}/scripts/orcd/bootstrap_orcd_git_checkout.sh" --run
@@ -173,29 +175,7 @@ else
   "${LOCAL_REPO}/scripts/orcd/bootstrap_orcd_git_checkout.sh" --run
 fi
 
-RSYNC_ARGS=(
-  -az
-  --delete
-  --exclude .git/
-  --exclude .venv/
-  --exclude __pycache__/
-  --exclude .pytest_cache/
-  --exclude .matplotlib_cache/
-  --exclude data_local/
-  --exclude reports/
-  --exclude logs/
-  --exclude outputs/current_keynote_edit/
-)
-if [[ "${DRY_RUN}" == "1" ]]; then
-  RSYNC_ARGS=(-n "${RSYNC_ARGS[@]}")
-fi
-
-if [[ "${TWIRL_STAGE_RSYNC_CODE}" == "1" ]]; then
-  echo "[stage-orcd] syncing current local code into the Git checkout"
-  run_or_echo rsync "${RSYNC_ARGS[@]}" -e "${ORCD_SSH_CMD}" "${LOCAL_REPO}/" "${ORCD_HOST}:${ORCD_REPO}/"
-else
-  echo "[stage-orcd] code sync skipped; ORCD code is managed by Git"
-fi
+echo "[stage-orcd] code is managed by Git; rsync deployment is disabled"
 
 echo "[stage-orcd] checking compact PDO artifact list"
 if [[ "${DRY_RUN}" == "1" ]]; then

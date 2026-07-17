@@ -44,6 +44,7 @@ ORCD_CONTROL_PATH="${ORCD_CONTROL_PATH:-$HOME/.ssh/cm/%r@%h:%p}"
 ORCD_CONNECT_TIMEOUT="${ORCD_CONNECT_TIMEOUT:-15}"
 TWIRL_GIT_REMOTE="${TWIRL_GIT_REMOTE:-https://github.com/TeHanHunter/TWIRL.git}"
 TWIRL_GIT_BRANCH="${TWIRL_GIT_BRANCH:-main}"
+TWIRL_GIT_SHA="${TWIRL_GIT_SHA:-}"
 TWIRL_ORCD_SPARSE="${TWIRL_ORCD_SPARSE:-1}"
 
 ORCD_SSH=(
@@ -72,6 +73,7 @@ set -euo pipefail
 echo "[orcd-git] repo=${ORCD_REPO}"
 echo "[orcd-git] remote=${TWIRL_GIT_REMOTE}"
 echo "[orcd-git] branch=${TWIRL_GIT_BRANCH}"
+echo "[orcd-git] expected_sha=${TWIRL_GIT_SHA:-<branch-head>}"
 echo "[orcd-git] sparse=${TWIRL_ORCD_SPARSE}"
 
 export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new}"
@@ -82,7 +84,18 @@ mkdir -p "${ORCD_REPO}"
 cd "${ORCD_REPO}"
 
 if [[ ! -d .git ]]; then
+  if find . -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    echo "[orcd-git] refusing to initialize Git in a nonempty directory" >&2
+    exit 6
+  fi
   git init -b "${TWIRL_GIT_BRANCH}"
+else
+  dirty="$(git status --porcelain=v1 --untracked-files=all)"
+  if [[ -n "${dirty}" ]]; then
+    echo "[orcd-git] refusing to refresh a dirty checkout" >&2
+    printf '%s\n' "${dirty}" >&2
+    exit 7
+  fi
 fi
 if git remote get-url origin >/dev/null 2>&1; then
   git remote set-url origin "${TWIRL_GIT_REMOTE}"
@@ -90,6 +103,11 @@ else
   git remote add origin "${TWIRL_GIT_REMOTE}"
 fi
 git fetch origin "${TWIRL_GIT_BRANCH}"
+target_sha="$(git rev-parse "origin/${TWIRL_GIT_BRANCH}")"
+if [[ -n "${TWIRL_GIT_SHA}" && "${target_sha}" != "${TWIRL_GIT_SHA}" ]]; then
+  echo "[orcd-git] fetched branch SHA ${target_sha} != expected ${TWIRL_GIT_SHA}" >&2
+  exit 8
+fi
 git symbolic-ref HEAD "refs/heads/${TWIRL_GIT_BRANCH}"
 git branch --set-upstream-to="origin/${TWIRL_GIT_BRANCH}" "${TWIRL_GIT_BRANCH}" >/dev/null 2>&1 || true
 
@@ -109,14 +127,16 @@ git reset --hard "origin/${TWIRL_GIT_BRANCH}"
 git rev-parse --show-toplevel
 git remote -v
 git status --short --branch
+test -z "$(git status --porcelain=v1 --untracked-files=all)"
 EOS
 )
 
 remote_command="$(
-  printf 'ORCD_REPO=%q TWIRL_GIT_REMOTE=%q TWIRL_GIT_BRANCH=%q TWIRL_ORCD_SPARSE=%q bash -lc %q' \
+  printf 'ORCD_REPO=%q TWIRL_GIT_REMOTE=%q TWIRL_GIT_BRANCH=%q TWIRL_GIT_SHA=%q TWIRL_ORCD_SPARSE=%q bash -lc %q' \
     "${ORCD_REPO}" \
     "${TWIRL_GIT_REMOTE}" \
     "${TWIRL_GIT_BRANCH}" \
+    "${TWIRL_GIT_SHA}" \
     "${TWIRL_ORCD_SPARSE}" \
     "${remote_script}"
 )"
