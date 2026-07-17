@@ -15,6 +15,7 @@ set -euo pipefail
 
 QUEUE_FILE=${1:?usage: $0 <queue-file>}
 REPO=${TWIRL_REPO:-/pdo/users/tehan/TWIRL}
+export TWIRL_REPO="$REPO"
 SOURCE_ROOT=${TWIRL_SOURCE_ROOT:-/pdo/users/tehan/tglc-gpu-production}
 A2V1_ROOT=${TWIRL_A2V1_ROOT:-/pdo/users/tehan/tglc-gpu-production-A2v1}
 QLP_PY=${TWIRL_QLP_PY:-/sw/qlp-environment/.venv/bin/python}
@@ -26,6 +27,8 @@ LOG_DIR=${TWIRL_A2V1_LOG_DIR:-$A2V1_ROOT/twirl_logs}
 QUEUE_LABEL=${TWIRL_A2V1_QUEUE_LABEL:-a2v1-sector-queue}
 QUEUE_LOG=$LOG_DIR/${QUEUE_LABEL}.log
 OBSERVATIONS=${TWIRL_OBSERVATIONS:-$REPO/data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits}
+
+"$REPO/scripts/assert_clean_checkout.sh" "$REPO"
 
 if [ ! -r "$QUEUE_FILE" ]; then
   echo "queue file is not readable: $QUEUE_FILE" >&2

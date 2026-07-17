@@ -19,6 +19,7 @@
 set -euo pipefail
 
 REPO=${TWIRL_REPO:-/pdo/users/tehan/TWIRL}
+export TWIRL_REPO="$REPO"
 SOURCE_ROOT=${TWIRL_SOURCE_ROOT:-/pdo/users/tehan/tglc-gpu-production}
 A2V1_ROOT=${TWIRL_A2V1_ROOT:-/pdo/users/tehan/tglc-gpu-production-A2v1}
 TGLC_FORK=${TWIRL_TGLC_FORK:-/pdo/users/tehan/tess-gaia-light-curve-twirl}
@@ -54,7 +55,9 @@ export MKL_NUM_THREADS=${MKL_NUM_THREADS:-1}
 export VECLIB_MAXIMUM_THREADS=${VECLIB_MAXIMUM_THREADS:-1}
 export NUMEXPR_NUM_THREADS=${NUMEXPR_NUM_THREADS:-1}
 export LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib:/pdo/app/anaconda/anaconda2-4.4.0/lib:${LD_LIBRARY_PATH:-}
-export PYTHONPATH=/pdo/users/tehan/TWIRL/src:/sw/qlp-environment/.venv/lib/python3.11/site-packages:${PYTHONPATH:-}
+export PYTHONPATH=$REPO/src:/sw/qlp-environment/.venv/lib/python3.11/site-packages:${PYTHONPATH:-}
+
+"$REPO/scripts/assert_clean_checkout.sh" "$REPO"
 
 mkdir -p "$A2V1_ROOT" "$LOG_DIR"
 

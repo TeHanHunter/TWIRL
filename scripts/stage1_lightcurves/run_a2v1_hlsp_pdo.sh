@@ -20,6 +20,7 @@ if [ "$#" -lt 1 ]; then
 fi
 
 REPO=${TWIRL_REPO:-/pdo/users/tehan/TWIRL}
+export TWIRL_REPO="$REPO"
 A2V1_ROOT=${TWIRL_A2V1_ROOT:-/pdo/users/tehan/tglc-gpu-production-A2v1}
 SCRIPT_DIR=${TWIRL_SCRIPT_DIR:-$REPO/scripts/stage1_lightcurves}
 PY=${TWIRL_QLP_PY:-/sw/qlp-environment/.venv/bin/python}
@@ -37,6 +38,8 @@ export VECLIB_MAXIMUM_THREADS=${VECLIB_MAXIMUM_THREADS:-1}
 export NUMEXPR_NUM_THREADS=${NUMEXPR_NUM_THREADS:-1}
 export LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib:/pdo/app/anaconda/anaconda2-4.4.0/lib:${LD_LIBRARY_PATH:-}
 export PYTHONPATH=$REPO/src:/sw/qlp-environment/.venv/lib/python3.11/site-packages:${PYTHONPATH:-}
+
+"$REPO/scripts/assert_clean_checkout.sh" "$REPO"
 
 ORBIT_ROOTS=()
 for orbit in "$@"; do
