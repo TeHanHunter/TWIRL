@@ -9,6 +9,7 @@ __pycache__/
 .matplotlib_cache/
 __codex_sync_tmp__/
 data_local/
+data_local
 .tmp/
 tmp/
 logs/
