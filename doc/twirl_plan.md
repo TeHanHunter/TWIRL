@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-16`.
+Last reconciled: `2026-07-17`.
 
 ## Current status
 
@@ -15,8 +15,9 @@ Last reconciled: `2026-07-16`.
 - `A2v1` is the active Stage 1 product family: no TIC-magnitude science cap,
   saturated-pixel ePSF masking, and sector-level ADP/ADP015 FITS products for
   the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS) and S57
-  (`27,213` FITS) pass edge-aware HDF5/FITS validation; S58 now also passes
-  its rebuilt full-product gate, and the queue is producing S59-S63. See
+  (`27,213` FITS) pass edge-aware HDF5/FITS validation; S58 and S59 pass their
+  full-product gates, and the resumable queue is producing S60-S63 from
+  `pdogpu5` after `pdogpu6` became unresponsive. See
   [Stage 1 history](twirl_progress_log.md#stage-1).
 - S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
   recovery in both active ADP apertures. Tier 0 verifies product integrity and
@@ -108,9 +109,10 @@ The operational contract is defined in the
 
 ### Current gate
 
-The S58-S63 serial queue is active. S58 passed its rebuilt full-product gate,
-and S59 is in HDF5 extraction. Do not create sector-specific production logic
-unless the sector is a documented exception.
+The S58-S63 serial queue is active. S59 passed its full-product gate, and the
+resumable S60 extraction is running on `pdogpu5` with the partial products
+retained. Do not create sector-specific production logic unless the sector is a
+documented exception.
 
 ### Exit criteria
 

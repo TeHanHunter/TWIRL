@@ -321,6 +321,8 @@ def build_existing_teacher_enrichment_batch(
     excluded_tables: Sequence[pd.DataFrame] = (),
     quotas: EnrichmentQuotas = DEFAULT_ENRICHMENT_QUOTAS,
     seed: int = 56,
+    required_peak_rank: int | None = None,
+    double_review_count: int = 100,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """Select one deterministic, blinded real-TIC enrichment batch."""
 
@@ -338,8 +340,16 @@ def build_existing_teacher_enrichment_batch(
     candidates["tic"] = candidates["tic"].astype(np.int64)
     candidates["sector"] = candidates["sector"].astype(np.int16)
     candidates = candidates.loc[candidates["sector"].eq(int(sector))].copy()
+    if required_peak_rank is not None:
+        peak_rank = pd.to_numeric(candidates["rep_peak_rank"], errors="coerce")
+        candidates = candidates.loc[peak_rank.eq(int(required_peak_rank))].copy()
     if candidates.empty:
-        raise ValueError(f"score table contains no Sector {sector} rows")
+        rank_note = (
+            f" at representative peak rank {required_peak_rank}"
+            if required_peak_rank is not None
+            else ""
+        )
+        raise ValueError(f"score table contains no Sector {sector} rows{rank_note}")
     excluded = _excluded_tics(excluded_tables)
     candidates = candidates.loc[~candidates["tic"].isin(excluded)].copy()
     if candidates["tic"].nunique() < quotas.total:
@@ -440,8 +450,9 @@ def build_existing_teacher_enrichment_batch(
     hidden["active_learning_policy_version"] = ACTIVE_LEARNING_POLICY_VERSION
     hidden["batch_index"] = int(batch_index)
     hidden["double_review"] = False
+    n_overlap = min(max(0, int(double_review_count)), len(hidden))
     overlap_indices = hidden.sample(
-        n=min(100, len(hidden)),
+        n=n_overlap,
         random_state=int(seed) + int(sector) + 10_000 + int(batch_index),
     ).index
     hidden.loc[overlap_indices, "double_review"] = True
@@ -459,6 +470,9 @@ def build_existing_teacher_enrichment_batch(
         "n_unique_tics": int(queue["tic"].nunique()),
         "n_double_review": int(len(overlap)),
         "n_excluded_tics": int(len(excluded)),
+        "required_peak_rank": (
+            int(required_peak_rank) if required_peak_rank is not None else None
+        ),
         "quotas": asdict(quotas),
         "selection_bucket_counts": {
             str(key): int(value)
@@ -469,7 +483,13 @@ def build_existing_teacher_enrichment_batch(
         "morphology_ranker": "existing shape_plus_periodogram_bls ensemble",
         "scores_hidden_from_browser": True,
     }
-    verify_enrichment_batch(queue, overlap, hidden, expected_quotas=quotas)
+    verify_enrichment_batch(
+        queue,
+        overlap,
+        hidden,
+        expected_quotas=quotas,
+        expected_overlap_count=n_overlap,
+    )
     return queue, overlap, hidden, summary
 
 
@@ -479,6 +499,7 @@ def verify_enrichment_batch(
     hidden: pd.DataFrame,
     *,
     expected_quotas: EnrichmentQuotas = DEFAULT_ENRICHMENT_QUOTAS,
+    expected_overlap_count: int = 100,
     sheet_dir: Path | None = None,
 ) -> dict[str, Any]:
     if len(queue) != expected_quotas.total or queue["tic"].nunique() != len(queue):
@@ -498,8 +519,12 @@ def verify_enrichment_batch(
     expected = {key: value for key, value in asdict(expected_quotas).items() if value > 0}
     if counts != expected:
         raise ValueError(f"selection bucket counts differ: observed={counts}, expected={expected}")
-    if len(overlap) != min(100, len(queue)):
-        raise ValueError("double-review queue must contain 100 rows or the complete short queue")
+    expected_overlap = min(max(0, int(expected_overlap_count)), len(queue))
+    if len(overlap) != expected_overlap:
+        raise ValueError(
+            "double-review queue has the wrong size: "
+            f"observed={len(overlap)}, expected={expected_overlap}"
+        )
     if not set(overlap["candidate_key"]).issubset(set(queue["candidate_key"])):
         raise ValueError("double-review queue contains rows absent from the public queue")
     sheet_status = "not_checked"
@@ -529,6 +554,8 @@ def write_existing_teacher_enrichment_batch(
     batch_index: int,
     exclude_paths: Sequence[Path] = (),
     quotas: EnrichmentQuotas = DEFAULT_ENRICHMENT_QUOTAS,
+    required_peak_rank: int | None = None,
+    double_review_count: int = 100,
 ) -> dict[str, Any]:
     compact = _read_table(compact_scores_path)
     morphology = _read_table(morphology_scores_path)
@@ -540,6 +567,8 @@ def write_existing_teacher_enrichment_batch(
         batch_index=int(batch_index),
         excluded_tables=exclusions,
         quotas=quotas,
+        required_peak_rank=required_peak_rank,
+        double_review_count=double_review_count,
     )
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -551,6 +580,7 @@ def write_existing_teacher_enrichment_batch(
         pd.read_csv(overlap_path),
         pd.read_parquet(hidden_path),
         expected_quotas=quotas,
+        expected_overlap_count=double_review_count,
     )
     summary.update(
         {
@@ -586,6 +616,7 @@ def build_mixed_existing_teacher_enrichment_batch(
     per_sector_quotas: EnrichmentQuotas,
     double_review_count: int = 100,
     seed: int = 56,
+    required_peak_rank: int | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """Build a sector-balanced queue with globally unique host TICs."""
 
@@ -606,6 +637,8 @@ def build_mixed_existing_teacher_enrichment_batch(
             excluded_tables=cumulative_exclusions,
             quotas=per_sector_quotas,
             seed=seed,
+            required_peak_rank=required_peak_rank,
+            double_review_count=0,
         )
         selected_hidden.append(hidden)
         cumulative_exclusions.append(hidden.loc[:, ["tic"]].copy())
@@ -637,6 +670,7 @@ def build_mixed_existing_teacher_enrichment_batch(
         overlap,
         hidden,
         expected_quotas=global_quotas,
+        expected_overlap_count=n_overlap,
     )
     sector_counts = {
         str(key): int(value)
@@ -670,6 +704,9 @@ def build_mixed_existing_teacher_enrichment_batch(
         },
         "per_sector_summaries": per_sector_summaries,
         "cross_sector_tic_deduplication": True,
+        "required_peak_rank": (
+            int(required_peak_rank) if required_peak_rank is not None else None
+        ),
         "training_performed": False,
         "compact_ranker": "existing shape_plus_raw_chronology ensemble",
         "morphology_ranker": "existing shape_plus_periodogram_bls ensemble",
@@ -686,6 +723,7 @@ def write_mixed_existing_teacher_enrichment_batch(
     exclude_paths: Sequence[Path] = (),
     per_sector_quotas: EnrichmentQuotas,
     double_review_count: int = 100,
+    required_peak_rank: int | None = None,
 ) -> dict[str, Any]:
     """Read frozen score products and write one blinded mixed-sector batch."""
 
@@ -711,6 +749,7 @@ def write_mixed_existing_teacher_enrichment_batch(
         excluded_tables=exclusions,
         per_sector_quotas=per_sector_quotas,
         double_review_count=int(double_review_count),
+        required_peak_rank=required_peak_rank,
     )
 
     out_dir = Path(out_dir)
@@ -733,6 +772,7 @@ def write_mixed_existing_teacher_enrichment_batch(
         pd.read_csv(overlap_path),
         pd.read_parquet(hidden_path),
         expected_quotas=global_quotas,
+        expected_overlap_count=double_review_count,
     )
     summary.update(
         {
