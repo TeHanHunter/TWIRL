@@ -169,6 +169,11 @@ def test_handoff_builder_and_app_roundtrip_period_factor(tmp_path: Path) -> None
     )
     assert summary["n_rows"] == 7
     assert summary["scores_in_package"] is False
+    launcher = (out_dir / "run_franklin_vetting.sh").read_text()
+    readme = (out_dir / "README_Franklin_vetting.md").read_text()
+    assert 'PORT="${FRANKLIN_PORT:-5003}"' in launcher
+    assert '--port "${PORT}"' in launcher
+    assert "ssh -N -L 5003:127.0.0.1:5003 pdogpu1.mit.edu" in readme
 
     app_module = _load_script(
         "franklin_vetting_app",
