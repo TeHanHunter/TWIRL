@@ -141,12 +141,13 @@ documented exception.
 The focused S56 compact revisit is complete (`407/407` sheets, including `11`
 new Planet-like labels from the `400` model-selected compact rows), but the
 separate blinded S56 `1,000`-TIC enrichment batch remains only partially
-labeled (`177/1,000` at the preserved checkpoint). Complete and audit that
-bounded S56 batch before expanding human review. An S57 queue was generated
-from `136,060` candidates over `27,212` real TICs before this gate and contains
-exactly six human labels. Preserve all six as explicitly premature
-experimental evidence, pause further S57 holdout consumption, and do not treat
-S57 as a pristine external holdout.
+labeled (`177/1,000` at the preserved checkpoint). A bounded Franklin handoff
+now deliberately extends enrichment review to `3,000` fresh real TICs across
+S57--S59 (`1,000` per sector). It uses the frozen teacher-v1 ranker only to
+enrich review: every displayed ephemeris is ADP-small BLS rank one, and model
+scores and selection buckets remain hidden. The six prior S57 labels are
+preserved as premature experimental evidence and the entire earlier S57 queue
+is excluded. S57 is therefore no longer a pristine external holdout.
 
 The immediate parallel work is to harden the existing S56 periodic/enrichment
 path, not to add search branches. Require the Tier-1 target pass mask, freeze a
@@ -280,9 +281,10 @@ never a completeness measurement.
    authoritative cadence/quality reference, produce the genuinely independent
    WD 1856 comparison, rerun the current Tier-0 report, and publish the target
    QA pass mask. This scope may qualify enrichment but never science release.
-3. Complete and audit the bounded S56 periodic enrichment on the Tier-1 pass
-   set, freeze the candidate/aperture contract, and merge only confidently
-   adjudicated labels into a versioned training set. Keep S57 labeling paused.
+3. Complete and audit the bounded S56 and Franklin S57--S59 enrichment
+   reviews, freeze the candidate/aperture contract, and merge only confidently
+   adjudicated labels into a versioned training set. Do not expand beyond this
+   bounded `3,000`-TIC handoff until its yield and label consistency are audited.
 4. Retrain and evaluate teacher v1 on that frozen set with TIC-grouped,
    source-separated, calibrated metrics and uncertainty intervals. Do not put
    teacher v2, student pseudo-labels, or another model family on this path.

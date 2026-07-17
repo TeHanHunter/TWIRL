@@ -110,14 +110,23 @@ sample.
   contains exactly six nonempty labels. Preserve all six as premature
   experimental evidence, pause further S57 holdout consumption, and do not
   treat S57 as a pristine external holdout.
+- `2026-07-17`: The accepted frozen teacher-v1 ensemble produced a blinded
+  Franklin handoff of `3,000` fresh real TICs: `1,000` each from S57, S58, and
+  S59. Every row uses the ADP-small BLS rank-one ephemeris; the hidden quotas
+  are `1,200` compact-transit, `900` Eclipse/contact, `300` Smooth-variable,
+  `300` disagreement, and `300` controls. The package has `3,000` current
+  `S56-ADP-HV2` PNG sheets, `14` real reference examples, zero PDFs, and no
+  exposed model scores or selection provenance. It is an active-learning
+  review set, not a new teacher test set. The self-contained package passed
+  its browser `--check-only` validation in place on PDO with all `3,000`
+  sheets resolved and a group-writable label CSV for Franklin.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Apply the Tier-1 target mask, complete and audit the bounded S56
-periodic enrichment, freeze its confident candidate/label set, and retrain the
-teacher-v1 baseline with grouped and calibrated evaluation. Keep S57 labeling
-paused; add dip, multi-sector, and false-alarm branches only after this path is
-robust.
+**Next:** Apply the Tier-1 target mask, complete and audit the bounded S56 and
+S57--S59 enrichment reviews, freeze the confident candidate/label set, and
+retrain the teacher-v1 baseline with grouped and calibrated evaluation. Add
+dip, multi-sector, and false-alarm branches only after this path is robust.
 
 ### Human labels and harmonic review
 
