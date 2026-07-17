@@ -316,6 +316,13 @@ def build_franklin_multisector_batch(
         )
         selected.append(hidden)
         cumulative_exclusions.append(hidden.loc[:, ["tic"]].copy())
+        summary["policy_version"] = FRANKLIN_MULTISECTOR_POLICY_VERSION
+        summary["compact_ranker"] = (
+            "Teacher-v1 sqrt(p_planet_like * p_preserve)"
+        )
+        summary["morphology_ranker"] = (
+            "Teacher-v1 shape_plus_periodogram_bls ensemble"
+        )
         sector_summaries[str(sector)] = summary
 
     hidden = pd.concat(selected, ignore_index=True, sort=False)

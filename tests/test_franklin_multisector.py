@@ -112,6 +112,11 @@ def test_multisector_batch_uses_rank1_unequal_quotas_and_global_tic_dedup() -> N
     assert set(queue["tic"]).isdisjoint({10_000, 20_000})
     assert len(overlap) == 4
     assert summary["rank_policy"].endswith("rank 1 only")
+    assert all(
+        value["compact_ranker"]
+        == "Teacher-v1 sqrt(p_planet_like * p_preserve)"
+        for value in summary["sector_summaries"].values()
+    )
     assert not any(
         column.startswith(("p_", "std_p_", "selection_", "model_"))
         for column in queue
