@@ -35,7 +35,9 @@ for _v in (
 ):
     _os.environ.setdefault(_v, "1")
 
+import json
 import sys
+from pathlib import Path
 
 from qlp.io.datastructures import OrbitalInfo, SectorInfo
 
@@ -43,7 +45,9 @@ from qlp.io.datastructures import OrbitalInfo, SectorInfo
 # Hard-coded TWIRL benchmark sector-orbit metadata. Cadence ranges come from
 # the TICA FFI filenames under /pdo/qlp-data/tica-delivery/s00XX/camC-ccdD/.
 # mjd_range is a placeholder (hlsp only iterates orbit_number at the call sites
-# we hit). Extend this table when adding new benchmark sectors.
+# we hit). Additional sectors can be supplied at runtime via the
+# TWIRL_SECTOR_ORBIT_JSON env var (see _load_extra_sector_orbit_entries); that
+# keeps one-off benchmarks (e.g. S96 QA) out of this file.
 SECTOR_ORBIT_TABLE: dict[int, list[OrbitalInfo]] = {
     56: [
         OrbitalInfo(
@@ -62,6 +66,37 @@ SECTOR_ORBIT_TABLE: dict[int, list[OrbitalInfo]] = {
         ),
     ],
 }
+
+
+def _load_extra_sector_orbit_entries() -> None:
+    """Merge entries from $TWIRL_SECTOR_ORBIT_JSON into SECTOR_ORBIT_TABLE.
+
+    JSON schema:
+      {"<sector_int>": [
+         {"orbit_number": int, "cadence_range": [int, int],
+          "mjd_range": [float, float]?},
+         ...
+      ], ...}
+    """
+    path = _os.environ.get("TWIRL_SECTOR_ORBIT_JSON")
+    if not path:
+        return
+    data = json.loads(Path(path).read_text())
+    for sector_str, entries in data.items():
+        sector = int(sector_str)
+        SECTOR_ORBIT_TABLE[sector] = [
+            OrbitalInfo(
+                orbit_number=int(e["orbit_number"]),
+                sector=sector,
+                cadence_range=tuple(e["cadence_range"]),
+                mjd_range=tuple(e.get("mjd_range", (0.0, 0.0))),
+                basename="",
+            )
+            for e in entries
+        ]
+
+
+_load_extra_sector_orbit_entries()
 
 ORBIT_SECTOR_MAP = {
     orbit.orbit_number: sector

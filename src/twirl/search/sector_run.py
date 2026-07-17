@@ -169,6 +169,47 @@ def _target_dir(sector_out: Path, tic: int) -> Path:
     return sector_out / "targets" / f"tic_{tic:010d}"
 
 
+def _tic_from_hlsp_path(path: Path) -> int | None:
+    try:
+        return int(path.name.split("-")[1].split("_")[0])
+    except Exception:
+        return None
+
+
+def _hlsp_path_for_tic(hlsp_root: Path, sector: int, tic: int) -> Path | None:
+    tic16 = f"{int(tic):016d}"
+    shard = Path(hlsp_root).joinpath(tic16[0:4], tic16[4:8], tic16[8:12], tic16[12:16])
+    patterns = (
+        f"hlsp_*_tess_ffi_s{sector:04d}-{tic16}_tess_v*_llc.fits",
+        f"hlsp_*_tess_ffi_*{tic16}*_llc.fits",
+    )
+    for pattern in patterns:
+        matches = sorted(shard.glob(pattern))
+        if matches:
+            return matches[0]
+    return None
+
+
+def _read_target_list(path: Path, hlsp_root: Path, sector: int) -> list[Path]:
+    """Read explicit Stage 2 targets from a file-list or TIC-list text file."""
+    out: list[Path] = []
+    for raw in Path(path).read_text().splitlines():
+        token = raw.strip()
+        if not token or token.startswith("#"):
+            continue
+        first = token.split(",", 1)[0].split()[0]
+        if first.isdigit():
+            resolved = _hlsp_path_for_tic(hlsp_root, sector, int(first))
+            if resolved is not None:
+                out.append(resolved)
+            continue
+        p = Path(first)
+        if not p.is_absolute():
+            p = Path(hlsp_root) / p
+        out.append(p)
+    return sorted(dict.fromkeys(out))
+
+
 def _process_one(path: Path) -> list[dict[str, Any]]:
     """Read + run BLS on one HLSP path. Returns candidate-table rows.
 
@@ -195,11 +236,14 @@ def _process_one(path: Path) -> list[dict[str, Any]]:
     for ap in cfg.apertures:
         out = run_bls_on_lc(lc, cfg, aperture=ap, return_periodogram=save_pg)
         if save_pg:
-            res, spec = out
-            try:
-                save_periodogram(spec, pg_dir / f"{ap}.npz")
-            except Exception:
-                pass
+            if isinstance(out, tuple):
+                res, spec = out
+                try:
+                    save_periodogram(spec, pg_dir / f"{ap}.npz")
+                except Exception:
+                    pass
+            else:
+                res = out
         else:
             res = out
         rows.extend(result_to_rows(res, _WORKER_RUN_ID))
@@ -231,6 +275,7 @@ def run_sector(
     periodogram_tics: list[int],
     out_suffix: str = "",
     include_tics: set[int] | None = None,
+    target_paths: list[Path] | None = None,
 ) -> Path:
     """Execute BLS over every HLSP target in `hlsp_root` for `sector`.
 
@@ -242,14 +287,9 @@ def run_sector(
     if not hlsp_root.exists():
         raise FileNotFoundError(f"HLSP root not found: {hlsp_root}")
 
-    paths = discover_sector_targets(hlsp_root, sector)
+    paths = list(target_paths) if target_paths is not None else discover_sector_targets(hlsp_root, sector)
     if include_tics:
-        def _tic_from(p: Path) -> int | None:
-            try:
-                return int(p.name.split("-")[1].split("_")[0])
-            except Exception:
-                return None
-        paths = [p for p in paths if _tic_from(p) in include_tics]
+        paths = [p for p in paths if _tic_from_hlsp_path(p) in include_tics]
     if limit is not None:
         paths = paths[:limit]
     if not paths:
@@ -372,6 +412,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                          "TIC IDs (one per line). Filter the HLSP path list to "
                          "only these targets — useful for re-running BLS on "
                          "top candidates to harvest periodograms + vet sheets.")
+    ap.add_argument("--target-list", type=Path, default=None,
+                    help="Optional text file with explicit HLSP FITS paths or TIC IDs. "
+                         "When supplied, avoids recursive target discovery under "
+                         "--hlsp-root.")
     ap.add_argument("--apertures", type=str,
                     default="DET_FLUX_SML,DET_FLUX,DET_FLUX_LAG",
                     help="Comma-separated list of aperture flux columns to search. "
@@ -423,6 +467,11 @@ def main(argv: list[str] | None = None) -> int:
                     include_tics.add(int(tok))
         # Targets in include_tics get periodograms saved automatically.
         pg_tics = sorted(set(pg_tics) | include_tics)
+    target_paths = (
+        _read_target_list(args.target_list, hlsp_root, int(args.sector))
+        if args.target_list is not None
+        else None
+    )
 
     run_sector(
         sector=int(args.sector),
@@ -434,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         periodogram_tics=pg_tics,
         out_suffix=args.out_suffix,
         include_tics=include_tics,
+        target_paths=target_paths,
     )
     return 0
 

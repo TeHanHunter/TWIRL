@@ -37,8 +37,12 @@ class BLSResult:
     n_cad_total: int
     n_cad_kept: int
     dropout_frac: float
-    n_orbits: int
-    baseline_d: float
+    n_cad_quality: int | None = None
+    n_cad_edge_trimmed: int = 0
+    n_cad_sigma_clipped: int = 0
+    quality_dropout_frac: float | None = None
+    n_orbits: int = 0
+    baseline_d: float = 0.0
     status: str = "ok"
     hlsp_path: str = ""
     peaks: list[BLSPeak] = field(default_factory=list)
@@ -110,6 +114,13 @@ def result_to_rows(res: BLSResult, run_id: str) -> list[dict[str, Any]]:
     "all_nan") emit a single row with peak_rank=0 and NaN peak fields so the
     candidate table has full coverage of the input target list.
     """
+    n_cad_quality = res.n_cad_kept if res.n_cad_quality is None else res.n_cad_quality
+    quality_dropout_frac = (
+        res.quality_dropout_frac
+        if res.quality_dropout_frac is not None
+        else 0.0 if res.n_cad_total == 0
+        else (res.n_cad_total - n_cad_quality) / res.n_cad_total
+    )
     base = {
         "tic": res.tic,
         "sector": res.sector,
@@ -120,6 +131,10 @@ def result_to_rows(res: BLSResult, run_id: str) -> list[dict[str, Any]]:
         "n_cad_total": res.n_cad_total,
         "n_cad_kept": res.n_cad_kept,
         "dropout_frac": res.dropout_frac,
+        "n_cad_quality": n_cad_quality,
+        "n_cad_edge_trimmed": res.n_cad_edge_trimmed,
+        "n_cad_sigma_clipped": res.n_cad_sigma_clipped,
+        "quality_dropout_frac": quality_dropout_frac,
         "n_orbits": res.n_orbits,
         "baseline_d": res.baseline_d,
         "status": res.status,
@@ -148,7 +163,9 @@ PARQUET_FIELDS: tuple[str, ...] = (
     "tic", "sector", "cam", "ccd", "tmag", "aperture",
     "peak_rank", "period_d", "t0_bjd", "duration_min", "depth",
     "depth_snr", "sde", "log_power",
-    "n_cad_total", "n_cad_kept", "dropout_frac", "n_orbits", "baseline_d",
+    "n_cad_total", "n_cad_quality", "n_cad_kept",
+    "n_cad_edge_trimmed", "n_cad_sigma_clipped",
+    "dropout_frac", "quality_dropout_frac", "n_orbits", "baseline_d",
     "status", "hlsp_path", "bls_run_id",
 )
 

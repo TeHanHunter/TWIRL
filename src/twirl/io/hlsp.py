@@ -1,7 +1,7 @@
 """HLSP (`hlsp_qlp_tess_ffi_*_v01_llc.fits`) reader for TWIRL Stage 2.
 
 Centralizes the load/quality/aperture pattern that previously lived in
-`benchmark/plot_wd1856.py` and `scripts/stage1_lcs/qc_plot_hlsp_sample.py`.
+`reports/exploratory/_scripts/plot_wd1856.py` and `scripts/stage1_lightcurves/qc_plot_hlsp_sample.py`.
 
 HLSP files are produced by `qlp lctools hlsp` at the sector level (vstack of
 all orbits in the sector). Per-target schema:
@@ -21,6 +21,17 @@ import numpy as np
 from astropy.io import fits
 
 APERTURES: tuple[str, ...] = ("DET_FLUX_SML", "DET_FLUX", "DET_FLUX_LAG")
+A2V1_ADP_APERTURES: tuple[str, ...] = (
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_ADP",
+    "DET_FLUX_ADP_LAG",
+)
+A2V1_ADP015_APERTURES: tuple[str, ...] = (
+    "DET_FLUX_ADP015_SML",
+    "DET_FLUX_ADP015",
+    "DET_FLUX_ADP015_LAG",
+)
+A2V1_APERTURES: tuple[str, ...] = A2V1_ADP_APERTURES + A2V1_ADP015_APERTURES
 BJDREFI: int = 2457000
 
 
@@ -31,6 +42,8 @@ class HLSPLightCurve:
     sector: int
     cam: int
     ccd: int
+    ra: float
+    dec: float
     time: np.ndarray
     cadenceno: np.ndarray
     orbitid: np.ndarray
@@ -40,18 +53,24 @@ class HLSPLightCurve:
 
 
 def iter_hlsp_fits(hlsp_root: Path) -> Iterator[Path]:
-    """Yield every `hlsp_qlp_tess_ffi_*.fits` under `hlsp_root`, sorted."""
-    yield from sorted(Path(hlsp_root).rglob("hlsp_qlp_tess_ffi_*.fits"))
+    """Yield every `hlsp_{qlp,twirl}_tess_ffi_*.fits` under `hlsp_root`, sorted.
+
+    Matches both the QLP-produced HLSPs (`hlsp_qlp_*`) and the TWIRL v3
+    flux-space-detrended HLSPs (`hlsp_twirl_*`) so downstream code reads
+    whichever tree it's pointed at without changes.
+    """
+    yield from sorted(Path(hlsp_root).rglob("hlsp_*_tess_ffi_*.fits"))
 
 
 def discover_sector_targets(hlsp_root: Path, sector: int) -> list[Path]:
     """All HLSP files for `sector` under `hlsp_root`.
 
-    Files are named `hlsp_qlp_tess_ffi_s{sector:04d}-{tic:016d}_tess_v01_llc.fits`,
-    so we filter by the `s{NNNN}` prefix to avoid loading unrelated sectors that
-    might co-exist in the tree.
+    Files are named `hlsp_{qlp,twirl}_tess_ffi_s{sector:04d}-{tic:016d}_tess_v01_llc.fits`;
+    we filter by the `s{NNNN}` prefix to avoid loading unrelated sectors that
+    might co-exist in the tree. The wildcard between `hlsp_` and `_tess_ffi_`
+    matches both QLP (`qlp`) and TWIRL v3 (`twirl`) HLSP variants.
     """
-    pat = f"hlsp_qlp_tess_ffi_s{sector:04d}-*.fits"
+    pat = f"hlsp_*_tess_ffi_s{sector:04d}-*.fits"
     return sorted(Path(hlsp_root).rglob(pat))
 
 
@@ -77,6 +96,8 @@ def read_hlsp(
             sector = int(hdr.get("SECTOR", -1))
             cam = int(hdr.get("CAMERA", -1))
             ccd = int(hdr.get("CCD", -1))
+            ra = float(hdr.get("RA_OBJ", np.nan))
+            dec = float(hdr.get("DEC_OBJ", np.nan))
             time = np.asarray(tab["TIME"], dtype=np.float64)
             cadenceno = np.asarray(
                 tab["CADENCENO"] if "CADENCENO" in tab.columns.names else np.arange(n)
@@ -93,6 +114,7 @@ def read_hlsp(
                     flux[c] = np.asarray(tab[c], dtype=np.float64)
         return HLSPLightCurve(
             tic=tic, tmag=tmag, sector=sector, cam=cam, ccd=ccd,
+            ra=ra, dec=dec,
             time=time, cadenceno=cadenceno, orbitid=orbitid, quality=quality,
             flux=flux, path=Path(path),
         )

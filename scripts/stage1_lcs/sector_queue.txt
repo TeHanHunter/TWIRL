@@ -1,0 +1,48 @@
+# TWIRL sector queue. Format: sector orbit_1 orbit_2
+# Sectors >= 56 only. Order = production order.
+#
+# S56: already DONE (validated 2026-04-30 with the run_s56_post_lc_chain.sh).
+# S57: TGLC done on pdogpu6; needs the post-LC chain via finalize_worker.
+#
+# Sector-to-orbit mapping derived from /pdo/qlp-data/orbit-*/ffi/run/cam1_quat.txt
+# headers; first cadence in each pair anchors the orbit number.
+57 121 122
+58 123 124
+59 125 126
+60 127 128
+61 129 130
+62 131 132
+63 133 134
+64 135 136
+65 137 138
+66 139 140
+67 141 142
+68 143 144
+69 145 146
+70 147 148
+71 149 150
+72 151 152
+73 153 154
+74 155 156
+75 157 158
+76 159 160
+77 161 162
+78 163 164
+79 165 166
+80 167 168
+81 169 170
+82 171 172
+83 173 174
+84 175 176
+85 177 178
+86 179 180
+87 181 182
+88 183 184
+89 185 186
+90 187 188
+91 189 190
+92 191 192
+93 193 194
+94 195 196
+95 197 198
+96 199 200

@@ -1,0 +1,42 @@
+# Candidate-level semi-supervised triage for the S56 TWIRL-FS search/vetting
+# table. The labels table should keep human and injection labels explicit; the
+# model writes pseudo-labels as a separate artifact rather than mutating labels.
+
+label_column: label
+source_column: label_source
+unlabeled_values:
+  - ""
+  - unknown
+  - unlabeled
+  - needs_review
+
+pseudo_min_confidence: 0.98
+pseudo_min_margin: 0.50
+pseudo_weight: 0.25
+max_pseudo_per_class: 5000
+review_queue_size: 250
+
+feature:
+  id_columns:
+    - tic
+  categorical_columns:
+    - source_kind
+    - source_bucket
+    - vet_class
+    - rep_aperture
+    - recovery_status
+    - recovery_status_DET_FLUX_SML
+    - recovery_status_DET_FLUX
+    - recovery_status_DET_FLUX_LAG
+    - leo_class
+  max_categorical_levels: 16
+  clip_sigma: 8.0
+  # Keep null to auto-select numeric candidate/vetting columns. The categorical
+  # columns above are one-hot encoded when present.
+  feature_columns:
+
+trainer:
+  max_iter: 500
+  l2: 0.001
+  tol: 0.0000001
+  class_weight_balanced: true

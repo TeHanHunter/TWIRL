@@ -1,0 +1,8 @@
+# A2v1 sectors queued after S57 validation.
+# Format: sector orbit-one:tag orbit-two:tag
+58 123:o1 124:o2
+59 125:o1 126:o2
+60 127:o1 128:o2
+61 129:o1 130:o2
+62 131:o1 132:o2
+63 133:o1 134:o2

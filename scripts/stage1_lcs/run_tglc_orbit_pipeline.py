@@ -271,6 +271,7 @@ def _process_one_ccd(
     reuse_catalogs_from_orbit: int | None,
     no_gpu: bool = False,
     gpu_id: str | None = None,
+    stages: set[str] = frozenset({"catalogs", "cutouts", "epsfs", "lightcurves"}),
 ) -> dict[str, object]:
     job_start = time.perf_counter()
     if gpu_id is not None:
@@ -284,6 +285,7 @@ def _process_one_ccd(
 
     for path in [job_root, catalogs_dir, source_dir, epsf_dir, lc_dir, tic_list_path.parent, log_root]:
         _require_user_owned_write_path(path)
+        path.mkdir(parents=True, exist_ok=True)
 
     if reuse_catalogs_from_orbit is not None and reuse_catalogs_from_orbit != orbit:
         reused = _reuse_sibling_catalogs(
@@ -320,112 +322,127 @@ def _process_one_ccd(
     stage_records: list[dict[str, object]] = []
     command_prefix = [str(python_bin), "-m", "tglc"]
 
-    catalogs_record = _run_stage(
-        stage_name="catalogs",
-        command=[
-            *command_prefix,
-            "catalogs",
-            "--orbit",
-            str(orbit),
-            "--ccd",
-            f"{job.camera},{job.ccd}",
-            "--max-magnitude",
-            str(max_magnitude),
-            "--nprocs",
-            str(catalogs_nprocs),
-            "--tglc-data-dir",
-            str(tglc_data_dir),
-        ],
-        env=runtime_env,
-        log_path=log_root / f"orbit-{orbit}_{job.label}_catalogs.log",
-    )
-    stage_records.append(catalogs_record)
-    if catalogs_record["return_code"] != 0:
-        raise RuntimeError(
-            f"catalogs failed for orbit {orbit} {job.label}; see {catalogs_record['log_path']}"
+    if "catalogs" in stages:
+        catalogs_record = _run_stage(
+            stage_name="catalogs",
+            command=[
+                *command_prefix,
+                "catalogs",
+                "--orbit",
+                str(orbit),
+                "--ccd",
+                f"{job.camera},{job.ccd}",
+                "--max-magnitude",
+                str(max_magnitude),
+                "--nprocs",
+                str(catalogs_nprocs),
+                "--tglc-data-dir",
+                str(tglc_data_dir),
+            ],
+            env=runtime_env,
+            log_path=log_root / f"orbit-{orbit}_{job.label}_catalogs.log",
         )
+        stage_records.append(catalogs_record)
+        if catalogs_record["return_code"] != 0:
+            raise RuntimeError(
+                f"catalogs failed for orbit {orbit} {job.label}; see {catalogs_record['log_path']}"
+            )
 
-    cutouts_record = _run_stage(
-        stage_name="cutouts",
-        command=[
-            *command_prefix,
-            "cutouts",
-            "--orbit",
-            str(orbit),
-            "--ccd",
-            f"{job.camera},{job.ccd}",
-            "--nprocs",
-            str(cutouts_nprocs),
-            "--replace",
-            "--tglc-data-dir",
-            str(tglc_data_dir),
-        ],
-        env=runtime_env,
-        log_path=log_root / f"orbit-{orbit}_{job.label}_cutouts.log",
-    )
-    stage_records.append(cutouts_record)
-    if cutouts_record["return_code"] != 0:
-        raise RuntimeError(
-            f"cutouts failed for orbit {orbit} {job.label}; see {cutouts_record['log_path']}"
+    if "cutouts" in stages:
+        # No --replace: tglc.ffi.ffi skips writing source pickles whose files
+        # already exist (ffi.py:332), so a resume reuses prior cutouts cheaply.
+        cutouts_record = _run_stage(
+            stage_name="cutouts",
+            command=[
+                *command_prefix,
+                "cutouts",
+                "--orbit",
+                str(orbit),
+                "--ccd",
+                f"{job.camera},{job.ccd}",
+                "--nprocs",
+                str(cutouts_nprocs),
+                "--tglc-data-dir",
+                str(tglc_data_dir),
+            ],
+            env=runtime_env,
+            log_path=log_root / f"orbit-{orbit}_{job.label}_cutouts.log",
         )
-    if stop_on_warning and (
-        cutouts_record["invalid_ffi_count"]
-        or cutouts_record["runtimewarning_count"]
-        or cutouts_record["cadence_gap_warning_count"]
-    ):
-        raise RuntimeError(
-            f"cutouts warning pattern for orbit {orbit} {job.label}; see {cutouts_record['log_path']}"
-        )
+        stage_records.append(cutouts_record)
+        if cutouts_record["return_code"] != 0:
+            raise RuntimeError(
+                f"cutouts failed for orbit {orbit} {job.label}; see {cutouts_record['log_path']}"
+            )
+        if stop_on_warning and (
+            cutouts_record["invalid_ffi_count"]
+            or cutouts_record["runtimewarning_count"]
+            or cutouts_record["cadence_gap_warning_count"]
+        ):
+            raise RuntimeError(
+                f"cutouts warning pattern for orbit {orbit} {job.label}; see {cutouts_record['log_path']}"
+            )
 
     source_count = _count_files(source_dir, "source_*.pkl")
-    if source_count != 196:
-        raise RuntimeError(
-            f"Expected 196 source pickles for orbit {orbit} {job.label}, got {source_count}"
-        )
+    # Only fail on missing sources if we either just ran cutouts or are about
+    # to run epsfs (which needs them). When the prep loop runs --stages
+    # catalogs,cutouts the check fires; when finalize runs --stages
+    # epsfs,lightcurves it fires before epsfs. When --stages catalogs only,
+    # we skip the check entirely (catalogs alone is a valid prep step).
+    if "cutouts" in stages or "epsfs" in stages:
+        if source_count != 196:
+            raise RuntimeError(
+                f"Expected 196 source pickles for orbit {orbit} {job.label}, got {source_count}"
+            )
 
-    epsfs_command = [
-        *command_prefix,
-        "epsfs",
-        "--orbit",
-        str(orbit),
-        "--ccd",
-        f"{job.camera},{job.ccd}",
-        "--nprocs",
-        str(epsfs_nprocs),
-        "--replace",
-        "--tglc-data-dir",
-        str(tglc_data_dir),
-    ]
-    if no_gpu:
-        epsfs_command.append("--no-gpu")
-    elif gpu_id is not None:
-        print(
-            f"[orbit-pipeline] {job.label}: epsfs pinned to CUDA_VISIBLE_DEVICES={gpu_id}",
-            flush=True,
+    if "epsfs" in stages:
+        # No --replace: tglc.scripts.epsfs.read_source_and_fit_and_save_epsf
+        # short-circuits when the .npy exists, so a resumed run skips finished
+        # cutouts for free.
+        epsfs_command = [
+            *command_prefix,
+            "epsfs",
+            "--orbit",
+            str(orbit),
+            "--ccd",
+            f"{job.camera},{job.ccd}",
+            "--nprocs",
+            str(epsfs_nprocs),
+            "--tglc-data-dir",
+            str(tglc_data_dir),
+        ]
+        if no_gpu:
+            epsfs_command.append("--no-gpu")
+        elif gpu_id is not None:
+            print(
+                f"[orbit-pipeline] {job.label}: epsfs pinned to CUDA_VISIBLE_DEVICES={gpu_id}",
+                flush=True,
+            )
+        epsfs_record = _run_stage(
+            stage_name="epsfs",
+            command=epsfs_command,
+            env=runtime_env,
+            log_path=log_root / f"orbit-{orbit}_{job.label}_epsfs.log",
         )
-    epsfs_record = _run_stage(
-        stage_name="epsfs",
-        command=epsfs_command,
-        env=runtime_env,
-        log_path=log_root / f"orbit-{orbit}_{job.label}_epsfs.log",
-    )
-    stage_records.append(epsfs_record)
-    if epsfs_record["return_code"] != 0:
-        raise RuntimeError(
-            f"epsfs failed for orbit {orbit} {job.label}; see {epsfs_record['log_path']}"
-        )
-    if stop_on_warning and epsfs_record["runtimewarning_count"]:
-        raise RuntimeError(
-            f"epsfs RuntimeWarning for orbit {orbit} {job.label}; see {epsfs_record['log_path']}"
-        )
+        stage_records.append(epsfs_record)
+        if epsfs_record["return_code"] != 0:
+            raise RuntimeError(
+                f"epsfs failed for orbit {orbit} {job.label}; see {epsfs_record['log_path']}"
+            )
+        if stop_on_warning and epsfs_record["runtimewarning_count"]:
+            raise RuntimeError(
+                f"epsfs RuntimeWarning for orbit {orbit} {job.label}; see {epsfs_record['log_path']}"
+            )
 
     epsf_count = _count_files(epsf_dir, "epsf_*.npy")
-    if epsf_count != 196:
-        raise RuntimeError(
-            f"Expected 196 ePSFs for orbit {orbit} {job.label}, got {epsf_count}"
-        )
+    if "epsfs" in stages or "lightcurves" in stages:
+        if epsf_count != 196:
+            raise RuntimeError(
+                f"Expected 196 ePSFs for orbit {orbit} {job.label}, got {epsf_count}"
+            )
 
-    if tic_list:
+    if "lightcurves" in stages and tic_list:
+        # No --replace: tglc lightcurves skips per-TIC h5 files that already
+        # exist, so resumes skip finished targets for free.
         lightcurve_command = [
             *command_prefix,
             "lightcurves",
@@ -435,7 +452,6 @@ def _process_one_ccd(
             f"{job.camera},{job.ccd}",
             "--nprocs",
             str(lightcurves_nprocs),
-            "--replace",
             "--tglc-data-dir",
             str(tglc_data_dir),
             "--tic",
@@ -471,12 +487,17 @@ def _process_one_ccd(
         "stage_records": stage_records,
         "job_wall_seconds": time.perf_counter() - job_start,
     }
-    summary_path = log_root / f"orbit-{orbit}_{job.label}_summary.json"
-    _require_user_owned_write_path(summary_path)
-    summary_path.write_text(
-        json.dumps(job_summary, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    # Write summary.json only when the lightcurves stage completed (the
+    # authoritative "fully done" marker that auto-resume keys off). Prep-only
+    # runs (--stages catalogs,cutouts) intentionally leave the marker absent,
+    # so the finalize side knows to pick up the CCD.
+    if "lightcurves" in stages and lc_count > 0:
+        summary_path = log_root / f"orbit-{orbit}_{job.label}_summary.json"
+        _require_user_owned_write_path(summary_path)
+        summary_path.write_text(
+            json.dumps(job_summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
     print(
         "[orbit-pipeline] "
@@ -588,6 +609,26 @@ def _parse_args() -> argparse.Namespace:
         help="Treat warning markers in stage logs as fatal.",
     )
     parser.add_argument(
+        "--no-auto-resume",
+        action="store_true",
+        help=(
+            "Disable the on-disk check that auto-skips CCDs whose ePSF and LC "
+            "outputs already exist. With this flag, every CCD in --ccd "
+            "(minus --skip-ccd) is reprocessed."
+        ),
+    )
+    parser.add_argument(
+        "--stages",
+        default="catalogs,cutouts,epsfs,lightcurves",
+        help=(
+            "Comma-separated subset of stages to run, in order: "
+            "catalogs,cutouts,epsfs,lightcurves. Default = all four. Examples: "
+            "'--stages catalogs,cutouts' (prep-only, e.g. on pdogpu1); "
+            "'--stages epsfs,lightcurves' (finalize, e.g. on pdogpu6). "
+            "summary.json is written only when 'lightcurves' is in the set."
+        ),
+    )
+    parser.add_argument(
         "--no-gpu",
         action="store_true",
         help=(
@@ -625,11 +666,61 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
 
+    valid_stages = {"catalogs", "cutouts", "epsfs", "lightcurves"}
+    stages = {s.strip() for s in args.stages.split(",") if s.strip()}
+    unknown = stages - valid_stages
+    if unknown:
+        raise ValueError(f"unknown --stages value(s): {sorted(unknown)}")
+    if not stages:
+        raise ValueError("--stages must include at least one of "
+                         f"{sorted(valid_stages)}")
+
     ccd_jobs = args.ccd if args.ccd else _default_ccd_jobs()
     skip_ccd_jobs = set(args.skip_ccd)
     ccd_jobs = [job for job in ccd_jobs if job not in skip_ccd_jobs]
+
+    # Auto-skip CCDs whose final-requested stage is already complete on disk.
+    # The skip criterion depends on which stages we're running:
+    #   - lightcurves in stages -> require summary.json (full pipeline marker)
+    #   - epsfs is final -> require epsf=196
+    #   - cutouts is final (prep-only run) -> require source=196
+    #   - catalogs only -> always run (catalogs has cheap native skip-if-exists)
+    # This lets pdogpu1's prep loop and pdogpu6's finalize loop both auto-resume
+    # cleanly without trampling each other.
+    run_label = args.run_label or f"s{args.sector:04d}_orbit{args.orbit}_p{args.max_parallel_ccd_jobs}"
+    summary_dir = args.log_dir / run_label
+    final_stage = "lightcurves" if "lightcurves" in stages else (
+        "epsfs" if "epsfs" in stages else (
+            "cutouts" if "cutouts" in stages else "catalogs"))
+    if not args.no_auto_resume:
+        already_done: list[CcdJob] = []
+        for job in ccd_jobs:
+            ccd_dir = (
+                args.tglc_data_dir / f"orbit-{args.orbit}" / "ffi"
+                / f"cam{job.camera}" / f"ccd{job.ccd}"
+            )
+            done = False
+            if final_stage == "lightcurves":
+                summary_path = summary_dir / f"orbit-{args.orbit}_{job.label}_summary.json"
+                done = summary_path.is_file()
+            elif final_stage == "epsfs":
+                done = _count_files(ccd_dir / "epsf", "epsf_*.npy") == 196
+            elif final_stage == "cutouts":
+                done = _count_files(ccd_dir / "source", "source_*.pkl") == 196
+            if done:
+                already_done.append(job)
+        if already_done:
+            print(
+                f"[orbit-pipeline] auto-skipping {len(already_done)} CCDs already "
+                f"done (epsf=196 and LC>0): "
+                f"{', '.join(j.label for j in already_done)}",
+                flush=True,
+            )
+            ccd_jobs = [job for job in ccd_jobs if job not in already_done]
+
     if not ccd_jobs:
-        raise ValueError("No CCD jobs selected after applying --skip-ccd.")
+        print("[orbit-pipeline] all CCDs already done; nothing to run.", flush=True)
+        return 0
 
     for path in [args.tglc_data_dir, args.log_dir]:
         _require_user_owned_write_path(path)
@@ -739,6 +830,7 @@ def main() -> int:
                 lightcurves_nprocs=args.lightcurves_nprocs,
                 stop_on_warning=args.stop_on_warning,
                 reuse_catalogs_from_orbit=args.reuse_catalogs_from_orbit,
+                stages=stages,
             ): job
             for idx, job in enumerate(ccd_jobs)
         }
