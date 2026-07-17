@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone browser vetting app for the Franklin S56 handoff package."""
+"""Standalone browser vetting app for a Franklin TWIRL handoff package."""
 from __future__ import annotations
 
 import argparse
@@ -24,13 +24,22 @@ LABEL_OPTIONS: tuple[str, ...] = (
 )
 
 LABEL_BUTTONS: tuple[tuple[str, str, str], ...] = (
-    ("1", "planet_like", "Planet"),
-    ("6", "wide_transit_like", "Wide transit"),
-    ("2", "eclipsing_binary_or_pceb", "EB/PCEB"),
-    ("3", "stellar_variability", "Variable"),
-    ("4", "instrumental_or_systematic", "Systematic"),
+    ("1", "planet_like", "Planet-like"),
+    ("6", "wide_transit_like", "Broad isolated dip"),
+    ("2", "eclipsing_binary_or_pceb", "Eclipse/contact"),
+    ("3", "stellar_variability", "Smooth variable"),
+    ("4", "instrumental_or_systematic", "Systematic/artifact"),
     ("5", "uncertain", "Flat/no signal"),
     ("0", "skip", "Skip"),
+)
+
+PERIOD_FACTOR_OPTIONS: tuple[tuple[str, str], ...] = (
+    ("0.25", "P/4"),
+    ("0.5", "P/2"),
+    ("1", "P"),
+    ("2", "2P"),
+    ("4", "4P"),
+    ("unresolved", "Unresolved"),
 )
 
 DISPLAY_COLUMNS: tuple[str, ...] = (
@@ -52,7 +61,6 @@ DISPLAY_COLUMNS: tuple[str, ...] = (
     "centroid_delta_pix",
     "centroid_z",
     "n_in_transit",
-    "selection_bucket",
 )
 
 LABEL_HEADER: tuple[str, ...] = (
@@ -64,6 +72,8 @@ LABEL_HEADER: tuple[str, ...] = (
     "label_source",
     "labeler",
     "notes",
+    "period_factor",
+    "period_status",
     "updated_utc",
 )
 
@@ -117,7 +127,23 @@ class Store:
 
     def _load_labels(self) -> list[dict[str, str]]:
         if self.labels_out.exists():
-            return _read_csv(self.labels_out)
+            rows = _read_csv(self.labels_out)
+            row_ids = [str(row.get("row_id", "")) for row in rows]
+            if len(row_ids) != len(set(row_ids)):
+                raise ValueError("label CSV contains duplicate row_id values")
+            queue_by_id = {str(row["row_id"]): row for row in self.rows}
+            for label in rows:
+                row_id = str(label.get("row_id", ""))
+                if row_id not in queue_by_id:
+                    raise ValueError(f"label CSV row_id {row_id!r} is absent from the queue")
+                expected = str(queue_by_id[row_id]["candidate_key"])
+                observed = str(label.get("candidate_key", "") or "")
+                if observed and observed != expected:
+                    raise ValueError(
+                        f"candidate_key mismatch for row_id={row_id}: "
+                        f"labels={observed!r}, queue={expected!r}"
+                    )
+            return rows
         return []
 
     def _apply_labels(self) -> None:
@@ -127,6 +153,12 @@ class Store:
             row["label"] = str(label.get("label", "") if label else "")
             row["labeler"] = str(label.get("labeler", self.labeler) if label else self.labeler)
             row["notes"] = str(label.get("notes", "") if label else "")
+            row["period_factor"] = str(
+                label.get("period_factor", "1") if label else "1"
+            ) or "1"
+            row["period_status"] = str(
+                label.get("period_status", "") if label else ""
+            )
             row["updated_utc"] = str(label.get("updated_utc", "") if label else "")
 
     @property
@@ -164,15 +196,29 @@ class Store:
             "label": row.get("label", ""),
             "labeler": row.get("labeler", self.labeler) or self.labeler,
             "notes": row.get("notes", ""),
+            "period_factor": row.get("period_factor", "1") or "1",
+            "period_status": row.get("period_status", ""),
             "updated_utc": row.get("updated_utc", ""),
             "sheet_name": sheet.name if sheet else "",
             "sheet_missing": sheet is None,
             "label_options": LABEL_OPTIONS,
+            "period_factor_options": PERIOD_FACTOR_OPTIONS,
         }
 
-    def save_label(self, row_id: int, label: str, labeler: str, notes: str) -> dict[str, Any]:
+    def save_label(
+        self,
+        row_id: int,
+        label: str,
+        labeler: str,
+        notes: str,
+        period_factor: str = "1",
+    ) -> dict[str, Any]:
         if label not in LABEL_OPTIONS and label != "":
             raise ValueError(f"unsupported label: {label}")
+        valid_factors = {value for value, _ in PERIOD_FACTOR_OPTIONS}
+        period_factor = str(period_factor or "1")
+        if period_factor not in valid_factors:
+            raise ValueError(f"unsupported period factor: {period_factor}")
         row = self.rows[int(row_id)]
         record = {
             "row_id": int(row_id),
@@ -183,6 +229,10 @@ class Store:
             "label_source": "human" if label else "",
             "labeler": labeler or self.labeler,
             "notes": notes,
+            "period_factor": period_factor,
+            "period_status": (
+                "unresolved" if period_factor == "unresolved" else "resolved"
+            ),
             "updated_utc": datetime.now(timezone.utc).isoformat(),
         }
         kept = [item for item in self.labels if str(item.get("row_id", "")) != str(row_id)]
@@ -194,10 +244,13 @@ class Store:
 
     def summary(self) -> dict[str, Any]:
         counts: dict[str, int] = {}
+        factor_counts: dict[str, int] = {}
         for row in self.rows:
             label = row.get("label", "")
             if label:
                 counts[label] = counts.get(label, 0) + 1
+                factor = str(row.get("period_factor", "1") or "1")
+                factor_counts[factor] = factor_counts.get(factor, 0) + 1
         return {
             "queue": str(self.queue),
             "labels_out": str(self.labels_out),
@@ -206,6 +259,7 @@ class Store:
             "labeled": sum(counts.values()),
             "unlabeled": self.count - sum(counts.values()),
             "label_counts": counts,
+            "period_factor_counts": factor_counts,
         }
 
 
@@ -214,12 +268,16 @@ def _index_html() -> str:
         f'<button class="label-btn" data-key="{key}" data-label="{label}">{key}: {text}</button>'
         for key, label, text in LABEL_BUTTONS
     )
+    period_buttons = "".join(
+        f'<button class="period-btn" data-factor="{value}">{text}</button>'
+        for value, text in PERIOD_FACTOR_OPTIONS
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TWIRL S56 Vetting</title>
+<title>TWIRL Franklin Vetting</title>
 <style>
 body {{ margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #161616; background: #f5f5f2; }}
 .layout {{ display: grid; grid-template-columns: minmax(620px, 1fr) 360px; min-height: 100vh; }}
@@ -233,6 +291,10 @@ button {{ border: 1px solid #222; background: white; padding: 8px 10px; font: in
 button:hover {{ background: #ecece6; }}
 .label-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }}
 .label-btn.active {{ background: #183a59; color: white; }}
+.period-title {{ margin-top: 14px; font-size: 13px; font-weight: 700; }}
+.period-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 6px 0 12px; }}
+.period-btn {{ min-width: 0; padding: 6px 4px; font-size: 12px; }}
+.period-btn.active {{ background: #183a59; color: white; }}
 textarea {{ width: 100%; min-height: 90px; box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid #888; background: white; }}
 table {{ width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }}
 td {{ border-bottom: 1px solid #ddd; padding: 4px 2px; vertical-align: top; }}
@@ -249,6 +311,8 @@ td:first-child {{ color: #555; width: 42%; }}
     <div class="topline"><div class="counter" id="counter"></div><div id="saved"></div></div>
     <div class="nav"><button id="prev">Previous</button><button id="next">Next</button><input id="jump" type="number" min="1" style="width:86px" aria-label="row"><button id="go">Go</button></div>
     <div class="label-grid">{buttons}</div>
+    <div class="period-title">Best displayed period</div>
+    <div class="period-grid">{period_buttons}</div>
     <textarea id="notes" placeholder="Notes, e.g. half period, refold at P/2, possible harmonic"></textarea>
     <div class="status" id="status"></div>
     <table id="meta"></table>
@@ -257,6 +321,7 @@ td:first-child {{ color: #555; width: 42%; }}
 <script>
 let index = Number(new URLSearchParams(location.search).get("i") || 0);
 let current = null;
+let periodFactor = "1";
 async function load(i) {{
   const r = await fetch(`/api/candidate?index=${{i}}`);
   current = await r.json();
@@ -267,6 +332,8 @@ async function load(i) {{
   document.getElementById("notes").value = current.notes || "";
   document.getElementById("saved").textContent = current.label ? `saved: ${{current.label}}` : "";
   document.querySelectorAll(".label-btn").forEach(b => b.classList.toggle("active", b.dataset.label === current.label));
+  periodFactor = current.period_factor || "1";
+  document.querySelectorAll(".period-btn").forEach(b => b.classList.toggle("active", b.dataset.factor === periodFactor));
   const sheet = document.getElementById("sheet");
   if (current.sheet_missing) sheet.innerHTML = '<div class="missing">Missing vet sheet</div>';
   else sheet.innerHTML = `<img src="/vet_sheet.png?index=${{index}}&v=${{Date.now()}}" alt="vet sheet">`;
@@ -276,7 +343,7 @@ async function load(i) {{
 }}
 async function save(label) {{
   if (!current) return;
-  const payload = {{ row_id: current.row_id, label, labeler: current.labeler, notes: document.getElementById("notes").value }};
+  const payload = {{ row_id: current.row_id, label, labeler: current.labeler, notes: document.getElementById("notes").value, period_factor: periodFactor }};
   const r = await fetch("/api/label", {{ method: "POST", headers: {{ "Content-Type": "application/json" }}, body: JSON.stringify(payload) }});
   const out = await r.json();
   if (!out.ok) {{ document.getElementById("status").textContent = out.error || "save failed"; return; }}
@@ -287,6 +354,10 @@ document.getElementById("prev").onclick = () => load(Math.max(index - 1, 0));
 document.getElementById("next").onclick = () => load(Math.min(index + 1, current.count - 1));
 document.getElementById("go").onclick = () => load(Math.max(0, Number(document.getElementById("jump").value || 1) - 1));
 document.querySelectorAll(".label-btn").forEach(b => b.onclick = () => save(b.dataset.label));
+document.querySelectorAll(".period-btn").forEach(b => b.onclick = () => {{
+  periodFactor = b.dataset.factor;
+  document.querySelectorAll(".period-btn").forEach(x => x.classList.toggle("active", x.dataset.factor === periodFactor));
+}});
 document.addEventListener("keydown", e => {{
   if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
   if (e.key === "ArrowLeft") load(Math.max(index - 1, 0));
@@ -344,6 +415,7 @@ class Handler(BaseHTTPRequestHandler):
                 label=str(payload.get("label", "")),
                 labeler=str(payload.get("labeler", "")),
                 notes=str(payload.get("notes", "")),
+                period_factor=str(payload.get("period_factor", "1")),
             )
             self._send_json({"ok": True, "record": record, "summary": self.store.summary()})
         except Exception as exc:
