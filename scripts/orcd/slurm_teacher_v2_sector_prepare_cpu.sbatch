@@ -18,6 +18,7 @@ DATA_ROOT="${TWIRL_ENRICH_DATA_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/s
 RAW_H5="${TWIRL_ENRICH_RAW_H5:-${DATA_ROOT}/s${SECTOR}_A2v1_tglc_raw_sources.h5}"
 WORK_ROOT="${TWIRL_ENRICH_WORK_ROOT:?set TWIRL_ENRICH_WORK_ROOT}"
 N_SHARDS="${TWIRL_ENRICH_BLS_SHARDS:-40}"
+SMALL_PEAKS="${TWIRL_ENRICH_SMALL_PEAKS:-3}"
 
 mkdir -p "${WORK_ROOT}/real_bls" "${WORK_ROOT}/candidates"
 cd "${REPO}"
@@ -33,4 +34,4 @@ export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
   --raw-source-h5 "${RAW_H5}" \
   --out-dir "${WORK_ROOT}/candidates" \
   --sector "${SECTOR}" \
-  --small-peaks 10
+  --small-peaks "${SMALL_PEAKS}"

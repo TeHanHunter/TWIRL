@@ -100,7 +100,7 @@ def _write_readme(
     counts = ", ".join(
         f"S{sector}: {count:,}" for sector, count in sorted(sector_counts.items())
     )
-    text = f"""# TWIRL S56-S59 Enriched Vetting Handoff
+    text = f"""# TWIRL S57-S59 Enriched Vetting Handoff
 
 This package contains {n_rows:,} real candidates selected for human review.
 Sector allocation: {counts}.
@@ -217,6 +217,10 @@ def build_handoff(
             f"expected={expected_sector_counts}"
         )
 
+    if out_dir.exists() and any(out_dir.iterdir()):
+        raise FileExistsError(
+            f"handoff destination must be absent or empty: {out_dir}"
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     destination_sheets = out_dir / "vet_sheets"
     destination_sheets.mkdir(parents=True, exist_ok=True)
@@ -252,8 +256,6 @@ def build_handoff(
     n_reference_pngs = 0
     if reference_root is not None:
         reference_destination = out_dir / "reference_examples"
-        if reference_destination.exists():
-            shutil.rmtree(reference_destination)
         shutil.copytree(reference_root, reference_destination)
         n_reference_pngs = len(list(reference_destination.rglob("*.png")))
     if reference_csv is not None:

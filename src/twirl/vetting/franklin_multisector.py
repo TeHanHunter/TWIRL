@@ -19,7 +19,7 @@ from twirl.vetting.teacher_v2_active_learning import (
 )
 
 
-FRANKLIN_MULTISECTOR_POLICY_VERSION = "s56_s59_franklin_rank1_teacher_v1"
+FRANKLIN_MULTISECTOR_POLICY_VERSION = "s57_s59_franklin_rank1_teacher_v1"
 
 _IDENTITY_COLUMNS: tuple[str, ...] = (
     "review_id",
