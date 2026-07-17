@@ -188,6 +188,12 @@ recording it as an available follow-up path.
   plan with the exploratory teacher-v2 and enrichment artifacts. The compact
   repository audit under [reports](../reports/README.md) records the evidence,
   figures, deferred risks, and adjusted critical path.
+- `2026-07-17`: Consolidated ORCD to one fresh, clean Git checkout and retained
+  every prior checkout payload in a dated, inventoried archive. Code deployment
+  now pins a Git SHA and rejects dirty checkouts. A separate sparse clean PDO
+  checkout is staged against the existing local data tree; the active queue and
+  live review session remain on the preserved legacy checkout until they reach
+  a safe handoff point.
 
 **Next:** Keep one authoritative priority list in the plan, one current pointer
 per live-log subsection, mark report-level status files as snapshots, and keep
