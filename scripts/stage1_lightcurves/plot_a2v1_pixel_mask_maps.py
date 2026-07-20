@@ -4,9 +4,9 @@
 Each map uses the median of the first requested staged FFIs for one
 orbit/camera/CCD. Red contours show the corresponding TGLC bad-pixel threshold
 proxy: saturated, low-flux, and nonfinite pixels plus their four neighbors.
-The companion grid shows the cadence-median central ePSF coefficient for each
-cutout, normalized by the CCD median. Red cell outlines identify an on-disk
-A2v1 ePSF rather than a legacy empty-mask ePSF symlink.
+The companion grid shows the proxy masked-pixel fraction in each 150-pixel
+source cutout. Red cell outlines identify local A2v1 ePSF refits; the A2v1
+prefill contract leaves only cutouts with nonempty static masks for refitting.
 """
 
 from __future__ import annotations
@@ -22,14 +22,11 @@ from matplotlib.colors import ListedColormap, LogNorm
 from matplotlib.patches import Rectangle
 import numpy as np
 from astropy.io import fits
-from astropy.table import Table
-from astropy.wcs import WCS
 
 from twirl.plotting.style import apply_twirl_style
 
 
 DEFAULT_A2V1_ROOT = Path("/pdo/users/tehan/tglc-gpu-production-A2v1")
-DEFAULT_SOURCE_TGLC_ROOT = Path("/pdo/users/tehan/tglc-gpu-production")
 DEFAULT_OUTPUT_DIR = Path("reports/stage1_lightcurves/a2v1_pixel_mask_maps")
 DEFAULT_SECTOR_ORBITS = {
     56: 119,
@@ -42,10 +39,7 @@ DEFAULT_SECTOR_ORBITS = {
     63: 133,
 }
 SOURCE_RE = re.compile(r"^source_(?P<x>\d+)_(?P<y>\d+)\.pkl$")
-BACKGROUND_PARAMETER_COUNT = 6
 CUTOUT_SIZE = 150
-CUTOUT_OVERLAP = 2
-CCD_X_OFFSET = 44
 
 
 @dataclass(frozen=True)
@@ -58,8 +52,8 @@ class MapSummary:
     n_source_tiles: int
     n_local_epsf_tiles: int
     n_proxy_bad_pixels: int
-    epsf_center_index: int
-    epsf_relative_scale_median: float
+    proxy_mask_fraction_median: float
+    proxy_mask_fraction_max: float
     png: str
     pdf: str
 
@@ -83,18 +77,6 @@ def parse_source_grid(path: Path) -> tuple[int, int]:
     if match is None:
         raise ValueError(f"Unexpected source-pickle filename: {path}")
     return int(match.group("x")), int(match.group("y"))
-
-
-def central_epsf_index(n_parameters: int) -> int:
-    """Return the flattened center index of the ePSF component block."""
-    n_epsf_parameters = n_parameters - BACKGROUND_PARAMETER_COUNT
-    side_length = int(np.sqrt(n_epsf_parameters))
-    if side_length * side_length != n_epsf_parameters or side_length % 2 == 0:
-        raise ValueError(
-            "ePSF parameters must contain an odd square block followed by "
-            f"{BACKGROUND_PARAMETER_COUNT} background parameters; got {n_parameters}"
-        )
-    return (side_length // 2) * side_length + side_length // 2
 
 
 def percentile_limits(image: np.ndarray) -> tuple[float, float]:
@@ -152,106 +134,24 @@ def mask_edges(mask: np.ndarray) -> np.ndarray:
     return mask & ~interior
 
 
-def tess_magnitude_from_gaia(
-    g_mag: np.ndarray,
-    bp_mag: np.ndarray,
-    rp_mag: np.ndarray,
-) -> np.ndarray:
-    """Match TGLC's Gaia-color conversion used in each source pickle."""
-    g_mag = np.asarray(g_mag, dtype=float)
-    color = np.asarray(bp_mag, dtype=float) - np.asarray(rp_mag, dtype=float)
-    tess_mag = (
-        g_mag
-        - 0.00522555 * color**3
-        + 0.0891337 * color**2
-        - 0.633923 * color
-        + 0.0324473
-    )
-    tess_mag[~np.isfinite(tess_mag)] = g_mag[~np.isfinite(tess_mag)] - 0.430
-    tess_mag[~np.isfinite(g_mag) | (g_mag >= 25)] = np.nan
-    return tess_mag
-
-
-def brightest_tmag_by_cutout(
-    *,
-    x: np.ndarray,
-    y: np.ndarray,
-    tess_mag: np.ndarray,
-    grid_shape: tuple[int, int],
-) -> np.ndarray:
-    """Return the brightest source magnitude for each overlapping TGLC cutout."""
+def mask_fraction_grid(mask: np.ndarray, grid_shape: tuple[int, int]) -> np.ndarray:
+    """Return the masked-pixel fraction for each TGLC 150-pixel source cutout."""
     grid_y_size, grid_x_size = grid_shape
-    stride = CUTOUT_SIZE - 2 * CUTOUT_OVERLAP
-    min_tmag = np.full(grid_shape, np.inf, dtype=float)
-    valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(tess_mag)
-    x, y, tess_mag = x[valid], y[valid], tess_mag[valid]
-    base_x = np.floor((x - (CCD_X_OFFSET - 4)) / stride).astype(int)
-    base_y = np.floor((y + 4) / stride).astype(int)
-    for dx in (0, 1):
-        for dy in (0, 1):
-            grid_x = base_x + dx
-            grid_y = base_y + dy
-            x0 = CCD_X_OFFSET + stride * grid_x
-            y0 = stride * grid_y
-            in_cutout = (
-                (grid_x >= 0)
-                & (grid_x < grid_x_size)
-                & (grid_y >= 0)
-                & (grid_y < grid_y_size)
-                & (x >= x0 - 4)
-                & (x <= x0 + CUTOUT_SIZE + 3)
-                & (y >= y0 - 4)
-                & (y <= y0 + CUTOUT_SIZE + 3)
-            )
-            flat_index = grid_y[in_cutout] * grid_x_size + grid_x[in_cutout]
-            np.minimum.at(min_tmag.ravel(), flat_index, tess_mag[in_cutout])
-    if not np.isfinite(min_tmag).all():
-        raise ValueError("One or more source cutouts have no finite Gaia Tmag")
-    return min_tmag
-
-
-def tmag10_scale_grid(
-    *,
-    source_tglc_root: Path,
-    orbit: int,
-    sector: int,
-    camera: int,
-    ccd: int,
-    ffi_path: Path,
-    grid_shape: tuple[int, int],
-) -> np.ndarray:
-    """Compute the per-cutout factor converting ePSF scale to Tmag=10."""
-    catalog_path = (
-        source_tglc_root
-        / f"orbit-{orbit}"
-        / "ffi"
-        / "catalogs"
-        / f"Gaia_cam{camera}_ccd{ccd}.ecsv"
-    )
-    catalog = Table.read(catalog_path)
-    tess_mag = tess_magnitude_from_gaia(
-        catalog["phot_g_mean_mag"],
-        catalog["phot_bp_mean_mag"],
-        catalog["phot_rp_mean_mag"],
-    )
-    with fits.open(ffi_path, memmap=True) as hdus:
-        wcs = WCS(hdus[0].header)
-    coordinates = np.column_stack((np.asarray(catalog["ra"]), np.asarray(catalog["dec"])))
-    pixels = wcs.all_world2pix(coordinates, 0, quiet=True)
-    brightest_tmag = brightest_tmag_by_cutout(
-        x=pixels[:, 0],
-        y=pixels[:, 1],
-        tess_mag=tess_mag,
-        grid_shape=grid_shape,
-    )
-    return 10.0 ** (0.4 * (brightest_tmag - 10.0))
+    fractions = np.empty(grid_shape, dtype=float)
+    for grid_y in range(grid_y_size):
+        for grid_x in range(grid_x_size):
+            y0 = grid_y * (CUTOUT_SIZE - 4)
+            x0 = grid_x * (CUTOUT_SIZE - 4)
+            cutout = mask[y0 : y0 + CUTOUT_SIZE, x0 : x0 + CUTOUT_SIZE]
+            if cutout.shape != (CUTOUT_SIZE, CUTOUT_SIZE):
+                raise ValueError(f"Unexpected edge cutout shape {cutout.shape} at {grid_x},{grid_y}")
+            fractions[grid_y, grid_x] = float(np.mean(cutout))
+    return fractions
 
 
 def load_sector_map(
     *,
     a2v1_root: Path,
-    source_tglc_root: Path,
-    sector: int,
     orbit: int,
     camera: int,
     ccd: int,
@@ -262,7 +162,6 @@ def load_sector_map(
     tuple[float, float, float, float],
     np.ndarray,
     np.ndarray,
-    int,
     int,
 ]:
     source_dir = a2v1_root / f"orbit-{orbit}" / "ffi" / f"cam{camera}" / f"ccd{ccd}" / "source"
@@ -288,61 +187,33 @@ def load_sector_map(
     median_flux = np.nanmedian(np.stack(images, axis=0), axis=0)
     proxy_mask = bad_pixel_proxy(median_flux)
 
-    epsf_scale: dict[tuple[int, int], float] = {}
     local_epsf_by_grid: dict[tuple[int, int], bool] = {}
-    n_source_tiles = 0
-    epsf_center = -1
 
     for source_path in source_paths:
         grid_x, grid_y = parse_source_grid(source_path)
-        n_source_tiles += 1
-
         epsf_path = epsf_dir / f"epsf_{grid_x}_{grid_y}.npy"
-        epsf = np.load(epsf_path, mmap_mode="r")
-        if epsf.ndim != 2 or epsf.shape[0] < n_cadences:
-            raise ValueError(f"Unexpected ePSF shape {epsf.shape} in {epsf_path}")
-        center = central_epsf_index(epsf.shape[1])
-        if epsf_center not in {-1, center}:
-            raise ValueError(f"Inconsistent ePSF parameterization in {epsf_path}")
-        epsf_center = center
-        epsf_scale[(grid_x, grid_y)] = float(np.nanmedian(epsf[:n_cadences, center]))
         local_epsf_by_grid[(grid_x, grid_y)] = not epsf_path.is_symlink()
 
     assert science_extent is not None
-    max_x = max(grid_x for grid_x, _ in epsf_scale) + 1
-    max_y = max(grid_y for _, grid_y in epsf_scale) + 1
-    scale_grid = np.full((max_y, max_x), np.nan, dtype=float)
+    max_x = max(grid_x for grid_x, _ in local_epsf_by_grid) + 1
+    max_y = max(grid_y for _, grid_y in local_epsf_by_grid) + 1
     local_epsf = np.zeros((max_y, max_x), dtype=bool)
-    for (grid_x, grid_y), scale in epsf_scale.items():
-        scale_grid[grid_y, grid_x] = scale
+    for grid_x, grid_y in local_epsf_by_grid:
         local_epsf[grid_y, grid_x] = local_epsf_by_grid[(grid_x, grid_y)]
-    scale_grid *= tmag10_scale_grid(
-        source_tglc_root=source_tglc_root,
-        orbit=orbit,
-        sector=sector,
-        camera=camera,
-        ccd=ccd,
-        ffi_path=ffi_paths[0],
-        grid_shape=scale_grid.shape,
-    )
-    scale_median = float(np.nanmedian(scale_grid))
-    if not np.isfinite(scale_median) or scale_median == 0:
-        raise ValueError("Cannot normalize ePSF center coefficients")
+    fractions = mask_fraction_grid(proxy_mask, local_epsf.shape)
     return (
         median_flux,
         proxy_mask,
         science_extent,
-        scale_grid / scale_median,
+        fractions,
         local_epsf,
-        n_source_tiles,
-        epsf_center,
+        len(source_paths),
     )
 
 
 def render_sector_map(
     *,
     a2v1_root: Path,
-    source_tglc_root: Path,
     output_dir: Path,
     sector: int,
     orbit: int,
@@ -354,14 +225,11 @@ def render_sector_map(
         median_flux,
         proxy_mask,
         science_extent,
-        relative_scale,
+        mask_fraction,
         local_epsf,
         n_tiles,
-        epsf_center,
     ) = load_sector_map(
         a2v1_root=a2v1_root,
-        source_tglc_root=source_tglc_root,
-        sector=sector,
         orbit=orbit,
         camera=camera,
         ccd=ccd,
@@ -401,27 +269,27 @@ def render_sector_map(
     )
     image_axis.grid(False)
 
-    finite_scale = relative_scale[np.isfinite(relative_scale)]
-    deviation = max(0.02, float(np.nanmax(np.abs(finite_scale - 1.0))))
+    masked_percent = 100.0 * mask_fraction
+    color_limit = max(0.05, float(np.nanpercentile(masked_percent, 99.0)))
     scale_image = scale_axis.imshow(
-        relative_scale,
+        masked_percent,
         origin="lower",
-        cmap="coolwarm",
-        vmin=1.0 - deviation,
-        vmax=1.0 + deviation,
+        cmap="viridis",
+        vmin=0.0,
+        vmax=color_limit,
         interpolation="nearest",
     )
-    for grid_y, grid_x in np.ndindex(relative_scale.shape):
-        value = relative_scale[grid_y, grid_x]
-        if np.isfinite(value):
+    for grid_y, grid_x in np.ndindex(masked_percent.shape):
+        value = masked_percent[grid_y, grid_x]
+        if np.isfinite(value) and value > 0:
             scale_axis.text(
                 grid_x,
                 grid_y,
-                f"{value:.2f}",
+                f"{value:.2f}%",
                 ha="center",
                 va="center",
-                fontsize=4.7,
-                color="#202020",
+                fontsize=4.2,
+                color="#f8f8f8" if value < 0.5 * color_limit else "#202020",
             )
         if local_epsf[grid_y, grid_x]:
             scale_axis.add_patch(
@@ -437,13 +305,13 @@ def render_sector_map(
     scale_axis.set(
         xlabel="cutout x",
         ylabel="cutout y",
-        title="central ePSF Tmag=10 scale\nrelative to CCD median; red = local A2v1 fit",
-        xticks=np.arange(relative_scale.shape[1]),
-        yticks=np.arange(relative_scale.shape[0]),
+        title="first-20-cadence proxy mask fraction\nred = local A2v1 masked ePSF refit",
+        xticks=np.arange(masked_percent.shape[1]),
+        yticks=np.arange(masked_percent.shape[0]),
     )
     scale_axis.grid(False)
     colorbar = figure.colorbar(scale_image, ax=scale_axis, fraction=0.046, pad=0.045)
-    colorbar.set_label("relative ePSF coefficient")
+    colorbar.set_label("masked cutout pixels [%]")
     figure.subplots_adjust(left=0.07, right=0.96, top=0.91, bottom=0.12)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -462,8 +330,8 @@ def render_sector_map(
         n_source_tiles=n_tiles,
         n_local_epsf_tiles=int(local_epsf.sum()),
         n_proxy_bad_pixels=int(proxy_mask.sum()),
-        epsf_center_index=epsf_center,
-        epsf_relative_scale_median=float(np.nanmedian(relative_scale)),
+        proxy_mask_fraction_median=float(np.nanmedian(mask_fraction)),
+        proxy_mask_fraction_max=float(np.nanmax(mask_fraction)),
         png=str(png),
         pdf=str(pdf),
     )
@@ -472,7 +340,6 @@ def render_sector_map(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--a2v1-root", type=Path, default=DEFAULT_A2V1_ROOT)
-    parser.add_argument("--source-tglc-root", type=Path, default=DEFAULT_SOURCE_TGLC_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--sector-orbit", type=parse_sector_orbit, action="append")
     parser.add_argument("--camera", type=int, default=1, choices=range(1, 5))
@@ -489,7 +356,6 @@ def main() -> None:
     summaries = [
         render_sector_map(
             a2v1_root=args.a2v1_root,
-            source_tglc_root=args.source_tglc_root,
             output_dir=args.output_dir,
             sector=sector,
             orbit=orbit,

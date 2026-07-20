@@ -17,18 +17,6 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-def test_central_epsf_index_uses_the_center_of_the_psf_block() -> None:
-    assert MODULE.central_epsf_index(535) == 264
-    assert MODULE.central_epsf_index(447) == 220
-
-
-def test_central_epsf_index_rejects_non_square_or_even_psf_blocks() -> None:
-    with pytest.raises(ValueError, match="odd square block"):
-        MODULE.central_epsf_index(536)
-    with pytest.raises(ValueError, match="odd square block"):
-        MODULE.central_epsf_index(10)
-
-
 def test_parse_sector_orbit() -> None:
     assert MODULE.parse_sector_orbit("64:135") == (64, 135)
     with pytest.raises(Exception, match="sector orbit"):
@@ -66,23 +54,13 @@ def test_mask_edges_excludes_only_the_interior_of_a_filled_region() -> None:
     assert not edges[1, 1]
 
 
-def test_brightest_tmag_by_cutout_respects_the_tglc_grid_geometry() -> None:
-    brightest = MODULE.brightest_tmag_by_cutout(
-        x=np.array([100.0, 250.0, 100.0, 250.0]),
-        y=np.array([100.0, 100.0, 200.0, 200.0]),
-        tess_mag=np.array([12.0, 11.0, 10.0, 9.0]),
-        grid_shape=(2, 2),
-    )
+def test_mask_fraction_grid_follows_the_tglc_source_stride() -> None:
+    mask = np.zeros((296, 296), dtype=bool)
+    mask[:150, :150] = True
 
-    assert np.array_equal(brightest, np.array([[12.0, 11.0], [10.0, 9.0]]))
+    fractions = MODULE.mask_fraction_grid(mask, (2, 2))
 
-
-def test_tess_magnitude_from_gaia_matches_the_fallback_for_missing_color() -> None:
-    tess_mag = MODULE.tess_magnitude_from_gaia(
-        np.array([15.0, 16.0]),
-        np.array([15.5, np.nan]),
-        np.array([14.5, np.nan]),
-    )
-
-    assert np.isfinite(tess_mag[0])
-    assert tess_mag[1] == pytest.approx(15.57)
+    assert fractions[0, 0] == pytest.approx(1.0)
+    assert fractions[0, 1] == pytest.approx(4 * 150 / 150**2)
+    assert fractions[1, 0] == pytest.approx(4 * 150 / 150**2)
+    assert fractions[1, 1] == pytest.approx(16 / 150**2)
