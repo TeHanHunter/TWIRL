@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import sys
 
+import numpy as np
 import pytest
 
 
@@ -32,3 +33,25 @@ def test_parse_sector_orbit() -> None:
     assert MODULE.parse_sector_orbit("64:135") == (64, 135)
     with pytest.raises(Exception, match="sector orbit"):
         MODULE.parse_sector_orbit("64")
+
+
+def test_science_pixel_slices_match_the_tglc_source_coordinate_frame() -> None:
+    y_slice, x_slice, extent = MODULE.science_pixel_slices("[45:2092,1:2048]")
+
+    assert (y_slice.start, y_slice.stop) == (0, 2048)
+    assert (x_slice.start, x_slice.stop) == (44, 2092)
+    assert extent == (44.0, 2092.0, 0.0, 2048.0)
+
+
+def test_bad_pixel_proxy_expands_a_saturated_pixel_to_cross_neighbors() -> None:
+    image = np.ones((5, 5), dtype=float)
+    image[2, 2] = 100.0
+
+    mask = MODULE.bad_pixel_proxy(image)
+
+    assert int(mask.sum()) == 5
+    assert mask[2, 2]
+    assert mask[1, 2]
+    assert mask[3, 2]
+    assert mask[2, 1]
+    assert mask[2, 3]

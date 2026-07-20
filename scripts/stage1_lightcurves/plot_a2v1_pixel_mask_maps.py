@@ -1,25 +1,27 @@
 #!/usr/bin/env python3
 """Render representative A2v1 saturated-pixel mask diagnostics by sector.
 
-Each map stitches the median of the first requested cadences from the 14x14
-TGLC source-cutout grid for one orbit/camera/CCD. Red contours show the static
-``Source.mask.mask`` pixels passed to the A2v1 ePSF fitter. The companion grid
-shows the cadence-median central ePSF coefficient for each cutout, normalized
-by the CCD median. It is a relative fit-scale diagnostic, not photometry.
+Each map uses the median of the first requested staged FFIs for one
+orbit/camera/CCD. Red contours show the corresponding TGLC bad-pixel threshold
+proxy: saturated, low-flux, and nonfinite pixels plus their four neighbors.
+The companion grid shows the cadence-median central ePSF coefficient for each
+cutout, normalized by the CCD median. Red cell outlines identify an on-disk
+A2v1 ePSF rather than a legacy empty-mask ePSF symlink.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import pickle
 import re
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+from matplotlib.patches import Rectangle
 import numpy as np
+from astropy.io import fits
 
 from twirl.plotting.style import apply_twirl_style
 
@@ -48,8 +50,8 @@ class MapSummary:
     ccd: int
     n_cadences: int
     n_source_tiles: int
-    n_masked_tiles: int
-    n_masked_pixels: int
+    n_local_epsf_tiles: int
+    n_proxy_bad_pixels: int
     epsf_center_index: int
     epsf_relative_scale_median: float
     png: str
@@ -99,6 +101,38 @@ def percentile_limits(image: np.ndarray) -> tuple[float, float]:
     return float(vmin), float(vmax)
 
 
+def science_pixel_slices(scipixs: str) -> tuple[slice, slice, tuple[float, float, float, float]]:
+    """Return science-image slices and zero-indexed CCD display bounds."""
+    try:
+        x_range, y_range = scipixs.strip("[]").split(",")
+        min_x, max_x = (int(value) for value in x_range.split(":"))
+        min_y, max_y = (int(value) for value in y_range.split(":"))
+    except ValueError as exc:
+        raise ValueError(f"Invalid SCIPIXS header value: {scipixs!r}") from exc
+    x0, y0 = min_x - 1, min_y - 1
+    return (
+        slice(y0, max_y),
+        slice(x0, max_x),
+        (float(x0), float(max_x), float(y0), float(max_y)),
+    )
+
+
+def bad_pixel_proxy(median_flux: np.ndarray) -> np.ndarray:
+    """Apply TGLC's bad-pixel thresholds to a first-cadence median image."""
+    bad = ~np.isfinite(median_flux)
+    finite = median_flux[np.isfinite(median_flux)]
+    if finite.size == 0:
+        return bad
+    bad |= median_flux > 0.8 * np.nanmax(finite)
+    bad |= median_flux < 0.2 * np.nanmedian(finite)
+    expanded = bad.copy()
+    expanded[1:, :] |= bad[:-1, :]
+    expanded[:-1, :] |= bad[1:, :]
+    expanded[:, 1:] |= bad[:, :-1]
+    expanded[:, :-1] |= bad[:, 1:]
+    return expanded
+
+
 def load_sector_map(
     *,
     a2v1_root: Path,
@@ -107,62 +141,49 @@ def load_sector_map(
     camera: int,
     ccd: int,
     n_cadences: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int, int]:
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    tuple[float, float, float, float],
+    np.ndarray,
+    np.ndarray,
+    int,
+    int,
+]:
     source_dir = a2v1_root / f"orbit-{orbit}" / "ffi" / f"cam{camera}" / f"ccd{ccd}" / "source"
     epsf_dir = source_dir.parent / "epsf"
+    ffi_dir = source_dir.parent / "ffi"
     source_paths = sorted(source_dir.glob("source_*.pkl"), key=parse_source_grid)
     if not source_paths:
         raise FileNotFoundError(f"No source pickles found: {source_dir}")
+    ffi_paths = sorted(path for path in ffi_dir.glob("*.fits") if path.is_file())
+    if len(ffi_paths) < n_cadences:
+        raise ValueError(f"{ffi_dir} has {len(ffi_paths)} FFIs; requested {n_cadences}")
 
-    mosaic_sum: np.ndarray | None = None
-    mosaic_count: np.ndarray | None = None
-    masked_count: np.ndarray | None = None
+    images: list[np.ndarray] = []
+    science_extent: tuple[float, float, float, float] | None = None
+    for ffi_path in ffi_paths[:n_cadences]:
+        with fits.open(ffi_path, memmap=True) as hdus:
+            y_slice, x_slice, extent = science_pixel_slices(hdus[0].header["SCIPIXS"])
+            if science_extent is None:
+                science_extent = extent
+            elif science_extent != extent:
+                raise ValueError(f"Inconsistent SCIPIXS value in {ffi_path}")
+            images.append(np.asarray(hdus[0].data[y_slice, x_slice], dtype=np.float32))
+    median_flux = np.nanmedian(np.stack(images, axis=0), axis=0)
+    proxy_mask = bad_pixel_proxy(median_flux)
+
     epsf_scale: dict[tuple[int, int], float] = {}
-    n_masked_tiles = 0
+    local_epsf_by_grid: dict[tuple[int, int], bool] = {}
     n_source_tiles = 0
     epsf_center = -1
 
     for source_path in source_paths:
         grid_x, grid_y = parse_source_grid(source_path)
-        with source_path.open("rb") as source_handle:
-            source = pickle.load(source_handle)
-        flux = np.asarray(source.flux[:n_cadences], dtype=float)
-        if flux.shape[0] < n_cadences:
-            raise ValueError(
-                f"{source_path} has only {flux.shape[0]} cadences; requested {n_cadences}"
-            )
-        tile = np.nanmedian(flux, axis=0)
-        source_mask = np.ma.getmaskarray(source.mask).astype(bool, copy=False)
-        if tile.shape != source_mask.shape:
-            raise ValueError(f"Flux/mask shape mismatch in {source_path}")
-
-        x0 = int(source.ccd_x)
-        y0 = int(source.ccd_y)
-        y1 = y0 + tile.shape[0]
-        x1 = x0 + tile.shape[1]
-        if mosaic_sum is None:
-            mosaic_sum = np.zeros((y1, x1), dtype=float)
-            mosaic_count = np.zeros((y1, x1), dtype=np.uint16)
-            masked_count = np.zeros((y1, x1), dtype=np.uint8)
-        elif y1 > mosaic_sum.shape[0] or x1 > mosaic_sum.shape[1]:
-            new_shape = (max(y1, mosaic_sum.shape[0]), max(x1, mosaic_sum.shape[1]))
-            expanded_sum = np.zeros(new_shape, dtype=float)
-            expanded_count = np.zeros(new_shape, dtype=np.uint16)
-            expanded_mask = np.zeros(new_shape, dtype=np.uint8)
-            expanded_sum[: mosaic_sum.shape[0], : mosaic_sum.shape[1]] = mosaic_sum
-            expanded_count[: mosaic_count.shape[0], : mosaic_count.shape[1]] = mosaic_count
-            expanded_mask[: masked_count.shape[0], : masked_count.shape[1]] = masked_count
-            mosaic_sum, mosaic_count, masked_count = expanded_sum, expanded_count, expanded_mask
-
-        finite = np.isfinite(tile)
-        mosaic_sum[y0:y1, x0:x1] += np.where(finite, tile, 0.0)
-        mosaic_count[y0:y1, x0:x1] += finite.astype(np.uint16)
-        masked_count[y0:y1, x0:x1] += source_mask.astype(np.uint8)
-        n_masked_tiles += int(source_mask.any())
         n_source_tiles += 1
 
         epsf_path = epsf_dir / f"epsf_{grid_x}_{grid_y}.npy"
-        epsf = np.load(epsf_path)
+        epsf = np.load(epsf_path, mmap_mode="r")
         if epsf.ndim != 2 or epsf.shape[0] < n_cadences:
             raise ValueError(f"Unexpected ePSF shape {epsf.shape} in {epsf_path}")
         center = central_epsf_index(epsf.shape[1])
@@ -170,26 +191,28 @@ def load_sector_map(
             raise ValueError(f"Inconsistent ePSF parameterization in {epsf_path}")
         epsf_center = center
         epsf_scale[(grid_x, grid_y)] = float(np.nanmedian(epsf[:n_cadences, center]))
+        local_epsf_by_grid[(grid_x, grid_y)] = not epsf_path.is_symlink()
 
-    assert mosaic_sum is not None
-    assert mosaic_count is not None
-    assert masked_count is not None
-    mosaic = np.divide(
-        mosaic_sum,
-        mosaic_count,
-        out=np.full(mosaic_sum.shape, np.nan, dtype=float),
-        where=mosaic_count > 0,
-    )
-    mask = masked_count > 0
+    assert science_extent is not None
     max_x = max(grid_x for grid_x, _ in epsf_scale) + 1
     max_y = max(grid_y for _, grid_y in epsf_scale) + 1
     scale_grid = np.full((max_y, max_x), np.nan, dtype=float)
+    local_epsf = np.zeros((max_y, max_x), dtype=bool)
     for (grid_x, grid_y), scale in epsf_scale.items():
         scale_grid[grid_y, grid_x] = scale
+        local_epsf[grid_y, grid_x] = local_epsf_by_grid[(grid_x, grid_y)]
     scale_median = float(np.nanmedian(scale_grid))
     if not np.isfinite(scale_median) or scale_median == 0:
         raise ValueError("Cannot normalize ePSF center coefficients")
-    return mosaic, mask, scale_grid / scale_median, n_source_tiles, n_masked_tiles, epsf_center
+    return (
+        median_flux,
+        proxy_mask,
+        science_extent,
+        scale_grid / scale_median,
+        local_epsf,
+        n_source_tiles,
+        epsf_center,
+    )
 
 
 def render_sector_map(
@@ -202,7 +225,15 @@ def render_sector_map(
     ccd: int,
     n_cadences: int,
 ) -> MapSummary:
-    mosaic, mask, relative_scale, n_tiles, n_masked_tiles, epsf_center = load_sector_map(
+    (
+        median_flux,
+        proxy_mask,
+        science_extent,
+        relative_scale,
+        local_epsf,
+        n_tiles,
+        epsf_center,
+    ) = load_sector_map(
         a2v1_root=a2v1_root,
         sector=sector,
         orbit=orbit,
@@ -217,19 +248,23 @@ def render_sector_map(
         figsize=(10.8, 4.75),
         gridspec_kw={"width_ratios": (1.13, 1.0), "wspace": 0.24},
     )
-    vmin, vmax = percentile_limits(mosaic)
+    vmin, vmax = percentile_limits(median_flux)
     image_axis.imshow(
-        mosaic,
+        median_flux,
         origin="lower",
         cmap="gray",
         norm=LogNorm(vmin=vmin, vmax=vmax),
         interpolation="nearest",
+        extent=science_extent,
     )
-    if np.any(mask):
+    if np.any(proxy_mask):
+        x_coordinates = np.linspace(science_extent[0], science_extent[1], proxy_mask.shape[1])
+        y_coordinates = np.linspace(science_extent[2], science_extent[3], proxy_mask.shape[0])
         image_axis.contour(
-            mask.astype(float),
+            x_coordinates,
+            y_coordinates,
+            proxy_mask.astype(float),
             levels=(0.5,),
-            origin="lower",
             colors=("#d1495b",),
             linewidths=0.45,
         )
@@ -238,7 +273,7 @@ def render_sector_map(
         ylabel="CCD y [pixel]",
         title=(
             f"S{sector:02d} orbit {orbit}, cam{camera}/ccd{ccd}\n"
-            f"median of first {n_cadences} cadences; mask outlines"
+            f"median of first {n_cadences} cadences; TGLC bad-pixel proxy"
         ),
     )
     image_axis.grid(False)
@@ -265,10 +300,21 @@ def render_sector_map(
                 fontsize=4.7,
                 color="#202020",
             )
+        if local_epsf[grid_y, grid_x]:
+            scale_axis.add_patch(
+                Rectangle(
+                    (grid_x - 0.5, grid_y - 0.5),
+                    1,
+                    1,
+                    fill=False,
+                    edgecolor="#d1495b",
+                    linewidth=0.7,
+                )
+            )
     scale_axis.set(
         xlabel="cutout x",
         ylabel="cutout y",
-        title="central ePSF coefficient\nrelative to CCD median",
+        title="central ePSF coefficient\nrelative to CCD median; red = local A2v1 fit",
         xticks=np.arange(relative_scale.shape[1]),
         yticks=np.arange(relative_scale.shape[0]),
     )
@@ -291,8 +337,8 @@ def render_sector_map(
         ccd=ccd,
         n_cadences=n_cadences,
         n_source_tiles=n_tiles,
-        n_masked_tiles=n_masked_tiles,
-        n_masked_pixels=int(mask.sum()),
+        n_local_epsf_tiles=int(local_epsf.sum()),
+        n_proxy_bad_pixels=int(proxy_mask.sum()),
         epsf_center_index=epsf_center,
         epsf_relative_scale_median=float(np.nanmedian(relative_scale)),
         png=str(png),
@@ -334,7 +380,8 @@ def main() -> None:
         print(
             "[a2v1-mask-map] "
             f"S{summary.sector:02d} orbit={summary.orbit} tiles={summary.n_source_tiles} "
-            f"masked_tiles={summary.n_masked_tiles} masked_pixels={summary.n_masked_pixels} "
+            f"local_epsf_tiles={summary.n_local_epsf_tiles} "
+            f"proxy_bad_pixels={summary.n_proxy_bad_pixels} "
             f"png={summary.png}"
         )
 
