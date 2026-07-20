@@ -14,6 +14,7 @@ QUEUE_RUNNER = (
     ROOT / "scripts" / "stage1_lightcurves" / "run_a2v1_sector_queue_pdo.sh"
 )
 S64_S69_MANIFEST = ROOT / "configs" / "a2v1_production_s64_s69.txt"
+CHECKOUT_GUARD = ROOT / "scripts" / "assert_clean_checkout.sh"
 TEACHER_RUNNER = (
     ROOT / "scripts" / "stage5_validation" / "run_s56_a2v1_teacher_search_pdo.sh"
 )
@@ -104,6 +105,13 @@ def test_a2v1_queue_and_teacher_share_validation_report_contract() -> None:
     assert "s${sector}_A2v1_validation_full_schema.json" in queue
     assert "${SECTOR_SHORT}_A2v1_validation_full_schema.json" in teacher
     assert "s$(printf '%04d' \"$sector\")_A2v1_full_validation.json" not in queue
+
+
+def test_checkout_guard_uses_legacy_git_compatible_directory_change() -> None:
+    guard = CHECKOUT_GUARD.read_text()
+
+    assert 'cd "${REPO}"' in guard
+    assert "git -C" not in guard
 
 
 def test_a2v1_queue_accepts_only_complete_or_absent_legacy_epsfs() -> None:
