@@ -55,3 +55,12 @@ def test_bad_pixel_proxy_expands_a_saturated_pixel_to_cross_neighbors() -> None:
     assert mask[3, 2]
     assert mask[2, 1]
     assert mask[2, 3]
+
+
+def test_mask_edges_excludes_only_the_interior_of_a_filled_region() -> None:
+    mask = np.ones((3, 3), dtype=bool)
+
+    edges = MODULE.mask_edges(mask)
+
+    assert int(edges.sum()) == 8
+    assert not edges[1, 1]

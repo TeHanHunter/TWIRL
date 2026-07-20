@@ -18,7 +18,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from matplotlib.colors import ListedColormap, LogNorm
 from matplotlib.patches import Rectangle
 import numpy as np
 from astropy.io import fits
@@ -131,6 +131,19 @@ def bad_pixel_proxy(median_flux: np.ndarray) -> np.ndarray:
     expanded[:, 1:] |= bad[:, :-1]
     expanded[:, :-1] |= bad[:, 1:]
     return expanded
+
+
+def mask_edges(mask: np.ndarray) -> np.ndarray:
+    """Return one-pixel outlines for a binary mask without contourpy."""
+    padded = np.pad(mask, 1, constant_values=False)
+    interior = (
+        mask
+        & padded[:-2, 1:-1]
+        & padded[2:, 1:-1]
+        & padded[1:-1, :-2]
+        & padded[1:-1, 2:]
+    )
+    return mask & ~interior
 
 
 def load_sector_map(
@@ -258,15 +271,12 @@ def render_sector_map(
         extent=science_extent,
     )
     if np.any(proxy_mask):
-        x_coordinates = np.linspace(science_extent[0], science_extent[1], proxy_mask.shape[1])
-        y_coordinates = np.linspace(science_extent[2], science_extent[3], proxy_mask.shape[0])
-        image_axis.contour(
-            x_coordinates,
-            y_coordinates,
-            proxy_mask.astype(float),
-            levels=(0.5,),
-            colors=("#d1495b",),
-            linewidths=0.45,
+        image_axis.imshow(
+            np.ma.masked_where(~mask_edges(proxy_mask), proxy_mask),
+            origin="lower",
+            cmap=ListedColormap(["#d1495b"]),
+            interpolation="nearest",
+            extent=science_extent,
         )
     image_axis.set(
         xlabel="CCD x [pixel]",
