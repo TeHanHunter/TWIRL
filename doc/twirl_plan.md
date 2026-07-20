@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-17`.
+Last reconciled: `2026-07-20`.
 
 ## Current status
 
@@ -110,9 +110,9 @@ The operational contract is defined in the
 ### Current gate
 
 S58-S63 completed their gated HDF5/FITS production on `pdogpu5`. The S64-S69
-source-only batch uses the generic queue's explicit all-refit mode; partial
-legacy ePSF inputs remain a hard failure. Do not create sector-specific
-production logic unless the sector is a documented exception.
+source-only batch is active on `pdogpu5` in the generic queue's explicit
+all-refit mode; partial legacy ePSF inputs remain a hard failure. Do not create
+sector-specific production logic unless the sector is a documented exception.
 
 ### Exit criteria
 
