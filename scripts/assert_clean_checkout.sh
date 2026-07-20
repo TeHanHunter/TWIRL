@@ -12,7 +12,7 @@ fi
 
 cd "${REPO}"
 
-status="$(git status --porcelain=v1 --untracked-files=all)"
+status="$(git status --porcelain --untracked-files=all)"
 if [[ -n "${status}" ]]; then
   echo "[git-clean] refusing dirty checkout: ${REPO}" >&2
   printf '%s\n' "${status}" >&2

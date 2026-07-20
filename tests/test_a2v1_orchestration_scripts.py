@@ -112,6 +112,7 @@ def test_checkout_guard_uses_legacy_git_compatible_directory_change() -> None:
 
     assert 'cd "${REPO}"' in guard
     assert "git -C" not in guard
+    assert "--porcelain=v1" not in guard
 
 
 def test_a2v1_queue_accepts_only_complete_or_absent_legacy_epsfs() -> None:
