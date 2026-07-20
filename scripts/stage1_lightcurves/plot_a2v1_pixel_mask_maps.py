@@ -22,11 +22,14 @@ from matplotlib.colors import ListedColormap, LogNorm
 from matplotlib.patches import Rectangle
 import numpy as np
 from astropy.io import fits
+from astropy.table import Table
+from astropy.wcs import WCS
 
 from twirl.plotting.style import apply_twirl_style
 
 
 DEFAULT_A2V1_ROOT = Path("/pdo/users/tehan/tglc-gpu-production-A2v1")
+DEFAULT_SOURCE_TGLC_ROOT = Path("/pdo/users/tehan/tglc-gpu-production")
 DEFAULT_OUTPUT_DIR = Path("reports/stage1_lightcurves/a2v1_pixel_mask_maps")
 DEFAULT_SECTOR_ORBITS = {
     56: 119,
@@ -40,6 +43,9 @@ DEFAULT_SECTOR_ORBITS = {
 }
 SOURCE_RE = re.compile(r"^source_(?P<x>\d+)_(?P<y>\d+)\.pkl$")
 BACKGROUND_PARAMETER_COUNT = 6
+CUTOUT_SIZE = 150
+CUTOUT_OVERLAP = 2
+CCD_X_OFFSET = 44
 
 
 @dataclass(frozen=True)
@@ -146,9 +152,105 @@ def mask_edges(mask: np.ndarray) -> np.ndarray:
     return mask & ~interior
 
 
+def tess_magnitude_from_gaia(
+    g_mag: np.ndarray,
+    bp_mag: np.ndarray,
+    rp_mag: np.ndarray,
+) -> np.ndarray:
+    """Match TGLC's Gaia-color conversion used in each source pickle."""
+    g_mag = np.asarray(g_mag, dtype=float)
+    color = np.asarray(bp_mag, dtype=float) - np.asarray(rp_mag, dtype=float)
+    tess_mag = (
+        g_mag
+        - 0.00522555 * color**3
+        + 0.0891337 * color**2
+        - 0.633923 * color
+        + 0.0324473
+    )
+    tess_mag[~np.isfinite(tess_mag)] = g_mag[~np.isfinite(tess_mag)] - 0.430
+    tess_mag[~np.isfinite(g_mag) | (g_mag >= 25)] = np.nan
+    return tess_mag
+
+
+def brightest_tmag_by_cutout(
+    *,
+    x: np.ndarray,
+    y: np.ndarray,
+    tess_mag: np.ndarray,
+    grid_shape: tuple[int, int],
+) -> np.ndarray:
+    """Return the brightest source magnitude for each overlapping TGLC cutout."""
+    grid_y_size, grid_x_size = grid_shape
+    stride = CUTOUT_SIZE - 2 * CUTOUT_OVERLAP
+    min_tmag = np.full(grid_shape, np.inf, dtype=float)
+    valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(tess_mag)
+    x, y, tess_mag = x[valid], y[valid], tess_mag[valid]
+    base_x = np.floor((x - (CCD_X_OFFSET - 4)) / stride).astype(int)
+    base_y = np.floor((y + 4) / stride).astype(int)
+    for dx in (0, 1):
+        for dy in (0, 1):
+            grid_x = base_x + dx
+            grid_y = base_y + dy
+            x0 = CCD_X_OFFSET + stride * grid_x
+            y0 = stride * grid_y
+            in_cutout = (
+                (grid_x >= 0)
+                & (grid_x < grid_x_size)
+                & (grid_y >= 0)
+                & (grid_y < grid_y_size)
+                & (x >= x0 - 4)
+                & (x <= x0 + CUTOUT_SIZE + 3)
+                & (y >= y0 - 4)
+                & (y <= y0 + CUTOUT_SIZE + 3)
+            )
+            flat_index = grid_y[in_cutout] * grid_x_size + grid_x[in_cutout]
+            np.minimum.at(min_tmag.ravel(), flat_index, tess_mag[in_cutout])
+    if not np.isfinite(min_tmag).all():
+        raise ValueError("One or more source cutouts have no finite Gaia Tmag")
+    return min_tmag
+
+
+def tmag10_scale_grid(
+    *,
+    source_tglc_root: Path,
+    orbit: int,
+    sector: int,
+    camera: int,
+    ccd: int,
+    ffi_path: Path,
+    grid_shape: tuple[int, int],
+) -> np.ndarray:
+    """Compute the per-cutout factor converting ePSF scale to Tmag=10."""
+    catalog_path = (
+        source_tglc_root
+        / f"orbit-{orbit}"
+        / "ffi"
+        / "catalogs"
+        / f"Gaia_cam{camera}_ccd{ccd}.ecsv"
+    )
+    catalog = Table.read(catalog_path)
+    tess_mag = tess_magnitude_from_gaia(
+        catalog["phot_g_mean_mag"],
+        catalog["phot_bp_mean_mag"],
+        catalog["phot_rp_mean_mag"],
+    )
+    with fits.open(ffi_path, memmap=True) as hdus:
+        wcs = WCS(hdus[0].header)
+    coordinates = np.column_stack((np.asarray(catalog["ra"]), np.asarray(catalog["dec"])))
+    pixels = wcs.all_world2pix(coordinates, 0, quiet=True)
+    brightest_tmag = brightest_tmag_by_cutout(
+        x=pixels[:, 0],
+        y=pixels[:, 1],
+        tess_mag=tess_mag,
+        grid_shape=grid_shape,
+    )
+    return 10.0 ** (0.4 * (brightest_tmag - 10.0))
+
+
 def load_sector_map(
     *,
     a2v1_root: Path,
+    source_tglc_root: Path,
     sector: int,
     orbit: int,
     camera: int,
@@ -214,6 +316,15 @@ def load_sector_map(
     for (grid_x, grid_y), scale in epsf_scale.items():
         scale_grid[grid_y, grid_x] = scale
         local_epsf[grid_y, grid_x] = local_epsf_by_grid[(grid_x, grid_y)]
+    scale_grid *= tmag10_scale_grid(
+        source_tglc_root=source_tglc_root,
+        orbit=orbit,
+        sector=sector,
+        camera=camera,
+        ccd=ccd,
+        ffi_path=ffi_paths[0],
+        grid_shape=scale_grid.shape,
+    )
     scale_median = float(np.nanmedian(scale_grid))
     if not np.isfinite(scale_median) or scale_median == 0:
         raise ValueError("Cannot normalize ePSF center coefficients")
@@ -231,6 +342,7 @@ def load_sector_map(
 def render_sector_map(
     *,
     a2v1_root: Path,
+    source_tglc_root: Path,
     output_dir: Path,
     sector: int,
     orbit: int,
@@ -248,6 +360,7 @@ def render_sector_map(
         epsf_center,
     ) = load_sector_map(
         a2v1_root=a2v1_root,
+        source_tglc_root=source_tglc_root,
         sector=sector,
         orbit=orbit,
         camera=camera,
@@ -324,7 +437,7 @@ def render_sector_map(
     scale_axis.set(
         xlabel="cutout x",
         ylabel="cutout y",
-        title="central ePSF coefficient\nrelative to CCD median; red = local A2v1 fit",
+        title="central ePSF Tmag=10 scale\nrelative to CCD median; red = local A2v1 fit",
         xticks=np.arange(relative_scale.shape[1]),
         yticks=np.arange(relative_scale.shape[0]),
     )
@@ -359,6 +472,7 @@ def render_sector_map(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--a2v1-root", type=Path, default=DEFAULT_A2V1_ROOT)
+    parser.add_argument("--source-tglc-root", type=Path, default=DEFAULT_SOURCE_TGLC_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--sector-orbit", type=parse_sector_orbit, action="append")
     parser.add_argument("--camera", type=int, default=1, choices=range(1, 5))
@@ -375,6 +489,7 @@ def main() -> None:
     summaries = [
         render_sector_map(
             a2v1_root=args.a2v1_root,
+            source_tglc_root=args.source_tglc_root,
             output_dir=args.output_dir,
             sector=sector,
             orbit=orbit,

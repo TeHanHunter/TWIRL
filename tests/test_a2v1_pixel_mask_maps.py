@@ -64,3 +64,25 @@ def test_mask_edges_excludes_only_the_interior_of_a_filled_region() -> None:
 
     assert int(edges.sum()) == 8
     assert not edges[1, 1]
+
+
+def test_brightest_tmag_by_cutout_respects_the_tglc_grid_geometry() -> None:
+    brightest = MODULE.brightest_tmag_by_cutout(
+        x=np.array([100.0, 250.0, 100.0, 250.0]),
+        y=np.array([100.0, 100.0, 200.0, 200.0]),
+        tess_mag=np.array([12.0, 11.0, 10.0, 9.0]),
+        grid_shape=(2, 2),
+    )
+
+    assert np.array_equal(brightest, np.array([[12.0, 11.0], [10.0, 9.0]]))
+
+
+def test_tess_magnitude_from_gaia_matches_the_fallback_for_missing_color() -> None:
+    tess_mag = MODULE.tess_magnitude_from_gaia(
+        np.array([15.0, 16.0]),
+        np.array([15.5, np.nan]),
+        np.array([14.5, np.nan]),
+    )
+
+    assert np.isfinite(tess_mag[0])
+    assert tess_mag[1] == pytest.approx(15.57)
