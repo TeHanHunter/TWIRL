@@ -14,10 +14,10 @@ Last reconciled: `2026-07-17`.
   `source_id` as the scientific identifier and TIC as operational metadata.
 - `A2v1` is the active Stage 1 product family: no TIC-magnitude science cap,
   saturated-pixel ePSF masking, and sector-level ADP/ADP015 FITS products for
-  the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS) and S57
-  (`27,213` FITS) pass edge-aware HDF5/FITS validation; S58 and S59 pass their
-  full-product gates, and the resumable queue is producing S60-S63 from
-  `pdogpu5` after `pdogpu6` became unresponsive. See
+  the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS), S57
+  (`27,213` FITS), and S58-S63 pass their edge-aware HDF5/FITS product gates.
+  The next source-only production batch is S64-S69; it will refit all ePSFs
+  because no legacy ePSFs are available. See
   [Stage 1 history](twirl_progress_log.md#stage-1).
 - S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
   recovery in both active ADP apertures. Tier 0 verifies product integrity and
@@ -109,10 +109,10 @@ The operational contract is defined in the
 
 ### Current gate
 
-The S58-S63 serial queue is active. S59 passed its full-product gate, and the
-resumable S60 extraction is running on `pdogpu5` with the partial products
-retained. Do not create sector-specific production logic unless the sector is a
-documented exception.
+S58-S63 completed their gated HDF5/FITS production on `pdogpu5`. The S64-S69
+source-only batch uses the generic queue's explicit all-refit mode; partial
+legacy ePSF inputs remain a hard failure. Do not create sector-specific
+production logic unless the sector is a documented exception.
 
 ### Exit criteria
 
@@ -275,8 +275,9 @@ never a completeness measurement.
 
 ## Immediate implementation priorities
 
-1. Let the gated S59-S63 A2v1 HDF5/FITS queue continue with its existing
-   stop-on-failure gates; do not wait for it to finish before hardening S56.
+1. Run the gated S64-S69 A2v1 HDF5/FITS queue in source-only, all-ePSF-refit
+   mode; retain its stop-on-failure gates and do not bypass a partial-input
+   preflight failure.
 2. Complete the bounded S56 `active_search_pair` Tier-1 evidence: build the
    authoritative cadence/quality reference, produce the genuinely independent
    WD 1856 comparison, rerun the current Tier-0 report, and publish the target

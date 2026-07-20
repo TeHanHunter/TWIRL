@@ -43,6 +43,8 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
 - `2026-07-16`: The `r2` queue's S58 HDF5 validator completed, but its `tee` subprocess blocked writing the full JSON report to the detached tmux TTY. No extraction or FITS process was active. The queue driver now sends verbose stage output only to the persistent queue log. After syntax and full-test validation, the deadlocked shell/logger were stopped without changing products, and the same manifest restarted as `twirl-a2v1-s58-s63-queue-r3` at `11:30 EDT`.
 - `2026-07-16`: S58 completed at `12:03 EDT`. Its rebuilt full-product validation reports `46,309` present HDF5 rows, zero non-edge HDF5 omissions, zero zero-byte or unreadable HDF5 files, zero non-edge missing FITS targets, and zero bad checked FITS schemas. The `r3` queue then advanced to S59; orbit `125` ePSF/light-curve production is active.
 - `2026-07-17`: S59 completed at `19:05 EDT` after HDF5 extraction and the required FITS/full-product gates. The `r3` S60 log stopped updating at `00:03 EDT` while `pdogpu6` became unresponsive; the shared tree retained `27,048` orbit-`127` and `15,390` orbit-`128` HDF5 files. After a clean `pdogpu5` GPU/runtime preflight, the unchanged manifest restarted as `twirl-a2v1-s58-s63-queue-r4-pdogpu5` at `11:00 EDT` on GPUs `4,5,6,7`. It revalidates accepted sectors and resumes S60 without deleting partial products.
+- `2026-07-18`: The `r4` queue completed S60 (`15:45 EDT`), S61 (`01:27 EDT`), S62 (`10:59 EDT`), and S63 (`21:35 EDT`) after their HDF5, FITS, and full A2v1 schema gates. The terminal log reports `A2v1 queue complete`; no worker remained active.
+- `2026-07-20`: Confirmed S64-S65's complete prepared source trees (`3,136` pickles per orbit) with no legacy ePSFs. The generic queue now permits either a complete reusable ePSF tree or an absent tree that forces all saturated-mask ePSF refits, while rejecting partial ePSF preparation. The next manifest is [S64-S69](../configs/a2v1_production_s64_s69.txt).
 - `2026-07-16`: Reclassified the existing S56 A2v1 QA as Tier-0
   integrity/benchmark QA. It remains valid evidence for product coverage and
   WD 1856 recovery, but science promotion now requires a separate Tier-1 pass
@@ -56,9 +58,10 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   configuration remains intentionally non-runnable until the real external
   artifact hashes are reviewed; this scope cannot set `science_ready=true`.
 
-**Next:** Let S59-S63 production continue while the authoritative S56 cadence
-artifact and independent WD 1856 comparison are completed; then rerun Tier 0
-and publish the bounded Tier-1 target pass mask before enrichment uses S56.
+**Next:** Run the gated S64-S69 source-only production queue while the
+authoritative S56 cadence artifact and independent WD 1856 comparison are
+completed; then rerun Tier 0 and publish the bounded Tier-1 target pass mask
+before enrichment uses S56.
 
 ### Catalog, archive index, and sample control
 
