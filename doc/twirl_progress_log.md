@@ -115,22 +115,41 @@ sample.
   experimental evidence, pause further S57 holdout consumption, and do not
   treat S57 as a pristine external holdout.
 - `2026-07-17`: The accepted frozen teacher-v1 ensemble produced a blinded
-  Franklin handoff of `3,000` fresh real TICs: `1,000` each from S57, S58, and
-  S59. Every row uses the ADP-small BLS rank-one ephemeris; the hidden quotas
-  are `1,200` compact-transit, `900` Eclipse/contact, `300` Smooth-variable,
-  `300` disagreement, and `300` controls. The package has `3,000` current
-  `S56-ADP-HV2` PNG sheets, `14` real reference examples, zero PDFs, and no
-  exposed model scores or selection provenance. It is an active-learning
-  review set, not a new teacher test set. The self-contained package passed
+  Franklin handoff of `3,000` real sector-observation rows: `1,000` each from
+  S57, S58, and S59. Every row uses the ADP-small BLS rank-one ephemeris; the
+  hidden quotas are `1,200` compact-transit, `900` Eclipse/contact, `300`
+  Smooth-variable, `300` disagreement, and `300` controls. The package has
+  `3,000` current `S56-ADP-HV2` PNG sheets, `14` real reference examples,
+  zero PDFs, and no exposed model scores or selection provenance. It is an
+  active-learning review set, not a new teacher test set. The self-contained package passed
   its browser `--check-only` validation in place on PDO with all `3,000`
   sheets resolved and a group-writable label CSV for Franklin.
+- `2026-07-21`: Franklin returned all `3,000` labels with complete internal
+  row/key/provenance coverage (SHA-256
+  `2bd4d86870c70091eb7291ced067c63bc908118fd730083bfb2d12d52c5a09bf`).
+  The return has `15` Planet-like labels rather than the reported `14`, plus
+  `121` Eclipse/contact and `106` Broad-isolated-dip labels. Nine of the `15`
+  Planet-like rows carry confidence, EB, wide-event, or faintness caveats, so
+  these are enrichment morphology labels rather than confirmed planets.
+- `2026-07-21`: Cross-sector auditing found `133` repeated TICs against the
+  active real S56 training table and `42` active-label differences, including
+  `23` against explicitly final S56 adjudications. The comprehensive second-
+  read set contains `347` unique rows after including planet/EB/wide labels,
+  cross-taxonomy notes, unresolved/refold cases, nine nonblank `uncertain`
+  rows, and S56 differences. Combined S56 plus S57--S59 has `4,702` labeled
+  sector observations but `4,569` unique TICs; every retraining and evaluation
+  split must therefore be TIC-grouped. The return's standalone-app key is not
+  the repository `label_io.candidate_key`, so it must be joined only to the
+  exact frozen `3,000`-row queue under the app-key contract.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Apply the Tier-1 target mask, complete and audit the bounded S56 and
-S57--S59 enrichment reviews, freeze the confident candidate/label set, and
-retrain the teacher-v1 baseline with grouped and calibrated evaluation. Add
-dip, multi-sector, and false-alarm branches only after this path is robust.
+**Next:** Apply the Tier-1 target mask, independently adjudicate the `347`
+flagged S57--S59 rows, complete the bounded S56 review, and freeze the
+confident candidate/label set. The next three-sector human-review batch may be
+prepared in parallel, but retrain teacher v1 only after the merged labels pass
+TIC-grouped, source-separated, calibrated evaluation. Add dip, multi-sector,
+and false-alarm branches only after this path is robust.
 
 ### Human labels and harmonic review
 

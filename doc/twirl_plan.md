@@ -141,13 +141,23 @@ sector-specific production logic unless the sector is a documented exception.
 The focused S56 compact revisit is complete (`407/407` sheets, including `11`
 new Planet-like labels from the `400` model-selected compact rows), but the
 separate blinded S56 `1,000`-TIC enrichment batch remains only partially
-labeled (`177/1,000` at the preserved checkpoint). A bounded Franklin handoff
-now deliberately extends enrichment review to `3,000` fresh real TICs across
-S57--S59 (`1,000` per sector). It uses the frozen teacher-v1 ranker only to
-enrich review: every displayed ephemeris is ADP-small BLS rank one, and model
-scores and selection buckets remain hidden. The six prior S57 labels are
-preserved as premature experimental evidence and the entire earlier S57 queue
-is excluded. S57 is therefore no longer a pristine external holdout.
+labeled (`177/1,000` at the preserved checkpoint). Franklin completed the
+bounded `3,000`-row S57--S59 handoff (`1,000` per sector). The return contains
+`15` Planet-like, `121` Eclipse/contact, and `106` Broad-isolated-dip labels,
+but these remain morphology decisions rather than confirmed astrophysical
+classes. Nine of the Planet-like rows are caveated, so the `347`-row
+planet/EB/wide/taxonomy/period/cross-sector review queue must be independently
+adjudicated before training.
+
+The handoff rows are fresh sector observations, not all fresh targets: `133`
+TICs overlap the active real S56 training corpus, with `42` active-label
+differences (`23` against explicitly final S56 adjudications). All future
+splits must therefore be TIC-grouped. The frozen teacher-v1 ranker was used
+only to enrich review: every displayed ephemeris is ADP-small BLS rank one,
+and model scores and selection buckets remained hidden. S57 is no longer a
+pristine external holdout. Preparation of the next user-vetted three-sector
+batch may proceed in parallel, but its labels should not be merged until this
+return is adjudicated and the candidate/aperture/label contract is frozen.
 
 The immediate parallel work is to harden the existing S56 periodic/enrichment
 path, not to add search branches. Require the Tier-1 target pass mask, freeze a
@@ -282,10 +292,11 @@ never a completeness measurement.
    authoritative cadence/quality reference, produce the genuinely independent
    WD 1856 comparison, rerun the current Tier-0 report, and publish the target
    QA pass mask. This scope may qualify enrichment but never science release.
-3. Complete and audit the bounded S56 and Franklin S57--S59 enrichment
-   reviews, freeze the candidate/aperture contract, and merge only confidently
-   adjudicated labels into a versioned training set. Do not expand beyond this
-   bounded `3,000`-TIC handoff until its yield and label consistency are audited.
+3. Independently adjudicate the `347` flagged rows from Franklin's completed
+   S57--S59 return, resolve its `42` active S56 label differences, complete the
+   bounded S56 review, and freeze the candidate/aperture/label contract. The
+   next three-sector human-review batch may be prepared in parallel, but merge
+   only confident decisions into a versioned TIC-grouped training corpus.
 4. Retrain and evaluate teacher v1 on that frozen set with TIC-grouped,
    source-separated, calibrated metrics and uncertainty intervals. Do not put
    teacher v2, student pseudo-labels, or another model family on this path.
