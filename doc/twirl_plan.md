@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-20`.
+Last reconciled: `2026-07-21`.
 
 ## Current status
 
@@ -145,19 +145,29 @@ labeled (`177/1,000` at the preserved checkpoint). Franklin completed the
 bounded `3,000`-row S57--S59 handoff (`1,000` per sector). The return contains
 `15` Planet-like, `121` Eclipse/contact, and `106` Broad-isolated-dip labels,
 but these remain morphology decisions rather than confirmed astrophysical
-classes. Nine of the Planet-like rows are caveated, so the `347`-row
-planet/EB/wide/taxonomy/period/cross-sector review queue must be independently
-adjudicated before training.
+classes. The user inspected the `347`-row special-case queue and accepted the
+return at the batch-level morphology layer. The exact queue and returned CSV
+are now frozen with a normalized `3,000`-row training artifact. This acceptance
+does not validate astrophysical class, period factor, or ephemeris.
 
 The handoff rows are fresh sector observations, not all fresh targets: `133`
-TICs overlap the active real S56 training corpus, with `42` active-label
-differences (`23` against explicitly final S56 adjudications). All future
-splits must therefore be TIC-grouped. The frozen teacher-v1 ranker was used
-only to enrich review: every displayed ephemeris is ADP-small BLS rank one,
-and model scores and selection buckets remained hidden. S57 is no longer a
-pristine external holdout. Preparation of the next user-vetted three-sector
-batch may proceed in parallel, but its labels should not be merged until this
-return is adjudicated and the candidate/aperture/label contract is frozen.
+TICs overlap the active real S56 training corpus, with `42` sector-to-sector
+label differences (`23` against explicitly final S56 adjudications). The
+training unit remains a sector observation, while every split must be
+TIC-grouped so repeated hosts never cross train/validation/test boundaries.
+The frozen teacher-v1 ranker was used only to enrich review: every displayed
+ephemeris is ADP-small BLS rank one, and model scores and selection buckets
+remained hidden. S57 is no longer a pristine external holdout.
+
+The model still receives all seven folds (`P/4`, `P/3`, `P/2`, `P`, `2P`,
+`3P`, `4P`) for every row. Franklin's standalone app preselected `P` and saved
+factor/status together with each morphology click, so those fields are retained
+only as audit metadata. All S57--S59 harmonic targets are explicitly masked
+unless a later factor-only review verifies them; injection truth and the
+existing explicitly verified S56 period decisions remain valid supervision.
+The next `3,000`-row S60--S62 handoff is complete on PDO and under active human
+review. Retrain teacher v1 once after that return is frozen rather than fitting
+an interim four-sector model.
 
 The immediate parallel work is to harden the existing S56 periodic/enrichment
 path, not to add search branches. Require the Tier-1 target pass mask, freeze a
@@ -292,12 +302,11 @@ never a completeness measurement.
    authoritative cadence/quality reference, produce the genuinely independent
    WD 1856 comparison, rerun the current Tier-0 report, and publish the target
    QA pass mask. This scope may qualify enrichment but never science release.
-3. Independently adjudicate the `347` flagged rows from Franklin's completed
-   S57--S59 return, resolve its `42` active S56 label differences, complete the
-   bounded S56 review, and freeze the candidate/aperture/label contract. The
-   next three-sector human-review batch may be prepared in parallel, but merge
-   only confident decisions into a versioned TIC-grouped training corpus.
-4. Retrain and evaluate teacher v1 on that frozen set with TIC-grouped,
+3. Complete the bounded S56 review and Franklin's active S60--S62 review, then
+   freeze one seven-sector morphology corpus. Keep sector observations and
+   their raw label provenance, resolve same-sector duplicates by an explicit
+   precedence rule, and enforce one immutable TIC-grouped split registry.
+4. Retrain and evaluate teacher v1 once on that frozen set with TIC-grouped,
    source-separated, calibrated metrics and uncertainty intervals. Do not put
    teacher v2, student pseudo-labels, or another model family on this path.
 5. After the periodic/enrichment path is robust, add the dip branch,

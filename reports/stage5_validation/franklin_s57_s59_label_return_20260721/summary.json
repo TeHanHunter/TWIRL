@@ -1,0 +1,54 @@
+{
+  "created_utc": "2026-07-21T21:20:21.770767+00:00",
+  "expected_label_source": "human",
+  "expected_original_labeler": "franklin",
+  "human_label_counts": {
+    "eclipsing_binary_or_pceb": 121,
+    "instrumental_or_systematic": 204,
+    "planet_like": 15,
+    "skip": 5,
+    "stellar_variability": 443,
+    "uncertain": 2106,
+    "wide_transit_like": 106
+  },
+  "inputs": {
+    "franklin_labels_returned": {
+      "path": "reports/stage5_validation/franklin_s57_s59_label_return_20260721/franklin_labels_returned.csv",
+      "sha256": "2bd4d86870c70091eb7291ced067c63bc908118fd730083bfb2d12d52c5a09bf"
+    },
+    "frozen_review_queue": {
+      "path": "reports/stage5_validation/franklin_s57_s59_label_return_20260721/frozen_review_queue.csv",
+      "sha256": "6431ceefecb565ba8878e0ea2fec0528cff817f1801dbbac4b4fdc78cdeac7b9"
+    }
+  },
+  "label_unit": "sector_observation",
+  "morphology_accepted_utc": "2026-07-21T21:10:38.262082+00:00",
+  "morphology_adjudicator": "tehan",
+  "morphology_review_status": "accepted_batch_level",
+  "morphology_target_counts": {
+    "eclipse_contact": 121,
+    "other": 2310,
+    "planet_like": 15,
+    "smooth_variable": 443
+  },
+  "n_harmonic_targets": 0,
+  "n_native_h5_paths_resolved": 0,
+  "n_rows": 3000,
+  "n_unique_tics": 3000,
+  "outputs": {
+    "accepted_morphology_labels": {
+      "path": "reports/stage5_validation/franklin_s57_s59_label_return_20260721/accepted_morphology_labels.csv",
+      "sha256": "443085c69bd7eb72a0b2616caa68fc16105b7e2f7d175f328f726123aa2a7dc9"
+    },
+    "summary": {
+      "path": "reports/stage5_validation/franklin_s57_s59_label_return_20260721/summary.json"
+    }
+  },
+  "period_supervision_policy": "reported factor/status retained for audit; all real-row harmonic targets masked until an explicit factor-only review",
+  "sector_counts": {
+    "57": 1000,
+    "58": 1000,
+    "59": 1000
+  },
+  "source_batch_id": "s57_s59_franklin_hv2_3k_20260717"
+}

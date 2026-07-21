@@ -141,15 +141,31 @@ sample.
   split must therefore be TIC-grouped. The return's standalone-app key is not
   the repository `label_io.candidate_key`, so it must be joined only to the
   exact frozen `3,000`-row queue under the app-key contract.
+- `2026-07-21`: The user inspected the `347` special-case vet sheets and
+  accepted Franklin's S57--S59 return at the batch-level morphology layer. The
+  exact public queue (SHA-256 `6431ceef...`), returned labels (`2bd4d868...`),
+  and normalized `3,000`-row morphology table are frozen in the
+  [label-return report](../reports/stage5_validation/franklin_s57_s59_label_return_20260721/README.md).
+  Franklin remains the original
+  labeler; TeHan's acceptance is recorded separately. All `3,000` period
+  factors/statuses remain audit metadata and produce zero harmonic targets.
+  The model will still ingest all seven folds around the unchanged rank-one
+  BLS ephemeris.
+- `2026-07-21`: The next S60--S62 handoff is active on PDO with `3,000` rows
+  (`1,000` per sector), `3,000/3,000` PNG vet sheets, and queue SHA-256
+  `01f1e627...`. ORCD access is healthy and the accepted five-fold teacher-v1
+  checkpoints remain hash-verified, but no retraining job was launched. The
+  estimated merged S56--S59 corpus has about `42` unique real Planet-like TICs,
+  still below the `50`-source student/promotion gate.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Apply the Tier-1 target mask, independently adjudicate the `347`
-flagged S57--S59 rows, complete the bounded S56 review, and freeze the
-confident candidate/label set. The next three-sector human-review batch may be
-prepared in parallel, but retrain teacher v1 only after the merged labels pass
-TIC-grouped, source-separated, calibrated evaluation. Add dip, multi-sector,
-and false-alarm branches only after this path is robust.
+**Next:** Apply the Tier-1 target mask and complete the bounded S56 and active
+S60--S62 reviews. In parallel, assemble the per-sector native seven-fold inputs
+and one immutable TIC-grouped split registry. Freeze the seven-sector corpus,
+then retrain teacher v1 once with source-separated, calibrated evaluation and
+bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches only
+after this path is robust.
 
 ### Human labels and harmonic review
 
@@ -163,6 +179,11 @@ and false-alarm branches only after this path is robust.
 - Rare harmonic supervision remains inadequate for promoting or iterating the
   exploratory teacher-v2 design: `P/3` has no supervised example and `3P` has
   only three in the current harmonic table.
+- Franklin morphology returns do not supply harmonic truth. The app's default
+  `P/resolved` state and any saved morphology click are insufficient evidence
+  that a factor was reviewed. Returned factors remain raw audit fields and are
+  masked unless an explicit factor-only review or injection truth verifies
+  them; all seven folds remain model inputs regardless of that mask.
 
 **Next:** Use teacher v1 to enrich real labels while preserving blinded score
 provenance and cross-review overlap; require a predeclared rare-factor and
