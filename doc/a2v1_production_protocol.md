@@ -56,9 +56,11 @@ not a required CLI argument for the reuse path.
 
 ## Pre-flight
 
-For each selected orbit/CCD, require exactly `196` prepared source pickles and
-`196` old ePSFs. Confirm TICA FFIs are present and inspect GPU memory before
-selecting explicit free devices. For example:
+For each selected orbit/CCD, require exactly `196` prepared source pickles.
+The legacy ePSF state must be either complete (`196` files, permitting
+empty-mask reuse) or absent (`0` files, requiring a saturated-mask refit for
+every source); reject partial legacy ePSF trees. Confirm TICA FFIs are present
+and inspect GPU memory before selecting explicit free devices. For example:
 
 ```bash
 for orbit in 121 122; do
@@ -151,9 +153,11 @@ bash /pdo/users/tehan/TWIRL/scripts/stage1_lightcurves/run_a2v1_sector_queue_pdo
 
 The queue uses an HDF5-only gate that opens every nonzero HDF5 as well as
 validating coverage before FITS production. It then validates the full
-HDF5-plus-FITS schema before advancing. It is a production chain, not a status
-monitor; inspect its persistent queue log manually when needed. Run it in
-detached tmux with verbose stage output redirected only to that log, not the
+HDF5-plus-FITS schema before advancing. Its input gate accepts a complete
+legacy ePSF tree for empty-mask reuse or a source-only tree that refits all
+ePSFs, but fails on partial legacy ePSFs. It is a production chain, not a
+status monitor; inspect its persistent queue log manually when needed. Run it
+in detached tmux with verbose stage output redirected only to that log, not the
 tmux TTY, because a full JSON validation report can otherwise fill the pane's
 output buffer and block the queue.
 

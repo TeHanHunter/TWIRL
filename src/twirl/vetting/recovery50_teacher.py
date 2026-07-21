@@ -83,6 +83,12 @@ LEAKAGE_PREFIXES = (
     "effective_period_",
     "variable_period_",
     "broad_",
+    "reported_",
+    "factor_review_",
+    "label_return_",
+    "pipeline_candidate_",
+    "standalone_app_",
+    "native_h5_",
 )
 LEAKAGE_EXACT = frozenset(
     {
@@ -120,6 +126,7 @@ LEAKAGE_EXACT = frozenset(
         "sector",
         "cam",
         "ccd",
+        "label_unit",
     }
 )
 

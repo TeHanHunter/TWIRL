@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-17`.
+Last reconciled: `2026-07-21`.
 
 ## Current status
 
@@ -14,10 +14,10 @@ Last reconciled: `2026-07-17`.
   `source_id` as the scientific identifier and TIC as operational metadata.
 - `A2v1` is the active Stage 1 product family: no TIC-magnitude science cap,
   saturated-pixel ePSF masking, and sector-level ADP/ADP015 FITS products for
-  the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS) and S57
-  (`27,213` FITS) pass edge-aware HDF5/FITS validation; S58 and S59 pass their
-  full-product gates, and the resumable queue is producing S60-S63 from
-  `pdogpu5` after `pdogpu6` became unresponsive. See
+  the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS), S57
+  (`27,213` FITS), and S58-S63 pass their edge-aware HDF5/FITS product gates.
+  The next source-only production batch is S64-S69; it will refit all ePSFs
+  because no legacy ePSFs are available. See
   [Stage 1 history](twirl_progress_log.md#stage-1).
 - S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
   recovery in both active ADP apertures. Tier 0 verifies product integrity and
@@ -109,10 +109,10 @@ The operational contract is defined in the
 
 ### Current gate
 
-The S58-S63 serial queue is active. S59 passed its full-product gate, and the
-resumable S60 extraction is running on `pdogpu5` with the partial products
-retained. Do not create sector-specific production logic unless the sector is a
-documented exception.
+S58-S63 completed their gated HDF5/FITS production on `pdogpu5`. The S64-S69
+source-only batch is active on `pdogpu5` in the generic queue's explicit
+all-refit mode; partial legacy ePSF inputs remain a hard failure. Do not create
+sector-specific production logic unless the sector is a documented exception.
 
 ### Exit criteria
 
@@ -141,12 +141,33 @@ documented exception.
 The focused S56 compact revisit is complete (`407/407` sheets, including `11`
 new Planet-like labels from the `400` model-selected compact rows), but the
 separate blinded S56 `1,000`-TIC enrichment batch remains only partially
-labeled (`177/1,000` at the preserved checkpoint). Complete and audit that
-bounded S56 batch before expanding human review. An S57 queue was generated
-from `136,060` candidates over `27,212` real TICs before this gate and contains
-exactly six human labels. Preserve all six as explicitly premature
-experimental evidence, pause further S57 holdout consumption, and do not treat
-S57 as a pristine external holdout.
+labeled (`177/1,000` at the preserved checkpoint). Franklin completed the
+bounded `3,000`-row S57--S59 handoff (`1,000` per sector). The return contains
+`15` Planet-like, `121` Eclipse/contact, and `106` Broad-isolated-dip labels,
+but these remain morphology decisions rather than confirmed astrophysical
+classes. The user inspected the `347`-row special-case queue and accepted the
+return at the batch-level morphology layer. The exact queue and returned CSV
+are now frozen with a normalized `3,000`-row training artifact. This acceptance
+does not validate astrophysical class, period factor, or ephemeris.
+
+The handoff rows are fresh sector observations, not all fresh targets: `133`
+TICs overlap the active real S56 training corpus, with `42` sector-to-sector
+label differences (`23` against explicitly final S56 adjudications). The
+training unit remains a sector observation, while every split must be
+TIC-grouped so repeated hosts never cross train/validation/test boundaries.
+The frozen teacher-v1 ranker was used only to enrich review: every displayed
+ephemeris is ADP-small BLS rank one, and model scores and selection buckets
+remained hidden. S57 is no longer a pristine external holdout.
+
+The model still receives all seven folds (`P/4`, `P/3`, `P/2`, `P`, `2P`,
+`3P`, `4P`) for every row. Franklin's standalone app preselected `P` and saved
+factor/status together with each morphology click, so those fields are retained
+only as audit metadata. All S57--S59 harmonic targets are explicitly masked
+unless a later factor-only review verifies them; injection truth and the
+existing explicitly verified S56 period decisions remain valid supervision.
+The next `3,000`-row S60--S62 handoff is complete on PDO and under active human
+review. Retrain teacher v1 once after that return is frozen rather than fitting
+an interim four-sector model.
 
 The immediate parallel work is to harden the existing S56 periodic/enrichment
 path, not to add search branches. Require the Tier-1 target pass mask, freeze a
@@ -274,16 +295,18 @@ never a completeness measurement.
 
 ## Immediate implementation priorities
 
-1. Let the gated S59-S63 A2v1 HDF5/FITS queue continue with its existing
-   stop-on-failure gates; do not wait for it to finish before hardening S56.
+1. Run the gated S64-S69 A2v1 HDF5/FITS queue in source-only, all-ePSF-refit
+   mode; retain its stop-on-failure gates and do not bypass a partial-input
+   preflight failure.
 2. Complete the bounded S56 `active_search_pair` Tier-1 evidence: build the
    authoritative cadence/quality reference, produce the genuinely independent
    WD 1856 comparison, rerun the current Tier-0 report, and publish the target
    QA pass mask. This scope may qualify enrichment but never science release.
-3. Complete and audit the bounded S56 periodic enrichment on the Tier-1 pass
-   set, freeze the candidate/aperture contract, and merge only confidently
-   adjudicated labels into a versioned training set. Keep S57 labeling paused.
-4. Retrain and evaluate teacher v1 on that frozen set with TIC-grouped,
+3. Complete the bounded S56 review and Franklin's active S60--S62 review, then
+   freeze one seven-sector morphology corpus. Keep sector observations and
+   their raw label provenance, resolve same-sector duplicates by an explicit
+   precedence rule, and enforce one immutable TIC-grouped split registry.
+4. Retrain and evaluate teacher v1 once on that frozen set with TIC-grouped,
    source-separated, calibrated metrics and uncertainty intervals. Do not put
    teacher v2, student pseudo-labels, or another model family on this path.
 5. After the periodic/enrichment path is robust, add the dip branch,

@@ -43,6 +43,9 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
 - `2026-07-16`: The `r2` queue's S58 HDF5 validator completed, but its `tee` subprocess blocked writing the full JSON report to the detached tmux TTY. No extraction or FITS process was active. The queue driver now sends verbose stage output only to the persistent queue log. After syntax and full-test validation, the deadlocked shell/logger were stopped without changing products, and the same manifest restarted as `twirl-a2v1-s58-s63-queue-r3` at `11:30 EDT`.
 - `2026-07-16`: S58 completed at `12:03 EDT`. Its rebuilt full-product validation reports `46,309` present HDF5 rows, zero non-edge HDF5 omissions, zero zero-byte or unreadable HDF5 files, zero non-edge missing FITS targets, and zero bad checked FITS schemas. The `r3` queue then advanced to S59; orbit `125` ePSF/light-curve production is active.
 - `2026-07-17`: S59 completed at `19:05 EDT` after HDF5 extraction and the required FITS/full-product gates. The `r3` S60 log stopped updating at `00:03 EDT` while `pdogpu6` became unresponsive; the shared tree retained `27,048` orbit-`127` and `15,390` orbit-`128` HDF5 files. After a clean `pdogpu5` GPU/runtime preflight, the unchanged manifest restarted as `twirl-a2v1-s58-s63-queue-r4-pdogpu5` at `11:00 EDT` on GPUs `4,5,6,7`. It revalidates accepted sectors and resumes S60 without deleting partial products.
+- `2026-07-18`: The `r4` queue completed S60 (`15:45 EDT`), S61 (`01:27 EDT`), S62 (`10:59 EDT`), and S63 (`21:35 EDT`) after their HDF5, FITS, and full A2v1 schema gates. The terminal log reports `A2v1 queue complete`; no worker remained active.
+- `2026-07-20`: Confirmed S64-S65's complete prepared source trees (`3,136` pickles per orbit) with no legacy ePSFs. The generic queue now permits either a complete reusable ePSF tree or an absent tree that forces all saturated-mask ePSF refits, while rejecting partial ePSF preparation. At `09:38 EDT`, the clean-clone tmux queue `twirl-a2v1-s64-s69-queue-r1-pdogpu5` started [S64-S69](../configs/a2v1_production_s64_s69.txt) on GPUs `4,5,6,7`; S64 preflight accepted both orbits with `epsf_mode=refit-all` and entered HDF5 extraction.
+- `2026-07-20`: Rendered representative S56-S63 A2v1 pixel-mask diagnostics with the [mask-map renderer](../scripts/stage1_lightcurves/plot_a2v1_pixel_mask_maps.py): first-orbit `cam1/ccd1`, first `20` staged FFIs per sector. The left panel is the TGLC threshold-mask proxy; the right panel reports the corresponding per-cutout masked fraction and outlines local A2v1 ePSF refits, which are the nonempty-static-mask cases under the prefill contract. All eight PNGs opened successfully; the contact sheet is in `reports/stage1_lightcurves/a2v1_pixel_mask_maps/`.
 - `2026-07-16`: Reclassified the existing S56 A2v1 QA as Tier-0
   integrity/benchmark QA. It remains valid evidence for product coverage and
   WD 1856 recovery, but science promotion now requires a separate Tier-1 pass
@@ -56,9 +59,10 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   configuration remains intentionally non-runnable until the real external
   artifact hashes are reviewed; this scope cannot set `science_ready=true`.
 
-**Next:** Let S59-S63 production continue while the authoritative S56 cadence
-artifact and independent WD 1856 comparison are completed; then rerun Tier 0
-and publish the bounded Tier-1 target pass mask before enrichment uses S56.
+**Next:** Run the gated S64-S69 source-only production queue while the
+authoritative S56 cadence artifact and independent WD 1856 comparison are
+completed; then rerun Tier 0 and publish the bounded Tier-1 target pass mask
+before enrichment uses S56.
 
 ### Catalog, archive index, and sample control
 
@@ -110,14 +114,58 @@ sample.
   contains exactly six nonempty labels. Preserve all six as premature
   experimental evidence, pause further S57 holdout consumption, and do not
   treat S57 as a pristine external holdout.
+- `2026-07-17`: The accepted frozen teacher-v1 ensemble produced a blinded
+  Franklin handoff of `3,000` real sector-observation rows: `1,000` each from
+  S57, S58, and S59. Every row uses the ADP-small BLS rank-one ephemeris; the
+  hidden quotas are `1,200` compact-transit, `900` Eclipse/contact, `300`
+  Smooth-variable, `300` disagreement, and `300` controls. The package has
+  `3,000` current `S56-ADP-HV2` PNG sheets, `14` real reference examples,
+  zero PDFs, and no exposed model scores or selection provenance. It is an
+  active-learning review set, not a new teacher test set. The self-contained package passed
+  its browser `--check-only` validation in place on PDO with all `3,000`
+  sheets resolved and a group-writable label CSV for Franklin.
+- `2026-07-21`: Franklin returned all `3,000` labels with complete internal
+  row/key/provenance coverage (SHA-256
+  `2bd4d86870c70091eb7291ced067c63bc908118fd730083bfb2d12d52c5a09bf`).
+  The return has `15` Planet-like labels rather than the reported `14`, plus
+  `121` Eclipse/contact and `106` Broad-isolated-dip labels. Nine of the `15`
+  Planet-like rows carry confidence, EB, wide-event, or faintness caveats, so
+  these are enrichment morphology labels rather than confirmed planets.
+- `2026-07-21`: Cross-sector auditing found `133` repeated TICs against the
+  active real S56 training table and `42` active-label differences, including
+  `23` against explicitly final S56 adjudications. The comprehensive second-
+  read set contains `347` unique rows after including planet/EB/wide labels,
+  cross-taxonomy notes, unresolved/refold cases, nine nonblank `uncertain`
+  rows, and S56 differences. Combined S56 plus S57--S59 has `4,702` labeled
+  sector observations but `4,569` unique TICs; every retraining and evaluation
+  split must therefore be TIC-grouped. The return's standalone-app key is not
+  the repository `label_io.candidate_key`, so it must be joined only to the
+  exact frozen `3,000`-row queue under the app-key contract.
+- `2026-07-21`: The user inspected the `347` special-case vet sheets and
+  accepted Franklin's S57--S59 return at the batch-level morphology layer. The
+  exact public queue (SHA-256 `6431ceef...`), returned labels (`2bd4d868...`),
+  and normalized `3,000`-row morphology table are frozen in the
+  [label-return report](../reports/stage5_validation/franklin_s57_s59_label_return_20260721/README.md).
+  Franklin remains the original
+  labeler; TeHan's acceptance is recorded separately. All `3,000` period
+  factors/statuses remain audit metadata and produce zero harmonic targets.
+  The model will still ingest all seven folds around the unchanged rank-one
+  BLS ephemeris.
+- `2026-07-21`: The next S60--S62 handoff is active on PDO with `3,000` rows
+  (`1,000` per sector), `3,000/3,000` PNG vet sheets, and queue SHA-256
+  `01f1e627...`. ORCD access is healthy and the accepted five-fold teacher-v1
+  checkpoints remain hash-verified, but no retraining job was launched. The
+  estimated merged S56--S59 corpus has about `42` unique real Planet-like TICs,
+  still below the `50`-source student/promotion gate.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Apply the Tier-1 target mask, complete and audit the bounded S56
-periodic enrichment, freeze its confident candidate/label set, and retrain the
-teacher-v1 baseline with grouped and calibrated evaluation. Keep S57 labeling
-paused; add dip, multi-sector, and false-alarm branches only after this path is
-robust.
+**Next:** Apply the Tier-1 target mask and complete the bounded S56 and active
+S60--S62 reviews. In parallel, assemble the per-sector native seven-fold inputs
+and one immutable TIC-grouped split registry. Freeze the seven-sector corpus,
+then retrain teacher v1 once with source-separated, calibrated evaluation and
+bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches only
+after this path is robust.
 
 ### Human labels and harmonic review
 
@@ -131,6 +179,11 @@ robust.
 - Rare harmonic supervision remains inadequate for promoting or iterating the
   exploratory teacher-v2 design: `P/3` has no supervised example and `3P` has
   only three in the current harmonic table.
+- Franklin morphology returns do not supply harmonic truth. The app's default
+  `P/resolved` state and any saved morphology click are insufficient evidence
+  that a factor was reviewed. Returned factors remain raw audit fields and are
+  masked unless an explicit factor-only review or injection truth verifies
+  them; all seven folds remain model inputs regardless of that mask.
 
 **Next:** Use teacher v1 to enrich real labels while preserving blinded score
 provenance and cross-review overlap; require a predeclared rare-factor and

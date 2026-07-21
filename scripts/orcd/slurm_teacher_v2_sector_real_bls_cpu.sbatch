@@ -19,6 +19,7 @@ DATA_ROOT="${TWIRL_ENRICH_DATA_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/s
 COMPACT="${TWIRL_ENRICH_COMPACT_H5:-${DATA_ROOT}/s${SECTOR}_A2v1_adp_pair_rebuilt.h5}"
 WORK_ROOT="${TWIRL_ENRICH_WORK_ROOT:?set TWIRL_ENRICH_WORK_ROOT}"
 N_SHARDS="${TWIRL_ENRICH_BLS_SHARDS:-40}"
+N_PERIODS="${TWIRL_ENRICH_BLS_N_PERIODS:-50000}"
 
 mkdir -p /orcd/data/mki_aryeh/001/twirl/logs/teacher_enrichment \
   "${WORK_ROOT}/real_bls/shards"
@@ -32,7 +33,7 @@ export HDF5_USE_FILE_LOCKING=FALSE
   --compact-lc "${COMPACT}" \
   --out-dir "${WORK_ROOT}/real_bls/shards" \
   --workers "${SLURM_CPUS_PER_TASK:-8}" \
-  --n-periods 200000 \
+  --n-periods "${N_PERIODS}" \
   --n-peaks 10 \
   --shard-index "${SLURM_ARRAY_TASK_ID}" \
   --n-shards "${N_SHARDS}" \

@@ -1,0 +1,28 @@
+{
+  "app_sha256": "92478104a199c5d06c41d2b859c35119d7250a16c1dad353f500c72dec7f199c",
+  "created_utc": "2026-07-17T18:39:04.586671+00:00",
+  "n_pdf_sheets": 0,
+  "n_png_sheets": 3000,
+  "n_reference_pngs": 14,
+  "n_rows": 3000,
+  "n_unique_tics": 3000,
+  "outputs": {
+    "labels": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/s57_s59_franklin_enrichment_20260717/TWIRL_S57_S59_Franklin_HV2_3k_20260717/franklin_labels_vetted.csv",
+    "launcher": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/s57_s59_franklin_enrichment_20260717/TWIRL_S57_S59_Franklin_HV2_3k_20260717/run_franklin_vetting.sh",
+    "queue": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/s57_s59_franklin_enrichment_20260717/TWIRL_S57_S59_Franklin_HV2_3k_20260717/franklin_review_queue_3k_real.csv",
+    "readme": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/s57_s59_franklin_enrichment_20260717/TWIRL_S57_S59_Franklin_HV2_3k_20260717/README_Franklin_vetting.md",
+    "sheet_root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/s57_s59_franklin_enrichment_20260717/TWIRL_S57_S59_Franklin_HV2_3k_20260717/vet_sheets"
+  },
+  "queue_sha256": "6431ceefecb565ba8878e0ea2fec0528cff817f1801dbbac4b4fdc78cdeac7b9",
+  "rank_policy": "ADP-small representative BLS peak rank 1 only",
+  "scores_in_package": false,
+  "sector_counts": {
+    "57": 1000,
+    "58": 1000,
+    "59": 1000
+  },
+  "selection_provenance_in_package": false,
+  "source_kind_counts": {
+    "real_candidate": 3000
+  }
+}
