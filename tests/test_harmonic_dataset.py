@@ -7,6 +7,10 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from twirl.lightcurves.external_quality import (
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+)
 from twirl.vetting.adjudication_audit import HARMONIC_CNN_TARGET_POLICY
 from twirl.vetting.harmonic_dataset import (
     HarmonicNativeDataset,
@@ -47,6 +51,33 @@ def _write_native_target(path: Path) -> None:
         }
         for name in NATIVE_DATASETS:
             group.create_dataset(name, data=payload[name])
+        h5.attrs["external_quality_policy_contract"] = (
+            EXTERNAL_QUALITY_POLICY_CONTRACT
+        )
+        h5.attrs["effective_quality_policy"] = EFFECTIVE_QUALITY_POLICY
+        h5.attrs["cadence_reference_contract_version"] = (
+            "s56_a2v1_cadence_reference_v1"
+        )
+        h5.attrs["cadence_reference_cadence_authority"] = "qlp_cam_quat"
+        h5.attrs["cadence_reference_quality_authority"] = (
+            "spoc_and_qlp_quality_flags"
+        )
+        h5.attrs["cadence_reference_table"] = "/authority/reference.csv"
+        h5.attrs["cadence_reference_manifest"] = "/authority/reference.json"
+        h5.attrs["cadence_reference_table_sha256"] = "1" * 64
+        h5.attrs["cadence_reference_manifest_sha256"] = "2" * 64
+        h5.attrs["cadence_reference_source_declaration_sha256"] = "3" * 64
+        quality_counts = {
+            "n_cad_total": n_cadences,
+            "n_cad_internal_bad": 0,
+            "n_cad_external_bad": 0,
+            "n_cad_external_only_bad": 0,
+            "n_cad_effective_bad": 0,
+        }
+        group.attrs["quality_policy_contract"] = EXTERNAL_QUALITY_POLICY_CONTRACT
+        for name, value in quality_counts.items():
+            group.attrs[name] = value
+            h5.attrs[f"quality_overlay_{name}"] = value
 
 
 def test_native_dataset_reuses_one_hdf5_handle(tmp_path: Path) -> None:

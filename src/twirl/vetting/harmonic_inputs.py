@@ -2,15 +2,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
 
+from twirl.lightcurves.external_quality import (
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+    EXPECTED_CADENCE_AUTHORITY,
+    EXPECTED_QUALITY_AUTHORITY,
+)
 
-RAW_PAIR_CONTRACT_VERSION = "s56_adp_raw_pair_v1"
-A2V1_TEACHER_INPUT_CONTRACT = "s56_A2v1_adp_raw_pair_v1"
+RAW_PAIR_CONTRACT_VERSION = "s56_adp_raw_pair_v2"
+A2V1_TEACHER_INPUT_CONTRACT = "s56_A2v1_adp_raw_pair_v2"
+CANDIDATE_PROVENANCE_CONTRACT_VERSION = (
+    "s56_a2v1_teacher_scoring_candidates_v1"
+)
 RAW_PAIR_APERTURES: tuple[str, str] = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
 HARMONIC_FACTORS: tuple[float, ...] = (0.25, 1.0 / 3.0, 0.5, 1.0, 2.0, 3.0, 4.0)
 HARMONIC_NAMES: tuple[str, ...] = (
@@ -81,6 +91,133 @@ CHANNEL_CONTRACT: Mapping[str, tuple[str, ...]] = {
     "harmonic_view_channels": HARMONIC_VIEW_CHANNELS,
     "periodogram_channels": PERIODOGRAM_CHANNELS,
 }
+RAW_PAIR_EXTERNAL_QUALITY_ATTRS: tuple[str, ...] = (
+    "external_quality_policy_contract",
+    "effective_quality_policy",
+    "cadence_reference_contract_version",
+    "cadence_reference_cadence_authority",
+    "cadence_reference_quality_authority",
+    "cadence_reference_table",
+    "cadence_reference_manifest",
+    "cadence_reference_table_sha256",
+    "cadence_reference_manifest_sha256",
+    "cadence_reference_source_declaration_sha256",
+)
+RAW_PAIR_QUALITY_COUNT_NAMES: tuple[str, ...] = (
+    "n_cad_total",
+    "n_cad_internal_bad",
+    "n_cad_external_bad",
+    "n_cad_external_only_bad",
+    "n_cad_effective_bad",
+)
+RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS: tuple[str, ...] = (
+    "candidate_provenance_contract_version",
+    "training_summary_sha256",
+    "tier1_target_eligibility_sha256",
+    "tier1_gate_json_sha256",
+    "adp_peaks_sha256",
+    "adp_peaks_summary_sha256",
+    "compact_lc_sha256",
+    "bls_search_contract_version",
+    "bls_config_sha256",
+)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _valid_sha256(value: Any) -> bool:
+    text = str(value)
+    return len(text) == 64 and all(
+        character in "0123456789abcdef" for character in text
+    )
+
+
+def candidate_provenance_from_summary(
+    *,
+    candidate_table: Path,
+    candidate_summary: Path,
+) -> dict[str, str]:
+    """Validate and return the immutable candidate-selection provenance.
+
+    The JSON summary is the transitive binding from the scoring table back to
+    the Tier-1 gate and approved BLS configuration. The table and summary are
+    hashed before and after parsing so concurrent replacement is rejected.
+    """
+
+    candidate_table = Path(candidate_table)
+    candidate_summary = Path(candidate_summary)
+    table_sha256 = _sha256(candidate_table)
+    summary_sha256 = _sha256(candidate_summary)
+    try:
+        summary = json.loads(candidate_summary.read_text())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid candidate summary {candidate_summary}: {exc}") from exc
+    if not isinstance(summary, dict):
+        raise ValueError("candidate summary must be a JSON object")
+    if (
+        summary.get("provenance_contract_version")
+        != CANDIDATE_PROVENANCE_CONTRACT_VERSION
+    ):
+        raise ValueError("candidate summary has the wrong provenance_contract_version")
+    if summary.get("candidate_table_sha256") != table_sha256:
+        raise ValueError("candidate summary does not match the candidate table SHA256")
+    if summary.get("tier1_gate", {}).get("enrichment_ready") is not True:
+        raise ValueError("candidate summary does not contain a passed Tier-1 enrichment gate")
+    bls_evidence = summary.get("bls_evidence", {})
+    if not isinstance(bls_evidence, dict) or bls_evidence.get("status") != "pass":
+        raise ValueError("candidate summary does not contain passed BLS evidence")
+
+    provenance: dict[str, str] = {
+        "candidate_provenance_contract_version": (
+            CANDIDATE_PROVENANCE_CONTRACT_VERSION
+        ),
+        "training_table_sha256": table_sha256,
+        "training_summary_sha256": summary_sha256,
+    }
+    for name in (
+        "tier1_target_eligibility_sha256",
+        "tier1_gate_json_sha256",
+        "adp_peaks_sha256",
+        "adp_peaks_summary_sha256",
+        "compact_lc_sha256",
+    ):
+        value = summary.get(name)
+        if not _valid_sha256(value):
+            raise ValueError(f"candidate summary has invalid {name}")
+        provenance[name] = str(value)
+    for name in ("bls_search_contract_version", "bls_config_sha256"):
+        value = summary.get(name, bls_evidence.get(name))
+        if not value:
+            raise ValueError(f"candidate summary is missing {name}")
+        if name.endswith("sha256") and not _valid_sha256(value):
+            raise ValueError(f"candidate summary has invalid {name}")
+        provenance[name] = str(value)
+    for name in (
+        "cadence_reference_sha256",
+        "cadence_reference_manifest_sha256",
+    ):
+        value = summary.get(name)
+        if not _valid_sha256(value):
+            raise ValueError(f"candidate summary has invalid {name}")
+        provenance[name] = str(value)
+    try:
+        n_rows = int(summary["n_candidate_rows"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("candidate summary has invalid n_candidate_rows") from exc
+    if n_rows < 1:
+        raise ValueError("candidate summary contains no candidate rows")
+    provenance["n_candidate_rows"] = str(n_rows)
+    if _sha256(candidate_table) != table_sha256:
+        raise RuntimeError("candidate table changed while its provenance was read")
+    if _sha256(candidate_summary) != summary_sha256:
+        raise RuntimeError("candidate summary changed while its provenance was read")
+    return provenance
 
 
 def native_group_path(row: Mapping[str, Any]) -> str:
@@ -556,6 +693,104 @@ def _read_group(group: Any, *, paired_prefix: str = "") -> NativeLightCurve:
     )
 
 
+def _external_quality_root_failures(attrs: Mapping[str, Any]) -> list[str]:
+    failures: list[str] = []
+    missing = [name for name in RAW_PAIR_EXTERNAL_QUALITY_ATTRS if name not in attrs]
+    if missing:
+        return [f"missing external-quality attrs: {','.join(missing)}"]
+    if str(attrs["external_quality_policy_contract"]) != (
+        EXTERNAL_QUALITY_POLICY_CONTRACT
+    ):
+        failures.append("external_quality_policy_contract mismatch")
+    if str(attrs["effective_quality_policy"]) != EFFECTIVE_QUALITY_POLICY:
+        failures.append("effective_quality_policy mismatch")
+    if str(attrs["cadence_reference_cadence_authority"]) != (
+        EXPECTED_CADENCE_AUTHORITY
+    ):
+        failures.append("cadence_reference_cadence_authority mismatch")
+    if str(attrs["cadence_reference_quality_authority"]) != (
+        EXPECTED_QUALITY_AUTHORITY
+    ):
+        failures.append("cadence_reference_quality_authority mismatch")
+    if not str(attrs["cadence_reference_contract_version"]).strip():
+        failures.append("cadence_reference_contract_version is empty")
+    for name in ("cadence_reference_table", "cadence_reference_manifest"):
+        if not str(attrs[name]).strip():
+            failures.append(f"{name} is empty")
+    for name in (
+        "cadence_reference_table_sha256",
+        "cadence_reference_manifest_sha256",
+        "cadence_reference_source_declaration_sha256",
+    ):
+        digest = str(attrs[name]).lower()
+        if len(digest) != 64 or any(
+            character not in "0123456789abcdef" for character in digest
+        ):
+            failures.append(f"{name} is not a SHA-256 digest")
+    quality_counts: dict[str, int] = {}
+    for name in RAW_PAIR_QUALITY_COUNT_NAMES:
+        attr = f"quality_overlay_{name}"
+        if attr not in attrs:
+            failures.append(f"missing {attr}")
+            continue
+        try:
+            value = int(attrs[attr])
+        except (TypeError, ValueError):
+            failures.append(f"{attr} is not an integer")
+            continue
+        if value < 0:
+            failures.append(f"{attr} is negative")
+        quality_counts[name] = value
+    if len(quality_counts) == len(RAW_PAIR_QUALITY_COUNT_NAMES):
+        if quality_counts["n_cad_external_only_bad"] > quality_counts[
+            "n_cad_external_bad"
+        ]:
+            failures.append("root external-only count exceeds external count")
+        if quality_counts["n_cad_effective_bad"] != (
+            quality_counts["n_cad_internal_bad"]
+            + quality_counts["n_cad_external_only_bad"]
+        ):
+            failures.append("root effective-bad arithmetic is inconsistent")
+    return failures
+
+
+def _external_quality_group_failures(group: Any, *, context: str) -> list[str]:
+    failures: list[str] = []
+    if str(group.attrs.get("quality_policy_contract", "")) != (
+        EXTERNAL_QUALITY_POLICY_CONTRACT
+    ):
+        failures.append(f"{context}:quality_policy_contract mismatch")
+    values: dict[str, int] = {}
+    for name in RAW_PAIR_QUALITY_COUNT_NAMES:
+        if name not in group.attrs:
+            failures.append(f"{context}:missing {name}")
+            continue
+        try:
+            values[name] = int(group.attrs[name])
+        except (TypeError, ValueError):
+            failures.append(f"{context}:{name} is not an integer")
+    if len(values) != len(RAW_PAIR_QUALITY_COUNT_NAMES):
+        return failures
+    n_total = values["n_cad_total"]
+    if n_total < 0 or any(value < 0 or value > n_total for value in values.values()):
+        failures.append(f"{context}:quality counts are outside [0,n_cad_total]")
+    if values["n_cad_external_only_bad"] > values["n_cad_external_bad"]:
+        failures.append(f"{context}:external-only count exceeds external count")
+    if values["n_cad_effective_bad"] != (
+        values["n_cad_internal_bad"] + values["n_cad_external_only_bad"]
+    ):
+        failures.append(f"{context}:effective-bad arithmetic is inconsistent")
+    if "quality" in group:
+        quality = np.asarray(group["quality"])
+        if len(quality) != n_total:
+            failures.append(f"{context}:n_cad_total disagrees with quality length")
+        if not np.isin(quality, (0, 1)).all():
+            failures.append(f"{context}:effective quality must be binary")
+        if int(np.count_nonzero(quality)) != values["n_cad_effective_bad"]:
+            failures.append(f"{context}:effective bad count disagrees with quality")
+    return failures
+
+
 def read_native_light_curve_from_h5(
     h5: Any,
     *,
@@ -569,6 +804,12 @@ def read_native_light_curve_from_h5(
         raise ValueError(f"unexpected native input contract {contract!r}")
     if str(h5.attrs.get("time_system", "")) != "BJD":
         raise ValueError("native input contract must declare time_system='BJD'")
+    quality_failures = _external_quality_root_failures(h5.attrs)
+    if quality_failures:
+        raise ValueError(
+            "native input external-quality contract failed: "
+            + "; ".join(quality_failures)
+        )
     for name, expected in CHANNEL_CONTRACT.items():
         observed = tuple(json.loads(str(h5.attrs.get(name, "[]"))))
         if observed != expected:
@@ -576,6 +817,14 @@ def read_native_light_curve_from_h5(
     if group_path not in h5:
         raise KeyError(f"missing native input group: {group_path}")
     group = h5[group_path]
+    group_quality_failures = _external_quality_group_failures(
+        group, context=f"/{group_path}"
+    )
+    if group_quality_failures:
+        raise ValueError(
+            "native group external-quality contract failed: "
+            + "; ".join(group_quality_failures)
+        )
     lc = _read_group(group)
     paired_names = [f"paired_original_{name}" for name in NATIVE_DATASETS[4:]]
     paired = None
@@ -617,14 +866,21 @@ def verify_raw_pair_contract(
     path = Path(path)
     failures: list[str] = []
     counts: dict[str, int] = {"targets": 0, "injections": 0}
+    quality_counts = {name: 0 for name in RAW_PAIR_QUALITY_COUNT_NAMES}
     if not path.exists():
-        return {"passed": False, "failures": [f"missing file: {path}"], "counts": counts}
+        return {
+            "passed": False,
+            "failures": [f"missing file: {path}"],
+            "counts": counts,
+            "external_quality_counts": quality_counts,
+        }
     with h5py.File(path, "r") as h5:
         contract = str(h5.attrs.get("contract_version", ""))
         if contract != RAW_PAIR_CONTRACT_VERSION:
             failures.append(f"contract_version={contract!r}")
         if str(h5.attrs.get("time_system", "")) != "BJD":
             failures.append("time_system must be BJD")
+        failures.extend(_external_quality_root_failures(h5.attrs))
         for name, expected in CHANNEL_CONTRACT.items():
             try:
                 observed = tuple(json.loads(str(h5.attrs.get(name, "[]"))))
@@ -637,6 +893,16 @@ def verify_raw_pair_contract(
                 continue
             for key, group in h5[root_name].items():
                 counts[root_name] += 1
+                context = f"/{root_name}/{key}"
+                failures.extend(
+                    _external_quality_group_failures(group, context=context)
+                )
+                if all(name in group.attrs for name in RAW_PAIR_QUALITY_COUNT_NAMES):
+                    for name in RAW_PAIR_QUALITY_COUNT_NAMES:
+                        try:
+                            quality_counts[name] += int(group.attrs[name])
+                        except (TypeError, ValueError):
+                            pass
                 missing = [name for name in NATIVE_DATASETS if name not in group]
                 if missing:
                     failures.append(f"/{root_name}/{key}:missing={','.join(missing)}")
@@ -676,11 +942,201 @@ def verify_raw_pair_contract(
                                 failures.append(f"/{root_name}/{key}:invalid_{name}")
         if sum(counts.values()) == 0:
             failures.append("no target or injection groups")
-    return {"passed": not failures, "failures": failures, "counts": counts}
+        for name, observed in quality_counts.items():
+            attr = f"quality_overlay_{name}"
+            if attr in h5.attrs:
+                try:
+                    declared = int(h5.attrs[attr])
+                except (TypeError, ValueError):
+                    continue
+                if declared != observed:
+                    failures.append(
+                        f"{attr}={declared} disagrees with group total {observed}"
+                    )
+    return {
+        "passed": not failures,
+        "failures": failures,
+        "counts": counts,
+        "external_quality_counts": quality_counts,
+    }
+
+
+def verify_native_candidate_binding(
+    path: Path,
+    *,
+    candidate_table: Path,
+    candidate_summary: Path,
+    require_periodograms: bool = True,
+    expected_periodogram_n: int | None = None,
+    expected_shard_index: int | None = None,
+    expected_n_shards: int | None = None,
+) -> dict[str, Any]:
+    """Verify a native file and its exact candidate/Tier-1/BLS binding.
+
+    Unlike :func:`verify_raw_pair_contract`, this production-cache verifier
+    requires the full scoring-candidate provenance and exact HDF5 group set.
+    Shard expectations use the same stable SHA1 partition as the builder.
+    """
+
+    import h5py
+    import pandas as pd
+
+    path = Path(path)
+    base = verify_raw_pair_contract(
+        path,
+        require_errors=True,
+        require_periodograms=require_periodograms,
+    )
+    failures = list(base["failures"])
+    provenance: dict[str, str] = {}
+    try:
+        provenance = candidate_provenance_from_summary(
+            candidate_table=candidate_table,
+            candidate_summary=candidate_summary,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        failures.append(f"candidate provenance: {exc}")
+
+    expected_groups: set[str] = set()
+    try:
+        candidate_table = Path(candidate_table)
+        if candidate_table.suffix.lower() == ".parquet":
+            rows = pd.read_parquet(candidate_table)
+        elif candidate_table.suffix.lower() in {".csv", ".txt"}:
+            rows = pd.read_csv(candidate_table, low_memory=False)
+        else:
+            raise ValueError(f"unsupported candidate table format: {candidate_table}")
+        if "review_id" in rows:
+            rows = rows.drop_duplicates("review_id", keep="last")
+        if provenance and len(rows) != int(provenance["n_candidate_rows"]):
+            failures.append(
+                "candidate row count disagrees with candidate summary: "
+                f"{len(rows)} != {provenance['n_candidate_rows']}"
+            )
+
+        def included(name: str) -> Any:
+            if name not in rows:
+                return pd.Series(False, index=rows.index)
+            values = rows[name]
+            if values.dtype == bool:
+                return values.fillna(False)
+            return values.fillna("").astype(str).str.lower().isin(
+                {"1", "1.0", "true", "t", "yes", "y"}
+            )
+
+        active = (
+            included("native_input_include")
+            if "native_input_include" in rows
+            else included("morphology_include_v1")
+            | included("preserve_include_v1")
+            | included("harmonic_include_v1")
+        )
+        groups = {
+            native_group_path(row)
+            for row in rows.loc[active].to_dict("records")
+        }
+        if expected_shard_index is not None or expected_n_shards is not None:
+            if expected_shard_index is None or expected_n_shards is None:
+                raise ValueError("both shard expectations must be supplied together")
+            if expected_n_shards < 1 or not 0 <= expected_shard_index < expected_n_shards:
+                raise ValueError("invalid expected shard index/count")
+            groups = {
+                value
+                for value in groups
+                if int.from_bytes(
+                    hashlib.sha1(value.encode("utf-8")).digest()[:8], "big"
+                )
+                % int(expected_n_shards)
+                == int(expected_shard_index)
+            }
+        expected_groups = groups
+    except (KeyError, OSError, TypeError, ValueError) as exc:
+        failures.append(f"candidate groups: {exc}")
+
+    if path.exists():
+        try:
+            with h5py.File(path, "r") as h5:
+                if provenance:
+                    for name in (
+                        "training_table_sha256",
+                        *RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS,
+                    ):
+                        observed = str(h5.attrs.get(name, ""))
+                        expected = provenance[name]
+                        if observed != expected:
+                            failures.append(
+                                f"{name}={observed!r}, expected {expected!r}"
+                            )
+                    cadence_pairs = (
+                        (
+                            "cadence_reference_table_sha256",
+                            "cadence_reference_sha256",
+                        ),
+                        (
+                            "cadence_reference_manifest_sha256",
+                            "cadence_reference_manifest_sha256",
+                        ),
+                    )
+                    for attr_name, provenance_name in cadence_pairs:
+                        if str(h5.attrs.get(attr_name, "")) != provenance[
+                            provenance_name
+                        ]:
+                            failures.append(
+                                f"{attr_name} does not match candidate provenance"
+                            )
+                if expected_periodogram_n is not None:
+                    try:
+                        observed_n = int(h5.attrs.get("periodogram_n", -1))
+                    except (TypeError, ValueError):
+                        observed_n = -1
+                    if observed_n != int(expected_periodogram_n):
+                        failures.append(
+                            f"periodogram_n={observed_n}, expected {expected_periodogram_n}"
+                        )
+                if expected_shard_index is not None:
+                    try:
+                        observed_index = int(h5.attrs.get("shard_index", -1))
+                        observed_n_shards = int(h5.attrs.get("n_shards", -1))
+                    except (TypeError, ValueError):
+                        observed_index = observed_n_shards = -1
+                    if observed_index != int(expected_shard_index):
+                        failures.append(
+                            f"shard_index={observed_index}, expected {expected_shard_index}"
+                        )
+                    if observed_n_shards != int(expected_n_shards):
+                        failures.append(
+                            f"n_shards={observed_n_shards}, expected {expected_n_shards}"
+                        )
+                observed_groups = {
+                    f"{root_name}/{key}"
+                    for root_name in ("targets", "injections")
+                    if root_name in h5
+                    for key in h5[root_name]
+                }
+                missing = sorted(expected_groups - observed_groups)
+                extra = sorted(observed_groups - expected_groups)
+                if missing:
+                    failures.append(
+                        f"missing {len(missing)} expected candidate groups; first={missing[:5]}"
+                    )
+                if extra:
+                    failures.append(
+                        f"contains {len(extra)} unexpected candidate groups; first={extra[:5]}"
+                    )
+        except (OSError, RuntimeError, ValueError) as exc:
+            failures.append(f"native HDF5: {exc}")
+    return {
+        **base,
+        "passed": not failures,
+        "failures": failures,
+        "candidate_provenance": provenance,
+        "n_expected_groups": len(expected_groups),
+    }
 
 
 __all__ = [
     "A2V1_TEACHER_INPUT_CONTRACT",
+    "CANDIDATE_PROVENANCE_CONTRACT_VERSION",
     "CHRONOLOGY_SMALL_CHANNELS",
     "CHRONOLOGY_SUPPLEMENTAL_CHANNELS",
     "CHANNEL_CONTRACT",
@@ -694,14 +1150,19 @@ __all__ = [
     "NativeChannels",
     "NativeLightCurve",
     "RAW_PAIR_APERTURES",
+    "RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS",
     "RAW_PAIR_CONTRACT_VERSION",
+    "RAW_PAIR_EXTERNAL_QUALITY_ATTRS",
+    "RAW_PAIR_QUALITY_COUNT_NAMES",
     "build_harmonic_views",
     "build_native_channels",
+    "candidate_provenance_from_summary",
     "injected_raw_uncertainty",
     "native_group_path",
     "orbital_phase",
     "pad_channel_sequences",
     "read_native_light_curve",
     "read_native_light_curve_from_h5",
+    "verify_native_candidate_binding",
     "verify_raw_pair_contract",
 ]

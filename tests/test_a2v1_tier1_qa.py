@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import twirl.lightcurves.a2v1_tier1_qa as tier1_qa
 from twirl.lightcurves.a2v1_qa import (
     A2V1_PHOTOMETRIC_QA_VERSION,
     WD1856_PERIOD_D,
@@ -18,12 +19,17 @@ from twirl.lightcurves.a2v1_qa import (
 )
 from twirl.lightcurves.a2v1_tier1_qa import (
     TIER1_QA_CONTRACT_VERSION,
+    TIER1_TARGET_REASON_CODES,
     Tier1QAConfig,
     _dataframe_content_sha256,
+    attach_target_qa_flags,
     audit_compact_population,
+    build_target_eligibility,
     evaluate_aperture_outliers,
+    evaluate_cadence_quality,
     evaluate_fixed_injections,
     evaluate_independent_extraction,
+    evaluate_tier0_prerequisite,
     evaluate_tier1_gates,
     injection_metadata_sha256,
     load_tier1_config,
@@ -31,10 +37,16 @@ from twirl.lightcurves.a2v1_tier1_qa import (
     summarize_fixed_injection_shards,
     write_strict_json,
 )
+from twirl.lightcurves.external_quality import (
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+)
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
 
 TEST_COMPACT_SHA256 = "a" * 64
+TEST_TIER0_SUMMARY_SHA256 = "6" * 64
+TEST_TIER0_BLS_SHA256 = "7" * 64
 TEST_INJECTION_IDS = tuple(f"inj_00_{index:03d}" for index in range(8))
 TEST_INJECTION_SELECTION_SHA256 = hashlib.sha256(
     ("\n".join(TEST_INJECTION_IDS) + "\n").encode()
@@ -70,6 +82,8 @@ def _write_compact(path, *, n_targets: int = 40, n_cadences: int = 200) -> None:
             group.attrs["camera"] = 4 if index == 0 else 1 + index % 2
             group.attrs["ccd"] = 1 if index == 0 else 1 + index % 4
             group.attrs["tessmag"] = 17.0 + 4.0 * index / max(n_targets - 1, 1)
+            if index == 0:
+                group.attrs["gaia_dr3_source_id"] = "2098419251571450880"
             group.create_dataset("time", data=np.arange(n_cadences) / 432.0)
             group.create_dataset("cadenceno", data=np.arange(n_cadences))
             quality = np.zeros(n_cadences, dtype=np.int32)
@@ -89,40 +103,85 @@ def _write_compact(path, *, n_targets: int = 40, n_cadences: int = 200) -> None:
 
 def _cadence_reference(*, n_cadences: int = 200) -> pd.DataFrame:
     rows: list[dict] = []
-    for camera, ccd in ((1, 1), (1, 3), (2, 2), (2, 4), (4, 1)):
-        for cadence in range(n_cadences):
-            rows.append(
-                {
-                    "sector": 56,
-                    "orbitid": 119 if cadence < n_cadences // 2 else 120,
-                    "camera": camera,
-                    "ccd": ccd,
-                    "cadenceno": cadence,
-                    "quality": 1 if cadence < 2 else 0,
-                }
-            )
+    for camera in range(1, 5):
+        for ccd in range(1, 5):
+            for cadence in range(n_cadences):
+                rows.append(
+                    {
+                        "sector": 56,
+                        "orbitid": 119 if cadence < n_cadences // 2 else 120,
+                        "camera": camera,
+                        "ccd": ccd,
+                        "cadenceno": cadence,
+                        "spoc_quality": 1 if cadence < 2 else 0,
+                        "qlp_quality": 0,
+                        "external_quality": 1 if cadence < 2 else 0,
+                    }
+                )
     return pd.DataFrame(rows)
 
 
 def _write_cadence_evidence(path) -> tuple[pd.DataFrame, dict]:
     table = _cadence_reference()
     table.to_csv(path, index=False)
+    sources: list[dict] = []
+    source_hashes: dict[str, str] = {}
+
+    def source(role: str, **metadata: int) -> None:
+        index = len(sources) + 1
+        source_path = str((path.parent / f"authority_{index:03d}.dat").resolve())
+        digest = f"{index:064x}"
+        sources.append(
+            {"role": role, "path": source_path, "sha256": digest, **metadata}
+        )
+        source_hashes[source_path] = digest
+
+    source("spoc_quality_table")
+    source("spoc_quality_provenance")
+    for camera in range(1, 5):
+        for ccd in range(1, 5):
+            source("spoc_flag_file", camera=camera, ccd=ccd)
+    for orbitid in (119, 120):
+        for camera in range(1, 5):
+            source("qlp_cam_quat", orbitid=orbitid, camera=camera)
+            for ccd in range(1, 5):
+                source(
+                    "qlp_detector_qflag",
+                    orbitid=orbitid,
+                    camera=camera,
+                    ccd=ccd,
+                )
+    detectors = [
+        f"cam{camera}_ccd{ccd}"
+        for camera in range(1, 5)
+        for ccd in range(1, 5)
+    ]
     manifest = {
         "contract_version": "s56_a2v1_cadence_reference_v1",
+        "builder_version": "a2v1_cadence_reference_builder_v2",
         "sector": 56,
         "cadence_authority": "qlp_cam_quat",
-        "quality_authority": "spoc_quality_flags",
+        "quality_authority": "spoc_and_qlp_quality_flags",
+        "quality_composition": {
+            "external_quality": "spoc_quality | (qlp_quality << 30)",
+            "qlp_quality_raw_values": [0, 1],
+            "qlp_quality_external_bit": 30,
+        },
         "table_sha256": file_sha256(path),
+        "table_columns": list(table.columns),
         "n_rows": len(table),
-        "detectors": [
-            "cam1_ccd1",
-            "cam1_ccd3",
-            "cam2_ccd2",
-            "cam2_ccd4",
-            "cam4_ccd1",
-        ],
+        "detectors": detectors,
         "orbits": [119, 120],
-        "source_file_sha256": {"authoritative-input": "c" * 64},
+        "n_rows_by_detector": {
+            detector: int(len(table) / len(detectors)) for detector in detectors
+        },
+        "source_file_sha256": source_hashes,
+        "sources": sources,
+        "n_spoc_authority_files_verified": 16,
+        "n_qlp_qflag_files_verified": 32,
+        "n_nonzero_spoc_quality": int((table["spoc_quality"] != 0).sum()),
+        "n_nonzero_qlp_quality": int((table["qlp_quality"] != 0).sum()),
+        "n_nonzero_external_quality": int((table["external_quality"] != 0).sum()),
     }
     return table, manifest
 
@@ -152,6 +211,7 @@ def _write_injection_shard(
             group.attrs["tmag"] = 19.4 if index < n_ids // 2 else 18.0
             group.attrs["camera"] = 1 + index % 4
             group.attrs["ccd"] = 1 + (index // 4) % 4
+            group.attrs["sector"] = 56
             group.attrs["period_d"] = periods[index]
             group.attrs["duration_min"] = durations[index]
             group.attrs["model_depth"] = depths[index]
@@ -160,6 +220,11 @@ def _write_injection_shard(
             model = np.ones(n)
             model[40:45] = np.array([0.97, 0.93, 0.90, 0.93, 0.97])
             group.create_dataset("quality", data=np.zeros(n, dtype=np.int32))
+            group.create_dataset("cadenceno", data=np.arange(n, dtype=np.int64))
+            group.create_dataset(
+                "orbitid",
+                data=np.where(np.arange(n) < n // 2, 119, 120),
+            )
             group.create_dataset("transit_model", data=model)
             for aperture in ADP_ONLY_APERTURES:
                 original = 1.0 + rng.normal(0.0, 1.0e-4, n)
@@ -171,6 +236,8 @@ def _write_injection_shard(
 def _small_injection_config(**changes) -> Tier1QAConfig:
     base = {
         "expected_compact_sha256": TEST_COMPACT_SHA256,
+        "expected_tier0_summary_sha256": TEST_TIER0_SUMMARY_SHA256,
+        "expected_tier0_bls_peaks_sha256": TEST_TIER0_BLS_SHA256,
         "injection_required_shard_indices": (0,),
         "injection_expected_ids": 8,
         "expected_injection_selection_sha256": TEST_INJECTION_SELECTION_SHA256,
@@ -190,13 +257,17 @@ def _small_injection_config(**changes) -> Tier1QAConfig:
 
 
 def _passing_independent(
-    *, current_compact_sha256: str = TEST_COMPACT_SHA256
+    *,
+    current_compact_sha256: str = TEST_COMPACT_SHA256,
+    cadence_reference_sha256: str = "0" * 64,
+    cadence_reference_manifest_sha256: str = "0" * 64,
 ) -> tuple[pd.DataFrame, dict]:
     metrics = pd.DataFrame(
         {
             "tic": [WD1856_TIC, WD1856_TIC],
             "sector": [56, 56],
             "aperture": list(ADP_ONLY_APERTURES),
+            "reference_flux_column": ["REFERENCE_FLUX_SML", "REFERENCE_FLUX"],
             "detector": ["cam4_ccd1", "cam4_ccd1"],
             "n_current_cadences": [11_775, 11_775],
             "n_reference_cadences": [11_770, 11_770],
@@ -224,10 +295,11 @@ def _passing_independent(
         }
     )
     manifest = {
-        "contract_version": "s56_a2v1_independent_extraction_v1",
+        "contract_version": "s56_a2v1_independent_extraction_v2",
         "sector": 56,
         "tic": WD1856_TIC,
         "independent": True,
+        "comparison_mode": "signal_timing_only",
         "independence_basis": "independent pixels and extraction code",
         "current_extractor_family": "MIT TGLC A2v1",
         "reference_extractor_family": "MAST QLP",
@@ -236,13 +308,26 @@ def _passing_independent(
         "current_revision": "abc123",
         "reference_revision": "release-1",
         "pixel_source": "independently calibrated TICA cutout",
-        "cadence_match_policy": "exact common CADENCENO intersection",
+        "cadence_match_policy": (
+            "exact common CADENCENO intersection with effective quality from "
+            "native internal OR authoritative external flags"
+        ),
         "scatter_definition": "out-of-transit robust MAD in ppm on common cadences",
         "depth_definition": "median in-event deficit on a fixed ephemeris",
         "ephemeris_recovery_definition": (
             "independent bounded BoxLeastSquares recovery on matched cadences"
         ),
         "current_apertures": list(ADP_ONLY_APERTURES),
+        "reference_flux_columns": {
+            ADP_ONLY_APERTURES[0]: "REFERENCE_FLUX_SML",
+            ADP_ONLY_APERTURES[1]: "REFERENCE_FLUX",
+        },
+        "reference_columns": {
+            "flux_by_current_aperture": {
+                ADP_ONLY_APERTURES[0]: "REFERENCE_FLUX_SML",
+                ADP_ONLY_APERTURES[1]: "REFERENCE_FLUX",
+            }
+        },
         "reference_product_aperture": "official pipeline aperture",
         "reference_target_id": f"TIC {WD1856_TIC}",
         "current_compact_sha256": current_compact_sha256,
@@ -273,6 +358,48 @@ def _passing_independent(
             "min_depth_snr": 5.0,
         },
         "max_time_delta_seconds_allowed": 5.0,
+        "n_current_cadences": 11_775,
+        "n_reference_cadences": 11_770,
+        "n_common_cadences": 11_760,
+        "external_quality_overlay": {
+            "policy_contract": EXTERNAL_QUALITY_POLICY_CONTRACT,
+            "effective_quality_policy": EFFECTIVE_QUALITY_POLICY,
+            "sector": 56,
+            "cadence_reference_contract_version": (
+                "s56_a2v1_cadence_reference_v1"
+            ),
+            "cadence_reference_cadence_authority": "qlp_cam_quat",
+            "cadence_reference_quality_authority": (
+                "spoc_and_qlp_quality_flags"
+            ),
+            "cadence_reference_table_sha256": cadence_reference_sha256,
+            "cadence_reference_manifest_sha256": (
+                cadence_reference_manifest_sha256
+            ),
+            "cadence_reference_source_declaration_sha256": "1" * 64,
+            "applied_before_common_cadence_metrics": True,
+            "current_compact_full_audit_counts": {
+                "n_cad_total": 11_775,
+                "n_cad_internal_bad": 100,
+                "n_cad_external_bad": 80,
+                "n_cad_external_only_bad": 30,
+                "n_cad_effective_bad": 130,
+            },
+            "current_common_audit_counts": {
+                "n_cad_total": 11_760,
+                "n_cad_internal_bad": 99,
+                "n_cad_external_bad": 79,
+                "n_cad_external_only_bad": 29,
+                "n_cad_effective_bad": 128,
+            },
+            "reference_common_audit_counts": {
+                "n_cad_total": 11_760,
+                "n_cad_internal_bad": 50,
+                "n_cad_external_bad": 79,
+                "n_cad_external_only_bad": 40,
+                "n_cad_effective_bad": 90,
+            },
+        },
         "metrics_file_sha256": "f" * 64,
         "metrics_content_sha256": _dataframe_content_sha256(metrics),
     }
@@ -280,14 +407,29 @@ def _passing_independent(
 
 
 def _passing_tier0(compact_sha256: str) -> dict:
+    gates = {
+        name: {"passed": True}
+        for name in (
+            "schema_and_completeness",
+            "bls_target_aperture_coverage",
+            "sampled_adp_photometry",
+            "aperture_consistency",
+            "prior_extraction_tree_comparison",
+            "benchmark",
+        )
+    }
     return {
         "sector": 56,
         "passed": True,
         "contract_version": A2V1_PHOTOMETRIC_QA_VERSION,
         "qa_tier": "tier0_integrity_and_benchmark",
+        "science_ready": False,
+        "gates": gates,
+        "benchmarks": {"wd1856": {"passed": True}},
         "provenance": {
             "compact_lc_sha256": compact_sha256,
             "schema_summary_sha256": "b" * 64,
+            "bls_peaks_sha256": TEST_TIER0_BLS_SHA256,
             "detrended_apertures": list(ADP_ONLY_APERTURES),
         },
     }
@@ -332,6 +474,36 @@ def test_tier1_config_is_strict_and_scoped(tmp_path) -> None:
         replace(Tier1QAConfig(), promotion_enabled=True).validate()
 
 
+def test_tier0_prerequisite_is_hash_bound_and_checks_every_nested_gate() -> None:
+    config = _small_injection_config()
+    summary = _passing_tier0(TEST_COMPACT_SHA256)
+    passed = evaluate_tier0_prerequisite(
+        summary,
+        sector=56,
+        config=config,
+        tier0_summary_sha256=TEST_TIER0_SUMMARY_SHA256,
+        current_compact_sha256=TEST_COMPACT_SHA256,
+    )
+    assert passed["status"] == "pass"
+
+    stale = _passing_tier0(TEST_COMPACT_SHA256)
+    stale["gates"]["benchmark"]["passed"] = False
+    stale["provenance"]["schema_summary_sha256"] = "not-even-a-digest"
+    failed = evaluate_tier0_prerequisite(
+        stale,
+        sector=56,
+        config=config,
+        tier0_summary_sha256="5" * 64,
+        current_compact_sha256=TEST_COMPACT_SHA256,
+    )
+    assert failed["status"] == "fail"
+    assert "Tier-0 summary is not pinned by the locked configuration" in failed[
+        "reasons"
+    ]
+    assert "Tier-0 gate benchmark did not pass" in failed["reasons"]
+    assert "Tier-0 schema evidence hash is invalid" in failed["reasons"]
+
+
 def test_compact_population_uses_authoritative_cadence_reference(tmp_path) -> None:
     compact = tmp_path / "compact.h5"
     _write_compact(compact)
@@ -344,26 +516,80 @@ def test_compact_population_uses_authoritative_cadence_reference(tmp_path) -> No
     assert len(apertures) == 80
     assert len(pairs) == 40
     assert targets["missing_cadence_fraction"].max() == 0.0
-    assert targets["n_quality_mismatches"].sum() == 0
+    assert targets["max_orbit_missing_cadence_fraction"].max() == 0.0
+    assert targets["missing_orbit_ids"].eq("").all()
+    assert targets.loc[targets["tic"].eq(WD1856_TIC), "gaia_dr3_source_id"].iloc[0] == (
+        "2098419251571450880"
+    )
+    assert targets["n_quality_mask_disagreements"].sum() == 0
     assert apertures["finite_quality0_fraction"].min() == 1.0
     assert pairs["mad_ratio"].between(0.9, 1.2).all()
+
+    external_mask = _cadence_reference()
+    externally_bad = external_mask["cadenceno"].eq(3)
+    external_mask.loc[externally_bad, "spoc_quality"] = 32
+    external_mask.loc[externally_bad, "external_quality"] = 32
+    masked_targets, masked_apertures, _ = audit_compact_population(
+        compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=external_mask,
+    )
+    assert masked_targets["n_quality_mask_disagreements"].eq(1).all()
+    assert masked_targets["internal_quality0_fraction"].eq(0.99).all()
+    assert masked_targets["external_quality0_fraction"].eq(0.985).all()
+    assert masked_targets["quality0_fraction"].eq(0.985).all()
+    cadence_gate, _ = evaluate_cadence_quality(
+        masked_targets, masked_apertures, Tier1QAConfig()
+    )
+    assert cadence_gate["status"] == "pass"
 
 
 def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> None:
     shard = tmp_path / "injections.h5"
     _write_injection_shard(shard)
-    metrics, manifest = summarize_fixed_injection_shards([shard])
+    cadence_path = tmp_path / "cadence.csv"
+    _, cadence_manifest = _write_cadence_evidence(cadence_path)
+    cadence_manifest_path = tmp_path / "cadence.json"
+    cadence_manifest_path.write_text(json.dumps(cadence_manifest) + "\n")
+    metrics, manifest = summarize_fixed_injection_shards(
+        [shard],
+        sector=56,
+        cadence_reference_path=cadence_path,
+        cadence_reference_manifest_path=cadence_manifest_path,
+    )
     assert len(metrics) == 16
     assert metrics["status"].eq("ok").all()
     assert np.allclose(metrics["depth_retention_fraction"], 0.96, atol=1.0e-8)
 
     config = _small_injection_config(
-        expected_injection_shard_sha256=(file_sha256(shard),)
+        expected_injection_shard_sha256=(file_sha256(shard),),
+        expected_cadence_reference_sha256=file_sha256(cadence_path),
+        expected_cadence_reference_manifest_sha256=file_sha256(
+            cadence_manifest_path
+        ),
     )
     gate = evaluate_fixed_injections(metrics, manifest, sector=56, config=config)
     assert gate["status"] == "pass"
     assert gate["n_faint_injection_ids"] == 4
     assert gate["period_support_ratio"] >= 5.0
+
+    internal_only = dict(manifest)
+    internal_only.pop("external_quality_overlay")
+    rejected = evaluate_fixed_injections(
+        metrics, internal_only, sector=56, config=config
+    )
+    assert rejected["status"] == "fail"
+    assert any("overlay is missing" in value for value in rejected["reasons"])
+
+    bad_counts = json.loads(json.dumps(manifest))
+    bad_counts["external_quality_overlay"]["aggregate_counts"][
+        "n_cad_effective_bad"
+    ] += 1
+    rejected = evaluate_fixed_injections(
+        metrics, bad_counts, sector=56, config=config
+    )
+    assert rejected["status"] == "fail"
+    assert any("arithmetic" in value for value in rejected["reasons"])
 
     wrong_shard = dict(manifest)
     wrong_shard["shard_indices"] = [1]
@@ -437,6 +663,50 @@ def test_independent_gate_rejects_same_family_and_unphysical_depth() -> None:
         < 1.0e-6
     )
 
+    # Raw-pixel and decontaminated extractions can have very different
+    # dilution and noise.  Those ratios are retained as diagnostics, while
+    # signal presence and ephemeris timing define this bounded gate.
+    diluted = metrics.copy()
+    diluted["reference_depth"] = [0.015, 0.0048]
+    diluted["reference_scatter_ppm"] = [8_759.0, 4_090.0]
+    diluted_manifest = dict(manifest)
+    diluted_manifest["metrics_content_sha256"] = _dataframe_content_sha256(
+        diluted
+    )
+    diluted_gate = evaluate_independent_extraction(
+        diluted,
+        diluted_manifest,
+        _small_injection_config(),
+        catalog_detectors={WD1856_TIC: "cam4_ccd1"},
+    )
+    assert diluted_gate["status"] == "pass"
+    assert diluted_gate["scatter_ratio_is_diagnostic_only"] is True
+    assert (
+        diluted_gate["wd1856"]["apertures"][0][
+            "depth_ratio_is_diagnostic_only"
+        ]
+        is True
+    )
+
+    truncated_reference = metrics.copy()
+    truncated_reference["n_reference_cadences"] = 100
+    truncated_reference["n_common_cadences"] = 100
+    truncated_reference["n_common_quality0_finite"] = 90
+    truncated_reference["n_in_event_cadences"] = 10
+    truncated_reference["n_out_of_event_cadences"] = 80
+    truncated_manifest = dict(manifest)
+    truncated_manifest["metrics_content_sha256"] = _dataframe_content_sha256(
+        truncated_reference
+    )
+    truncated_gate = evaluate_independent_extraction(
+        truncated_reference,
+        truncated_manifest,
+        _small_injection_config(),
+        catalog_detectors={WD1856_TIC: "cam4_ccd1"},
+    )
+    assert truncated_gate["status"] == "fail"
+    assert truncated_gate["current_cadence_coverage_fraction_min"] < 0.01
+
     same_family = dict(manifest)
     same_family["reference_extractor_family"] = "MIT TGLC A2v1"
     failed = evaluate_independent_extraction(
@@ -447,6 +717,33 @@ def test_independent_gate_rejects_same_family_and_unphysical_depth() -> None:
     )
     assert failed["status"] == "fail"
     assert any("not independent" in reason for reason in failed["reasons"])
+
+    bad_quality = json.loads(json.dumps(manifest))
+    bad_quality["external_quality_overlay"][
+        "current_common_audit_counts"
+    ]["n_cad_effective_bad"] += 1
+    bad_quality_gate = evaluate_independent_extraction(
+        metrics,
+        bad_quality,
+        _small_injection_config(),
+        catalog_detectors={WD1856_TIC: "cam4_ccd1"},
+    )
+    assert bad_quality_gate["status"] == "fail"
+    assert any(
+        "quality audit current_common_audit_counts is inconsistent" in reason
+        for reason in bad_quality_gate["reasons"]
+    )
+
+    loose_timing = dict(manifest)
+    loose_timing["max_time_delta_seconds_allowed"] = 60.1
+    loose_gate = evaluate_independent_extraction(
+        metrics,
+        loose_timing,
+        _small_injection_config(),
+        catalog_detectors={WD1856_TIC: "cam4_ccd1"},
+    )
+    assert loose_gate["status"] == "fail"
+    assert any("tolerance" in reason for reason in loose_gate["reasons"])
 
     bad_depth = metrics.copy()
     bad_depth.loc[0, "reference_depth"] = 1.2
@@ -490,13 +787,100 @@ def test_aperture_gate_rejects_anticorrelated_channels() -> None:
     assert evaluate_aperture_outliers(pairs, Tier1QAConfig())["status"] == "fail"
 
 
+def test_target_aperture_correlation_has_review_band() -> None:
+    targets = pd.DataFrame(
+        {
+            "sector": [56],
+            "tic": [123],
+            "camera": [1],
+            "ccd": [1],
+            "detector": ["cam1_ccd1"],
+            "tmag": [18.0],
+            "tier1_cadence_qa_status": ["pass"],
+            "tier1_cadence_qa_reasons": [""],
+        }
+    )
+    apertures = pd.DataFrame(
+        {
+            "tic": [123, 123],
+            "tmag": [18.0, 18.0],
+            "aperture": list(ADP_ONLY_APERTURES),
+            "mad_ppm": [10_000.0, 11_000.0],
+            "rms5_ppm": [15_000.0, 16_000.0],
+        }
+    )
+    pairs = pd.DataFrame({"tic": [123], "mad_ratio": [1.1], "correlation": [-0.1]})
+    reviewed = attach_target_qa_flags(targets, apertures, pairs, Tier1QAConfig())
+    assert reviewed.loc[0, "tier1_target_qa_status"] == "review"
+    assert reviewed.loc[0, "tier1_target_qa_reasons"] == "aperture_correlation_low"
+
+    pairs.loc[0, "correlation"] = -0.3
+    failed = attach_target_qa_flags(targets, apertures, pairs, Tier1QAConfig())
+    assert failed.loc[0, "tier1_target_qa_status"] == "fail"
+    assert failed.loc[0, "tier1_target_qa_reasons"] == "aperture_anticorrelation"
+
+
+def test_target_eligibility_rejects_coerced_or_inconsistent_pass_flags() -> None:
+    target = pd.DataFrame(
+        {
+            "sector": [56],
+            "tic": [123],
+            "camera": [1],
+            "ccd": [1],
+            "detector": ["cam1_ccd1"],
+            "tmag": [18.0],
+            "tier1_cadence_qa_status": ["pass"],
+            "tier1_scatter_qa_status": ["pass"],
+            "tier1_aperture_pair_qa_status": ["pass"],
+            "tier1_target_qa_status": ["fail"],
+            "tier1_target_qa_reasons": ["finite_flux"],
+            "tier1_target_qa_pass": ["False"],
+        }
+    )
+    with pytest.raises(ValueError, match="non-null booleans"):
+        build_target_eligibility(target, Tier1QAConfig())
+
+    target["tier1_target_qa_pass"] = True
+    with pytest.raises(ValueError, match="status and pass flag are inconsistent"):
+        build_target_eligibility(target, Tier1QAConfig())
+
+
+def test_missing_orbit_gets_explicit_target_reason(tmp_path) -> None:
+    compact = tmp_path / "compact.h5"
+    _write_compact(compact)
+    with h5py.File(compact, "r+") as handle:
+        group = handle[f"targets/{1001:016d}"]
+        group["orbitid"][:] = 119
+    targets, apertures, _ = audit_compact_population(
+        compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=_cadence_reference(),
+    )
+    gate, flagged = evaluate_cadence_quality(targets, apertures, Tier1QAConfig())
+    row = flagged.loc[flagged["tic"].eq(1001)].iloc[0]
+    assert row["missing_orbit_ids"] == "120"
+    assert row["max_orbit_missing_cadence_fraction"] == 1.0
+    reasons = set(str(row["tier1_cadence_qa_reasons"]).split(";"))
+    assert {"orbit_missing", "orbit_cadence_loss", "orbit_mismatch"} <= reasons
+    assert reasons <= set(TIER1_TARGET_REASON_CODES)
+    assert gate["status"] == "fail"
+
+
 def test_active_scope_can_be_enrichment_ready_but_not_science_ready(tmp_path) -> None:
     shard = tmp_path / "injections.h5"
     _write_injection_shard(shard)
+    cadence_path = tmp_path / "cadence.csv"
+    _, cadence_manifest = _write_cadence_evidence(cadence_path)
+    cadence_manifest_path = tmp_path / "cadence.json"
+    cadence_manifest_path.write_text(json.dumps(cadence_manifest) + "\n")
     config = _small_injection_config(
         min_population_targets=40,
         min_targets_per_magnitude_bin=3,
         expected_injection_shard_sha256=(file_sha256(shard),),
+        expected_cadence_reference_sha256=file_sha256(cadence_path),
+        expected_cadence_reference_manifest_sha256=file_sha256(
+            cadence_manifest_path
+        ),
     )
     compact = tmp_path / "compact.h5"
     _write_compact(compact)
@@ -505,12 +889,21 @@ def test_active_scope_can_be_enrichment_ready_but_not_science_ready(tmp_path) ->
         apertures=config.apertures,
         cadence_reference=_cadence_reference(),
     )
-    injections, injection_manifest = summarize_fixed_injection_shards([shard])
-    independent, independent_manifest = _passing_independent()
+    injections, injection_manifest = summarize_fixed_injection_shards(
+        [shard],
+        sector=56,
+        cadence_reference_path=cadence_path,
+        cadence_reference_manifest_path=cadence_manifest_path,
+    )
+    independent, independent_manifest = _passing_independent(
+        cadence_reference_sha256=file_sha256(cadence_path),
+        cadence_reference_manifest_sha256=file_sha256(cadence_manifest_path),
+    )
     evaluated, bins, target_flags = evaluate_tier1_gates(
         sector=56,
         config=config,
         tier0_summary=_passing_tier0(TEST_COMPACT_SHA256),
+        tier0_summary_sha256=TEST_TIER0_SUMMARY_SHA256,
         target_metrics=targets,
         aperture_metrics=apertures,
         pair_metrics=pairs,
@@ -536,6 +929,7 @@ def test_active_scope_can_be_enrichment_ready_but_not_science_ready(tmp_path) ->
         sector=56,
         config=config,
         tier0_summary=old_tier0,
+        tier0_summary_sha256=TEST_TIER0_SUMMARY_SHA256,
         target_metrics=targets,
         aperture_metrics=apertures,
         pair_metrics=pairs,
@@ -560,7 +954,9 @@ def test_strict_json_replaces_nonfinite_values_atomically(tmp_path) -> None:
     assert not path.with_suffix(".json.tmp").exists()
 
 
-def test_end_to_end_runner_writes_a_scoped_pass(tmp_path) -> None:
+def test_end_to_end_runner_writes_a_scoped_pass(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     compact = tmp_path / "compact.h5"
     _write_compact(compact)
     compact_sha256 = file_sha256(compact)
@@ -579,6 +975,10 @@ def test_end_to_end_runner_writes_a_scoped_pass(tmp_path) -> None:
     config_path.write_text(json.dumps(asdict(config)))
     tier0_path = tmp_path / "tier0.json"
     tier0_path.write_text(json.dumps(_passing_tier0(compact_sha256)))
+    config = replace(
+        config,
+        expected_tier0_summary_sha256=file_sha256(tier0_path),
+    )
 
     cadence_path = tmp_path / "cadence.csv"
     _, cadence_manifest = _write_cadence_evidence(cadence_path)
@@ -594,7 +994,9 @@ def test_end_to_end_runner_writes_a_scoped_pass(tmp_path) -> None:
     config_path.write_text(json.dumps(asdict(config)))
 
     independent, independent_manifest = _passing_independent(
-        current_compact_sha256=compact_sha256
+        current_compact_sha256=compact_sha256,
+        cadence_reference_sha256=file_sha256(cadence_path),
+        cadence_reference_manifest_sha256=file_sha256(cadence_manifest_path),
     )
     independent_path = tmp_path / "independent.csv"
     independent.to_csv(independent_path, index=False)
@@ -639,8 +1041,30 @@ def test_end_to_end_runner_writes_a_scoped_pass(tmp_path) -> None:
     assert summary["enrichment_ready"] is True
     assert summary["science_ready"] is False
     assert summary["target_qa"]["n_pass"] == 40
+    assert summary["target_qa"]["observation_key"] == ["sector", "tic"]
     assert gate_json.exists()
     assert (out_dir / "target_metrics.parquet").exists()
+    eligibility_path = out_dir / "target_eligibility.csv"
+    eligibility = pd.read_csv(eligibility_path, dtype={"gaia_dr3_source_id": "string"})
+    assert len(eligibility) == 40
+    assert not eligibility.duplicated(["sector", "tic"]).any()
+    assert eligibility.loc[
+        eligibility["tic"].eq(WD1856_TIC), "gaia_dr3_source_id"
+    ].iloc[0] == "2098419251571450880"
+    assert set(
+        reason
+        for value in eligibility["tier1_target_qa_reasons"].fillna("").astype(str)
+        for reason in value.split(";")
+        if reason
+    ) <= set(TIER1_TARGET_REASON_CODES)
+    assert (out_dir / "detector_summary.csv").exists()
+    for name in (
+        "tier1_qa_diagnostics.png",
+        "tier1_qa_diagnostics.pdf",
+        "tier1_detector_eligibility.png",
+        "tier1_detector_eligibility.pdf",
+    ):
+        assert (out_dir / name).stat().st_size > 0
     published_manifest_path = out_dir / "fixed_injection_manifest.json"
     assert published_manifest_path.exists()
     published_manifest = json.loads(published_manifest_path.read_text())
@@ -683,6 +1107,38 @@ def test_end_to_end_runner_writes_a_scoped_pass(tmp_path) -> None:
     assert precomputed["provenance"]["injection_manifest_input_sha256"] == file_sha256(
         published_manifest_path
     )
+
+    original_plot = tier1_qa.plot_detector_eligibility
+
+    def mutate_evidence_after_plot(*args, **kwargs) -> None:
+        original_plot(*args, **kwargs)
+        tier0_path.write_text(tier0_path.read_text() + "\n")
+
+    monkeypatch.setattr(
+        tier1_qa,
+        "plot_detector_eligibility",
+        mutate_evidence_after_plot,
+    )
+    race_out = tmp_path / "race_out"
+    race_gate = tmp_path / "race_gate.json"
+    with pytest.raises(ValueError, match="evidence inputs changed"):
+        run_a2v1_tier1_qa(
+            sector=56,
+            config_path=config_path,
+            tier0_summary_path=tier0_path,
+            compact_lc=compact,
+            cadence_reference_path=cadence_path,
+            cadence_reference_manifest_path=cadence_manifest_path,
+            injection_source_parity_path=injection_parity_path,
+            injection_metrics_path=out_dir / "fixed_injection_metrics.csv",
+            injection_manifest_path=published_manifest_path,
+            independent_metrics_path=independent_path,
+            independent_manifest_path=independent_manifest_path,
+            out_dir=race_out,
+            gate_json=race_gate,
+        )
+    assert not race_gate.exists()
+    assert not (race_out / "summary.json").exists()
 
 
 def test_runner_rejects_input_output_collision(tmp_path) -> None:

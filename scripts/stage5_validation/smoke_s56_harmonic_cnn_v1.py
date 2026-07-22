@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -14,6 +15,10 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
+from twirl.lightcurves.external_quality import (  # noqa: E402
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+)
 from twirl.vetting.adjudication_audit import HARMONIC_CNN_TARGET_POLICY  # noqa: E402
 from twirl.vetting.harmonic_cnn import HarmonicTrainConfig  # noqa: E402
 from twirl.vetting.harmonic_inputs import (  # noqa: E402
@@ -169,7 +174,26 @@ def build_smoke_fixture(out_dir: Path, *, seed: int = 56) -> tuple[Path, Path]:
 
     with h5py.File(native_path, "w") as h5:
         h5.attrs["contract_version"] = RAW_PAIR_CONTRACT_VERSION
+        h5.attrs["training_table_sha256"] = hashlib.sha256(
+            table_path.read_bytes()
+        ).hexdigest()
         h5.attrs["time_system"] = "BJD"
+        h5.attrs["external_quality_policy_contract"] = (
+            EXTERNAL_QUALITY_POLICY_CONTRACT
+        )
+        h5.attrs["effective_quality_policy"] = EFFECTIVE_QUALITY_POLICY
+        h5.attrs["cadence_reference_contract_version"] = (
+            "synthetic_smoke_cadence_reference_v1"
+        )
+        h5.attrs["cadence_reference_cadence_authority"] = "qlp_cam_quat"
+        h5.attrs["cadence_reference_quality_authority"] = (
+            "spoc_and_qlp_quality_flags"
+        )
+        h5.attrs["cadence_reference_table"] = "synthetic-smoke://reference"
+        h5.attrs["cadence_reference_manifest"] = "synthetic-smoke://manifest"
+        h5.attrs["cadence_reference_table_sha256"] = "1" * 64
+        h5.attrs["cadence_reference_manifest_sha256"] = "2" * 64
+        h5.attrs["cadence_reference_source_declaration_sha256"] = "3" * 64
         for name, channels in CHANNEL_CONTRACT.items():
             h5.attrs[name] = json.dumps(channels)
         h5.create_group("targets")
@@ -183,8 +207,24 @@ def build_smoke_fixture(out_dir: Path, *, seed: int = 56) -> tuple[Path, Path]:
                 group = h5.create_group(f"targets/{int(row['tic']):016d}")
             group.attrs["tic"] = int(row["tic"])
             _write_group(group, payload)
+            group.attrs["quality_policy_contract"] = (
+                EXTERNAL_QUALITY_POLICY_CONTRACT
+            )
+            group.attrs["n_cad_total"] = len(payload["quality"])
+            group.attrs["n_cad_internal_bad"] = 0
+            group.attrs["n_cad_external_bad"] = 0
+            group.attrs["n_cad_external_only_bad"] = 0
+            group.attrs["n_cad_effective_bad"] = 0
             if bool(row["is_injected_row"]):
                 _write_paired_original(group, payload)
+        h5.attrs["quality_overlay_n_cad_total"] = int(256 * len(table))
+        for name in (
+            "n_cad_internal_bad",
+            "n_cad_external_bad",
+            "n_cad_external_only_bad",
+            "n_cad_effective_bad",
+        ):
+            h5.attrs[f"quality_overlay_{name}"] = 0
     return table_path, native_path
 
 

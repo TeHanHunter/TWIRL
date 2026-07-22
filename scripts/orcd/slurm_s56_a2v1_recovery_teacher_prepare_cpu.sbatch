@@ -19,6 +19,8 @@ LOG_ROOT="${TWIRL_RECOVERY_LOG_ROOT:-/orcd/data/mki_aryeh/001/twirl/logs/${SECTO
 INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/${SECTOR_TAG}_A2v1}"
 OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/${SECTOR_TAG}_A2v1_teacher_v1_recovery}"
 ADP_H5="${TWIRL_A2V1_ADP_H5:-${INPUT_ROOT}/${SECTOR_TAG}_A2v1_adp_pair_rebuilt.h5}"
+CADENCE_REFERENCE="${TWIRL_A2V1_CADENCE_REFERENCE:?set TWIRL_A2V1_CADENCE_REFERENCE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST:?set TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST}"
 SHARD="${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID is required}"
 TAG="$(printf '%02d' "${SHARD}")"
 FULL="${OUT_ROOT}/full"
@@ -34,6 +36,9 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HDF5_USE_FILE_LOCKING=FALS
   --pair-h5 "${FULL}/injection_shards/injections_${TAG}.h5" \
   --raw-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_tglc_raw_sources.h5" \
   --adp-h5 "${ADP_H5}" \
+  --cadence-reference-table "${CADENCE_REFERENCE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
+  --sector "${SECTOR}" \
   --out-candidates "${FULL}/teacher_input_shards/candidates_${TAG}.csv" \
   --out-native-h5 "${FULL}/teacher_input_shards/native_${TAG}.h5" \
   --overwrite

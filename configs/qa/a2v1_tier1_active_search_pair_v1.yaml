@@ -4,6 +4,10 @@ sector: 56
 scope: active_search_pair
 promotion_enabled: false
 expected_tier0_contract: a2v1_tier0_integrity_qa_v2
+# Deliberate fail-closed placeholders. Replace only after rerunning and
+# reviewing Tier-0 with the quality-aware S56 BLS peak table.
+expected_tier0_summary_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+expected_tier0_bls_peaks_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 apertures:
   - DET_FLUX_ADP_SML
   - DET_FLUX_ADP
@@ -106,7 +110,7 @@ injection_review_inband_fraction: 0.90
 
 # One truly independent WD 1856 reduction is enough for the enrichment scope.
 # A full-product promotion config must raise detector coverage to all 16 cells.
-independent_contract_template: "s{sector}_a2v1_independent_extraction_v1"
+independent_contract_template: "s{sector}_a2v1_independent_extraction_v2"
 # Deliberate fail-closed placeholders. Replace only after building and
 # reviewing the real external WD 1856 product and its emitted evidence pair.
 expected_independent_metrics_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
@@ -114,15 +118,14 @@ expected_independent_manifest_sha256: "00000000000000000000000000000000000000000
 expected_independent_reference_product_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 min_independent_targets: 1
 min_independent_detectors: 1
+# Gate only on independent signal presence and ephemeris timing. Raw TESSCut
+# and decontaminated TGLC do not share a dilution or scatter transfer function.
+independent_comparison_mode: "signal_timing_only"
+# Official TESSCut and A2v1 timestamps differ by up to roughly one cadence.
+independent_max_time_delta_seconds: 60.0
 independent_pass_common_fraction: 0.90
 independent_review_common_fraction: 0.80
-independent_pass_abs_log_scatter_ratio: 0.30
-independent_review_abs_log_scatter_ratio: 0.48
 wd1856_pass_period_relative_error: 0.0001
 wd1856_review_period_relative_error: 0.0005
 wd1856_pass_epoch_residual_min: 5.0
 wd1856_review_epoch_residual_min: 15.0
-wd1856_pass_depth_ratio_low: 0.50
-wd1856_pass_depth_ratio_high: 2.0
-wd1856_review_depth_ratio_low: 0.25
-wd1856_review_depth_ratio_high: 4.0

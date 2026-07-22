@@ -12,6 +12,10 @@
 
 set -euo pipefail
 
+echo "Blocked: generic sector Teacher-v1 scoring lacks a strict Tier-1 candidate summary and native binding." >&2
+echo "Migrate this workflow to the quality-gated production scoring contract before use." >&2
+exit 64
+
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
 PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56-torch/bin/python}"
 SECTOR="${TWIRL_ENRICH_SECTOR:?set TWIRL_ENRICH_SECTOR}"

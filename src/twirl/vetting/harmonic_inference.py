@@ -27,6 +27,13 @@ from twirl.vetting.harmonic_inputs import (
     A2V1_TEACHER_INPUT_CONTRACT,
     RAW_PAIR_CONTRACT_VERSION,
     native_group_path,
+    verify_native_candidate_binding,
+    verify_raw_pair_contract,
+)
+from twirl.vetting.harmonic_training import (
+    ENCODER_PRETRAINING_CACHE_SCHEMA,
+    TEACHER_NATIVE_V2_CHECKPOINT_NAMESPACE,
+    validate_native_v2_provenance_shape,
 )
 from twirl.vetting.recovery50_teacher import leakage_columns
 
@@ -34,6 +41,8 @@ from twirl.vetting.recovery50_teacher import leakage_columns
 SELECTED_TEACHER_PROFILE = "shape_plus_periodogram_bls"
 TEACHER_TRAINING_SECTOR = 56
 TEACHER_SCORE_POLICY = "active_learning_priority_not_scientific_classification"
+TEACHER_SCORE_ARTIFACT_CONTRACT = "s56_harmonic_teacher_scores_v2"
+RECOVERY_SCORE_ARTIFACT_CONTRACT = "s56_a2v1_teacher_recovery_scores_v2"
 HARMONIC_DISPLAY_LABELS: tuple[str, ...] = (
     "P_over_4",
     "P_over_3",
@@ -199,6 +208,7 @@ def _load_ensemble(
     checkpoints: list[dict[str, Any]] = []
     normalizations: list[MetadataNormalization] = []
     seen_folds: set[int] = set()
+    ensemble_provenance: tuple[str, str, str, str] | None = None
     for path in checkpoint_paths:
         checkpoint = torch.load(Path(path), map_location="cpu", weights_only=False)
         if checkpoint.get("model_version") != MODEL_VERSION:
@@ -207,6 +217,32 @@ def _load_ensemble(
             )
         if checkpoint.get("input_contract_version") != RAW_PAIR_CONTRACT_VERSION:
             raise ValueError(f"{path} has the wrong native input contract")
+        try:
+            validate_native_v2_provenance_shape(
+                checkpoint,
+                artifact=f"teacher checkpoint {path}",
+            )
+        except RuntimeError as exc:
+            raise ValueError(str(exc)) from exc
+        if checkpoint.get("encoder_pretraining_cache_schema") != (
+            ENCODER_PRETRAINING_CACHE_SCHEMA
+        ):
+            raise ValueError(f"{path} has stale encoder-pretraining provenance")
+        pretraining_sha256 = str(checkpoint.get("encoder_pretraining_sha256", ""))
+        if len(pretraining_sha256) != 64 or any(
+            value not in "0123456789abcdef" for value in pretraining_sha256
+        ):
+            raise ValueError(f"{path} has an invalid encoder-pretraining SHA256")
+        checkpoint_provenance = (
+            str(checkpoint["checkpoint_namespace"]),
+            str(checkpoint["input_contract_version"]),
+            str(checkpoint["native_h5_sha256"]),
+            str(checkpoint["training_table_sha256"]),
+        )
+        if ensemble_provenance is None:
+            ensemble_provenance = checkpoint_provenance
+        elif checkpoint_provenance != ensemble_provenance:
+            raise ValueError(f"{path} has inconsistent ensemble training provenance")
         if checkpoint.get("profile") != profile:
             raise ValueError(
                 f"{path} has profile={checkpoint.get('profile')!r}, expected {profile!r}"
@@ -241,6 +277,7 @@ def score_harmonic_teacher_ensemble(
     workers: int = 4,
     require_cuda: bool = True,
     allow_injections: bool = False,
+    verify_native_contract: bool = True,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Score candidates once through the data path and five times through the CNN."""
 
@@ -249,6 +286,18 @@ def score_harmonic_teacher_ensemble(
     from torch.utils.data import DataLoader
 
     rows = prepare_inference_rows(candidates, allow_injections=allow_injections)
+    native_verification: dict[str, Any] | None = None
+    if verify_native_contract:
+        native_verification = verify_raw_pair_contract(
+            Path(native_h5),
+            require_errors=True,
+            require_periodograms=True,
+        )
+        if not native_verification["passed"]:
+            raise ValueError(
+                "native HDF5 failed the v2 contract: "
+                + "; ".join(native_verification["failures"][:10])
+            )
     with h5py.File(Path(native_h5), "r") as h5:
         if str(h5.attrs.get("contract_version", "")) != RAW_PAIR_CONTRACT_VERSION:
             raise ValueError("native HDF5 has the wrong contract_version")
@@ -381,17 +430,26 @@ def score_harmonic_teacher_ensemble(
     )
     scored["model_version"] = MODEL_VERSION
     scored["model_profile"] = profile
+    scored["checkpoint_namespace"] = TEACHER_NATIVE_V2_CHECKPOINT_NAMESPACE
     scored["input_contract_version"] = A2V1_TEACHER_INPUT_CONTRACT
     scored["teacher_training_sector"] = TEACHER_TRAINING_SECTOR
     scored["score_policy"] = TEACHER_SCORE_POLICY
     summary = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "model_version": MODEL_VERSION,
+        "checkpoint_namespace": TEACHER_NATIVE_V2_CHECKPOINT_NAMESPACE,
+        "checkpoint_native_training_h5_sha256": checkpoints[0][
+            "native_h5_sha256"
+        ],
+        "checkpoint_training_table_sha256": checkpoints[0][
+            "training_table_sha256"
+        ],
         "profile": profile,
         "teacher_training_sector": TEACHER_TRAINING_SECTOR,
         "score_policy": TEACHER_SCORE_POLICY,
         "input_contract_version": A2V1_TEACHER_INPUT_CONTRACT,
         "native_h5_contract_version": RAW_PAIR_CONTRACT_VERSION,
+        "native_contract_verification": native_verification,
         "n_rows": int(len(scored)),
         "n_unique_tics": int(pd.to_numeric(scored["tic"], errors="coerce").nunique()),
         "sectors": sorted(
@@ -427,9 +485,87 @@ def score_harmonic_teacher_ensemble(
     return scored, summary
 
 
+def _input_hashes(
+    *,
+    candidates_path: Path,
+    candidate_summary_path: Path | None,
+    native_h5: Path,
+    checkpoint_paths: Sequence[Path],
+) -> dict[str, Any]:
+    return {
+        "candidate_table_sha256": _sha256(candidates_path),
+        "candidate_summary_sha256": (
+            _sha256(candidate_summary_path)
+            if candidate_summary_path is not None
+            else ""
+        ),
+        "native_h5_sha256": _sha256(native_h5),
+        "checkpoint_sha256": {
+            str(path): _sha256(path) for path in checkpoint_paths
+        },
+    }
+
+
+def _input_artifact_summary(
+    *,
+    candidates_path: Path,
+    candidate_summary_path: Path | None,
+    native_h5: Path,
+    checkpoint_paths: Sequence[Path],
+    before: dict[str, Any],
+    after: dict[str, Any],
+) -> dict[str, Any]:
+    def entry(path: Path, name: str) -> dict[str, str]:
+        return {
+            "path": str(path),
+            "sha256_before": str(before[name]),
+            "sha256_after": str(after[name]),
+        }
+
+    artifacts: dict[str, Any] = {
+        "candidate_table": entry(candidates_path, "candidate_table_sha256"),
+        "native_h5": entry(native_h5, "native_h5_sha256"),
+        "checkpoints": [
+            {
+                "path": str(path),
+                "sha256_before": before["checkpoint_sha256"][str(path)],
+                "sha256_after": after["checkpoint_sha256"][str(path)],
+            }
+            for path in checkpoint_paths
+        ],
+    }
+    if candidate_summary_path is not None:
+        artifacts["candidate_summary"] = entry(
+            candidate_summary_path, "candidate_summary_sha256"
+        )
+    return artifacts
+
+
+def _stage_table(
+    frame: pd.DataFrame,
+    *,
+    out_dir: Path,
+    stem: str,
+) -> tuple[Path, Path]:
+    parquet_path = out_dir / f"{stem}.parquet"
+    parquet_tmp = out_dir / f".{stem}.tmp.parquet"
+    parquet_tmp.unlink(missing_ok=True)
+    try:
+        frame.to_parquet(parquet_tmp, compression="zstd", index=False)
+        return parquet_tmp, parquet_path
+    except (ImportError, ModuleNotFoundError, ValueError):
+        parquet_tmp.unlink(missing_ok=True)
+    csv_path = out_dir / f"{stem}.csv"
+    csv_tmp = out_dir / f".{stem}.tmp.csv"
+    csv_tmp.unlink(missing_ok=True)
+    frame.to_csv(csv_tmp, index=False)
+    return csv_tmp, csv_path
+
+
 def score_harmonic_teacher_to_disk(
     *,
     candidates_path: Path,
+    candidate_summary_path: Path | None = None,
     native_h5: Path,
     checkpoint_paths: Sequence[Path],
     out_dir: Path,
@@ -438,7 +574,44 @@ def score_harmonic_teacher_to_disk(
     workers: int = 4,
     require_cuda: bool = True,
 ) -> dict[str, Any]:
-    candidates_path = Path(candidates_path)
+    """Score and atomically publish a hash-bound teacher artifact set."""
+
+    candidates_path = Path(candidates_path).resolve()
+    candidate_summary_path = (
+        Path(candidate_summary_path).resolve()
+        if candidate_summary_path is not None
+        else None
+    )
+    native_h5 = Path(native_h5).resolve()
+    checkpoint_paths = tuple(Path(path).resolve() for path in checkpoint_paths)
+    if len(checkpoint_paths) != 5:
+        raise ValueError(f"expected five fold checkpoints, got {len(checkpoint_paths)}")
+    native_verification = (
+        verify_native_candidate_binding(
+            native_h5,
+            candidate_table=candidates_path,
+            candidate_summary=candidate_summary_path,
+            require_periodograms=True,
+            expected_periodogram_n=4096,
+        )
+        if candidate_summary_path is not None
+        else verify_raw_pair_contract(
+            native_h5,
+            require_errors=True,
+            require_periodograms=True,
+        )
+    )
+    if not native_verification["passed"]:
+        raise ValueError(
+            "native candidate binding failed: "
+            + "; ".join(native_verification["failures"][:10])
+        )
+    before = _input_hashes(
+        candidates_path=candidates_path,
+        candidate_summary_path=candidate_summary_path,
+        native_h5=native_h5,
+        checkpoint_paths=checkpoint_paths,
+    )
     candidates = (
         pd.read_parquet(candidates_path)
         if candidates_path.suffix.lower() == ".parquet"
@@ -452,37 +625,182 @@ def score_harmonic_teacher_to_disk(
         batch_size=batch_size,
         workers=workers,
         require_cuda=require_cuda,
+        verify_native_contract=False,
     )
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    score_path = out_dir / "teacher_v1_real_candidate_scores.parquet"
-    try:
-        scored.to_parquet(score_path, compression="zstd", index=False)
-    except (ImportError, ModuleNotFoundError, ValueError):
-        score_path = score_path.with_suffix(".csv")
-        scored.to_csv(score_path, index=False)
     ranked = rank_planet_enrichment(scored)
-    ranking_path = out_dir / "teacher_v1_planet_enrichment_ranked.parquet"
-    try:
-        ranked.to_parquet(ranking_path, compression="zstd", index=False)
-    except (ImportError, ModuleNotFoundError, ValueError):
-        ranking_path = ranking_path.with_suffix(".csv")
-        ranked.to_csv(ranking_path, index=False)
-    summary["outputs"] = {
-        "scores": str(score_path),
-        "planet_enrichment_ranking": str(ranking_path),
-        "summary": str(out_dir / "summary.json"),
-    }
-    (out_dir / "summary.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n"
+    out_dir = Path(out_dir).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    score_tmp, score_path = _stage_table(
+        scored,
+        out_dir=out_dir,
+        stem="teacher_v1_real_candidate_scores",
     )
+    ranking_tmp, ranking_path = _stage_table(
+        ranked,
+        out_dir=out_dir,
+        stem="teacher_v1_planet_enrichment_ranked",
+    )
+    after = _input_hashes(
+        candidates_path=candidates_path,
+        candidate_summary_path=candidate_summary_path,
+        native_h5=native_h5,
+        checkpoint_paths=checkpoint_paths,
+    )
+    if after != before:
+        score_tmp.unlink(missing_ok=True)
+        ranking_tmp.unlink(missing_ok=True)
+        raise RuntimeError("teacher scoring inputs changed before outputs were published")
+    expected_checkpoint_hashes = before["checkpoint_sha256"]
+    if summary.get("checkpoint_sha256") != expected_checkpoint_hashes:
+        score_tmp.unlink(missing_ok=True)
+        ranking_tmp.unlink(missing_ok=True)
+        raise RuntimeError("ensemble checkpoint hashes disagree with pre-scoring hashes")
+
+    score_tmp.replace(score_path)
+    ranking_tmp.replace(ranking_path)
+    for selected in (score_path, ranking_path):
+        alternate = selected.with_suffix(
+            ".csv" if selected.suffix.lower() == ".parquet" else ".parquet"
+        )
+        alternate.unlink(missing_ok=True)
+    summary_path = out_dir / "summary.json"
+    summary.update(
+        {
+            "artifact_contract_version": TEACHER_SCORE_ARTIFACT_CONTRACT,
+            "strict_provenance_passed": True,
+            "native_contract_verification": native_verification,
+            "input_artifacts": _input_artifact_summary(
+                candidates_path=candidates_path,
+                candidate_summary_path=candidate_summary_path,
+                native_h5=native_h5,
+                checkpoint_paths=checkpoint_paths,
+                before=before,
+                after=after,
+            ),
+            "outputs": {
+                "scores": str(score_path),
+                "planet_enrichment_ranking": str(ranking_path),
+                "summary": str(summary_path),
+            },
+            "output_sha256": {
+                "scores": _sha256(score_path),
+                "planet_enrichment_ranking": _sha256(ranking_path),
+            },
+            "n_ranked_unique_tics": int(len(ranked)),
+        }
+    )
+    summary_tmp = out_dir / ".summary.json.tmp"
+    summary_tmp.write_text(
+        json.dumps(summary, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    )
+    summary_tmp.replace(summary_path)
     return summary
+
+
+def verify_teacher_score_cache(
+    *,
+    summary_path: Path,
+    candidates_path: Path,
+    candidate_summary_path: Path,
+    native_h5: Path,
+    checkpoint_paths: Sequence[Path],
+) -> dict[str, Any]:
+    """Return whether score/ranking outputs exactly match all current inputs."""
+
+    failures: list[str] = []
+    summary_path = Path(summary_path).resolve()
+    candidates_path = Path(candidates_path).resolve()
+    candidate_summary_path = Path(candidate_summary_path).resolve()
+    native_h5 = Path(native_h5).resolve()
+    checkpoint_paths = tuple(Path(path).resolve() for path in checkpoint_paths)
+    try:
+        summary = json.loads(summary_path.read_text())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return {"passed": False, "failures": [f"score summary: {exc}"]}
+    if summary.get("artifact_contract_version") != TEACHER_SCORE_ARTIFACT_CONTRACT:
+        failures.append("wrong artifact_contract_version")
+    if summary.get("strict_provenance_passed") is not True:
+        failures.append("strict_provenance_passed is not true")
+    try:
+        current = _input_hashes(
+            candidates_path=candidates_path,
+            candidate_summary_path=candidate_summary_path,
+            native_h5=native_h5,
+            checkpoint_paths=checkpoint_paths,
+        )
+    except OSError as exc:
+        failures.append(f"input hash: {exc}")
+        current = {}
+    artifacts = summary.get("input_artifacts", {})
+    expected_inputs: tuple[tuple[str, Path, str], ...] = (
+        ("candidate_table", candidates_path, "candidate_table_sha256"),
+        ("candidate_summary", candidate_summary_path, "candidate_summary_sha256"),
+        ("native_h5", native_h5, "native_h5_sha256"),
+    )
+    for artifact_name, path, hash_name in expected_inputs:
+        record = artifacts.get(artifact_name, {})
+        if record.get("path") != str(path):
+            failures.append(f"{artifact_name} path mismatch")
+        observed_hash = current.get(hash_name, "")
+        if (
+            record.get("sha256_before") != observed_hash
+            or record.get("sha256_after") != observed_hash
+        ):
+            failures.append(f"{artifact_name} SHA256 mismatch")
+    checkpoint_records = artifacts.get("checkpoints", [])
+    if len(checkpoint_records) != len(checkpoint_paths):
+        failures.append("checkpoint count mismatch")
+    else:
+        current_checkpoint_hashes = current.get("checkpoint_sha256", {})
+        for path, record in zip(checkpoint_paths, checkpoint_records):
+            digest = current_checkpoint_hashes.get(str(path), "")
+            if record.get("path") != str(path):
+                failures.append(f"checkpoint path mismatch: {path}")
+            if (
+                record.get("sha256_before") != digest
+                or record.get("sha256_after") != digest
+            ):
+                failures.append(f"checkpoint SHA256 mismatch: {path}")
+    outputs = summary.get("outputs", {})
+    output_hashes = summary.get("output_sha256", {})
+    for name in ("scores", "planet_enrichment_ranking"):
+        output_path = Path(str(outputs.get(name, "")))
+        if not output_path.is_absolute():
+            failures.append(f"{name} output path is not absolute")
+            continue
+        try:
+            digest = _sha256(output_path)
+        except OSError as exc:
+            failures.append(f"{name} output: {exc}")
+            continue
+        if output_hashes.get(name) != digest:
+            failures.append(f"{name} output SHA256 mismatch")
+    binding = verify_native_candidate_binding(
+        native_h5,
+        candidate_table=candidates_path,
+        candidate_summary=candidate_summary_path,
+        require_periodograms=True,
+        expected_periodogram_n=4096,
+    )
+    if not binding["passed"]:
+        failures.extend(
+            f"native binding: {failure}" for failure in binding["failures"]
+        )
+    return {
+        "passed": not failures,
+        "failures": failures,
+        "native_binding": binding,
+        "current_input_hashes": current,
+    }
 
 
 __all__ = [
     "HARMONIC_DISPLAY_LABELS",
+    "RECOVERY_SCORE_ARTIFACT_CONTRACT",
     "SELECTED_TEACHER_PROFILE",
+    "TEACHER_SCORE_ARTIFACT_CONTRACT",
     "prepare_inference_rows",
     "score_harmonic_teacher_ensemble",
     "score_harmonic_teacher_to_disk",
+    "verify_teacher_score_cache",
 ]

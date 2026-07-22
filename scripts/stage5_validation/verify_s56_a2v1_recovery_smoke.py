@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 
@@ -12,16 +13,26 @@ import numpy as np
 import pandas as pd
 
 from twirl.vetting.harmonic_cnn import MORPHOLOGY_CLASSES
+from twirl.vetting.harmonic_inference import RECOVERY_SCORE_ARTIFACT_CONTRACT
 
 
 def _json(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--recovery-root", type=Path, required=True)
     parser.add_argument("--input-verification", type=Path, required=True)
+    parser.add_argument("--checkpoint-manifest", type=Path, required=True)
     parser.add_argument("--out-json", type=Path, required=True)
     parser.add_argument("--expect-injections", type=int, default=100)
     parser.add_argument("--expect-scores", type=int, default=128)
@@ -36,6 +47,8 @@ def main() -> int:
         "native": smoke / "teacher_inputs/native_00.teacher_summary.json",
         "candidates": smoke / "teacher_inputs/candidates_00.csv",
         "scores": smoke / "teacher_scores_128.parquet",
+        "score_summary": smoke / "teacher_scores_128.summary.json",
+        "checkpoint_manifest": args.checkpoint_manifest,
     }
     failures: list[str] = []
     for name, path in paths.items():
@@ -69,7 +82,26 @@ def main() -> int:
         failures.append("native Teacher-v1 input verification did not pass")
 
     score_summary: dict[str, object] = {}
-    if paths["candidates"].exists() and paths["scores"].exists():
+    if (
+        paths["candidates"].exists()
+        and paths["scores"].exists()
+        and paths["score_summary"].exists()
+    ):
+        score_provenance = _json(paths["score_summary"])
+        if score_provenance.get("artifact_contract_version") != (
+            RECOVERY_SCORE_ARTIFACT_CONTRACT
+        ):
+            failures.append("Teacher smoke has the wrong score artifact contract")
+        if score_provenance.get("strict_provenance_passed") is not True:
+            failures.append("Teacher smoke did not pass strict provenance")
+        if score_provenance.get("out_scores_sha256") != _sha256(paths["scores"]):
+            failures.append("Teacher smoke score SHA256 disagrees with its summary")
+        if score_provenance.get("checkpoint_manifest", {}).get("sha256") != _sha256(
+            paths["checkpoint_manifest"]
+        ):
+            failures.append(
+                "Teacher smoke checkpoint manifest differs from the current manifest"
+            )
         candidates = pd.read_csv(paths["candidates"], low_memory=False).head(
             args.expect_scores
         )

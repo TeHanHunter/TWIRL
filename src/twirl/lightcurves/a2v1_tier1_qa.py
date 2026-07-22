@@ -35,12 +35,48 @@ from twirl.lightcurves.a2v1_qa import (
     file_sha256,
     stratified_target_sample,
 )
+from twirl.lightcurves.external_quality import (
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+    load_external_quality_reference,
+)
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
 
 TIER1_QA_CONTRACT_VERSION = "a2v1_tier1_science_qa_v1"
 TIER1_SCOPES = ("active_search_pair", "full_a2v1_product")
 STATUS_ORDER = {"pass": 0, "review": 1, "fail": 2}
+TIER0_REQUIRED_GATES = (
+    "schema_and_completeness",
+    "bls_target_aperture_coverage",
+    "sampled_adp_photometry",
+    "aperture_consistency",
+    "prior_extraction_tree_comparison",
+    "benchmark",
+)
+TIER1_TARGET_REASON_CODES = (
+    "aperture_anticorrelation",
+    "aperture_correlation_missing",
+    "aperture_correlation_low",
+    "aperture_mad_ratio",
+    "aperture_missing",
+    "cadence_loss",
+    "duplicate_cadence",
+    "finite_flux",
+    "orbit_cadence_loss",
+    "orbit_mismatch",
+    "orbit_missing",
+    "scatter_absolute_high",
+    "unexpected_cadence",
+    "usable_cadence",
+)
+INJECTION_QUALITY_COUNT_NAMES = (
+    "n_cad_total",
+    "n_cad_internal_bad",
+    "n_cad_external_bad",
+    "n_cad_external_only_bad",
+    "n_cad_effective_bad",
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +89,11 @@ class Tier1QAConfig:
     scope: str = "active_search_pair"
     promotion_enabled: bool = False
     expected_tier0_contract: str = A2V1_PHOTOMETRIC_QA_VERSION
+    # Tier-1 may only consume the exact reviewed Tier-0 report and BLS table.
+    # The all-zero defaults deliberately make an unreviewed production run
+    # impossible.
+    expected_tier0_summary_sha256: str = "0" * 64
+    expected_tier0_bls_peaks_sha256: str = "0" * 64
     apertures: tuple[str, ...] = ADP_ONLY_APERTURES
     sample_size: int = 0
     sample_seed: int = 560101
@@ -153,7 +194,7 @@ class Tier1QAConfig:
     injection_pass_inband_fraction: float = 0.95
     injection_review_inband_fraction: float = 0.90
 
-    independent_contract_template: str = "s{sector}_a2v1_independent_extraction_v1"
+    independent_contract_template: str = "s{sector}_a2v1_independent_extraction_v2"
     # Deliberate impossible locks until the external WD 1856 extraction and
     # its metrics/manifest pair are built and independently reviewed.
     expected_independent_metrics_sha256: str = "0" * 64
@@ -161,18 +202,14 @@ class Tier1QAConfig:
     expected_independent_reference_product_sha256: str = "0" * 64
     min_independent_targets: int = 1
     min_independent_detectors: int = 1
+    independent_comparison_mode: str = "signal_timing_only"
+    independent_max_time_delta_seconds: float = 60.0
     independent_pass_common_fraction: float = 0.90
     independent_review_common_fraction: float = 0.80
-    independent_pass_abs_log_scatter_ratio: float = 0.30
-    independent_review_abs_log_scatter_ratio: float = 0.48
     wd1856_pass_period_relative_error: float = 1.0e-4
     wd1856_review_period_relative_error: float = 5.0e-4
     wd1856_pass_epoch_residual_min: float = 5.0
     wd1856_review_epoch_residual_min: float = 15.0
-    wd1856_pass_depth_ratio_low: float = 0.50
-    wd1856_pass_depth_ratio_high: float = 2.0
-    wd1856_review_depth_ratio_low: float = 0.25
-    wd1856_review_depth_ratio_high: float = 4.0
 
     def validate(self) -> None:
         """Reject ambiguous or internally inconsistent gate configurations."""
@@ -206,6 +243,14 @@ class Tier1QAConfig:
             raise ValueError("population coverage counts must be positive")
         for value, label in (
             (self.expected_compact_sha256, "expected_compact_sha256"),
+            (
+                self.expected_tier0_summary_sha256,
+                "expected_tier0_summary_sha256",
+            ),
+            (
+                self.expected_tier0_bls_peaks_sha256,
+                "expected_tier0_bls_peaks_sha256",
+            ),
             (
                 self.expected_cadence_reference_sha256,
                 "expected_cadence_reference_sha256",
@@ -304,6 +349,15 @@ class Tier1QAConfig:
             raise ValueError("injection support ratios must exceed one")
         if min(self.min_independent_targets, self.min_independent_detectors) < 1:
             raise ValueError("independent-extraction coverage counts must be positive")
+        if self.independent_comparison_mode != "signal_timing_only":
+            raise ValueError(
+                "Tier-1 v1 requires independent_comparison_mode="
+                "'signal_timing_only'"
+            )
+        if not 0 < self.independent_max_time_delta_seconds <= 60.0:
+            raise ValueError(
+                "independent timestamp tolerance must be in (0, 60] seconds"
+            )
 
         for passed, review, label in (
             (self.scatter_pass_finite_fraction, self.scatter_review_finite_fraction, "scatter finite fraction"),
@@ -350,11 +404,6 @@ class Tier1QAConfig:
                 "negative aperture correlation fraction",
             ),
             (
-                self.independent_pass_abs_log_scatter_ratio,
-                self.independent_review_abs_log_scatter_ratio,
-                "independent scatter ratio",
-            ),
-            (
                 self.wd1856_pass_period_relative_error,
                 self.wd1856_review_period_relative_error,
                 "WD 1856 period",
@@ -395,13 +444,6 @@ class Tier1QAConfig:
                 self.injection_pass_retention_high,
                 self.injection_review_retention_high,
                 "injection retention",
-            ),
-            (
-                self.wd1856_review_depth_ratio_low,
-                self.wd1856_pass_depth_ratio_low,
-                self.wd1856_pass_depth_ratio_high,
-                self.wd1856_review_depth_ratio_high,
-                "WD 1856 depth ratio",
             ),
         ):
             if not (0 < review_low <= pass_low <= pass_high <= review_high):
@@ -544,6 +586,54 @@ def _status_interval(
     return "fail"
 
 
+def _status_correlation(value: float, *, passed: float, failed_below: float) -> str:
+    """Classify one aperture correlation without rejecting benign low values.
+
+    The population gate still constrains the median and the strongly
+    anticorrelated fraction.  At target level, values between the declared
+    strong-anticorrelation boundary and the pass threshold are review rather
+    than fail so quiet/noisy but non-pathological light curves remain visible.
+    """
+
+    if not np.isfinite(value):
+        return "fail"
+    if value >= passed:
+        return "pass"
+    if value >= failed_below:
+        return "review"
+    return "fail"
+
+
+def _optional_gaia_dr3_source_id(group: h5py.Group) -> int | None:
+    """Return an exact Gaia identifier when the compact group records one."""
+
+    candidates = (
+        "gaia_dr3_source_id",
+        "gaia_source_id",
+        "gaiaid",
+        "gaia_id",
+        "source_id",
+    )
+    for name in candidates:
+        if name not in group.attrs:
+            continue
+        value = group.attrs[name]
+        if isinstance(value, bytes):
+            value = value.decode("utf-8")
+        # Gaia DR3 identifiers exceed the exact-integer range of float64.
+        # Never turn a rounded floating-point attribute into an authoritative
+        # identifier.
+        if isinstance(value, (float, np.floating)):
+            continue
+        try:
+            source_id = int(str(value).strip())
+        except (TypeError, ValueError):
+            continue
+        if source_id > 0:
+            return source_id
+    return None
+
+
 def _worst_status(statuses: Iterable[str]) -> str:
     values = list(statuses)
     return max(values, key=STATUS_ORDER.__getitem__) if values else "fail"
@@ -643,7 +733,9 @@ def audit_compact_population(
         "camera",
         "ccd",
         "cadenceno",
-        "quality",
+        "spoc_quality",
+        "qlp_quality",
+        "external_quality",
     }
     missing_reference = sorted(reference_required - set(cadence_reference.columns))
     if missing_reference:
@@ -660,13 +752,32 @@ def audit_compact_population(
             "cadence reference sector mismatch: "
             f"reference={observed_reference_sectors}, compact={observed_catalog_sectors}"
         )
+    spoc_quality = reference["spoc_quality"].to_numpy(dtype=np.int64)
+    qlp_quality = reference["qlp_quality"].to_numpy(dtype=np.int64)
+    external_quality = reference["external_quality"].to_numpy(dtype=np.int64)
+    if (
+        np.any(spoc_quality < 0)
+        or not np.isin(qlp_quality, (0, 1)).all()
+        or not np.array_equal(
+            external_quality, spoc_quality | (qlp_quality << 30)
+        )
+    ):
+        raise ValueError("cadence reference has invalid external quality derivation")
     reference_maps: dict[tuple[int, int], dict[int, tuple[int, int]]] = {}
+    reference_orbit_cadences: dict[
+        tuple[int, int], dict[int, frozenset[int]]
+    ] = {}
     for (camera, ccd), rows in reference.groupby(["camera", "ccd"], sort=False):
         if rows["cadenceno"].duplicated().any():
             raise ValueError(f"cadence reference has duplicate IDs for cam{camera}/ccd{ccd}")
-        reference_maps[(int(camera), int(ccd))] = {
-            int(row.cadenceno): (int(row.quality), int(row.orbitid))
+        detector_key = (int(camera), int(ccd))
+        reference_maps[detector_key] = {
+            int(row.cadenceno): (int(row.external_quality), int(row.orbitid))
             for row in rows.itertuples(index=False)
+        }
+        reference_orbit_cadences[detector_key] = {
+            int(orbitid): frozenset(group["cadenceno"].astype(np.int64))
+            for orbitid, group in rows.groupby("orbitid", sort=True)
         }
     sample = (
         stratified_target_sample(catalog, sample_size=sample_size, seed=seed)
@@ -688,8 +799,10 @@ def audit_compact_population(
             cadence = np.asarray(group["cadenceno"], dtype=np.int64)
             if len(cadence) != len(quality):
                 raise ValueError(f"TIC {record.tic}: cadence/quality length mismatch")
-            q0 = quality == 0
+            internal_q0 = quality == 0
             orbitid = np.asarray(group["orbitid"], dtype=np.int64)
+            if len(orbitid) != len(cadence):
+                raise ValueError(f"TIC {record.tic}: cadence/orbit length mismatch")
             detector_key = (int(record.camera), int(record.ccd))
             if detector_key not in reference_maps:
                 raise KeyError(
@@ -704,19 +817,62 @@ def audit_compact_population(
             first_index: dict[int, int] = {}
             for index, cadence_id in enumerate(cadence):
                 first_index.setdefault(int(cadence_id), int(index))
-            quality_mismatches = sum(
-                int(quality[first_index[cadence_id]])
-                != int(reference_map[cadence_id][0])
-                for cadence_id in reference_ids & observed_ids
+            external_quality = np.fromiter(
+                (
+                    int(reference_map.get(int(cadence_id), (-1, -1))[0])
+                    for cadence_id in cadence
+                ),
+                dtype=np.int64,
+                count=len(cadence),
+            )
+            external_known = external_quality >= 0
+            external_q0 = external_quality == 0
+            q0 = internal_q0 & external_q0
+            quality_mask_disagreements = int(
+                np.count_nonzero(external_known & (internal_q0 != external_q0))
             )
             orbit_mismatches = sum(
                 int(orbitid[first_index[cadence_id]])
                 != int(reference_map[cadence_id][1])
                 for cadence_id in reference_ids & observed_ids
             )
+            expected_by_orbit = reference_orbit_cadences[detector_key]
+            expected_orbits = sorted(expected_by_orbit)
+            observed_by_orbit: dict[int, set[int]] = {}
+            for cadence_id, observed_orbit in zip(cadence, orbitid, strict=True):
+                observed_by_orbit.setdefault(int(observed_orbit), set()).add(
+                    int(cadence_id)
+                )
+            orbit_details: dict[str, dict[str, int | float]] = {}
+            missing_orbits: list[int] = []
+            orbit_loss_fractions: list[float] = []
+            n_observed_expected_orbits = 0
+            for expected_orbit in expected_orbits:
+                expected_orbit_ids = expected_by_orbit[expected_orbit]
+                observed_orbit_ids = observed_by_orbit.get(expected_orbit, set())
+                observed_expected_ids = expected_orbit_ids & observed_orbit_ids
+                missing_orbit_ids = expected_orbit_ids - observed_orbit_ids
+                loss_fraction = float(len(missing_orbit_ids) / len(expected_orbit_ids))
+                orbit_loss_fractions.append(loss_fraction)
+                if observed_expected_ids:
+                    n_observed_expected_orbits += 1
+                else:
+                    missing_orbits.append(expected_orbit)
+                orbit_details[str(expected_orbit)] = {
+                    "n_expected": int(len(expected_orbit_ids)),
+                    "n_observed": int(len(observed_expected_ids)),
+                    "n_missing": int(len(missing_orbit_ids)),
+                    "missing_fraction": loss_fraction,
+                }
+            gaia_dr3_source_id = _optional_gaia_dr3_source_id(group)
             target_rows.append(
                 {
                     "tic": int(record.tic),
+                    "gaia_dr3_source_id": (
+                        str(gaia_dr3_source_id)
+                        if gaia_dr3_source_id is not None
+                        else pd.NA
+                    ),
                     "sector": int(record.sector),
                     "camera": int(record.camera),
                     "ccd": int(record.ccd),
@@ -725,7 +881,37 @@ def audit_compact_population(
                     "n_cadences": int(len(quality)),
                     "n_quality0": int(np.count_nonzero(q0)),
                     "quality0_fraction": float(np.mean(q0)) if len(q0) else np.nan,
+                    "internal_quality0_fraction": (
+                        float(np.mean(internal_q0)) if len(internal_q0) else np.nan
+                    ),
+                    "external_quality0_fraction": (
+                        float(np.mean(external_q0[external_known]))
+                        if np.any(external_known)
+                        else np.nan
+                    ),
+                    "n_internal_quality_nonzero": int(
+                        np.count_nonzero(~internal_q0)
+                    ),
+                    "n_external_quality_nonzero": int(
+                        np.count_nonzero(external_known & ~external_q0)
+                    ),
+                    "n_effective_quality_nonzero": int(np.count_nonzero(~q0)),
+                    "n_quality_mask_disagreements": quality_mask_disagreements,
                     "n_orbits": int(len(np.unique(orbitid))),
+                    "n_expected_orbits": int(len(expected_orbits)),
+                    "n_observed_expected_orbits": int(n_observed_expected_orbits),
+                    "missing_orbit_ids": ";".join(str(value) for value in missing_orbits),
+                    "max_orbit_missing_cadence_fraction": (
+                        float(np.nanmax(orbit_loss_fractions))
+                        if orbit_loss_fractions
+                        else np.nan
+                    ),
+                    "orbit_cadence_metrics_json": json.dumps(
+                        orbit_details,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    ),
                     "n_expected_cadences": int(len(reference_ids)),
                     "n_missing_cadences": int(len(missing_cadences)),
                     "missing_cadence_fraction": (
@@ -735,7 +921,6 @@ def audit_compact_population(
                     ),
                     "n_unexpected_cadences": int(len(unexpected_cadences)),
                     "n_duplicate_cadences": duplicate_cadences,
-                    "n_quality_mismatches": int(quality_mismatches),
                     "n_orbit_mismatches": int(orbit_mismatches),
                 }
             )
@@ -970,11 +1155,17 @@ def evaluate_cadence_quality(
         "n_cadences",
         "n_expected_cadences",
         "missing_cadence_fraction",
+        "n_expected_orbits",
+        "n_observed_expected_orbits",
+        "missing_orbit_ids",
+        "max_orbit_missing_cadence_fraction",
         "n_unexpected_cadences",
         "n_duplicate_cadences",
-        "n_quality_mismatches",
         "n_orbit_mismatches",
         "quality0_fraction",
+        "internal_quality0_fraction",
+        "external_quality0_fraction",
+        "n_quality_mask_disagreements",
     }
     aperture_required = {"tic", "aperture", "finite_quality0_fraction"}
     missing = sorted(
@@ -1002,6 +1193,10 @@ def evaluate_cadence_quality(
     )
     median_loss = _quantile(targets["relative_cadence_loss"], 0.5)
     p95_loss = _quantile(targets["relative_cadence_loss"], 0.95)
+    orbit_loss = pd.to_numeric(
+        targets["max_orbit_missing_cadence_fraction"], errors="coerce"
+    )
+    p95_orbit_loss = _quantile(orbit_loss, 0.95)
     selected = aperture_metrics.loc[
         aperture_metrics["aperture"].astype(str).isin(config.apertures)
     ].copy()
@@ -1024,7 +1219,6 @@ def evaluate_cadence_quality(
     anomaly_columns = (
         "n_unexpected_cadences",
         "n_duplicate_cadences",
-        "n_quality_mismatches",
         "n_orbit_mismatches",
     )
     anomaly_totals = {
@@ -1054,6 +1248,11 @@ def evaluate_cadence_quality(
         "p95_relative_cadence_loss": _status_max(
             p95_loss, config.cadence_pass_p95_loss, config.cadence_review_p95_loss
         ),
+        "p95_max_orbit_cadence_loss": _status_max(
+            p95_orbit_loss,
+            config.cadence_pass_p95_loss,
+            config.cadence_review_p95_loss,
+        ),
         "finite_quality0_median": _status_min(
             finite_median, config.finite_pass_median, config.finite_review_median
         ),
@@ -1070,6 +1269,121 @@ def evaluate_cadence_quality(
             "pass" if authoritative_integrity else "fail"
         ),
     }
+
+    detector_summaries: list[dict[str, Any]] = []
+    detector_statuses: list[str] = []
+    for detector, detector_targets in targets.groupby("detector", sort=True):
+        detector_tics = set(detector_targets["tic"].astype(np.int64))
+        detector_apertures = selected.loc[selected["tic"].isin(detector_tics)]
+        detector_loss = pd.to_numeric(
+            detector_targets["relative_cadence_loss"], errors="coerce"
+        )
+        detector_orbit_loss = pd.to_numeric(
+            detector_targets["max_orbit_missing_cadence_fraction"],
+            errors="coerce",
+        )
+        detector_finite = pd.to_numeric(
+            detector_apertures["finite_quality0_fraction"], errors="coerce"
+        )
+        detector_usable = pd.to_numeric(
+            detector_apertures["usable_cadence_fraction"], errors="coerce"
+        )
+        detector_internal_good = pd.to_numeric(
+            detector_targets["internal_quality0_fraction"], errors="coerce"
+        )
+        detector_external_good = pd.to_numeric(
+            detector_targets["external_quality0_fraction"], errors="coerce"
+        )
+        detector_quality_disagreements = int(
+            pd.to_numeric(
+                detector_targets["n_quality_mask_disagreements"], errors="coerce"
+            )
+            .fillna(0)
+            .sum()
+        )
+        detector_anomalies = {
+            column: int(
+                pd.to_numeric(detector_targets[column], errors="coerce")
+                .fillna(-1)
+                .sum()
+            )
+            for column in anomaly_columns
+        }
+        detector_exact_apertures = bool(
+            not detector_apertures.duplicated(["tic", "aperture"]).any()
+            and len(detector_apertures)
+            == len(detector_targets) * len(config.apertures)
+            and detector_apertures["tic"].nunique() == len(detector_targets)
+        )
+        detector_components = {
+            "median_relative_cadence_loss": _status_max(
+                _quantile(detector_loss, 0.5),
+                config.cadence_pass_median_loss,
+                config.cadence_review_median_loss,
+            ),
+            "p95_relative_cadence_loss": _status_max(
+                _quantile(detector_loss, 0.95),
+                config.cadence_pass_p95_loss,
+                config.cadence_review_p95_loss,
+            ),
+            "p95_max_orbit_cadence_loss": _status_max(
+                _quantile(detector_orbit_loss, 0.95),
+                config.cadence_pass_p95_loss,
+                config.cadence_review_p95_loss,
+            ),
+            "finite_quality0_median": _status_min(
+                _quantile(detector_finite, 0.5),
+                config.finite_pass_median,
+                config.finite_review_median,
+            ),
+            "finite_quality0_p05": _status_min(
+                _quantile(detector_finite, 0.05),
+                config.finite_pass_p05,
+                config.finite_review_p05,
+            ),
+            "usable_cadence_median": _status_min(
+                _quantile(detector_usable, 0.5),
+                config.usable_pass_median,
+                config.usable_review_median,
+            ),
+            "usable_cadence_p05": _status_min(
+                _quantile(detector_usable, 0.05),
+                config.usable_pass_p05,
+                config.usable_review_p05,
+            ),
+            "reference_integrity": (
+                "pass"
+                if detector_exact_apertures
+                and all(value == 0 for value in detector_anomalies.values())
+                else "fail"
+            ),
+        }
+        detector_status = _worst_status(detector_components.values())
+        detector_statuses.append(detector_status)
+        detector_summaries.append(
+            {
+                "detector": str(detector),
+                "status": detector_status,
+                "n_targets": int(len(detector_targets)),
+                "median_relative_cadence_loss": _quantile(detector_loss, 0.5),
+                "p95_relative_cadence_loss": _quantile(detector_loss, 0.95),
+                "p95_max_orbit_cadence_loss": _quantile(
+                    detector_orbit_loss, 0.95
+                ),
+                "finite_quality0_fraction_p05": _quantile(detector_finite, 0.05),
+                "usable_cadence_fraction_p05": _quantile(detector_usable, 0.05),
+                "internal_quality0_fraction_median": _quantile(
+                    detector_internal_good, 0.5
+                ),
+                "external_quality0_fraction_median": _quantile(
+                    detector_external_good, 0.5
+                ),
+                "quality_mask_disagreements_total": detector_quality_disagreements,
+                "reference_anomaly_totals": detector_anomalies,
+                "component_status": detector_components,
+            }
+        )
+    statuses["detector_stratified"] = _worst_status(detector_statuses)
 
     per_target_aperture = (
         selected.groupby("tic", as_index=False)
@@ -1091,6 +1405,11 @@ def evaluate_cadence_quality(
                 config.cadence_pass_p95_loss,
                 config.cadence_review_p95_loss,
             ),
+            _status_max(
+                float(row["max_orbit_missing_cadence_fraction"]),
+                config.cadence_pass_p95_loss,
+                config.cadence_review_p95_loss,
+            ),
             _status_min(
                 float(row["finite_quality0_fraction_min"]),
                 config.finite_pass_p05,
@@ -1105,13 +1424,36 @@ def evaluate_cadence_quality(
         if components[0] != "pass":
             reasons.append("cadence_loss")
         if components[1] != "pass":
-            reasons.append("finite_flux")
+            reasons.append("orbit_cadence_loss")
         if components[2] != "pass":
+            reasons.append("finite_flux")
+        if components[3] != "pass":
             reasons.append("usable_cadence")
-        anomalies = sum(int(row[column]) for column in anomaly_columns)
-        if anomalies or int(row.get("n_tier1_apertures", 0)) != len(config.apertures):
+        missing_orbits = str(row.get("missing_orbit_ids", "")).strip()
+        if (
+            missing_orbits
+            or int(row["n_observed_expected_orbits"]) != int(row["n_expected_orbits"])
+        ):
             components.append("fail")
-            reasons.append("reference_integrity")
+            reasons.append("orbit_missing")
+        anomaly_reasons = {
+            "n_unexpected_cadences": "unexpected_cadence",
+            "n_duplicate_cadences": "duplicate_cadence",
+            "n_orbit_mismatches": "orbit_mismatch",
+        }
+        for column, reason in anomaly_reasons.items():
+            if int(row[column]) != 0:
+                components.append("fail")
+                reasons.append(reason)
+        n_tier1_apertures = pd.to_numeric(
+            pd.Series([row.get("n_tier1_apertures", np.nan)]), errors="coerce"
+        ).iloc[0]
+        if (
+            not np.isfinite(n_tier1_apertures)
+            or int(n_tier1_apertures) != len(config.apertures)
+        ):
+            components.append("fail")
+            reasons.append("aperture_missing")
         return _worst_status(components), ";".join(reasons)
 
     target_flags = targets.apply(_target_status, axis=1, result_type="expand")
@@ -1128,10 +1470,24 @@ def evaluate_cadence_quality(
         ),
         "median_relative_cadence_loss": median_loss,
         "p95_relative_cadence_loss": p95_loss,
+        "p95_max_orbit_cadence_loss": p95_orbit_loss,
         "authoritative_reference_integrity": authoritative_integrity,
         "reference_anomaly_totals": anomaly_totals,
         "quality0_fraction_median": _quantile(targets["quality0_fraction"], 0.5),
         "quality0_fraction_p05": _quantile(targets["quality0_fraction"], 0.05),
+        "internal_quality0_fraction_median": _quantile(
+            targets["internal_quality0_fraction"], 0.5
+        ),
+        "external_quality0_fraction_median": _quantile(
+            targets["external_quality0_fraction"], 0.5
+        ),
+        "quality_mask_disagreements_total": int(
+            pd.to_numeric(
+                targets["n_quality_mask_disagreements"], errors="coerce"
+            )
+            .fillna(0)
+            .sum()
+        ),
         "finite_quality0_fraction_median": finite_median,
         "finite_quality0_fraction_p05": finite_p05,
         "usable_cadence_fraction_median": usable_median,
@@ -1139,6 +1495,7 @@ def evaluate_cadence_quality(
         "n_target_qa_pass": int(targets["tier1_cadence_qa_pass"].sum()),
         "n_target_qa_review": int(targets["tier1_cadence_qa_status"].eq("review").sum()),
         "n_target_qa_fail": int(targets["tier1_cadence_qa_status"].eq("fail").sum()),
+        "detectors": detector_summaries,
         "component_status": statuses,
     }, targets
 
@@ -1289,29 +1646,45 @@ def attach_target_qa_flags(
     pairs = pair_metrics.copy()
     ratio = pd.to_numeric(pairs["mad_ratio"], errors="coerce")
     correlation = pd.to_numeric(pairs["correlation"], errors="coerce")
-    pairs["tier1_aperture_pair_qa_status"] = [
-        _worst_status(
-            (
-                _status_interval(
-                    ratio_value,
-                    config.aperture_moderate_ratio_low,
-                    config.aperture_moderate_ratio_high,
-                    config.aperture_extreme_ratio_low,
-                    config.aperture_extreme_ratio_high,
-                ),
-                _status_min(
-                    correlation_value,
-                    config.aperture_pass_correlation_median,
-                    config.aperture_review_correlation_median,
-                ),
-            )
+    pairs["tier1_aperture_ratio_qa_status"] = [
+        _status_interval(
+            ratio_value,
+            config.aperture_moderate_ratio_low,
+            config.aperture_moderate_ratio_high,
+            config.aperture_extreme_ratio_low,
+            config.aperture_extreme_ratio_high,
         )
-        for ratio_value, correlation_value in zip(ratio, correlation, strict=True)
+        for ratio_value in ratio
+    ]
+    pairs["tier1_aperture_correlation_qa_status"] = [
+        _status_correlation(
+            correlation_value,
+            passed=config.aperture_pass_correlation_median,
+            failed_below=config.aperture_negative_correlation_threshold,
+        )
+        for correlation_value in correlation
+    ]
+    pairs["tier1_aperture_pair_qa_status"] = [
+        _worst_status((ratio_status, correlation_status))
+        for ratio_status, correlation_status in zip(
+            pairs["tier1_aperture_ratio_qa_status"],
+            pairs["tier1_aperture_correlation_qa_status"],
+            strict=True,
+        )
     ]
     pair_by_target = (
         pairs.groupby("tic", as_index=False)
         .agg(
             n_aperture_pairs=("tic", "size"),
+            aperture_correlation=("correlation", "first"),
+            tier1_aperture_ratio_qa_status=(
+                "tier1_aperture_ratio_qa_status",
+                lambda values: _worst_status(values),
+            ),
+            tier1_aperture_correlation_qa_status=(
+                "tier1_aperture_correlation_qa_status",
+                lambda values: _worst_status(values),
+            ),
             tier1_aperture_pair_qa_status=(
                 "tier1_aperture_pair_qa_status",
                 lambda values: _worst_status(values),
@@ -1343,9 +1716,29 @@ def attach_target_qa_flags(
             if value and value != "nan"
         ]
         if scatter != "pass":
-            reasons.append("absolute_scatter")
-        if aperture_pair != "pass":
-            reasons.append("aperture_pair")
+            reasons.append("scatter_absolute_high")
+        ratio_status = str(row.get("tier1_aperture_ratio_qa_status", "fail"))
+        correlation_status = str(
+            row.get("tier1_aperture_correlation_qa_status", "fail")
+        )
+        if ratio_status != "pass":
+            reasons.append("aperture_mad_ratio")
+        correlation_value = pd.to_numeric(
+            pd.Series([row.get("aperture_correlation", np.nan)]), errors="coerce"
+        ).iloc[0]
+        if not np.isfinite(correlation_value):
+            reasons.append("aperture_correlation_missing")
+        elif correlation_status == "review":
+            reasons.append("aperture_correlation_low")
+        elif correlation_status == "fail":
+            reasons.append("aperture_anticorrelation")
+        if not np.isfinite(n_scatter) or int(n_scatter) != len(config.apertures):
+            reasons.append("aperture_missing")
+        if not np.isfinite(n_pairs) or int(n_pairs) != 1:
+            reasons.append("aperture_missing")
+        unknown_reasons = sorted(set(reasons) - set(TIER1_TARGET_REASON_CODES))
+        if unknown_reasons:
+            raise RuntimeError(f"unknown Tier-1 target reason codes: {unknown_reasons}")
         return status, ";".join(dict.fromkeys(reasons))
 
     combined = out.apply(_combined, axis=1, result_type="expand")
@@ -1358,6 +1751,9 @@ def attach_target_qa_flags(
 def summarize_fixed_injection_shards(
     shard_paths: Sequence[Path],
     *,
+    sector: int,
+    cadence_reference_path: Path,
+    cadence_reference_manifest_path: Path,
     apertures: Sequence[str] = ADP_ONLY_APERTURES,
     selected_ids: set[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -1367,6 +1763,11 @@ def summarize_fixed_injection_shards(
         raise ValueError(
             "Tier-1 v1 forbids arbitrary injection-ID selection; provide complete shards"
         )
+    quality_reference = load_external_quality_reference(
+        table_path=cadence_reference_path,
+        manifest_path=cadence_reference_manifest_path,
+        sector=int(sector),
+    )
     rows: list[dict[str, Any]] = []
     contracts: set[str] = set()
     seen_ids: set[str] = set()
@@ -1379,6 +1780,9 @@ def summarize_fixed_injection_shards(
     declared_counts: dict[str, int] = {}
     actual_counts: dict[str, int] = {}
     malformed_shards: list[str] = []
+    quality_totals = {name: 0 for name in INJECTION_QUALITY_COUNT_NAMES}
+    quality_by_shard: dict[str, dict[str, int]] = {}
+    n_quality_groups_applied = 0
     for path in sorted(Path(item) for item in shard_paths):
         file_hashes[str(path)] = file_sha256(path)
         with h5py.File(path, "r") as h5:
@@ -1405,15 +1809,61 @@ def summarize_fixed_injection_shards(
             source_adp_paths.add(str(h5.attrs.get("source_adp_h5", "")))
             declared_counts[str(path)] = declared_count
             actual_counts[str(path)] = len(h5["injections"])
+            shard_quality = {name: 0 for name in INJECTION_QUALITY_COUNT_NAMES}
+            shard_quality["n_groups_applied"] = 0
+            quality_by_shard[str(path)] = shard_quality
             for injection_id, group in h5["injections"].items():
                 if str(injection_id) in seen_ids:
                     duplicate_ids.add(str(injection_id))
                 seen_ids.add(str(injection_id))
-                quality = np.asarray(group["quality"], dtype=np.int64)
-                model = np.asarray(group["transit_model"], dtype=float)
-                x = 1.0 - model
                 camera = int(group.attrs.get("camera", -1))
                 ccd = int(group.attrs.get("ccd", -1))
+                group_sector = int(group.attrs.get("sector", sector))
+                required_datasets = (
+                    "quality",
+                    "cadenceno",
+                    "orbitid",
+                    "transit_model",
+                )
+                missing_datasets = [
+                    name for name in required_datasets if name not in group
+                ]
+                quality_overlay = None
+                quality_error = ""
+                if missing_datasets:
+                    quality_error = f"missing datasets {missing_datasets}"
+                else:
+                    quality = np.asarray(group["quality"], dtype=np.int64)
+                    model = np.asarray(group["transit_model"], dtype=float)
+                    try:
+                        quality_overlay = quality_reference.apply(
+                            sector=group_sector,
+                            camera=camera,
+                            ccd=ccd,
+                            cadenceno=np.asarray(group["cadenceno"]),
+                            orbitid=np.asarray(group["orbitid"]),
+                            internal_quality=quality,
+                            context=f"injection {injection_id}",
+                        )
+                        if len(model) != len(quality_overlay.quality):
+                            raise ValueError(
+                                "transit_model length disagrees with cadence arrays"
+                            )
+                    except (KeyError, TypeError, ValueError) as exc:
+                        quality_error = str(exc)
+                if quality_overlay is None:
+                    malformed_shards.append(
+                        f"{path}:/injections/{injection_id}: {quality_error}"
+                    )
+                    x = np.asarray([], dtype=float)
+                else:
+                    x = 1.0 - model
+                    for name in INJECTION_QUALITY_COUNT_NAMES:
+                        value = int(quality_overlay.counts[name])
+                        quality_totals[name] += value
+                        shard_quality[name] += value
+                    n_quality_groups_applied += 1
+                    shard_quality["n_groups_applied"] += 1
                 for aperture in apertures:
                     original_name = f"{aperture}_original"
                     injected_name = f"{aperture}_injected"
@@ -1432,13 +1882,26 @@ def summarize_fixed_injection_shards(
                         "shard_index": shard_index,
                         "source_shard": str(path),
                     }
+                    if quality_overlay is None:
+                        rows.append(
+                            {
+                                **base,
+                                "status": "quality_overlay_error",
+                                "quality_error": quality_error,
+                            }
+                        )
+                        continue
                     if original_name not in group or injected_name not in group:
                         rows.append({**base, "status": "missing_dataset"})
                         continue
                     original = np.asarray(group[original_name], dtype=float)
                     injected = np.asarray(group[injected_name], dtype=float)
                     y = -(injected - original)
-                    good = (quality == 0) & np.isfinite(x) & np.isfinite(y)
+                    good = (
+                        (quality_overlay.quality == 0)
+                        & np.isfinite(x)
+                        & np.isfinite(y)
+                    )
                     in_transit = good & (x > 1.0e-10)
                     if np.count_nonzero(in_transit) < 2 or np.count_nonzero(good) < 20:
                         rows.append({**base, "status": "insufficient_cadences"})
@@ -1466,6 +1929,7 @@ def summarize_fixed_injection_shards(
     }
     if final_file_hashes != file_hashes:
         raise ValueError("one or more injection shards changed during summarization")
+    quality_reference.assert_unchanged()
     selection_sha256 = hashlib.sha256(
         ("\n".join(sorted(seen_ids)) + "\n").encode()
     ).hexdigest()
@@ -1492,6 +1956,13 @@ def summarize_fixed_injection_shards(
         "shard_sha256": file_hashes,
         "shard_index_sha256": shard_index_hashes,
         "metrics_content_sha256": _dataframe_content_sha256(metrics),
+        "external_quality_overlay": {
+            **quality_reference.provenance,
+            "applied_before_retention_metrics": True,
+            "n_groups_applied": int(n_quality_groups_applied),
+            "aggregate_counts": quality_totals,
+            "counts_by_shard": quality_by_shard,
+        },
     }
     return metrics, summary
 
@@ -1502,6 +1973,128 @@ def _positive_support_ratio(values: pd.Series) -> float:
     if not len(good):
         return np.nan
     return float(np.max(good) / np.min(good))
+
+
+def _fixed_injection_quality_overlay_failures(
+    manifest: Mapping[str, Any],
+    *,
+    sector: int,
+    config: Tier1QAConfig,
+) -> list[str]:
+    """Validate authoritative quality provenance and count arithmetic."""
+
+    overlay = manifest.get("external_quality_overlay")
+    if not isinstance(overlay, Mapping):
+        return ["fixed-injection external-quality overlay is missing"]
+    reasons: list[str] = []
+    expected = {
+        "policy_contract": EXTERNAL_QUALITY_POLICY_CONTRACT,
+        "effective_quality_policy": EFFECTIVE_QUALITY_POLICY,
+        "sector": int(sector),
+        "cadence_reference_contract_version": (
+            config.cadence_reference_contract_template.format(sector=int(sector))
+        ),
+        "cadence_reference_cadence_authority": "qlp_cam_quat",
+        "cadence_reference_quality_authority": "spoc_and_qlp_quality_flags",
+        "cadence_reference_table_sha256": (
+            config.expected_cadence_reference_sha256
+        ),
+        "cadence_reference_manifest_sha256": (
+            config.expected_cadence_reference_manifest_sha256
+        ),
+    }
+    for name, expected_value in expected.items():
+        if overlay.get(name) != expected_value:
+            reasons.append(
+                f"fixed-injection external-quality overlay has incompatible {name}"
+            )
+    source_digest = str(
+        overlay.get("cadence_reference_source_declaration_sha256", "")
+    )
+    if re.fullmatch(r"[0-9a-f]{64}", source_digest) is None:
+        reasons.append("fixed-injection quality source-declaration hash is invalid")
+    if overlay.get("applied_before_retention_metrics") is not True:
+        reasons.append(
+            "fixed-injection external quality was not applied before retention metrics"
+        )
+
+    def parse_counts(value: Any, *, context: str) -> dict[str, int] | None:
+        if not isinstance(value, Mapping):
+            reasons.append(f"{context} is missing or malformed")
+            return None
+        parsed: dict[str, int] = {}
+        if set(value) != set(INJECTION_QUALITY_COUNT_NAMES):
+            reasons.append(f"{context} has wrong count fields")
+            return None
+        for name in INJECTION_QUALITY_COUNT_NAMES:
+            try:
+                parsed[name] = int(value[name])
+            except (TypeError, ValueError):
+                reasons.append(f"{context}.{name} is invalid")
+                return None
+        if any(value < 0 for value in parsed.values()):
+            reasons.append(f"{context} contains negative counts")
+        total = parsed["n_cad_total"]
+        if any(
+            parsed[name] > total
+            for name in INJECTION_QUALITY_COUNT_NAMES
+            if name != "n_cad_total"
+        ):
+            reasons.append(f"{context} has counts above n_cad_total")
+        if parsed["n_cad_external_only_bad"] > parsed["n_cad_external_bad"]:
+            reasons.append(f"{context} has impossible external-only count")
+        if parsed["n_cad_effective_bad"] != (
+            parsed["n_cad_internal_bad"] + parsed["n_cad_external_only_bad"]
+        ):
+            reasons.append(f"{context} has inconsistent effective-bad arithmetic")
+        return parsed
+
+    aggregate = parse_counts(
+        overlay.get("aggregate_counts"), context="fixed-injection aggregate quality"
+    )
+    per_shard = overlay.get("counts_by_shard")
+    shard_hashes = manifest.get("shard_sha256")
+    if not isinstance(per_shard, Mapping) or not isinstance(shard_hashes, Mapping):
+        reasons.append("fixed-injection per-shard quality counts are missing")
+        per_shard = {}
+        shard_hashes = {}
+    elif set(str(value) for value in per_shard) != set(
+        str(value) for value in shard_hashes
+    ):
+        reasons.append("fixed-injection per-shard quality keys disagree with shard hashes")
+    summed = {name: 0 for name in INJECTION_QUALITY_COUNT_NAMES}
+    summed_groups = 0
+    for shard_path, value in per_shard.items():
+        if not isinstance(value, Mapping):
+            reasons.append(f"fixed-injection shard quality {shard_path} is malformed")
+            continue
+        counts = parse_counts(
+            {name: value.get(name) for name in INJECTION_QUALITY_COUNT_NAMES},
+            context=f"fixed-injection shard quality {shard_path}",
+        )
+        try:
+            groups = int(value.get("n_groups_applied", -1))
+        except (TypeError, ValueError):
+            groups = -1
+        if groups < 0:
+            reasons.append(
+                f"fixed-injection shard quality {shard_path}.n_groups_applied is invalid"
+            )
+        else:
+            summed_groups += groups
+        if counts is not None:
+            for name in INJECTION_QUALITY_COUNT_NAMES:
+                summed[name] += counts[name]
+    try:
+        declared_groups = int(overlay.get("n_groups_applied", -1))
+        n_injections = int(manifest.get("n_injection_ids", -1))
+    except (TypeError, ValueError):
+        declared_groups = n_injections = -1
+    if declared_groups != n_injections or summed_groups != declared_groups:
+        reasons.append("fixed-injection quality overlay does not cover every injection")
+    if aggregate is not None and summed != aggregate:
+        reasons.append("fixed-injection aggregate/per-shard quality counts disagree")
+    return reasons
 
 
 def evaluate_fixed_injections(
@@ -1534,6 +2127,13 @@ def evaluate_fixed_injections(
         observed_contracts = [str(observed)] if observed else []
     observed_contracts = sorted(str(value) for value in observed_contracts)
     reasons: list[str] = []
+    reasons.extend(
+        _fixed_injection_quality_overlay_failures(
+            manifest,
+            sector=sector,
+            config=config,
+        )
+    )
     if missing:
         reasons.append(f"missing columns: {missing}")
     if observed_contracts != [expected_contract]:
@@ -1807,6 +2407,142 @@ def _wd_epoch_residual_minutes(t0_bjd: float) -> float:
     return float(abs((phase + 0.5) % 1.0 - 0.5) * WD1856_PERIOD_D * 1440.0)
 
 
+_INDEPENDENT_QUALITY_COUNT_KEYS = {
+    "n_cad_total",
+    "n_cad_internal_bad",
+    "n_cad_external_bad",
+    "n_cad_external_only_bad",
+    "n_cad_effective_bad",
+}
+
+
+def _validate_independent_quality_overlay(
+    manifest: Mapping[str, Any],
+    config: Tier1QAConfig,
+    *,
+    sector: int,
+) -> list[str]:
+    """Validate quality-mask provenance and arithmetic for WD 1856 evidence."""
+
+    reasons: list[str] = []
+    overlay = manifest.get("external_quality_overlay")
+    if not isinstance(overlay, Mapping):
+        return ["independent external-quality overlay is missing or malformed"]
+    exact_values = {
+        "policy_contract": EXTERNAL_QUALITY_POLICY_CONTRACT,
+        "effective_quality_policy": EFFECTIVE_QUALITY_POLICY,
+        "sector": int(sector),
+        "cadence_reference_contract_version": (
+            f"s{int(sector)}_a2v1_cadence_reference_v1"
+        ),
+        "cadence_reference_cadence_authority": "qlp_cam_quat",
+        "cadence_reference_quality_authority": "spoc_and_qlp_quality_flags",
+        "cadence_reference_table_sha256": (
+            config.expected_cadence_reference_sha256
+        ),
+        "cadence_reference_manifest_sha256": (
+            config.expected_cadence_reference_manifest_sha256
+        ),
+    }
+    for field, expected in exact_values.items():
+        if overlay.get(field) != expected:
+            reasons.append(
+                f"independent external-quality overlay has incompatible {field}"
+            )
+    source_digest = str(
+        overlay.get("cadence_reference_source_declaration_sha256", "")
+    )
+    if not re.fullmatch(r"[0-9a-f]{64}", source_digest):
+        reasons.append(
+            "independent external-quality source-declaration hash is invalid"
+        )
+    if overlay.get("applied_before_common_cadence_metrics") is not True:
+        reasons.append(
+            "independent external quality was not applied before cadence metrics"
+        )
+    cadence_policy = str(manifest.get("cadence_match_policy", "")).lower()
+    if not all(token in cadence_policy for token in ("effective", "internal", "external")):
+        reasons.append(
+            "independent cadence policy does not declare effective internal/external quality"
+        )
+
+    parsed: dict[str, dict[str, int]] = {}
+    count_fields = (
+        "current_compact_full_audit_counts",
+        "current_common_audit_counts",
+        "reference_common_audit_counts",
+    )
+    for field in count_fields:
+        raw_counts = overlay.get(field)
+        if not isinstance(raw_counts, Mapping) or set(raw_counts) != (
+            _INDEPENDENT_QUALITY_COUNT_KEYS
+        ):
+            reasons.append(f"independent quality audit {field} has wrong keys")
+            continue
+        counts: dict[str, int] = {}
+        valid = True
+        for name in _INDEPENDENT_QUALITY_COUNT_KEYS:
+            value = raw_counts.get(name)
+            if type(value) is not int or value < 0:
+                reasons.append(
+                    f"independent quality audit {field}.{name} is invalid"
+                )
+                valid = False
+            else:
+                counts[name] = int(value)
+        if not valid:
+            continue
+        total = counts["n_cad_total"]
+        bounded = all(
+            counts[name] <= total
+            for name in (
+                "n_cad_internal_bad",
+                "n_cad_external_bad",
+                "n_cad_external_only_bad",
+                "n_cad_effective_bad",
+            )
+        )
+        arithmetic = (
+            counts["n_cad_external_only_bad"]
+            <= counts["n_cad_external_bad"]
+            and counts["n_cad_effective_bad"]
+            == counts["n_cad_internal_bad"]
+            + counts["n_cad_external_only_bad"]
+        )
+        if not bounded or not arithmetic:
+            reasons.append(f"independent quality audit {field} is inconsistent")
+        parsed[field] = counts
+
+    try:
+        n_current = int(manifest.get("n_current_cadences", -1))
+        n_common = int(manifest.get("n_common_cadences", -1))
+    except (TypeError, ValueError):
+        n_current, n_common = -1, -1
+    full = parsed.get("current_compact_full_audit_counts")
+    current_common = parsed.get("current_common_audit_counts")
+    reference_common = parsed.get("reference_common_audit_counts")
+    if full is not None and full["n_cad_total"] != n_current:
+        reasons.append("independent full quality-audit cadence count is inconsistent")
+    for field, counts in (
+        ("current", current_common),
+        ("reference", reference_common),
+    ):
+        if counts is not None and counts["n_cad_total"] != n_common:
+            reasons.append(
+                f"independent {field} common quality-audit count is inconsistent"
+            )
+    if (
+        current_common is not None
+        and reference_common is not None
+        and current_common["n_cad_external_bad"]
+        != reference_common["n_cad_external_bad"]
+    ):
+        reasons.append(
+            "independent current/reference common external-quality counts disagree"
+        )
+    return reasons
+
+
 def evaluate_independent_extraction(
     metrics: pd.DataFrame,
     manifest: Mapping[str, Any],
@@ -1827,6 +2563,7 @@ def evaluate_independent_extraction(
         "sector",
         "tic",
         "independent",
+        "comparison_mode",
         "independence_basis",
         "current_extractor_family",
         "reference_extractor_family",
@@ -1840,6 +2577,8 @@ def evaluate_independent_extraction(
         "depth_definition",
         "ephemeris_recovery_definition",
         "current_apertures",
+        "reference_flux_columns",
+        "reference_columns",
         "reference_product_aperture",
         "reference_target_id",
         "current_compact_sha256",
@@ -1853,11 +2592,16 @@ def evaluate_independent_extraction(
         "max_time_delta_seconds_allowed",
         "metrics_file_sha256",
         "metrics_content_sha256",
+        "n_current_cadences",
+        "n_reference_cadences",
+        "n_common_cadences",
+        "external_quality_overlay",
     }
     required_metrics = {
         "tic",
         "sector",
         "aperture",
+        "reference_flux_column",
         "detector",
         "n_current_cadences",
         "n_reference_cadences",
@@ -1907,6 +2651,11 @@ def evaluate_independent_extraction(
         manifest_tic = -1
     if manifest_tic != WD1856_TIC:
         reasons.append("independent-extraction target is not WD 1856")
+    if str(manifest["comparison_mode"]) != config.independent_comparison_mode:
+        reasons.append("independent-extraction comparison mode mismatch")
+    reasons.extend(
+        _validate_independent_quality_overlay(manifest, config, sector=sector)
+    )
     if str(manifest["current_compact_sha256"]) != current_compact_sha256:
         reasons.append("independent evidence is not bound to the current compact product")
     if str(manifest["current_product_sha256"]) != current_compact_sha256:
@@ -1920,6 +2669,40 @@ def evaluate_independent_extraction(
         reasons.append("independent metrics content hash mismatch")
     if tuple(manifest["current_apertures"]) != tuple(config.apertures):
         reasons.append("independent comparison aperture set mismatch")
+    reference_flux_columns = manifest["reference_flux_columns"]
+    normalized_reference_flux_columns: dict[str, str] = {}
+    if not isinstance(reference_flux_columns, Mapping):
+        reasons.append("independent reference_flux_columns is not a mapping")
+    else:
+        normalized_reference_flux_columns = {
+            str(aperture): str(column).strip()
+            for aperture, column in reference_flux_columns.items()
+        }
+        if set(normalized_reference_flux_columns) != set(config.apertures):
+            reasons.append(
+                "independent reference flux mapping does not cover the locked "
+                "aperture set"
+            )
+        if any(not column for column in normalized_reference_flux_columns.values()):
+            reasons.append("independent reference flux mapping has an empty column")
+        if len(set(normalized_reference_flux_columns.values())) != len(
+            normalized_reference_flux_columns
+        ):
+            reasons.append(
+                "independent reference flux mapping reuses one external column"
+            )
+    reference_columns = manifest["reference_columns"]
+    if not isinstance(reference_columns, Mapping):
+        reasons.append("independent reference_columns is not a mapping")
+    else:
+        nested_mapping = reference_columns.get("flux_by_current_aperture")
+        if not isinstance(nested_mapping, Mapping) or {
+            str(key): str(value).strip() for key, value in nested_mapping.items()
+        } != normalized_reference_flux_columns:
+            reasons.append(
+                "independent reference column provenance disagrees with its "
+                "aperture mapping"
+            )
     for key in (
         "current_extractor_family",
         "reference_extractor_family",
@@ -2032,6 +2815,18 @@ def evaluate_independent_extraction(
     observed_apertures = set(work["aperture"].astype(str))
     if observed_apertures != set(config.apertures):
         reasons.append("independent metric rows do not cover the locked aperture set")
+    metric_apertures = work["aperture"].astype(str)
+    metric_reference_columns = work["reference_flux_column"].astype(str).str.strip()
+    expected_metric_reference_columns = metric_apertures.map(
+        normalized_reference_flux_columns
+    )
+    if (
+        expected_metric_reference_columns.isna().any()
+        or not metric_reference_columns.eq(expected_metric_reference_columns).all()
+    ):
+        reasons.append(
+            "independent metric aperture mapping disagrees with the manifest"
+        )
     tic_numeric = pd.to_numeric(work["tic"], errors="coerce")
     if not np.isfinite(tic_numeric).all() or (tic_numeric <= 0).any():
         reasons.append("independent metric TIC identifiers are invalid")
@@ -2069,7 +2864,11 @@ def evaluate_independent_extraction(
     )
     if not valid_counts.all():
         reasons.append("independent cadence counts are invalid")
-    work["common_fraction"] = common_n / np.minimum(current_n, reference_n).replace(0, np.nan)
+    work["current_common_fraction"] = common_n / current_n.replace(0, np.nan)
+    work["reference_common_fraction"] = common_n / reference_n.replace(0, np.nan)
+    work["common_fraction"] = work[
+        ["current_common_fraction", "reference_common_fraction"]
+    ].min(axis=1)
     current_scatter = pd.to_numeric(work["current_scatter_ppm"], errors="coerce")
     reference_scatter = pd.to_numeric(work["reference_scatter_ppm"], errors="coerce")
     valid_scatter = (
@@ -2129,7 +2928,11 @@ def evaluate_independent_extraction(
         )
         if not valid_bls.all():
             reasons.append("independent bounded-BLS diagnostics are invalid")
-        if not np.isfinite(max_time_delta_allowed) or max_time_delta_allowed <= 0:
+        if (
+            not np.isfinite(max_time_delta_allowed)
+            or max_time_delta_allowed <= 0
+            or max_time_delta_allowed > config.independent_max_time_delta_seconds
+        ):
             reasons.append("independent cadence-match tolerance is invalid")
         elif not valid_cadence_diagnostics.all():
             reasons.append("independent cadence-match diagnostics are invalid")
@@ -2140,6 +2943,8 @@ def evaluate_independent_extraction(
     n_detectors = int(detector.nunique())
     common_median = _quantile(work["common_fraction"], 0.5)
     common_min = _quantile(work["common_fraction"], 0.0)
+    current_common_min = _quantile(work["current_common_fraction"], 0.0)
+    reference_common_min = _quantile(work["reference_common_fraction"], 0.0)
     scatter_median = _quantile(work["abs_log_scatter_ratio"], 0.5)
     scatter_max = _quantile(work["abs_log_scatter_ratio"], 1.0)
     statuses = {
@@ -2153,11 +2958,6 @@ def evaluate_independent_extraction(
             common_min,
             config.independent_pass_common_fraction,
             config.independent_review_common_fraction,
-        ),
-        "scatter_ratio": _status_max(
-            scatter_max,
-            config.independent_pass_abs_log_scatter_ratio,
-            config.independent_review_abs_log_scatter_ratio,
         ),
     }
     for column in (
@@ -2194,13 +2994,6 @@ def evaluate_independent_extraction(
                 config.wd1856_pass_epoch_residual_min,
                 config.wd1856_review_epoch_residual_min,
             )
-            depth_status = _status_interval(
-                depth_ratio,
-                config.wd1856_pass_depth_ratio_low,
-                config.wd1856_pass_depth_ratio_high,
-                config.wd1856_review_depth_ratio_low,
-                config.wd1856_review_depth_ratio_high,
-            )
             period_status = _status_max(
                 period_error,
                 config.wd1856_pass_period_relative_error,
@@ -2212,7 +3005,7 @@ def evaluate_independent_extraction(
                 else "fail"
             )
             wd_status = _worst_status(
-                [timing_status, depth_status, period_status, physical_depth_status]
+                [timing_status, period_status, physical_depth_status]
             )
             aperture_statuses.append(wd_status)
             aperture_summaries.append(
@@ -2226,6 +3019,7 @@ def evaluate_independent_extraction(
                     "current_depth": current_depth,
                     "reference_depth": reference_depth,
                     "reference_to_current_depth_ratio": depth_ratio,
+                    "depth_ratio_is_diagnostic_only": True,
                 }
             )
         statuses["wd1856"] = _worst_status(aperture_statuses)
@@ -2241,8 +3035,16 @@ def evaluate_independent_extraction(
         "n_detectors": n_detectors,
         "common_cadence_fraction_median": common_median,
         "common_cadence_fraction_min": common_min,
+        "current_cadence_coverage_fraction_min": current_common_min,
+        "reference_cadence_coverage_fraction_min": reference_common_min,
         "abs_log_scatter_ratio_median": scatter_median,
         "abs_log_scatter_ratio_max": scatter_max,
+        "scatter_ratio_is_diagnostic_only": True,
+        "comparison_note": (
+            "Tier-1 gates on independent signal presence and ephemeris timing. "
+            "Depth and scatter ratios are diagnostic because aperture dilution "
+            "and decontamination differ between extraction families."
+        ),
         "component_status": statuses,
         "wd1856": wd_summary,
         "provenance": dict(manifest),
@@ -2254,6 +3056,7 @@ def evaluate_tier0_prerequisite(
     *,
     sector: int,
     config: Tier1QAConfig,
+    tier0_summary_sha256: str,
     current_compact_sha256: str | None = None,
 ) -> dict[str, Any]:
     current_compact_sha256 = (
@@ -2262,6 +3065,8 @@ def evaluate_tier0_prerequisite(
         else str(current_compact_sha256)
     )
     reasons: list[str] = []
+    if str(tier0_summary_sha256) != config.expected_tier0_summary_sha256:
+        reasons.append("Tier-0 summary is not pinned by the locked configuration")
     if int(summary.get("sector", -1)) != int(sector):
         reasons.append("Tier-0 sector mismatch")
     if summary.get("passed") is not True:
@@ -2270,6 +3075,28 @@ def evaluate_tier0_prerequisite(
         reasons.append("Tier-0 contract mismatch")
     if str(summary.get("qa_tier", "")) != "tier0_integrity_and_benchmark":
         reasons.append("Tier-0 report lacks the current tier label")
+    if summary.get("science_ready") is not False:
+        reasons.append("Tier-0 science_ready must be explicitly false")
+
+    gates = summary.get("gates")
+    if not isinstance(gates, Mapping):
+        reasons.append("Tier-0 report is missing its gate mapping")
+        gates = {}
+    observed_gate_names = set(gates)
+    expected_gate_names = set(TIER0_REQUIRED_GATES)
+    if observed_gate_names != expected_gate_names:
+        reasons.append("Tier-0 gate inventory does not match the current contract")
+    for gate_name in TIER0_REQUIRED_GATES:
+        gate = gates.get(gate_name)
+        if not isinstance(gate, Mapping):
+            reasons.append(f"Tier-0 gate {gate_name} is missing or malformed")
+        elif gate.get("passed") is not True:
+            reasons.append(f"Tier-0 gate {gate_name} did not pass")
+
+    benchmarks = summary.get("benchmarks")
+    wd1856 = benchmarks.get("wd1856") if isinstance(benchmarks, Mapping) else None
+    if not isinstance(wd1856, Mapping) or wd1856.get("passed") is not True:
+        reasons.append("Tier-0 WD 1856 benchmark did not pass")
     provenance = summary.get("provenance", {})
     if not isinstance(provenance, Mapping):
         provenance = {}
@@ -2281,14 +3108,21 @@ def evaluate_tier0_prerequisite(
         reasons.append("Tier-0 report is not bound to the locked compact product")
     if tuple(provenance.get("detrended_apertures", ())) != tuple(config.apertures):
         reasons.append("Tier-0 aperture scope mismatch")
-    if not str(provenance.get("schema_summary_sha256", "")):
-        reasons.append("Tier-0 schema evidence hash is missing")
+    schema_summary_sha256 = str(provenance.get("schema_summary_sha256", ""))
+    if not re.fullmatch(r"[0-9a-f]{64}", schema_summary_sha256):
+        reasons.append("Tier-0 schema evidence hash is invalid")
+    tier0_bls_peaks_sha256 = str(provenance.get("bls_peaks_sha256", ""))
+    if tier0_bls_peaks_sha256 != config.expected_tier0_bls_peaks_sha256:
+        reasons.append("Tier-0 BLS peak table is not pinned by the locked configuration")
     return {
         "status": "fail" if reasons else "pass",
         "reasons": reasons,
         "contract_version": summary.get("contract_version"),
         "sector": summary.get("sector"),
+        "tier0_summary_sha256": str(tier0_summary_sha256),
         "compact_lc_sha256": tier0_compact_sha256,
+        "bls_peaks_sha256": tier0_bls_peaks_sha256,
+        "required_gates": list(TIER0_REQUIRED_GATES),
     }
 
 
@@ -2297,6 +3131,7 @@ def evaluate_tier1_gates(
     sector: int,
     config: Tier1QAConfig,
     tier0_summary: Mapping[str, Any],
+    tier0_summary_sha256: str,
     target_metrics: pd.DataFrame,
     aperture_metrics: pd.DataFrame,
     pair_metrics: pd.DataFrame,
@@ -2337,6 +3172,7 @@ def evaluate_tier1_gates(
             tier0_summary,
             sector=sector,
             config=config,
+            tier0_summary_sha256=tier0_summary_sha256,
             current_compact_sha256=current_compact_sha256,
         ),
         "population_scatter": scatter_gate,
@@ -2381,6 +3217,368 @@ def evaluate_tier1_gates(
     }, magnitude_bins, targets_with_loss
 
 
+def build_target_eligibility(
+    targets: pd.DataFrame, config: Tier1QAConfig
+) -> pd.DataFrame:
+    """Build the compact sector-observation mask consumed downstream."""
+
+    required = {
+        "sector",
+        "tic",
+        "camera",
+        "ccd",
+        "detector",
+        "tmag",
+        "tier1_cadence_qa_status",
+        "tier1_scatter_qa_status",
+        "tier1_aperture_pair_qa_status",
+        "tier1_target_qa_status",
+        "tier1_target_qa_reasons",
+        "tier1_target_qa_pass",
+    }
+    missing = sorted(required - set(targets.columns))
+    if missing:
+        raise KeyError(f"target eligibility inputs are missing columns: {missing}")
+    if targets.duplicated(["sector", "tic"]).any():
+        raise ValueError("target eligibility requires unique (sector, TIC) rows")
+    observed_sectors = sorted(
+        set(pd.to_numeric(targets["sector"], errors="coerce").dropna().astype(int))
+    )
+    if observed_sectors != [config.sector]:
+        raise ValueError(f"target eligibility sector mismatch: {observed_sectors}")
+    reason_values = {
+        reason
+        for value in targets["tier1_target_qa_reasons"].fillna("").astype(str)
+        for reason in value.split(";")
+        if reason
+    }
+    unknown = sorted(reason_values - set(TIER1_TARGET_REASON_CODES))
+    if unknown:
+        raise ValueError(f"target eligibility has unknown reason codes: {unknown}")
+    status = targets["tier1_target_qa_status"].astype("string")
+    if status.isna().any() or not status.isin(STATUS_ORDER).all():
+        raise ValueError("target eligibility has invalid target QA status values")
+    pass_values = targets["tier1_target_qa_pass"]
+    if not pd.api.types.is_bool_dtype(pass_values.dtype) or pass_values.isna().any():
+        raise ValueError("target eligibility pass flags must be non-null booleans")
+    expected_pass = status.eq("pass")
+    if not pass_values.eq(expected_pass).all():
+        raise ValueError("target eligibility status and pass flag are inconsistent")
+
+    columns = [
+        "sector",
+        "tic",
+        "gaia_dr3_source_id",
+        "camera",
+        "ccd",
+        "detector",
+        "tmag",
+        "tier1_cadence_qa_status",
+        "tier1_scatter_qa_status",
+        "tier1_aperture_pair_qa_status",
+        "tier1_target_qa_status",
+        "tier1_target_qa_reasons",
+        "tier1_target_qa_pass",
+    ]
+    work = targets.copy()
+    if "gaia_dr3_source_id" not in work:
+        work["gaia_dr3_source_id"] = pd.NA
+    output = work.loc[:, columns].copy()
+    output.insert(0, "tier1_scope", config.scope)
+    output.insert(0, "tier1_config_name", config.name)
+    output.insert(0, "tier1_contract_version", config.contract_version)
+    output.insert(
+        3,
+        "sector_tic_key",
+        [
+            f"s{int(sector):04d}-tic{int(tic):016d}"
+            for sector, tic in zip(output["sector"], output["tic"], strict=True)
+        ],
+    )
+    output["tier1_target_qa_pass"] = expected_pass.astype(bool).to_numpy()
+    return output.sort_values(["sector", "tic"], kind="stable").reset_index(drop=True)
+
+
+def summarize_target_eligibility(eligibility: pd.DataFrame) -> pd.DataFrame:
+    """Summarize final target eligibility by detector for QA and plotting."""
+
+    required = {
+        "camera",
+        "ccd",
+        "detector",
+        "tier1_target_qa_status",
+        "tier1_target_qa_pass",
+    }
+    missing = sorted(required - set(eligibility.columns))
+    if missing:
+        raise KeyError(f"detector eligibility inputs are missing columns: {missing}")
+    rows: list[dict[str, Any]] = []
+    for (camera, ccd, detector), group in eligibility.groupby(
+        ["camera", "ccd", "detector"], sort=True
+    ):
+        status = group["tier1_target_qa_status"].astype(str)
+        n_targets = int(len(group))
+        n_pass = int(status.eq("pass").sum())
+        rows.append(
+            {
+                "camera": int(camera),
+                "ccd": int(ccd),
+                "detector": str(detector),
+                "n_targets": n_targets,
+                "n_pass": n_pass,
+                "n_review": int(status.eq("review").sum()),
+                "n_fail": int(status.eq("fail").sum()),
+                "pass_fraction": float(n_pass / n_targets) if n_targets else np.nan,
+            }
+        )
+    return pd.DataFrame(rows).sort_values(["camera", "ccd"], kind="stable").reset_index(
+        drop=True
+    )
+
+
+def _save_figure_atomic(figure: Any, path: Path, *, dpi: int | None = None) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    try:
+        figure.savefig(
+            temporary,
+            dpi=dpi,
+            bbox_inches="tight",
+            format=path.suffix.lstrip("."),
+        )
+        temporary.replace(path)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def plot_tier1_diagnostics(
+    *,
+    targets: pd.DataFrame,
+    aperture_metrics: pd.DataFrame,
+    pair_metrics: pd.DataFrame,
+    injection_metrics: pd.DataFrame,
+    config: Tier1QAConfig,
+    output_png: Path,
+    output_pdf: Path,
+) -> None:
+    """Render a compact four-panel diagnostic for the bounded Tier-1 gate."""
+
+    import matplotlib.pyplot as plt
+
+    from twirl.plotting.style import apply_twirl_style, get_ordered_palette
+
+    template = apply_twirl_style("full_page")
+    figure, axes = plt.subplots(
+        2,
+        2,
+        figsize=(template["figsize"][0], 5.4),
+        constrained_layout=True,
+    )
+    colors = get_ordered_palette(len(config.apertures), "viridis")
+    aperture_labels = {
+        ADP_ONLY_APERTURES[0]: "ADP small",
+        ADP_ONLY_APERTURES[1]: "ADP primary",
+    }
+    finite_tmag = pd.to_numeric(aperture_metrics["tmag"], errors="coerce")
+    finite_tmag = finite_tmag[np.isfinite(finite_tmag)]
+    x_min = float(finite_tmag.min()) if len(finite_tmag) else 15.0
+    x_max = float(finite_tmag.max()) if len(finite_tmag) else 21.0
+    envelope_tmag = np.linspace(x_min, x_max, 256)
+    envelope_scale = 10.0 ** (
+        config.scatter_envelope_dex_per_mag
+        * (envelope_tmag - config.scatter_envelope_reference_tmag)
+    )
+
+    for aperture, color in zip(config.apertures, colors, strict=True):
+        rows = aperture_metrics.loc[
+            aperture_metrics["aperture"].astype(str).eq(aperture)
+        ]
+        axes[0, 0].scatter(
+            rows["tmag"],
+            rows["mad_ppm"],
+            s=2.0,
+            alpha=0.22,
+            linewidths=0,
+            rasterized=True,
+            color=color,
+            label=aperture_labels.get(aperture, aperture),
+        )
+        axes[0, 1].scatter(
+            rows["tmag"],
+            rows["rms5_ppm"],
+            s=2.0,
+            alpha=0.22,
+            linewidths=0,
+            rasterized=True,
+            color=color,
+            label=aperture_labels.get(aperture, aperture),
+        )
+    axes[0, 0].plot(
+        envelope_tmag,
+        config.scatter_pass_mad_ppm_at_reference * envelope_scale,
+        color="0.15",
+        linewidth=0.9,
+        label="pass envelope",
+    )
+    axes[0, 0].plot(
+        envelope_tmag,
+        config.scatter_review_mad_ppm_at_reference * envelope_scale,
+        color="0.25",
+        linewidth=0.9,
+        linestyle="--",
+        label="review envelope",
+    )
+    axes[0, 1].plot(
+        envelope_tmag,
+        config.scatter_pass_rms5_ppm_at_reference * envelope_scale,
+        color="0.15",
+        linewidth=0.9,
+    )
+    axes[0, 1].plot(
+        envelope_tmag,
+        config.scatter_review_rms5_ppm_at_reference * envelope_scale,
+        color="0.25",
+        linewidth=0.9,
+        linestyle="--",
+    )
+    for axis, ylabel in zip(
+        axes[0], ("Robust MAD (ppm)", "5σ-clipped RMS (ppm)"), strict=True
+    ):
+        axis.set_yscale("log")
+        axis.set_xlabel("TESS magnitude")
+        axis.set_ylabel(ylabel)
+    axes[0, 0].legend(loc="best", frameon=True, ncol=2)
+
+    ratio = pd.to_numeric(pair_metrics["mad_ratio"], errors="coerce")
+    correlation = pd.to_numeric(pair_metrics["correlation"], errors="coerce")
+    pair_good = np.isfinite(ratio) & (ratio > 0) & np.isfinite(correlation)
+    axes[1, 0].scatter(
+        ratio[pair_good],
+        correlation[pair_good],
+        c=pd.to_numeric(pair_metrics.loc[pair_good, "tmag"], errors="coerce"),
+        cmap="viridis",
+        s=2.5,
+        alpha=0.3,
+        linewidths=0,
+        rasterized=True,
+    )
+    axes[1, 0].set_xscale("log")
+    for boundary in (
+        config.aperture_moderate_ratio_low,
+        config.aperture_moderate_ratio_high,
+    ):
+        axes[1, 0].axvline(boundary, color="0.35", linewidth=0.8, linestyle="--")
+    axes[1, 0].axhline(
+        config.aperture_pass_correlation_median, color="0.2", linewidth=0.8
+    )
+    axes[1, 0].axhline(
+        config.aperture_negative_correlation_threshold,
+        color="0.35",
+        linewidth=0.8,
+        linestyle="--",
+    )
+    axes[1, 0].set_xlabel("Primary/small MAD ratio")
+    axes[1, 0].set_ylabel("Aperture correlation")
+
+    injection = injection_metrics.copy()
+    if "status" in injection:
+        injection = injection.loc[injection["status"].astype(str).eq("ok")]
+    retention_underflow = 0
+    retention_overflow = 0
+    for aperture, color in zip(config.apertures, colors, strict=True):
+        values = pd.to_numeric(
+            injection.loc[
+                injection["aperture"].astype(str).eq(aperture),
+                "depth_retention_fraction",
+            ],
+            errors="coerce",
+        )
+        values = values[np.isfinite(values)]
+        if len(values):
+            retention_underflow += int((values < 0.0).sum())
+            retention_overflow += int((values > 2.0).sum())
+            axes[1, 1].hist(
+                np.clip(values, 0.0, 2.0),
+                bins=np.linspace(0.0, 2.0, 51),
+                histtype="step",
+                linewidth=1.0,
+                color=color,
+                label=aperture_labels.get(aperture, aperture),
+            )
+    axes[1, 1].axvline(1.0, color="0.15", linewidth=0.9)
+    for boundary in (config.injection_inband_low, config.injection_inband_high):
+        axes[1, 1].axvline(boundary, color="0.35", linewidth=0.8, linestyle="--")
+    axes[1, 1].set_xlim(0.0, 2.0)
+    axes[1, 1].set_xlabel("Injected-depth retention")
+    axes[1, 1].set_ylabel("Injection-aperture rows")
+    axes[1, 1].legend(loc="best", frameon=True)
+
+    status_counts = targets["tier1_target_qa_status"].astype(str).value_counts()
+    axes[1, 1].text(
+        0.98,
+        0.96,
+        "Targets: "
+        + ", ".join(
+            f"{name}={int(status_counts.get(name, 0))}"
+            for name in ("pass", "review", "fail")
+        ),
+        transform=axes[1, 1].transAxes,
+        ha="right",
+        va="top",
+        fontsize=template["annotation_size"],
+    )
+    axes[1, 1].text(
+        0.98,
+        0.86,
+        f"Clipped to edges: <0={retention_underflow}, >2={retention_overflow}",
+        transform=axes[1, 1].transAxes,
+        ha="right",
+        va="top",
+        fontsize=template["annotation_size"],
+    )
+    _save_figure_atomic(figure, output_png, dpi=220)
+    _save_figure_atomic(figure, output_pdf)
+    plt.close(figure)
+
+
+def plot_detector_eligibility(
+    detector_summary: pd.DataFrame, *, output_png: Path, output_pdf: Path
+) -> None:
+    """Render the 4x4 target-pass fraction map for one TESS sector."""
+
+    import matplotlib.pyplot as plt
+
+    from twirl.plotting.style import apply_twirl_style
+
+    template = apply_twirl_style("column")
+    values = np.full((4, 4), np.nan, dtype=float)
+    labels: dict[tuple[int, int], str] = {}
+    for row in detector_summary.itertuples(index=False):
+        camera = int(row.camera)
+        ccd = int(row.ccd)
+        values[camera - 1, ccd - 1] = float(row.pass_fraction)
+        labels[(camera - 1, ccd - 1)] = f"{int(row.n_pass)}/{int(row.n_targets)}"
+    colormap = plt.get_cmap("viridis").copy()
+    colormap.set_bad("0.9")
+    figure, axis = plt.subplots(figsize=(template["figsize"][0], 3.0))
+    image = axis.imshow(values, vmin=0.0, vmax=1.0, cmap=colormap, aspect="equal")
+    for (row, column), label in labels.items():
+        value = values[row, column]
+        text_color = "white" if np.isfinite(value) and value < 0.55 else "black"
+        axis.text(column, row, label, ha="center", va="center", color=text_color)
+    axis.set_xticks(np.arange(4), labels=["1", "2", "3", "4"])
+    axis.set_yticks(np.arange(4), labels=["1", "2", "3", "4"])
+    axis.set_xlabel("CCD")
+    axis.set_ylabel("Camera")
+    colorbar = figure.colorbar(image, ax=axis, pad=0.03, fraction=0.05)
+    colorbar.set_label("Tier-1 target pass fraction")
+    _save_figure_atomic(figure, output_png, dpi=220)
+    _save_figure_atomic(figure, output_pdf)
+    plt.close(figure)
+
+
 def _read_table(path: Path) -> pd.DataFrame:
     path = Path(path)
     if path.suffix.lower() == ".parquet":
@@ -2407,14 +3605,23 @@ def evaluate_cadence_reference_evidence(
 
     required = {
         "contract_version",
+        "builder_version",
         "sector",
         "cadence_authority",
         "quality_authority",
+        "quality_composition",
         "table_sha256",
+        "table_columns",
         "n_rows",
         "detectors",
         "orbits",
         "source_file_sha256",
+        "sources",
+        "n_spoc_authority_files_verified",
+        "n_qlp_qflag_files_verified",
+        "n_nonzero_spoc_quality",
+        "n_nonzero_qlp_quality",
+        "n_nonzero_external_quality",
     }
     reasons: list[str] = []
     missing = sorted(required - set(manifest))
@@ -2444,12 +3651,31 @@ def evaluate_cadence_reference_evidence(
         reasons.append("cadence-reference row-count mismatch")
     if str(manifest["cadence_authority"]) != "qlp_cam_quat":
         reasons.append("cadence reference is not sourced from QLP camera quaternion tables")
-    if str(manifest["quality_authority"]) != "spoc_quality_flags":
-        reasons.append("quality reference is not sourced from SPOC flags")
-    table_required = {"sector", "orbitid", "camera", "ccd", "cadenceno", "quality"}
-    missing_table = sorted(table_required - set(table.columns))
-    if missing_table:
-        reasons.append(f"cadence-reference table missing columns: {missing_table}")
+    if str(manifest["quality_authority"]) != "spoc_and_qlp_quality_flags":
+        reasons.append("quality reference is not sourced from SPOC and QLP flags")
+    expected_columns = (
+        "sector",
+        "orbitid",
+        "camera",
+        "ccd",
+        "cadenceno",
+        "spoc_quality",
+        "qlp_quality",
+        "external_quality",
+    )
+    expected_quality_composition = {
+        "external_quality": "spoc_quality | (qlp_quality << 30)",
+        "qlp_quality_raw_values": [0, 1],
+        "qlp_quality_external_bit": 30,
+    }
+    if manifest["quality_composition"] != expected_quality_composition:
+        reasons.append("cadence-reference quality composition mismatch")
+    if tuple(manifest["table_columns"]) != expected_columns:
+        reasons.append("cadence-reference manifest table columns mismatch")
+    if tuple(table.columns) != expected_columns:
+        reasons.append(
+            "cadence-reference table must contain the exact ordered v1 schema"
+        )
         observed_detectors: list[str] = []
         observed_orbits: list[int] = []
     else:
@@ -2462,6 +3688,41 @@ def evaluate_cadence_reference_evidence(
         observed_orbits = sorted(
             set(pd.to_numeric(table["orbitid"], errors="coerce").dropna().astype(int))
         )
+        spoc_quality = pd.to_numeric(table["spoc_quality"], errors="coerce")
+        qlp_quality = pd.to_numeric(table["qlp_quality"], errors="coerce")
+        external_quality = pd.to_numeric(table["external_quality"], errors="coerce")
+        spoc_values = spoc_quality.to_numpy(dtype=np.int64, na_value=-1)
+        qlp_values = qlp_quality.to_numpy(dtype=np.int64, na_value=-1)
+        external_values = external_quality.to_numpy(dtype=np.int64, na_value=-1)
+        valid_quality = bool(
+            np.isfinite(spoc_quality).all()
+            and np.isfinite(qlp_quality).all()
+            and np.isfinite(external_quality).all()
+            and (spoc_quality >= 0).all()
+            and qlp_quality.isin((0, 1)).all()
+            and np.array_equal(
+                external_values, spoc_values | (qlp_values << 30)
+            )
+        )
+        if not valid_quality:
+            reasons.append("cadence-reference external quality derivation is invalid")
+        count_fields = {
+            "n_nonzero_spoc_quality": "spoc_quality",
+            "n_nonzero_qlp_quality": "qlp_quality",
+            "n_nonzero_external_quality": "external_quality",
+        }
+        for manifest_field, column in count_fields.items():
+            observed_count = int(
+                np.count_nonzero(table[column].to_numpy(dtype=np.int64))
+            )
+            try:
+                declared_count = int(manifest[manifest_field])
+            except (TypeError, ValueError):
+                declared_count = -1
+            if declared_count != observed_count:
+                reasons.append(
+                    f"cadence-reference {manifest_field} disagrees with the table"
+                )
     if sorted(str(value) for value in manifest["detectors"]) != observed_detectors:
         reasons.append("cadence-reference detector list mismatch")
     try:
@@ -2470,6 +3731,16 @@ def evaluate_cadence_reference_evidence(
         manifest_orbits = []
     if manifest_orbits != observed_orbits:
         reasons.append("cadence-reference orbit list mismatch")
+    if int(sector) == 56:
+        expected_detectors = [
+            f"cam{camera}_ccd{ccd}"
+            for camera in range(1, 5)
+            for ccd in range(1, 5)
+        ]
+        if observed_detectors != expected_detectors:
+            reasons.append("S56 cadence reference does not cover all 16 detectors")
+        if observed_orbits != [119, 120]:
+            reasons.append("S56 cadence reference does not cover exactly orbits 119/120")
     source_hashes = manifest["source_file_sha256"]
     if (
         not isinstance(source_hashes, Mapping)
@@ -2481,6 +3752,38 @@ def evaluate_cadence_reference_evidence(
         )
     ):
         reasons.append("cadence-reference source-file hashes are missing or invalid")
+    sources = manifest["sources"]
+    if not isinstance(sources, list) or not sources:
+        reasons.append("cadence-reference source inventory is missing or invalid")
+    elif isinstance(source_hashes, Mapping):
+        source_inventory: dict[str, str] = {}
+        for source in sources:
+            if not isinstance(source, Mapping):
+                reasons.append("cadence-reference source inventory has a non-object")
+                continue
+            path = str(source.get("path", "")).strip()
+            digest = str(source.get("sha256", "")).lower()
+            if not path or path in source_inventory:
+                reasons.append(
+                    "cadence-reference source inventory has an empty/duplicate path"
+                )
+                continue
+            source_inventory[path] = digest
+        declared_sources = {
+            str(path): str(digest).lower()
+            for path, digest in source_hashes.items()
+        }
+        if source_inventory != declared_sources:
+            reasons.append(
+                "cadence-reference source inventory disagrees with source hashes"
+            )
+    try:
+        n_spoc_sources = int(manifest["n_spoc_authority_files_verified"])
+        n_qlp_sources = int(manifest["n_qlp_qflag_files_verified"])
+    except (TypeError, ValueError):
+        n_spoc_sources, n_qlp_sources = -1, -1
+    if sector == 56 and (n_spoc_sources != 16 or n_qlp_sources != 32):
+        reasons.append("S56 cadence reference lacks all 16 SPOC and 32 QLP inputs")
     return {
         "status": "fail" if reasons else "pass",
         "reasons": reasons,
@@ -2620,12 +3923,18 @@ def run_a2v1_tier1_qa(
 
     paths = {
         "target_metrics": out_dir / "target_metrics.parquet",
+        "target_eligibility": out_dir / "target_eligibility.csv",
         "aperture_metrics": out_dir / "aperture_metrics.parquet",
         "aperture_pair_metrics": out_dir / "aperture_pair_metrics.csv",
+        "detector_summary": out_dir / "detector_summary.csv",
         "magnitude_bins": out_dir / "magnitude_bins.csv",
         "injection_metrics": out_dir / "fixed_injection_metrics.csv",
         "injection_manifest": out_dir / "fixed_injection_manifest.json",
         "independent_metrics": out_dir / "independent_extraction_metrics.csv",
+        "qa_diagnostics_png": out_dir / "tier1_qa_diagnostics.png",
+        "qa_diagnostics_pdf": out_dir / "tier1_qa_diagnostics.pdf",
+        "detector_eligibility_png": out_dir / "tier1_detector_eligibility.png",
+        "detector_eligibility_pdf": out_dir / "tier1_detector_eligibility.pdf",
         "summary": out_dir / "summary.json",
     }
     input_paths = {
@@ -2650,7 +3959,9 @@ def run_a2v1_tier1_qa(
     if len(output_resolved) != len(output_resolved_list):
         raise ValueError("Tier-1 output paths collide with one another")
     temporary_resolved_list = [
-        path.with_suffix(path.suffix + ".tmp").resolve() for path in output_path_list
+        path.with_suffix(path.suffix + suffix).resolve()
+        for path in output_path_list
+        for suffix in (".tmp", ".publish.tmp")
     ]
     temporary_resolved = set(temporary_resolved_list)
     if (
@@ -2663,15 +3974,27 @@ def run_a2v1_tier1_qa(
     if collisions:
         raise ValueError(f"Tier-1 inputs and outputs collide: {collisions}")
 
-    # Direct shards are guarded inside their HDF5 summarizer and again before
-    # publication below. All other evidence is hashed before any long scan so
-    # a concurrent replacement cannot silently alter the evaluated contract.
+    # Hash every evidence input before any long scan. The same frozen mapping
+    # is used for validation and published provenance; live re-hashes are never
+    # substituted for the generation that was actually evaluated.
     guarded_input_paths = sorted(
-        input_paths - set(injection_shards), key=lambda path: str(path.resolve())
+        input_paths, key=lambda path: str(path.resolve())
     )
     initial_input_sha256 = {
         str(path.resolve()): file_sha256(path) for path in guarded_input_paths
     }
+
+    def initial_sha256(path: Path) -> str:
+        return initial_input_sha256[str(Path(path).resolve())]
+
+    def assert_inputs_unchanged() -> None:
+        final_input_sha256 = {
+            str(path.resolve()): file_sha256(path) for path in guarded_input_paths
+        }
+        if final_input_sha256 != initial_input_sha256:
+            raise ValueError(
+                "one or more Tier-1 evidence inputs changed during the audit"
+            )
 
     config = load_tier1_config(config_path)
     if int(sector) != config.sector:
@@ -2696,11 +4019,13 @@ def run_a2v1_tier1_qa(
             "compact product hash does not match the locked Tier-1 configuration: "
             f"{compact_sha256}"
         )
+    tier0_summary_sha256 = initial_input_sha256[str(tier0_summary_path.resolve())]
     tier0_summary = json.loads(tier0_summary_path.read_text())
     tier0_preflight = evaluate_tier0_prerequisite(
         tier0_summary,
         sector=sector,
         config=config,
+        tier0_summary_sha256=tier0_summary_sha256,
         current_compact_sha256=compact_sha256,
     )
     if tier0_preflight["status"] != "pass":
@@ -2733,6 +4058,19 @@ def run_a2v1_tier1_qa(
             "cadence-reference preflight failed before population scan: "
             + "; ".join(cadence_reference_gate["reasons"])
         )
+    # Use the central immutable reference loader as the final authority for all
+    # downstream masks, including the precomputed-injection branch.
+    load_external_quality_reference(
+        table_path=cadence_reference_path,
+        manifest_path=cadence_reference_manifest_path,
+        sector=sector,
+        expected_orbits=(119, 120) if int(sector) == 56 else None,
+        expected_detectors=(
+            tuple((camera, ccd) for camera in range(1, 5) for ccd in range(1, 5))
+            if int(sector) == 56
+            else None
+        ),
+    )
     if injection_metrics_path is not None:
         if injection_manifest_path is None:
             raise ValueError("precomputed injection metrics require an injection manifest")
@@ -2747,6 +4085,9 @@ def run_a2v1_tier1_qa(
             raise ValueError("provide injection metrics or at least one injection shard")
         injection_metrics, injection_manifest = summarize_fixed_injection_shards(
             injection_shards,
+            sector=sector,
+            cadence_reference_path=cadence_reference_path,
+            cadence_reference_manifest_path=cadence_reference_manifest_path,
             apertures=config.apertures,
         )
     independent_metrics = _read_table(independent_metrics_path)
@@ -2802,6 +4143,7 @@ def run_a2v1_tier1_qa(
         sector=sector,
         config=config,
         tier0_summary=tier0_summary,
+        tier0_summary_sha256=tier0_summary_sha256,
         target_metrics=target_metrics,
         aperture_metrics=aperture_metrics,
         pair_metrics=pair_metrics,
@@ -2814,30 +4156,54 @@ def run_a2v1_tier1_qa(
         cadence_reference_gate=cadence_reference_gate,
         injection_source_parity_gate=injection_source_parity_gate,
     )
+    target_eligibility = build_target_eligibility(targets_with_loss, config)
+    detector_summary = summarize_target_eligibility(target_eligibility)
+    evaluated["target_qa"].update(
+        {
+            "observation_key": ["sector", "tic"],
+            "reason_code_vocabulary": list(TIER1_TARGET_REASON_CODES),
+            "n_with_gaia_dr3_source_id": int(
+                target_eligibility["gaia_dr3_source_id"].notna().sum()
+            ),
+        }
+    )
 
-    final_input_sha256 = {
-        str(path.resolve()): file_sha256(path) for path in guarded_input_paths
-    }
-    if final_input_sha256 != initial_input_sha256:
-        raise ValueError("one or more Tier-1 evidence inputs changed during the audit")
+    assert_inputs_unchanged()
     if injection_shards:
         expected_direct_shard_hashes = {
             str(path): str(injection_manifest["shard_sha256"].get(str(path), ""))
             for path in injection_shards
         }
         observed_direct_shard_hashes = {
-            str(path): file_sha256(path) for path in injection_shards
+            str(path): initial_sha256(path) for path in injection_shards
         }
         if observed_direct_shard_hashes != expected_direct_shard_hashes:
             raise ValueError("one or more injection shards changed during the audit")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     _write_table_atomic(targets_with_loss, paths["target_metrics"])
+    _write_table_atomic(target_eligibility, paths["target_eligibility"])
     _write_table_atomic(aperture_metrics, paths["aperture_metrics"])
     _write_table_atomic(pair_metrics, paths["aperture_pair_metrics"])
+    _write_table_atomic(detector_summary, paths["detector_summary"])
     _write_table_atomic(magnitude_bins, paths["magnitude_bins"])
     _write_table_atomic(injection_metrics, paths["injection_metrics"])
     _write_table_atomic(independent_metrics, paths["independent_metrics"])
+    plot_tier1_diagnostics(
+        targets=targets_with_loss,
+        aperture_metrics=aperture_metrics,
+        pair_metrics=pair_metrics,
+        injection_metrics=injection_metrics,
+        config=config,
+        output_png=paths["qa_diagnostics_png"],
+        output_pdf=paths["qa_diagnostics_pdf"],
+    )
+    plot_detector_eligibility(
+        detector_summary,
+        output_png=paths["detector_eligibility_png"],
+        output_pdf=paths["detector_eligibility_pdf"],
+    )
+    assert_inputs_unchanged()
 
     # Publish the complete frozen-canary evidence, not merely a digest of a
     # mutable in-memory mapping.  Rebind the copied manifest to the exact CSV
@@ -2856,7 +4222,7 @@ def run_a2v1_tier1_qa(
                 str(injection_metrics_path) if injection_metrics_path else None
             ),
             "source_metrics_file_sha256": (
-                file_sha256(injection_metrics_path)
+                initial_sha256(injection_metrics_path)
                 if injection_metrics_path is not None
                 else None
             ),
@@ -2864,7 +4230,7 @@ def run_a2v1_tier1_qa(
                 str(injection_manifest_path) if injection_manifest_path else None
             ),
             "source_manifest_file_sha256": (
-                file_sha256(injection_manifest_path)
+                initial_sha256(injection_manifest_path)
                 if injection_manifest_path is not None
                 else None
             ),
@@ -2874,26 +4240,26 @@ def run_a2v1_tier1_qa(
 
     provenance = {
         "config": str(config_path),
-        "config_sha256": file_sha256(config_path),
+        "config_sha256": initial_sha256(config_path),
         "tier0_summary": str(tier0_summary_path),
-        "tier0_summary_sha256": file_sha256(tier0_summary_path),
+        "tier0_summary_sha256": tier0_summary_sha256,
         "compact_lc": str(compact_lc),
         "compact_lc_sha256": compact_sha256,
         "cadence_reference": str(cadence_reference_path),
-        "cadence_reference_sha256": file_sha256(cadence_reference_path),
+        "cadence_reference_sha256": initial_sha256(cadence_reference_path),
         "cadence_reference_manifest": str(cadence_reference_manifest_path),
-        "cadence_reference_manifest_sha256": file_sha256(
+        "cadence_reference_manifest_sha256": initial_sha256(
             cadence_reference_manifest_path
         ),
         "injection_source_parity": str(injection_source_parity_path),
-        "injection_source_parity_sha256": file_sha256(
+        "injection_source_parity_sha256": initial_sha256(
             injection_source_parity_path
         ),
         "injection_metrics_input": (
             str(injection_metrics_path) if injection_metrics_path else None
         ),
         "injection_metrics_input_sha256": (
-            file_sha256(injection_metrics_path)
+            initial_sha256(injection_metrics_path)
             if injection_metrics_path is not None
             else None
         ),
@@ -2901,7 +4267,7 @@ def run_a2v1_tier1_qa(
             str(injection_manifest_path) if injection_manifest_path else None
         ),
         "injection_manifest_input_sha256": (
-            file_sha256(injection_manifest_path)
+            initial_sha256(injection_manifest_path)
             if injection_manifest_path is not None
             else None
         ),
@@ -2940,16 +4306,37 @@ def run_a2v1_tier1_qa(
         "outputs": {name: str(path) for name, path in paths.items()}
         | {"gate_json": str(gate_json)},
     }
-    write_strict_json(paths["summary"], summary)
-    write_strict_json(gate_json, summary)
+    summary_text = (
+        json.dumps(_safe_json(summary), indent=2, sort_keys=True, allow_nan=False)
+        + "\n"
+    )
+    summary_temporary = paths["summary"].with_suffix(
+        paths["summary"].suffix + ".publish.tmp"
+    )
+    gate_temporary = gate_json.with_suffix(gate_json.suffix + ".publish.tmp")
+    try:
+        summary_temporary.write_text(summary_text)
+        gate_temporary.write_text(summary_text)
+        assert_inputs_unchanged()
+        summary_temporary.replace(paths["summary"])
+        gate_temporary.replace(gate_json)
+        assert_inputs_unchanged()
+    except Exception:
+        summary_temporary.unlink(missing_ok=True)
+        gate_temporary.unlink(missing_ok=True)
+        paths["summary"].unlink(missing_ok=True)
+        gate_json.unlink(missing_ok=True)
+        raise
     return _safe_json(summary)
 
 
 __all__ = [
     "TIER1_QA_CONTRACT_VERSION",
+    "TIER1_TARGET_REASON_CODES",
     "Tier1QAConfig",
     "attach_target_qa_flags",
     "audit_compact_population",
+    "build_target_eligibility",
     "evaluate_aperture_outliers",
     "evaluate_cadence_reference_evidence",
     "evaluate_cadence_quality",
@@ -2961,7 +4348,10 @@ __all__ = [
     "evaluate_tier1_gates",
     "injection_metadata_sha256",
     "load_tier1_config",
+    "plot_detector_eligibility",
+    "plot_tier1_diagnostics",
     "run_a2v1_tier1_qa",
+    "summarize_target_eligibility",
     "summarize_fixed_injection_shards",
     "write_strict_json",
 ]

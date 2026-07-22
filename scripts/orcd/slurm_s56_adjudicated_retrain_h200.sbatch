@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -p pg_mki_aryeh
-#SBATCH --job-name=twirl-harmonic-cnn-v1
+#SBATCH --job-name=twirl-teacher-v1-native-v2
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 48
@@ -16,8 +16,8 @@ REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56-torch/bin/python}"
 ROOT="${TWIRL_ADJUDICATION_ROOT:-reports/stage5_validation/s56_label_adjudication_real343}"
 TRAINING="${ROOT}/adjudicated_training_table/human_vetting_training_table_adjudicated.csv"
-NATIVE_H5="${TWIRL_HARMONIC_NATIVE_H5:-${ROOT}/native_inputs/s56_adp_raw_pair_v1.h5}"
-OUT="${ROOT}/retrained/s56_harmonic_cnn_v1"
+NATIVE_H5="${TWIRL_HARMONIC_NATIVE_H5:-${ROOT}/native_inputs/s56_adp_raw_pair_v2.h5}"
+OUT="${ROOT}/retrained/s56_harmonic_cnn_v1_native_v2"
 
 mkdir -p /orcd/data/mki_aryeh/001/twirl/logs "${OUT}"
 cd "${REPO}"
@@ -48,4 +48,4 @@ nvidia-smi
   --weight-decay 1e-4 \
   --patience 12
 
-echo "[harmonic-cnn-v1] complete $(date -Is): ${OUT}"
+echo "[harmonic-cnn-v1-native-v2] complete $(date -Is): ${OUT}"

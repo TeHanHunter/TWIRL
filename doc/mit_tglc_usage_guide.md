@@ -747,6 +747,14 @@ Output path convention:
 
 `hlsp.py` raises `ValueError` for `get_ticaflags(sector < 67)` because TICA quality headers didn't exist until Sector 67. For Sector 56, set `--flag-type spoc`. SPOC flags are read from `/pdo/qlp-data/spocflags/spocffiflag_s56_cam<c>_ccd<d>.txt`. Confirm these files exist before running HLSP generation on the Sector 56 benchmark.
 
+That combined-bit statement applies to the **legacy QLP HLSP writer**. The
+custom TWIRL-FS/A2v1 writer preserves the TGLC internal flag in `QUALITY` but
+does not itself merge the sector-level SPOC and QLP detector flags. Tier-1 and
+downstream enrichment therefore overlay the authoritative detector/cadence
+table and accept a cadence only when both the internal and external values are
+zero. Do not treat a custom A2v1 `QUALITY == 0` test by itself as the final
+search mask.
+
 ### Recovery rate surfaced by hlsp
 
 `generate_qlp_hlsp_fits_file` returns `False` and logs a warning for every TIC ID whose HDF5 file is missing. This makes HLSP production the natural place to measure the 3-level recovery rate:

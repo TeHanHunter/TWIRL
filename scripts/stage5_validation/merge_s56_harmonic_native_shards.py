@@ -17,6 +17,7 @@ from twirl.vetting.harmonic_export import (  # noqa: E402
 from twirl.vetting.harmonic_dataset import prepare_harmonic_training_rows  # noqa: E402
 from twirl.vetting.harmonic_inputs import (  # noqa: E402
     native_group_path,
+    verify_native_candidate_binding,
     verify_raw_pair_contract,
 )
 
@@ -26,12 +27,23 @@ def main() -> None:
     parser.add_argument("--shards", type=Path, nargs="+", required=True)
     parser.add_argument("--out-h5", type=Path, required=True)
     parser.add_argument("--training-table", type=Path, required=True)
+    parser.add_argument("--training-summary", type=Path)
     args = parser.parse_args()
     merge = merge_raw_pair_shards(shard_paths=args.shards, out_h5=args.out_h5)
-    verification = verify_raw_pair_contract(
-        args.out_h5,
-        require_errors=True,
-        require_periodograms=True,
+    verification = (
+        verify_native_candidate_binding(
+            args.out_h5,
+            candidate_table=args.training_table,
+            candidate_summary=args.training_summary,
+            require_periodograms=True,
+            expected_periodogram_n=4096,
+        )
+        if args.training_summary is not None
+        else verify_raw_pair_contract(
+            args.out_h5,
+            require_errors=True,
+            require_periodograms=True,
+        )
     )
     source_rows = read_candidate_table(args.training_table)
     if "native_input_include" in source_rows:

@@ -19,6 +19,7 @@ from twirl.vetting.harmonic_inference import (  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidates", type=Path, required=True)
+    parser.add_argument("--candidate-summary", type=Path, required=True)
     parser.add_argument("--native-h5", type=Path, required=True)
     parser.add_argument("--checkpoints", type=Path, nargs=5, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
@@ -29,6 +30,7 @@ def main() -> None:
     args = parser.parse_args()
     summary = score_harmonic_teacher_to_disk(
         candidates_path=args.candidates,
+        candidate_summary_path=args.candidate_summary,
         native_h5=args.native_h5,
         checkpoint_paths=args.checkpoints,
         out_dir=args.out_dir,

@@ -58,11 +58,31 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   authoritative cadence plus independent WD 1856 evidence. The production
   configuration remains intentionally non-runnable until the real external
   artifact hashes are reviewed; this scope cannot set `science_ready=true`.
+- `2026-07-22`: Hardened the bounded S56 Tier-1 path around one authoritative
+  cadence policy. The custom A2v1 compact product carries the internal TGLC
+  flag only; the WD 1856 audit found `5.4268%` internally flagged cadences and
+  another `4.2887%` flagged only by the external SPOC/QLP authorities. Tier-1,
+  BLS, candidate-metadata, and real/injected teacher-native builders and
+  validators now require the effective internal-OR-external mask and retain
+  the cadence-table/manifest checksums. Added builders for the 16-detector SPOC
+  intermediate and 32 orbit/detector QLP mappings, exact `(sector, TIC)` target
+  eligibility, pinned Tier-0/BLS prerequisites, and a genuinely independent
+  official TESSCut WD 1856 extraction. The downloaded S56 TESSCut product has
+  `11,775` rows and passed the standalone extraction smoke; production evidence
+  still requires the accepted compact product, authority files, reviewed
+  hashes, and a full CPU run. No Tier-1 pass or science-readiness claim has
+  been made. Because the effective mask changes native channels and BLS
+  periodograms, the S56 native-input contract is now v2; candidate artifacts
+  bind that v2 input while retaining a separately versioned provenance
+  envelope. The old native-v1 checkpoint is intentionally incompatible. Any
+  S56 path-validation retrain uses a distinct native-v2 namespace; the planned
+  seven-sector retrain first requires a new observation-keyed multi-sector
+  native contract and cannot simply reuse the S56-only file.
 
-**Next:** Run the gated S64-S69 source-only production queue while the
-authoritative S56 cadence artifact and independent WD 1856 comparison are
-completed; then rerun Tier 0 and publish the bounded Tier-1 target pass mask
-before enrichment uses S56.
+**Next:** Run the gated S64-S69 source-only production queue while the real S56
+cadence/TESSCut evidence is published; regenerate the quality-aware BLS table,
+rerun and pin Tier 0, then execute the bounded Tier-1 CPU gate before
+enrichment uses S56.
 
 ### Catalog, archive index, and sample control
 
@@ -161,9 +181,10 @@ sample.
   multi-sector aggregation remain unimplemented production gates.
 
 **Next:** Apply the Tier-1 target mask and complete the bounded S56 and active
-S60--S62 reviews. In parallel, assemble the per-sector native seven-fold inputs
-and one immutable TIC-grouped split registry. Freeze the seven-sector corpus,
-then retrain teacher v1 once with source-separated, calibrated evaluation and
+S60--S62 reviews. In parallel, design, implement, and validate an observation-
+keyed multi-sector native contract plus one immutable TIC-grouped split
+registry; only then assemble the seven-sector inputs. Freeze that corpus and
+retrain teacher v1 once with source-separated, calibrated evaluation and
 bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches only
 after this path is robust.
 
@@ -198,6 +219,11 @@ oracle-factor evaluation before any future model iteration.
 - Pixel/source-pickle injection smokes run through extraction, TWIRL-FS, and
   BLS, but no representative pixel-level calibration set or frozen
   extraction-to-candidate completeness surface exists.
+- `2026-07-22`: Bound the existing A2v1 candidate-retention recovery launcher
+  to the native-v2 selected-checkpoint manifest. Its scorer now rejects
+  mixed-generation candidate/native/checkpoint inputs, stages outputs
+  atomically, and records exact before/after hashes. This was infrastructure
+  hardening only; no new recovery or H200 job was launched.
 
 **Next:** Run candidate-retention recovery against the accepted A2v1 ADP pair
 and frozen Stage 2 contract, then build a pixel-level calibration subset

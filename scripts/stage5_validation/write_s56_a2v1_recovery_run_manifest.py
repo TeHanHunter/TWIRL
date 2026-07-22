@@ -70,6 +70,7 @@ def main() -> int:
         ),
     )
     parser.add_argument("--checkpoints", type=Path, nargs=5, required=True)
+    parser.add_argument("--checkpoint-manifest", type=Path, required=True)
     parser.add_argument("--out-json", type=Path, required=True)
     args = parser.parse_args()
 
@@ -123,6 +124,8 @@ def main() -> int:
         "checkpoint_sha256": {
             str(path.resolve()): _sha256(path) for path in args.checkpoints
         },
+        "checkpoint_manifest": str(args.checkpoint_manifest.resolve()),
+        "checkpoint_manifest_sha256": _sha256(args.checkpoint_manifest),
         "host_exclusion_and_selection": {
             key: schedule.get(key)
             for key in (

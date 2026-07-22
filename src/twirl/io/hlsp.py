@@ -125,9 +125,11 @@ def read_hlsp(
 def quality_mask(lc: HLSPLightCurve, aperture: str = "DET_FLUX") -> np.ndarray:
     """Boolean mask: QUALITY==0 AND finite flux for the named aperture.
 
-    QUALITY bit semantics (from `qlp.lctools.bin.hlsp:424`): SPOC bits 0..15,
-    TGLC bit 29, QLP bit 30. We require QUALITY==0 (any flagged cadence is
-    excluded), matching the convention in the Stage 1 QA scripts.
+    In legacy QLP HLSPs, QUALITY combines SPOC bits 0..15, TGLC bit 29, and
+    QLP bit 30. Custom TWIRL/A2v1 products preserve the internal TGLC value
+    only; Tier-1 search/model workflows must first apply the authoritative
+    SPOC+QLP detector/cadence overlay. This helper masks the value currently
+    attached to ``lc`` and cannot infer absent external flags.
     """
     if aperture not in lc.flux:
         return np.zeros(len(lc.time), dtype=bool)

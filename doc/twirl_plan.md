@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-21`.
+Last reconciled: `2026-07-22`.
 
 ## Current status
 
@@ -22,8 +22,18 @@ Last reconciled: `2026-07-21`.
 - S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
   recovery in both active ADP apertures. Tier 0 verifies product integrity and
   benchmark behavior; it is not the Tier-1 science QA needed for survey
-  release. The `s56_harmonic_cnn_v1` teacher remains the active-learning
-  baseline. Teacher v2 was completed as an exploratory comparison but missed
+  release. The bounded S56-only Tier-1 code path is implemented and fail-
+  closed around the authoritative external-quality overlay, exact target/BLS
+  provenance, fixed injections, and an independent TESSCut route. It has not
+  produced an accepted production report: the locked configuration still
+  contains deliberate zero/impossible evidence-hash placeholders. The
+  `s56_harmonic_cnn_v1` architecture and evaluation profile remain the
+  active-learning baseline. Its old native-v1 checkpoint is not reused with
+  the external-quality-aware S56 native-v2 tensors. Any S56 path-validation
+  retrain uses a distinct native-v2 cache/checkpoint namespace. The planned
+  seven-sector retrain first needs a new observation-keyed multi-sector input
+  contract rather than reusing that S56-only file. Teacher v2 was completed as
+  an exploratory comparison but missed
   its promotion gates, so it is not a production ranker or student-label
   generator. See [Stage 2 history](twirl_progress_log.md#stage-2).
 - LC-level injection/recovery, two-aperture vetting, and pixel-injection smokes
@@ -127,14 +137,19 @@ sector-specific production logic unless the sector is a documented exception.
   missing cadences, quality flags, aperture outliers, WD 1856 timing, a fixed
   injection-preservation test, and a genuinely independent extraction
   comparison. A Tier-0 pass alone does not promote a sector for science use.
+  The bounded ADP-pair scope can authorize enrichment only; release promotion
+  requires the future full six-channel scope.
 
 ## Stage 2: transparent search and candidate generation (...)
 
 ### Implemented
 
-- Per-sector multi-aperture BLS, retained peak tables, cross-aperture
-  consolidation, heuristic vetting, LEO comparison, centroid diagnostics,
-  human-review tooling, and an ADP-only S56 active-learning teacher.
+- A transparent per-sector multi-aperture BLS algorithmic baseline, retained
+  peak tables, cross-aperture consolidation, heuristic vetting, LEO
+  comparison, centroid diagnostics, human-review tooling, and an ADP-only S56
+  active-learning teacher. The generic baseline still uses the quality field
+  stored in the input product; only the separate S56 enrichment builder is
+  currently bound to the authoritative external-quality overlay.
 
 ### Current gate
 
@@ -181,7 +196,14 @@ search or a science-ready candidate catalog.
 
 ### Model gate
 
-- Use `s56_harmonic_cnn_v1` as the active-learning baseline only.
+- Use the `s56_harmonic_cnn_v1` architecture/evaluation profile as the
+  active-learning baseline only. Do not apply its native-v1 checkpoint to the
+  quality-aware S56 native-v2 inputs. Any immediate S56 retrain must use the
+  distinct native-v2 cache/checkpoint/sync namespace.
+- Before seven-sector training, implement per-sector quality references and an
+  observation-keyed `(sector, TIC)` native-input registry/contract. Repeated
+  TICs may contribute sector observations but may never collide in storage or
+  cross a TIC-grouped train/validation/test boundary.
 - Treat the small real training set as the limiting resource: improve the
   versioned data/label manifest, TIC-grouped splits, source-separated
   evaluation, probability calibration, and bootstrap uncertainty before
@@ -300,20 +322,28 @@ never a completeness measurement.
    preflight failure.
 2. Complete the bounded S56 `active_search_pair` Tier-1 evidence: build the
    authoritative cadence/quality reference, produce the genuinely independent
-   WD 1856 comparison, rerun the current Tier-0 report, and publish the target
-   QA pass mask. This scope may qualify enrichment but never science release.
+   WD 1856 comparison, regenerate quality-aware BLS peaks, rerun and pin the
+   current Tier-0 report, and publish the target QA pass mask. The code path is
+   implemented and fail-closed; real authority artifacts, reviewed hashes,
+   and the full CPU run remain. This scope may qualify enrichment but never
+   science release.
 3. Complete the bounded S56 review and Franklin's active S60--S62 review, then
    freeze one seven-sector morphology corpus. Keep sector observations and
    their raw label provenance, resolve same-sector duplicates by an explicit
    precedence rule, and enforce one immutable TIC-grouped split registry.
-4. Retrain and evaluate teacher v1 once on that frozen set with TIC-grouped,
+4. Design, implement, and validate the seven-sector observation-keyed native
+   input contract: per-sector cadence/quality references, `(sector, TIC)`
+   group identity, one immutable TIC-grouped split registry, and hash-bound
+   corpus/checkpoint provenance. The existing S56 native-v2 contract is not
+   this multi-sector contract.
+5. Retrain and evaluate teacher v1 once on that frozen set with TIC-grouped,
    source-separated, calibrated metrics and uncertainty intervals. Do not put
    teacher v2, student pseudo-labels, or another model family on this path.
-5. After the periodic/enrichment path is robust, add the dip branch,
+6. After the periodic/enrichment path is robust, add the dip branch,
    multi-sector merging, and branch-aware false-alarm calibration; then rerun
    frozen-chain candidate-retention and representative pixel-level recovery
    before survey-wide enrichment or science claims.
-6. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
+7. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
    sample criteria; characterize the `764` no-TIC-bridge WDs and the S94+ QLP
    boundary before the survey release is locked.
 

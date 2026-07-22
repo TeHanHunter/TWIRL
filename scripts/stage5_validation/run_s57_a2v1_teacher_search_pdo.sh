@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Resume S57 A2v1 validation, ADP-only BLS, and experimental teacher scoring.
+# Retired legacy S57 chain. The active teacher candidate-quality contract is
+# deliberately S56-only, so this wrapper must not launch partial production.
 set -euo pipefail
+
+echo "Blocked: the legacy S57 teacher chain is retired. The current candidate-quality and Tier-1 contracts support S56 only." >&2
+exit 64
 
 REPO="${TWIRL_PDO_TEACHER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 A2V1_ROOT="${TWIRL_A2V1_ROOT:-/pdo/users/tehan/tglc-gpu-production-A2v1}"
@@ -9,7 +13,7 @@ OBSERVATIONS="${TWIRL_OBSERVATIONS:-${PRODUCTION_REPO}/data_local/catalogs/twirl
 HLSP_ROOT="${A2V1_ROOT}/hlsp_s0057_A2v1"
 HLSP_LOG="${TWIRL_S57_HLSP_LOG:-${A2V1_ROOT}/twirl_logs/s57_a2v1_hlsp_r1.log}"
 SCHEMA_SUMMARY="${TWIRL_S57_SCHEMA_SUMMARY:-${A2V1_ROOT}/twirl_logs/s57_A2v1_validation_full_schema.json}"
-OUT_ROOT="${TWIRL_S57_TEACHER_ROOT:-/pdo/users/tehan/twirl_stage5/s57_A2v1_teacher_search_v1}"
+OUT_ROOT="${TWIRL_S57_TEACHER_ROOT:-/pdo/users/tehan/twirl_stage5/s57_A2v1_teacher_search_exploratory_v2}"
 CHAIN_LOG="${OUT_ROOT}/logs/s57_teacher_chain.log"
 BASE_PYTHON="${TWIRL_PDO_BASE_PYTHON:-/sw/qlp-environment/.venv/bin/python}"
 POLL_SECONDS="${TWIRL_S57_POLL_SECONDS:-60}"
@@ -86,11 +90,13 @@ run_teacher() {
   log "starting S57 compact export, ADP-only BLS, QA, and native input preparation"
   TWIRL_TEACHER_SECTOR=57 \
   TWIRL_PDO_TEACHER_REPO="${REPO}" \
+  TWIRL_TEACHER_SEARCH_ROOT="${OUT_ROOT}" \
   TWIRL_PDO_NATIVE_PARALLEL="${TWIRL_PDO_NATIVE_PARALLEL:-4}" \
     bash "${RUNNER}" prep
   log "starting S57 teacher-v1 experimental scoring"
   TWIRL_TEACHER_SECTOR=57 \
   TWIRL_PDO_TEACHER_REPO="${REPO}" \
+  TWIRL_TEACHER_SEARCH_ROOT="${OUT_ROOT}" \
     bash "${RUNNER}" score
   log "S57 experimental score table and one-row-per-TIC Planet ranking are complete"
 }
