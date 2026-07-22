@@ -98,8 +98,8 @@ def _write_tesscut(
     primary_raw = np.sum(
         cube[
             :,
-            size // 2 - 1 : size // 2 + 2,
-            size // 2 - 1 : size // 2 + 2,
+            size // 2 : size // 2 + 2,
+            size // 2 : size // 2 + 2,
         ],
         axis=(1, 2),
         dtype=np.float64,
@@ -236,7 +236,7 @@ def _build(tmp_path: Path, tesscut: Path, compact: Path, **options: object) -> d
     )
 
 
-def test_build_extracts_centered_apertures_and_detrends_independently(
+def test_build_extracts_wcs_apertures_and_detrends_independently(
     tmp_path: Path,
 ) -> None:
     tesscut, compact, raw, cadence = _inputs(tmp_path)
@@ -277,7 +277,9 @@ def test_build_extracts_centered_apertures_and_detrends_independently(
         )
         assert hdul[0].header["FILLUSE"] is False
         assert hdul[0].header["APERSML"] == "1x1 central pixel"
-        assert hdul[0].header["APERBIG"] == "3x3 centered sum"
+        assert hdul[0].header["APERBIG"] == "2x2 WCS-bracketing sum"
+        assert hdul[0].header["BIGX0"] == 2
+        assert hdul[0].header["BIGY0"] == 2
         table = hdul["LIGHTCURVE"].data
         assert list(table.names) == manifest["output"]["columns"]
         np.testing.assert_array_equal(table["TICID"], WD1856_TIC)
@@ -293,6 +295,14 @@ def test_build_extracts_centered_apertures_and_detrends_independently(
         )
 
     assert manifest["builder_version"] == BUILDER_VERSION
+    assert manifest["extraction"]["primary_aperture_zero_based"] == {
+        "selection_rule": (
+            "lower indices are floor of the fractional target WCS coordinate; "
+            "upper indices are lower + 1"
+        ),
+        "x_indices": [2, 3],
+        "y_indices": [2, 3],
+    }
     assert manifest["tesscut_source"]["procver"] == ["test-astrocut-1.0"]
     assert manifest["compact_cadence_authority"]["datasets_read"] == [
         "time",

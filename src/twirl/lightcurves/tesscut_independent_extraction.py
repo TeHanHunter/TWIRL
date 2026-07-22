@@ -38,7 +38,7 @@ WD1856_TESSCUT_DEC_DEG = 53.509024
 DEFAULT_POSITION_TOLERANCE_ARCSEC = 1.0
 DEFAULT_MAX_TIME_DELTA_SECONDS = 60.0
 DEFAULT_ROLLING_WINDOW_CADENCES = 433
-BUILDER_VERSION = "wd1856_s56_tesscut_independent_extraction_v2"
+BUILDER_VERSION = "wd1856_s56_tesscut_independent_extraction_v3"
 MASKED_TREND_FILL_POLICY = (
     "linear interpolation by row index between supported rolling medians, "
     "with nearest-supported edge carry; permitted only where effective quality != 0"
@@ -280,9 +280,25 @@ def _read_tesscut(path: Path, *, tolerance_arcsec: float) -> dict[str, Any]:
         pixel_x_float, pixel_y_float = target_pixel[0]
         pixel_x = int(np.rint(pixel_x_float))
         pixel_y = int(np.rint(pixel_y_float))
-        if not (1 <= pixel_x < nx - 1 and 1 <= pixel_y < ny - 1):
+        if not (0 <= pixel_x < nx and 0 <= pixel_y < ny):
             raise ValueError(
-                "the WCS-nearest WD 1856 pixel cannot support a centered 3x3 aperture"
+                "the WCS-nearest WD 1856 pixel lies outside the TESSCut image"
+            )
+        bracket_x = (
+            float(pixel_x)
+            if np.isclose(pixel_x_float, pixel_x, rtol=0.0, atol=1.0e-9)
+            else float(pixel_x_float)
+        )
+        bracket_y = (
+            float(pixel_y)
+            if np.isclose(pixel_y_float, pixel_y, rtol=0.0, atol=1.0e-9)
+            else float(pixel_y_float)
+        )
+        primary_x0 = int(np.floor(bracket_x))
+        primary_y0 = int(np.floor(bracket_y))
+        if not (0 <= primary_x0 < nx - 1 and 0 <= primary_y0 < ny - 1):
+            raise ValueError(
+                "the WD 1856 position cannot support a WCS-bracketing 2x2 aperture"
             )
         center_world = np.asarray(
             wcs.all_pix2world([[float(pixel_x), float(pixel_y)]], 0), dtype=float
@@ -298,7 +314,11 @@ def _read_tesscut(path: Path, *, tolerance_arcsec: float) -> dict[str, Any]:
 
         small_raw = flux[:, pixel_y, pixel_x]
         primary_raw = np.sum(
-            flux[:, pixel_y - 1 : pixel_y + 2, pixel_x - 1 : pixel_x + 2],
+            flux[
+                :,
+                primary_y0 : primary_y0 + 2,
+                primary_x0 : primary_x0 + 2,
+            ],
             axis=(1, 2),
             dtype=np.float64,
         )
@@ -312,6 +332,8 @@ def _read_tesscut(path: Path, *, tolerance_arcsec: float) -> dict[str, Any]:
             "shape": (int(ny), int(nx)),
             "pixel_x": pixel_x,
             "pixel_y": pixel_y,
+            "primary_x0": primary_x0,
+            "primary_y0": primary_y0,
             "pixel_x_float": float(pixel_x_float),
             "pixel_y_float": float(pixel_y_float),
             "center_separation_arcsec": center_separation,
@@ -569,6 +591,8 @@ def _build_output_hdul(
     position_tolerance_arcsec: float,
     pixel_x: int,
     pixel_y: int,
+    primary_x0: int,
+    primary_y0: int,
     created_utc: str,
 ) -> Any:
     from astropy.io import fits
@@ -600,8 +624,10 @@ def _build_output_hdul(
         "POSTOL": (position_tolerance_arcsec, "target-position tolerance, arcsec"),
         "CENTX": (pixel_x, "zero-based central aperture x pixel"),
         "CENTY": (pixel_y, "zero-based central aperture y pixel"),
+        "BIGX0": (primary_x0, "zero-based 2x2 lower x index"),
+        "BIGY0": (primary_y0, "zero-based 2x2 lower y index"),
         "APERSML": ("1x1 central pixel", "small reference aperture"),
-        "APERBIG": ("3x3 centered sum", "primary reference aperture"),
+        "APERBIG": ("2x2 WCS-bracketing sum", "primary reference aperture"),
         "FLUXSRC": ("TESSCut FLUX pixels", "photometric pixel authority"),
         "DETREND": ("centered quality-zero rolling median division", "method"),
         "CURFLUX": (False, "compact/TGLC flux was not read or used"),
@@ -854,6 +880,8 @@ def build_wd1856_tesscut_independent_extraction(
             position_tolerance_arcsec=float(position_tolerance_arcsec),
             pixel_x=tesscut["pixel_x"],
             pixel_y=tesscut["pixel_y"],
+            primary_x0=tesscut["primary_x0"],
+            primary_y0=tesscut["primary_y0"],
             created_utc=created_utc,
         )
         try:
@@ -927,7 +955,23 @@ def build_wd1856_tesscut_independent_extraction(
                 },
                 "apertures": {
                     "TESSCUT_FLUX_SML": "single WCS-nearest central pixel",
-                    "TESSCUT_FLUX": "centered 3x3 sum",
+                    "TESSCUT_FLUX": (
+                        "WCS-defined 2x2 sum bracketing the target position"
+                    ),
+                },
+                "primary_aperture_zero_based": {
+                    "selection_rule": (
+                        "lower indices are floor of the fractional target WCS "
+                        "coordinate; upper indices are lower + 1"
+                    ),
+                    "x_indices": [
+                        tesscut["primary_x0"],
+                        tesscut["primary_x0"] + 1,
+                    ],
+                    "y_indices": [
+                        tesscut["primary_y0"],
+                        tesscut["primary_y0"] + 1,
+                    ],
                 },
                 "detrending": {
                     "method": "centered rolling median division",
