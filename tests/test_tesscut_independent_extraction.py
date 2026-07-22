@@ -340,7 +340,7 @@ def test_build_extracts_wcs_apertures_and_detrends_independently(
         "median": float(np.median(expected_small_trend)),
         "max": float(np.max(expected_small_trend)),
     }
-    assert manifest["diagnostics"]["trend_3x3"] == {
+    assert manifest["diagnostics"]["trend_2x2"] == {
         "min": float(np.min(expected_primary_trend)),
         "median": float(np.median(expected_primary_trend)),
         "max": float(np.max(expected_primary_trend)),

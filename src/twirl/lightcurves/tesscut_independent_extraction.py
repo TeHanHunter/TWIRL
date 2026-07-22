@@ -38,7 +38,7 @@ WD1856_TESSCUT_DEC_DEG = 53.509024
 DEFAULT_POSITION_TOLERANCE_ARCSEC = 1.0
 DEFAULT_MAX_TIME_DELTA_SECONDS = 60.0
 DEFAULT_ROLLING_WINDOW_CADENCES = 433
-BUILDER_VERSION = "wd1856_s56_tesscut_independent_extraction_v3"
+BUILDER_VERSION = "wd1856_s56_tesscut_independent_extraction_v4"
 MASKED_TREND_FILL_POLICY = (
     "linear interpolation by row index between supported rolling medians, "
     "with nearest-supported edge carry; permitted only where effective quality != 0"
@@ -1001,11 +1001,11 @@ def build_wd1856_tesscut_independent_extraction(
                     "max": float(np.max(delta)),
                 },
                 "raw_1x1": _float_summary(tesscut["small_raw"]),
-                "raw_3x3": _float_summary(tesscut["primary_raw"]),
+                "raw_2x2": _float_summary(tesscut["primary_raw"]),
                 "trend_1x1": _float_summary(small_trend),
-                "trend_3x3": _float_summary(primary_trend),
+                "trend_2x2": _float_summary(primary_trend),
                 "detrended_1x1": _float_summary(small_flux),
-                "detrended_3x3": _float_summary(primary_flux),
+                "detrended_2x2": _float_summary(primary_flux),
             },
             "output": {
                 "path": str(output_fits),
