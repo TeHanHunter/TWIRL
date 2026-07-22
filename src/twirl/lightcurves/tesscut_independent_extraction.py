@@ -38,7 +38,12 @@ WD1856_TESSCUT_DEC_DEG = 53.509024
 DEFAULT_POSITION_TOLERANCE_ARCSEC = 1.0
 DEFAULT_MAX_TIME_DELTA_SECONDS = 60.0
 DEFAULT_ROLLING_WINDOW_CADENCES = 433
-BUILDER_VERSION = "wd1856_s56_tesscut_independent_extraction_v1"
+BUILDER_VERSION = "wd1856_s56_tesscut_independent_extraction_v2"
+MASKED_TREND_FILL_POLICY = (
+    "linear interpolation by row index between supported rolling medians, "
+    "with nearest-supported edge carry; permitted only where effective quality != 0"
+)
+MASKED_TREND_FILL_HEADER = "linear row interpolation; quality-masked only"
 CADENCE_MAP_HASH_ALGORITHM = (
     "sha256(contract UTF-8 + row-count <u8 + TESSCut TIME <f8 + "
     "compact TIME <f8 + CADENCENO <i8)"
@@ -455,10 +460,10 @@ def _cadence_map_sha256(
     return digest.hexdigest()
 
 
-def centered_rolling_median_detrend(
+def _centered_rolling_median_detrend_with_diagnostics(
     flux: np.ndarray, quality: np.ndarray, *, window_cadences: int
-) -> tuple[np.ndarray, np.ndarray, int]:
-    """Divide by a centered quality-zero rolling-median trend."""
+) -> tuple[np.ndarray, np.ndarray, int, int]:
+    """Detrend and report the count of quality-masked trend fills."""
 
     if (
         isinstance(window_cadences, bool)
@@ -485,15 +490,52 @@ def centered_rolling_median_detrend(
         .median()
         .to_numpy(dtype=np.float64)
     )
-    if not np.isfinite(trend).all():
+    unsupported = ~np.isfinite(trend)
+    unsupported_on_usable = unsupported & (flags == 0)
+    if unsupported_on_usable.any():
         raise ValueError(
-            "quality-zero rolling median is undefined for one or more cadences"
+            "quality-zero rolling median is undefined at one or more "
+            "quality-zero cadences"
         )
+    n_masked_trend_filled = int(np.count_nonzero(unsupported))
+    if n_masked_trend_filled:
+        supported_index = np.flatnonzero(~unsupported)
+        if not len(supported_index):
+            raise ValueError("quality-zero rolling median has no supported cadences")
+        unsupported_index = np.flatnonzero(unsupported)
+        trend = trend.copy()
+        trend[unsupported_index] = np.interp(
+            unsupported_index,
+            supported_index,
+            trend[supported_index],
+        )
+    if not np.isfinite(trend).all():
+        raise RuntimeError("masked-cadence rolling-median interpolation failed")
     if (trend <= 0).any():
         raise ValueError("quality-zero rolling-median trend must remain positive")
     detrended = values / trend
     if not np.isfinite(detrended).all():
         raise ValueError("rolling-median detrending produced nonfinite flux")
+    return detrended, trend, minimum_periods, n_masked_trend_filled
+
+
+def centered_rolling_median_detrend(
+    flux: np.ndarray, quality: np.ndarray, *, window_cadences: int
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """Divide by a centered quality-zero rolling-median trend.
+
+    Undefined trend samples may be interpolated only where the effective
+    quality is nonzero.  The public three-value return contract is preserved;
+    product builders use the internal diagnostic helper to record fill counts.
+    """
+
+    detrended, trend, minimum_periods, _ = (
+        _centered_rolling_median_detrend_with_diagnostics(
+            flux,
+            quality,
+            window_cadences=window_cadences,
+        )
+    )
     return detrended, trend, minimum_periods
 
 
@@ -522,6 +564,7 @@ def _build_output_hdul(
     source_url: str,
     rolling_window_cadences: int,
     rolling_min_periods: int,
+    rolling_masked_fill_count: int,
     max_time_delta_seconds: float,
     position_tolerance_arcsec: float,
     pixel_x: int,
@@ -550,6 +593,9 @@ def _build_output_hdul(
         "SRCURL": (source_url, "official MAST TESSCut source URL"),
         "ROLLWIN": (rolling_window_cadences, "centered rolling-median window"),
         "ROLLMIN": (rolling_min_periods, "minimum quality-zero baseline rows"),
+        "ROLLFILL": (rolling_masked_fill_count, "quality-masked trend fills"),
+        "ROLLPOL": MASKED_TREND_FILL_HEADER,
+        "FILLUSE": (False, "filled trend rows are not science-eligible"),
         "MAXDTS": (max_time_delta_seconds, "allowed map mismatch, seconds"),
         "POSTOL": (position_tolerance_arcsec, "target-position tolerance, arcsec"),
         "CENTX": (pixel_x, "zero-based central aperture x pixel"),
@@ -755,20 +801,30 @@ def build_wd1856_tesscut_independent_extraction(
         context="WD 1856 mapped TESSCut reference",
     )
     effective_tesscut_quality = tesscut_overlay.quality
-    small_flux, small_trend, rolling_min_periods = centered_rolling_median_detrend(
+    (
+        small_flux,
+        small_trend,
+        rolling_min_periods,
+        small_masked_trend_fill_count,
+    ) = _centered_rolling_median_detrend_with_diagnostics(
         tesscut["small_raw"],
         effective_tesscut_quality,
         window_cadences=int(rolling_window_cadences),
     )
-    primary_flux, primary_trend, primary_min_periods = (
-        centered_rolling_median_detrend(
-            tesscut["primary_raw"],
-            effective_tesscut_quality,
-            window_cadences=int(rolling_window_cadences),
-        )
+    (
+        primary_flux,
+        primary_trend,
+        primary_min_periods,
+        primary_masked_trend_fill_count,
+    ) = _centered_rolling_median_detrend_with_diagnostics(
+        tesscut["primary_raw"],
+        effective_tesscut_quality,
+        window_cadences=int(rolling_window_cadences),
     )
     if primary_min_periods != rolling_min_periods:
         raise RuntimeError("aperture detrending used inconsistent baseline minima")
+    if primary_masked_trend_fill_count != small_masked_trend_fill_count:
+        raise RuntimeError("aperture detrending used inconsistent masked trend fills")
 
     _assert_sources_unchanged(states)
     quality_reference.assert_unchanged()
@@ -793,6 +849,7 @@ def build_wd1856_tesscut_independent_extraction(
             source_url=source_url,
             rolling_window_cadences=int(rolling_window_cadences),
             rolling_min_periods=rolling_min_periods,
+            rolling_masked_fill_count=small_masked_trend_fill_count,
             max_time_delta_seconds=float(max_time_delta_seconds),
             position_tolerance_arcsec=float(position_tolerance_arcsec),
             pixel_x=tesscut["pixel_x"],
@@ -881,6 +938,9 @@ def build_wd1856_tesscut_independent_extraction(
                     "window_cadences": int(rolling_window_cadences),
                     "minimum_baseline_cadences": rolling_min_periods,
                     "edge_policy": "centered partial windows with the same minimum",
+                    "masked_unsupported_trend_policy": MASKED_TREND_FILL_POLICY,
+                    "n_masked_trend_filled": small_masked_trend_fill_count,
+                    "filled_samples_science_eligible": False,
                 },
             },
             "diagnostics": {

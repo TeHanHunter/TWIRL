@@ -271,6 +271,11 @@ def test_build_extracts_centered_apertures_and_detrends_independently(
         ]["policy_contract"]
         assert hdul[0].header["SRCURL"] == SOURCE_URL
         assert hdul[0].header["ROLLWIN"] == 5
+        assert hdul[0].header["ROLLFILL"] == 0
+        assert hdul[0].header["ROLLPOL"] == (
+            "linear row interpolation; quality-masked only"
+        )
+        assert hdul[0].header["FILLUSE"] is False
         assert hdul[0].header["APERSML"] == "1x1 central pixel"
         assert hdul[0].header["APERBIG"] == "3x3 centered sum"
         table = hdul["LIGHTCURVE"].data
@@ -312,6 +317,14 @@ def test_build_extracts_centered_apertures_and_detrends_independently(
     }
     assert overlay["tesscut_mapped_audit_counts"]["n_cad_effective_bad"] == 3
     assert manifest["extraction"]["detrending"]["minimum_baseline_cadences"] == minimum
+    assert manifest["extraction"]["detrending"]["n_masked_trend_filled"] == 0
+    assert (
+        manifest["extraction"]["detrending"]["filled_samples_science_eligible"]
+        is False
+    )
+    assert "permitted only where effective quality != 0" in manifest["extraction"][
+        "detrending"
+    ]["masked_unsupported_trend_policy"]
     assert manifest["diagnostics"]["trend_1x1"] == {
         "min": float(np.min(expected_small_trend)),
         "median": float(np.median(expected_small_trend)),
@@ -322,6 +335,75 @@ def test_build_extracts_centered_apertures_and_detrends_independently(
         "median": float(np.median(expected_primary_trend)),
         "max": float(np.max(expected_primary_trend)),
     }
+
+
+def test_detrending_fills_only_unsupported_quality_masked_cadences() -> None:
+    values = np.arange(21, dtype=float) + 10.0
+    quality = np.zeros(21, dtype=np.int32)
+    quality[6:15] = 1
+
+    detrended, trend, minimum, n_filled = (
+        tesscut_module._centered_rolling_median_detrend_with_diagnostics(
+            values,
+            quality,
+            window_cadences=9,
+        )
+    )
+    raw_trend = (
+        pd.Series(np.where(quality == 0, values, np.nan))
+        .rolling(9, center=True, min_periods=minimum)
+        .median()
+        .to_numpy()
+    )
+    unsupported = ~np.isfinite(raw_trend)
+    expected = raw_trend.copy()
+    expected[unsupported] = np.interp(
+        np.flatnonzero(unsupported),
+        np.flatnonzero(~unsupported),
+        raw_trend[~unsupported],
+    )
+
+    assert minimum == 3
+    assert n_filled == 5
+    assert np.all(quality[unsupported] != 0)
+    np.testing.assert_allclose(trend, expected)
+    np.testing.assert_allclose(detrended, values / expected)
+
+    quality[10] = 0
+    with pytest.raises(ValueError, match="undefined.*quality-zero cadences"):
+        centered_rolling_median_detrend(values, quality, window_cadences=9)
+
+
+def test_builder_records_nonzero_masked_trend_fill_provenance(tmp_path: Path) -> None:
+    tesscut, compact, _, _ = _inputs(tmp_path, n_rows=21)
+    table_path = tmp_path / "cadence_reference.csv"
+    manifest_path = tmp_path / "cadence_reference.json"
+    frame = pd.read_csv(table_path)
+    frame.loc[6:14, "spoc_quality"] = 16
+    frame["external_quality"] = frame["spoc_quality"].to_numpy(dtype=np.int64) | (
+        frame["qlp_quality"].to_numpy(dtype=np.int64) << 30
+    )
+    frame.to_csv(table_path, index=False)
+    cadence_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    cadence_manifest["table_sha256"] = file_sha256(table_path)
+    cadence_manifest["n_nonzero_spoc_quality"] = int(
+        np.count_nonzero(frame["spoc_quality"])
+    )
+    cadence_manifest["n_nonzero_external_quality"] = int(
+        np.count_nonzero(frame["external_quality"])
+    )
+    manifest_path.write_text(json.dumps(cadence_manifest), encoding="utf-8")
+
+    manifest = _build(tmp_path, tesscut, compact)
+    n_filled = manifest["extraction"]["detrending"]["n_masked_trend_filled"]
+
+    assert n_filled > 0
+    with fits.open(tmp_path / "reference.fits", memmap=False, checksum=True) as hdul:
+        assert hdul[0].header["ROLLFILL"] == n_filled
+        assert hdul[0].header["ROLLPOL"] == (
+            "linear row interpolation; quality-masked only"
+        )
+        assert hdul[0].header["FILLUSE"] is False
 
 
 def test_output_and_sidecar_are_hash_bound_and_overwrite_is_explicit(
