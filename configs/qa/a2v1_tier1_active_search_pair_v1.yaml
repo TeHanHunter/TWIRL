@@ -1,5 +1,5 @@
 name: a2v1_tier1_active_search_pair_v1
-contract_version: a2v1_tier1_science_qa_v3
+contract_version: a2v1_tier1_science_qa_v4
 sector: 56
 scope: active_search_pair
 promotion_enabled: false

@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import fields
 from typing import Any, Mapping
+
+from twirl.search.bls import BLSConfig
 
 
 A2V1_TEACHER_BLS_SEARCH_CONTRACT = "s56_a2v1_teacher_bls_search_v1"
@@ -31,6 +34,28 @@ def approved_a2v1_teacher_bls_config() -> dict[str, Any]:
     }
 
 
+def approved_a2v1_teacher_bls_runtime_config() -> BLSConfig:
+    """Return the runtime config represented by the locked JSON contract."""
+
+    payload = approved_a2v1_teacher_bls_config()
+    metadata_fields = {"source_product_tag"}
+    runtime_fields = {field.name for field in fields(BLSConfig)}
+    observed_runtime_fields = set(payload) - metadata_fields
+    if observed_runtime_fields != runtime_fields:
+        missing = sorted(runtime_fields - observed_runtime_fields)
+        unexpected = sorted(observed_runtime_fields - runtime_fields)
+        raise RuntimeError(
+            "locked A2v1 BLS JSON/runtime fields disagree: "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    runtime_payload = {
+        key: value for key, value in payload.items() if key in runtime_fields
+    }
+    for key in ("apertures", "durations_min", "period_bin_edges"):
+        runtime_payload[key] = tuple(runtime_payload[key])
+    return BLSConfig(**runtime_payload)
+
+
 def bls_config_sha256(config: Mapping[str, Any]) -> str:
     """Fingerprint a JSON-native BLS configuration without path dependence."""
 
@@ -44,5 +69,6 @@ __all__ = [
     "A2V1_TEACHER_BLS_SEARCH_CONTRACT",
     "A2V1_TEACHER_MIN_CADENCES",
     "approved_a2v1_teacher_bls_config",
+    "approved_a2v1_teacher_bls_runtime_config",
     "bls_config_sha256",
 ]

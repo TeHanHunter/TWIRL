@@ -25,11 +25,13 @@ Last reconciled: `2026-07-23`.
   release. The bounded S56-only Tier-1 code path is implemented and fail-
   closed around the authoritative external-quality overlay, exact target/BLS
   provenance, fixed injections, and an independent TESSCut route. The exact
-  `31,450`-target v2 audit is complete but returns `review`, not an accepted
-  enrichment pass: seven gates pass, while cam1/ccd1 misses the predeclared
-  detector median-usable-cadence pass line (`0.743` versus `0.80`). Its target
-  mask contains `30,115` pass, `1,303` review, and `32` fail rows but remains
-  unauthorized until an explicit no-threshold-relaxation remediation passes.
+  `31,450`-target v2 audit exposed that a detector-level usable-fraction review
+  would veto otherwise searchable data: cam1/ccd1 retains thousands of usable
+  cadences per target despite a `0.743` median. Tier-1 therefore now treats
+  population, flag-fraction, scatter, and aperture-disagreement reviews as
+  sensitivity warnings. The v4 paired-input mask uses the exact shared BLS
+  preparation and excludes only structurally unsearchable inputs; its final
+  checksum-locked ORCD rerun is pending.
   The `s56_harmonic_cnn_v1` architecture and evaluation profile remain the
   active-learning baseline. Its old native-v1 checkpoint is not reused with
   the external-quality-aware S56 native-v2 tensors. Any S56 path-validation
@@ -119,8 +121,8 @@ The operational contract is defined in the
   ADP/ADP015 FITS writer, compact export, and edge-aware validator.
 - S56--S63 are complete through required HDF5/FITS validation. S56 also
   passes the replacement quality-aware Tier-0 integrity/benchmark QA. Its
-  full-population bounded Tier-1 enrichment gate is review pending one
-  detector-scoped remediation.
+  full-population bounded Tier-1 enrichment gate is being rerun under the
+  conservative exact-BLS paired-input contract.
 
 ### Current gate
 
@@ -190,8 +192,9 @@ review. Retrain teacher v1 once after that return is frozen rather than fitting
 an interim four-sector model.
 
 The immediate parallel work is to harden the existing S56 periodic/enrichment
-path, not to add search branches. Resolve the current cam1/ccd1 Tier-1 review
-without relaxing its threshold, then require a passed target mask. Freeze a
+path, not to add search branches. Complete the exact-BLS Tier-1 rerun, then
+require its paired-input mask for teacher construction while retaining
+single-aperture-searchable cases for separate review. Freeze a
 candidate-level aperture rule that keeps the small ADP aperture as the search
 channel and primary ADP aperture as contamination evidence unless injection
 and real-data tests justify a change, complete the bounded S56 review, and
@@ -349,11 +352,11 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Resolve the bounded S56 `active_search_pair` Tier-1 review without relaxing
-   thresholds. Prefer a predeclared enrichment-only cam1/ccd1 exclusion,
-   rerun the exact checksum-locked gate on the remaining 15 cells, and publish
-   the target QA mask only if that scope passes. Preserve cam1/ccd1 in the
-   archive and statistical parent sample for later quality-mask calibration.
+1. Complete the checksum-locked S56 `active_search_pair` Tier-1 v4 rerun on
+   all 16 detector cells. Publish the paired-teacher mask only if the exact BLS
+   input predicate passes; do not veto detectors or targets from flagged
+   fraction alone. Preserve one-channel-searchable cases for manual or
+   single-aperture review and never use missing-channel cases as negatives.
 2. Complete the bounded S56 review and Franklin's active S60--S62 review, then
    freeze the seven-sector S56--S62 observation-level morphology corpus.
    Preserve raw label provenance and cross-sector differences, and resolve

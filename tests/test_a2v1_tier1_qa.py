@@ -11,6 +11,7 @@ import pytest
 
 import twirl.lightcurves.a2v1_tier1_qa as tier1_qa
 from twirl.injections.a2v1_recovery import epoch_quality_provenance
+from twirl.io.hlsp import HLSPLightCurve
 from twirl.lightcurves.a2v1_cadence_reference import (
     AUTHORITY_EXCLUSION_EXTERNAL_BIT,
     AUTHORITY_EXCLUSION_POLICY,
@@ -50,6 +51,7 @@ from twirl.lightcurves.external_quality import (
     EXTERNAL_QUALITY_POLICY_CONTRACT,
     load_external_quality_reference,
 )
+from twirl.search.bls import BLSConfig, run_bls_on_lc
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
 
@@ -722,6 +724,104 @@ def test_flagged_fraction_is_diagnostic_until_bls_cadence_floor(tmp_path) -> Non
     assert flagged["tier1_target_searchability_reasons"].eq(
         "too_few_effective_cadences"
     ).all()
+
+
+def test_tier1_searchability_uses_exact_bls_finite_quality_mask(tmp_path) -> None:
+    compact = tmp_path / "exact_bls_mask.h5"
+    _write_compact(compact, n_targets=1, n_cadences=500)
+    with h5py.File(compact, "r+") as handle:
+        group = next(iter(handle["targets"].values()))
+        quality = np.zeros(500, dtype=np.int32)
+        quality[:300] = 1
+        group["quality"][:] = quality
+        for aperture in ADP_ONLY_APERTURES:
+            flux = np.asarray(group[aperture])
+            flux[:300] = 0.0
+            group[aperture][:] = flux
+
+    targets, apertures, _ = audit_compact_population(
+        compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=_cadence_reference(n_cadences=500),
+    )
+    _, eligible = evaluate_cadence_quality(targets, apertures, Tier1QAConfig())
+    assert eligible["n_finite_quality0_min"].eq(200).all()
+    assert eligible["bls_input_statuses"].eq("").all()
+    assert eligible["tier1_target_searchable"].all()
+
+    with h5py.File(compact, "r") as handle:
+        group = next(iter(handle["targets"].values()))
+        lc = HLSPLightCurve(
+            tic=int(group.attrs["tic"]),
+            tmag=float(group.attrs["tessmag"]),
+            sector=56,
+            cam=int(group.attrs["camera"]),
+            ccd=int(group.attrs["ccd"]),
+            ra=np.nan,
+            dec=np.nan,
+            time=np.asarray(group["time"]),
+            cadenceno=np.asarray(group["cadenceno"]),
+            orbitid=np.asarray(group["orbitid"]),
+            quality=np.asarray(group["quality"]),
+            flux={
+                aperture: np.asarray(group[aperture])
+                for aperture in ADP_ONLY_APERTURES
+            },
+            path=compact,
+        )
+    result = run_bls_on_lc(
+        lc,
+        BLSConfig(n_periods=100, n_peaks=1),
+        aperture=ADP_ONLY_APERTURES[0],
+    )
+    assert result.status == "ok"
+    assert result.n_cad_quality == 200
+
+    with h5py.File(compact, "r+") as handle:
+        group = next(iter(handle["targets"].values()))
+        group[ADP_ONLY_APERTURES[0]][:] = np.nan
+    targets, apertures, _ = audit_compact_population(
+        compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=_cadence_reference(n_cadences=500),
+    )
+    _, single_aperture = evaluate_cadence_quality(
+        targets, apertures, Tier1QAConfig()
+    )
+    assert single_aperture["n_bls_input_valid_apertures"].eq(1).all()
+    assert single_aperture["searchable_apertures"].eq(
+        ADP_ONLY_APERTURES[1]
+    ).all()
+    assert single_aperture["tier1_any_aperture_searchable"].all()
+    assert not single_aperture["tier1_target_searchable"].any()
+    assert not single_aperture["tier1_paired_teacher_eligible"].any()
+
+    with h5py.File(compact, "r+") as handle:
+        group = next(iter(handle["targets"].values()))
+        group["time"][:] = np.nan
+    targets, apertures, _ = audit_compact_population(
+        compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=_cadence_reference(n_cadences=500),
+    )
+    _, ineligible = evaluate_cadence_quality(
+        targets, apertures, Tier1QAConfig()
+    )
+    assert ineligible["n_finite_quality0_min"].eq(0).all()
+    assert not ineligible["tier1_any_aperture_searchable"].any()
+    assert not ineligible["tier1_target_searchable"].any()
+    assert ineligible["tier1_target_searchability_reasons"].eq(
+        "too_few_effective_cadences"
+    ).all()
+
+    lc.time[:] = np.nan
+    result = run_bls_on_lc(
+        lc,
+        BLSConfig(n_periods=100, n_peaks=1),
+        aperture=ADP_ONLY_APERTURES[0],
+    )
+    assert result.status == "too_few_cadences"
+    assert result.n_cad_quality == 0
 
 
 def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> None:

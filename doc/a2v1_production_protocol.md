@@ -270,13 +270,22 @@ gates remain blocking; any `fail` remains blocking.
 The Tier-1 target table is a downstream data contract. Candidate generation,
 enrichment review, and teacher-set assembly must join it by exact
 `(sector, TIC)` and retain only `tier1_target_searchable == True`. Searchability
-is intentionally a minimal catastrophic-data check: both active apertures must
-have at least the locked BLS minimum of `200` effective-good finite cadences,
-and cadence/aperture structure must be valid. Target `review` rows remain
-searchable. Flagged-cadence fraction, scatter, and aperture disagreement remain
-diagnostics and model/vetting features; they are not automatic target or
-detector exclusions. The published summary includes the complete
-fixed-injection manifest and hashes all input and output evidence.
+is intentionally a minimal catastrophic-data check for the current paired
+teacher contract: both active apertures must pass the exact locked BLS input
+preparation, including the shared effective-quality/finite-time/finite-flux
+mask, the `200`-cadence floor, finite nonzero normalization, conditional
+upper-tail clipping, and a nondegenerate post-cleaning baseline. Cadence
+structure must also be valid. Target `review` rows remain searchable.
+Flagged-cadence fraction, scatter, and aperture disagreement remain diagnostics
+and model/vetting features; they are not automatic target or detector
+exclusions.
+
+The table separately records whether at least one active aperture is searchable
+and which apertures survive. A target with one missing active channel is
+ineligible for the current two-channel teacher but remains available for
+single-aperture search or manual review; it is never converted into a negative
+label. The published summary includes the complete fixed-injection manifest
+and hashes all input and output evidence.
 
 Custom TWIRL/A2v1 FITS and compact products preserve the TGLC internal quality
 flag; they do **not** already contain the sector-level SPOC and QLP flags that

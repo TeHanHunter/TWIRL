@@ -10,8 +10,10 @@ The evidence contract is fail-closed: missing or stale evidence is a failure,
 not a warning.  Population ``review`` findings remain visible but do not block
 bounded enrichment.  Target inclusion is deliberately narrower than the
 diagnostic QA status: a target is searchable when both active apertures satisfy
-the locked BLS minimum and its cadence structure is internally valid.  An
-``active_search_pair`` evaluation can never set ``science_ready``.
+the exact locked BLS input preparation and its cadence structure is internally
+valid.  One-aperture-searchable targets remain identified separately for
+manual or single-channel review.  An ``active_search_pair`` evaluation can
+never set ``science_ready``.
 """
 from __future__ import annotations
 
@@ -53,11 +55,16 @@ from twirl.lightcurves.external_quality import (
     EXTERNAL_QUALITY_POLICY_CONTRACT,
     load_external_quality_reference,
 )
-from twirl.search.a2v1_bls_contract import A2V1_TEACHER_MIN_CADENCES
+from twirl.search.a2v1_bls_contract import (
+    A2V1_TEACHER_MIN_CADENCES,
+    approved_a2v1_teacher_bls_runtime_config,
+)
+from twirl.search.bls import prepare_bls_inputs_from_arrays
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
 
-TIER1_QA_CONTRACT_VERSION = "a2v1_tier1_science_qa_v3"
+TIER1_QA_CONTRACT_VERSION = "a2v1_tier1_science_qa_v4"
+LOCKED_BLS_CONFIG = approved_a2v1_teacher_bls_runtime_config()
 TIER1_SCOPES = ("active_search_pair", "full_a2v1_product")
 STATUS_ORDER = {"pass": 0, "review": 1, "fail": 2}
 TIER1_NONBLOCKING_REVIEW_GATES = (
@@ -92,6 +99,8 @@ TIER1_TARGET_REASON_CODES = (
 TIER1_SEARCHABILITY_REASON_CODES = (
     "aperture_missing",
     "cadence_structure_invalid",
+    "search_baseline_invalid",
+    "search_normalization_invalid",
     "too_few_effective_cadences",
 )
 INJECTION_QUALITY_COUNT_NAMES = (
@@ -254,7 +263,7 @@ class Tier1QAConfig:
         if self.contract_version != TIER1_QA_CONTRACT_VERSION:
             raise ValueError("unsupported Tier-1 contract_version")
         if self.sector != 56:
-            raise ValueError("the locked Tier-1 v2 configuration is S56-specific")
+            raise ValueError("the locked Tier-1 configuration is S56-specific")
         if self.scope not in TIER1_SCOPES:
             raise ValueError(f"unsupported Tier-1 scope: {self.scope}")
         if not self.apertures or len(set(self.apertures)) != len(self.apertures):
@@ -268,10 +277,10 @@ class Tier1QAConfig:
             raise ValueError("active_search_pair must use the two locked ADP apertures")
         if self.promotion_enabled:
             raise ValueError(
-                "promotion is disabled in Tier-1 v2 until the six-channel evaluator is implemented"
+                "promotion is disabled until the six-channel Tier-1 evaluator is implemented"
             )
         if self.sample_size != 0:
-            raise ValueError("Tier-1 v2 requires a full-population scan (sample_size=0)")
+            raise ValueError("Tier-1 requires a full-population scan (sample_size=0)")
         if min(
             self.min_population_targets,
             self.min_targets_per_magnitude_bin,
@@ -353,7 +362,7 @@ class Tier1QAConfig:
         ):
             raise ValueError("invalid absolute RMS envelope")
         if self.injection_selection_mode != "full_shard":
-            raise ValueError("Tier-1 v2 requires complete, predeclared injection shards")
+            raise ValueError("Tier-1 requires complete, predeclared injection shards")
         if (
             not self.injection_required_shard_indices
             or len(set(self.injection_required_shard_indices))
@@ -392,7 +401,7 @@ class Tier1QAConfig:
             raise ValueError("independent-extraction coverage counts must be positive")
         if self.independent_comparison_mode != "signal_timing_only":
             raise ValueError(
-                "Tier-1 v2 requires independent_comparison_mode="
+                "Tier-1 requires independent_comparison_mode="
                 "'signal_timing_only'"
             )
         if not 0 < self.independent_max_time_delta_seconds <= 60.0:
@@ -569,15 +578,20 @@ def _clipped_rms(values: np.ndarray, sigma: float = 5.0, iterations: int = 2) ->
     return float(np.sqrt(np.mean((array - center) ** 2)))
 
 
-def _normalized(values: np.ndarray) -> np.ndarray:
+def _normalized(values: np.ndarray, mask: np.ndarray) -> np.ndarray:
     array = np.asarray(values, dtype=float)
-    finite = array[np.isfinite(array)]
+    selected = np.asarray(mask, dtype=bool)
+    if array.shape != selected.shape:
+        raise ValueError("normalization values and mask must have identical shapes")
+    finite = array[selected & np.isfinite(array)]
     if not finite.size:
         return np.full(array.shape, np.nan)
     median = float(np.median(finite))
-    if not np.isfinite(median) or abs(median) < 1.0e-12:
+    if not np.isfinite(median) or median == 0.0:
         return np.full(array.shape, np.nan)
-    return array / median
+    normalized = np.full(array.shape, np.nan)
+    normalized[selected] = array[selected] / median
+    return normalized
 
 
 def _correlation(left: np.ndarray, right: np.ndarray) -> float:
@@ -850,14 +864,17 @@ def audit_compact_population(
         for record in sample.itertuples(index=False):
             group_path = f"targets/{int(record.tic):016d}"
             group = h5[group_path]
-            required = ("quality", "orbitid", "cadenceno", *apertures)
+            required = ("time", "quality", "orbitid", "cadenceno", *apertures)
             missing = [name for name in required if name not in group]
             if missing:
                 raise KeyError(f"TIC {record.tic} missing Tier-1 datasets: {missing}")
             quality = np.asarray(group["quality"], dtype=np.int64)
+            time = np.asarray(group["time"], dtype=float)
             cadence = np.asarray(group["cadenceno"], dtype=np.int64)
-            if len(cadence) != len(quality):
-                raise ValueError(f"TIC {record.tic}: cadence/quality length mismatch")
+            if not (len(time) == len(cadence) == len(quality)):
+                raise ValueError(
+                    f"TIC {record.tic}: time/cadence/quality length mismatch"
+                )
             internal_q0 = quality == 0
             orbitid = np.asarray(group["orbitid"], dtype=np.int64)
             if len(orbitid) != len(cadence):
@@ -912,6 +929,7 @@ def audit_compact_population(
             external_known = external_quality >= 0
             external_q0 = external_quality == 0
             q0 = internal_q0 & external_q0
+            effective_quality = np.logical_not(q0).astype(np.int8)
             quality_mask_disagreements = int(
                 np.count_nonzero(external_known & (internal_q0 != external_q0))
             )
@@ -1015,9 +1033,24 @@ def audit_compact_population(
             per_aperture: dict[str, dict[str, Any]] = {}
             for aperture in apertures:
                 flux = np.asarray(group[aperture], dtype=float)
-                norm = _normalized(flux)
+                if len(flux) != len(time):
+                    raise ValueError(
+                        f"TIC {record.tic}: time/{aperture} length mismatch"
+                    )
+                prepared = prepare_bls_inputs_from_arrays(
+                    time=time,
+                    flux=flux,
+                    quality=effective_quality,
+                    orbitid=orbitid,
+                    cfg=LOCKED_BLS_CONFIG,
+                )
+                good = prepared.initial_mask
+                n_good = prepared.n_cad_quality
+                search_flux_median = prepared.flux_median
+                search_baseline_d = prepared.baseline_d
+                bls_input_status = prepared.status
+                norm = _normalized(flux, good)
                 normalized[aperture] = norm
-                good = q0 & np.isfinite(norm)
                 row = {
                     "tic": int(record.tic),
                     "sector": int(record.sector),
@@ -1027,12 +1060,16 @@ def audit_compact_population(
                     "tmag": float(record.tmag),
                     "aperture": str(aperture),
                     "n_quality0": int(np.count_nonzero(q0)),
-                    "n_finite_quality0": int(np.count_nonzero(good)),
+                    "n_finite_quality0": n_good,
                     "finite_quality0_fraction": (
-                        float(np.count_nonzero(good) / np.count_nonzero(q0))
+                        float(n_good / np.count_nonzero(q0))
                         if np.count_nonzero(q0)
                         else np.nan
                     ),
+                    "search_flux_median": search_flux_median,
+                    "search_baseline_d": search_baseline_d,
+                    "bls_input_status": bls_input_status,
+                    "bls_input_valid": bls_input_status == "ok",
                     "mad_ppm": _robust_mad(norm[good]) * 1.0e6,
                     "rms5_ppm": _clipped_rms(norm[good]) * 1.0e6,
                 }
@@ -1042,7 +1079,7 @@ def audit_compact_population(
                 left_name, right_name = apertures[:2]
                 left = normalized[left_name]
                 right = normalized[right_name]
-                both = q0 & np.isfinite(left) & np.isfinite(right)
+                both = np.isfinite(left) & np.isfinite(right)
                 left_mad = float(per_aperture[left_name]["mad_ppm"])
                 right_mad = float(per_aperture[right_name]["mad_ppm"])
                 pair_rows.append(
@@ -1258,6 +1295,8 @@ def evaluate_cadence_quality(
     aperture_required = {
         "tic",
         "aperture",
+        "bls_input_status",
+        "bls_input_valid",
         "n_finite_quality0",
         "finite_quality0_fraction",
     }
@@ -1486,6 +1525,10 @@ def evaluate_cadence_quality(
         )
     statuses["detector_stratified"] = _worst_status(detector_statuses)
 
+    selected["searchable_aperture"] = selected["aperture"].astype(str).where(
+        selected["bls_input_valid"].astype(bool),
+        "",
+    )
     per_target_aperture = (
         selected.groupby("tic", as_index=False)
         .agg(
@@ -1493,6 +1536,19 @@ def evaluate_cadence_quality(
             n_finite_quality0_min=("n_finite_quality0", "min"),
             finite_quality0_fraction_min=("finite_quality0_fraction", "min"),
             usable_cadence_fraction_min=("usable_cadence_fraction", "min"),
+            n_bls_input_valid_apertures=("bls_input_valid", "sum"),
+            bls_input_statuses=(
+                "bls_input_status",
+                lambda values: ";".join(
+                    sorted({str(value) for value in values if str(value) != "ok"})
+                ),
+            ),
+            searchable_apertures=(
+                "searchable_aperture",
+                lambda values: ";".join(
+                    sorted({str(value) for value in values if str(value)})
+                ),
+            ),
         )
     )
     targets = targets.merge(
@@ -1563,6 +1619,18 @@ def evaluate_cadence_quality(
     targets["tier1_cadence_qa_reasons"] = target_flags[1]
     targets["tier1_cadence_qa_pass"] = targets["tier1_cadence_qa_status"].eq("pass")
 
+    def _cadence_structure_invalid(row: pd.Series) -> bool:
+        structural_columns = (
+            "n_unexpected_cadences",
+            "n_duplicate_cadences",
+            "n_orbit_mismatches",
+        )
+        return (
+            int(row["n_expected_cadences"]) <= 0
+            or int(row["n_observed_expected_orbits"]) <= 0
+            or any(int(row[column]) != 0 for column in structural_columns)
+        )
+
     def _target_searchability(row: pd.Series) -> tuple[bool, str]:
         reasons: list[str] = []
         n_apertures = pd.to_numeric(
@@ -1578,17 +1646,23 @@ def evaluate_cadence_quality(
             or int(n_effective) < config.min_searchable_cadences
         ):
             reasons.append("too_few_effective_cadences")
-        structural_columns = (
-            "n_unexpected_cadences",
-            "n_duplicate_cadences",
-            "n_orbit_mismatches",
+        input_statuses = {
+            value
+            for value in str(row.get("bls_input_statuses", "")).split(";")
+            if value
+        }
+        if "all_nan" in input_statuses:
+            reasons.append("search_normalization_invalid")
+        if "degenerate_grid" in input_statuses:
+            reasons.append("search_baseline_invalid")
+        unknown_input_statuses = sorted(
+            input_statuses - {"too_few_cadences", "all_nan", "degenerate_grid"}
         )
-        structural_invalid = (
-            int(row["n_expected_cadences"]) <= 0
-            or int(row["n_observed_expected_orbits"]) <= 0
-            or any(int(row[column]) != 0 for column in structural_columns)
-        )
-        if structural_invalid:
+        if unknown_input_statuses:
+            raise RuntimeError(
+                f"unknown locked-BLS input statuses: {unknown_input_statuses}"
+            )
+        if _cadence_structure_invalid(row):
             reasons.append("cadence_structure_invalid")
         unknown = sorted(set(reasons) - set(TIER1_SEARCHABILITY_REASON_CODES))
         if unknown:
@@ -1601,6 +1675,16 @@ def evaluate_cadence_quality(
     )
     targets["tier1_target_searchable"] = searchability[0].astype(bool)
     targets["tier1_target_searchability_reasons"] = searchability[1]
+    structure_valid = ~targets.apply(_cadence_structure_invalid, axis=1)
+    targets["tier1_any_aperture_searchable"] = (
+        pd.to_numeric(
+            targets["n_bls_input_valid_apertures"], errors="coerce"
+        ).fillna(0)
+        >= 1
+    ) & structure_valid
+    targets["tier1_paired_teacher_eligible"] = targets[
+        "tier1_target_searchable"
+    ].astype(bool)
     status = _worst_status(statuses.values())
     return {
         "status": status,
@@ -1645,6 +1729,12 @@ def evaluate_cadence_quality(
         "n_target_qa_fail": int(targets["tier1_cadence_qa_status"].eq("fail").sum()),
         "n_target_searchable": int(targets["tier1_target_searchable"].sum()),
         "n_target_excluded": int((~targets["tier1_target_searchable"]).sum()),
+        "n_any_aperture_searchable": int(
+            targets["tier1_any_aperture_searchable"].sum()
+        ),
+        "n_paired_teacher_eligible": int(
+            targets["tier1_paired_teacher_eligible"].sum()
+        ),
         "min_searchable_cadences": int(config.min_searchable_cadences),
         "detectors": detector_summaries,
         "component_status": statuses,
@@ -1927,7 +2017,7 @@ def summarize_fixed_injection_shards(
 
     if selected_ids is not None:
         raise ValueError(
-            "Tier-1 v2 forbids arbitrary injection-ID selection; provide complete shards"
+            "Tier-1 forbids arbitrary injection-ID selection; provide complete shards"
         )
     quality_reference = load_external_quality_reference(
         table_path=cadence_reference_path,
@@ -3725,6 +3815,12 @@ def evaluate_tier1_gates(
             "n_fail": int(targets_with_loss["tier1_target_qa_status"].eq("fail").sum()),
             "n_searchable": int(searchable.sum()),
             "n_excluded": int((~searchable).sum()),
+            "n_any_aperture_searchable": int(
+                targets_with_loss["tier1_any_aperture_searchable"].sum()
+            ),
+            "n_paired_teacher_eligible": int(
+                targets_with_loss["tier1_paired_teacher_eligible"].sum()
+            ),
             "candidate_teacher_filter": "tier1_target_searchable == True",
         },
         "gates": gates,
