@@ -70,9 +70,19 @@ The first v1 evaluator run (ORCD job `18641848`) failed before the population
 scan. Its retention predictor omitted the stored injection-baseline and
 detrending-scale normalization, and one frozen epoch had no effective-good
 in-transit samples after the external-quality overlay. Correcting the
-definition gave median retention near 0.991 in both apertures, while the v2
-epoch policy moved only the affected injection to an eligible epoch. This was
-a fail-closed contract-remediation event, not a scientific Tier-1 failure.
+definition gave median retention near 0.991 in both apertures, while v2
+resampled epochs against the authoritative effective-quality mask, including
+the previously invalid case. This was a fail-closed contract-remediation
+event, not a scientific Tier-1 failure.
+
+The first v2 preflight (ORCD job `18651862`) also stopped before population
+scanning because the configuration still pinned the v1 realization-metadata
+digest. The injection IDs and all schedule/host fields were bit-for-bit
+unchanged, but effective-quality epoch sampling resampled all 2,000 epochs and
+changed the cadence-sampled `model_depth` for 1,591 injections. A hybrid
+recalculation replacing only `model_depth` transforms the v1 digest
+`54996889…1910` into the v2 digest `b56a0b84…f0b0`. The v2 realization hash
+was therefore relocked without changing the sample or any gate threshold.
 
 | Gate | Status | Principal result |
 |---|---:|---|
@@ -140,9 +150,9 @@ independent-extraction checksums, the Tier-0 summary (`1f7865b9…432ca`) and
 BLS table (`c3a7bd9f…10692`) checksums, and v2 shard-producer commit
 `f1b8b53c7f2b2c62912e9d240b595458cbbd5d14`. The ordered v2 shard hashes are
 `fe999651…6525`, `7b166ddf…fa07`, `4d6f8f11…ce9b`, and
-`9e309d6b…e5a4`; their unchanged selection and metadata digests are
-`8ee40ea7…6c5a` and `54996889…1910`, respectively. The final evaluator/config
-revision remains **[PENDING FINAL HASH-LOCK COMMIT]**.
+`9e309d6b…e5a4`. The selection digest remains `8ee40ea7…6c5a`, while the v2
+epoch-realization metadata digest is `b56a0b84…f0b0`. The final
+evaluator/config revision remains **[PENDING FINAL HASH-LOCK COMMIT]**.
 
 ## Verdict
 

@@ -121,7 +121,16 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   alignment, copied-flux, raw-equation, uncertainty-equation, stored-quality,
   or provenance failures. The ordered shard hashes are `fe999651…6525`,
   `7b166ddf…fa07`, `4d6f8f11…ce9b`, and `9e309d6b…e5a4`; thresholds were not
-  relaxed.
+  relaxed. The first v2 evaluator preflight, CPU job `18651862`, then failed
+  closed on the legacy metadata digest before population scanning. Exact
+  old/new manifest comparison showed bit-for-bit identity for TIC, TESS
+  magnitude, detector, period, duration, and shard; the effective-quality
+  policy resampled all `2,000` epochs and changed the cadence-sampled
+  `model_depth` for `1,591`. Replacing only that realization field transforms
+  the legacy digest `54996889…1910` into the observed v2 digest
+  `b56a0b84…f0b0`, so the v2 lock was updated without changing the sample or
+  thresholds. A future contract should separate schedule/host and
+  epoch-realization digests explicitly.
 
 **Next:** Keep the gated S64-S69 source-only production queue active in
 parallel; commit and deploy the v2 hash lock, execute the exact bounded Tier-1
