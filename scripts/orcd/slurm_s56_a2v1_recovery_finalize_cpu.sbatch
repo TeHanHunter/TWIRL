@@ -19,6 +19,8 @@ OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/${SECTOR_TAG}
 FULL="${OUT_ROOT}/full"
 INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/${SECTOR_TAG}_A2v1}"
 CONFIG="${TWIRL_RECOVERY_CONFIG:-${REPO}/configs/injections/${SECTOR_TAG}_a2v1_teacher_v1_recovery_v1.yaml}"
+CADENCE_REFERENCE="${TWIRL_A2V1_CADENCE_REFERENCE:?set TWIRL_A2V1_CADENCE_REFERENCE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST:?set TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST}"
 CHECKPOINT_ROOT="${TWIRL_TEACHER_CHECKPOINT_ROOT:-${REPO}/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1_native_v2/shape_plus_periodogram_bls}"
 CHECKPOINT_MANIFEST="${TWIRL_TEACHER_CHECKPOINT_MANIFEST:-$(dirname "${CHECKPOINT_ROOT}")/selected_checkpoint_manifest.json}"
 PRODUCER_SHA_FILE="${OUT_ROOT}/schedule/producer_git_sha.txt"
@@ -42,6 +44,8 @@ test -s "${PRODUCER_SHA_FILE}"
   --shards "${FULL}"/injection_shards/injections_*.h5 \
   --raw-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_tglc_raw_sources.h5" \
   --adp-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_adp_pair_rebuilt.h5" \
+  --cadence-reference-table "${CADENCE_REFERENCE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
   --out-json "${FULL}/final/injection_product_audit.json"
 
 "${PYTHON}" scripts/stage5_validation/finalize_s56_a2v1_teacher_recovery.py \

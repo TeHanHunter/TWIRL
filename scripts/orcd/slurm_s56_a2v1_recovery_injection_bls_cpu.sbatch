@@ -53,6 +53,8 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HDF5_USE_FILE_LOCKING=FALS
   --config "${CONFIG}" \
   --raw-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_tglc_raw_sources.h5" \
   --adp-h5 "${ADP_H5}" \
+  --cadence-reference-table "${CADENCE_REFERENCE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
   --schedule "${OUT_ROOT}/schedule/injection_schedule.parquet" \
   --shard-index "${SHARD}" \
   --out-h5 "${PAIR_H5}" \

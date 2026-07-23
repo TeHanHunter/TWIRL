@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 import twirl.lightcurves.a2v1_tier1_qa as tier1_qa
+from twirl.injections.a2v1_recovery import epoch_quality_provenance
 from twirl.lightcurves.a2v1_cadence_reference import (
     AUTHORITY_EXCLUSION_EXTERNAL_BIT,
     AUTHORITY_EXCLUSION_POLICY,
@@ -47,6 +48,7 @@ from twirl.lightcurves.a2v1_tier1_qa import (
 from twirl.lightcurves.external_quality import (
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
+    load_external_quality_reference,
 )
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
@@ -211,12 +213,12 @@ def _write_injection_shard(
     path,
     *,
     n_ids: int = 8,
-    retention: float = 0.96,
+    retention: float = 1.0,
     shard_index: int = 0,
 ) -> None:
     rng = np.random.default_rng(123 + shard_index)
     with h5py.File(path, "w") as h5:
-        h5.attrs["contract_version"] = "s56_a2v1_fresh_injection_pair_v1"
+        h5.attrs["contract_version"] = "s56_a2v1_fresh_injection_pair_v2"
         h5.attrs["shard_index"] = shard_index
         h5.attrs["n_shards"] = 40
         h5.attrs["n_injections"] = n_ids
@@ -237,6 +239,10 @@ def _write_injection_shard(
             group.attrs["duration_min"] = durations[index]
             group.attrs["model_depth"] = depths[index]
             group.attrs["radius_rearth"] = 0.2 + index
+            group.attrs["injection_baseline_Small"] = 120.0
+            group.attrs["DET_FLUX_ADP_SML_scale"] = 240.0
+            group.attrs["injection_baseline_Primary"] = 150.0
+            group.attrs["DET_FLUX_ADP_scale"] = 500.0
             n = 200
             model = np.ones(n)
             model[40:45] = np.array([0.97, 0.93, 0.90, 0.93, 0.97])
@@ -248,10 +254,63 @@ def _write_injection_shard(
             )
             group.create_dataset("transit_model", data=model)
             for aperture in ADP_ONLY_APERTURES:
+                baseline_over_scale = (
+                    float(group.attrs["injection_baseline_Small"])
+                    / float(group.attrs["DET_FLUX_ADP_SML_scale"])
+                    if aperture == ADP_ONLY_APERTURES[0]
+                    else float(group.attrs["injection_baseline_Primary"])
+                    / float(group.attrs["DET_FLUX_ADP_scale"])
+                )
                 original = 1.0 + rng.normal(0.0, 1.0e-4, n)
-                injected = original - retention * (1.0 - model) + 2.0e-4
+                injected = (
+                    original
+                    - retention * baseline_over_scale * (1.0 - model)
+                    + 2.0e-4
+                )
                 group.create_dataset(f"{aperture}_original", data=original)
                 group.create_dataset(f"{aperture}_injected", data=injected)
+
+
+def _bind_injection_shard_to_cadence_reference(
+    shard_path,
+    cadence_path,
+    cadence_manifest_path,
+) -> None:
+    reference = load_external_quality_reference(
+        table_path=cadence_path,
+        manifest_path=cadence_manifest_path,
+        sector=56,
+    )
+    provenance = epoch_quality_provenance(reference)
+    with h5py.File(shard_path, "r+") as h5:
+        for name, value in provenance.items():
+            h5.attrs[name] = value
+        for injection_id, group in h5["injections"].items():
+            overlay = reference.apply(
+                sector=int(group.attrs["sector"]),
+                camera=int(group.attrs["camera"]),
+                ccd=int(group.attrs["ccd"]),
+                cadenceno=np.asarray(group["cadenceno"]),
+                orbitid=np.asarray(group["orbitid"]),
+                internal_quality=np.asarray(group["quality"]),
+                context=f"test injection {injection_id}",
+            )
+            for name in ("external_quality", "effective_quality"):
+                if name in group:
+                    del group[name]
+            group.create_dataset(
+                "external_quality",
+                data=np.asarray(overlay.external_quality, dtype=np.int64),
+            )
+            group.create_dataset(
+                "effective_quality",
+                data=np.asarray(overlay.quality, dtype=np.int32),
+            )
+            for name, value in provenance.items():
+                group.attrs[name] = value
+            for name, value in overlay.counts.items():
+                group.attrs[f"epoch_quality_{name}"] = int(value)
+    reference.assert_unchanged()
 
 
 def _small_injection_config(**changes) -> Tier1QAConfig:
@@ -496,6 +555,11 @@ def test_tier1_config_is_strict_and_scoped(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="promotion is disabled"):
         replace(Tier1QAConfig(), promotion_enabled=True).validate()
+    with pytest.raises(ValueError, match="unsupported Tier-1 contract_version"):
+        replace(
+            Tier1QAConfig(),
+            contract_version="a2v1_tier1_science_qa_v1",
+        ).validate()
 
 
 def test_tier0_prerequisite_is_hash_bound_and_checks_every_nested_gate() -> None:
@@ -621,6 +685,11 @@ def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> Non
     _, cadence_manifest = _write_cadence_evidence(cadence_path)
     cadence_manifest_path = tmp_path / "cadence.json"
     cadence_manifest_path.write_text(json.dumps(cadence_manifest) + "\n")
+    _bind_injection_shard_to_cadence_reference(
+        shard,
+        cadence_path,
+        cadence_manifest_path,
+    )
     metrics, manifest = summarize_fixed_injection_shards(
         [shard],
         sector=56,
@@ -629,7 +698,17 @@ def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> Non
     )
     assert len(metrics) == 16
     assert metrics["status"].eq("ok").all()
-    assert np.allclose(metrics["depth_retention_fraction"], 0.96, atol=1.0e-8)
+    assert np.allclose(metrics["depth_retention_fraction"], 1.0, atol=1.0e-8)
+    assert set(metrics["baseline_over_scale"].round(8)) == {0.3, 0.5}
+    assert np.allclose(
+        metrics["raw_depth_response_slope"],
+        metrics["baseline_over_scale"],
+        atol=1.0e-8,
+    )
+    assert (
+        manifest["retention_metric"]["version"]
+        == tier1_qa.INJECTION_RETENTION_METRIC_VERSION
+    )
 
     config = _small_injection_config(
         expected_injection_shard_sha256=(file_sha256(shard),),
@@ -642,6 +721,10 @@ def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> Non
     assert gate["status"] == "pass"
     assert gate["n_faint_injection_ids"] == 4
     assert gate["period_support_ratio"] >= 5.0
+    assert all(
+        np.isclose(aperture["median_depth_retention"], 1.0)
+        for aperture in gate["apertures"]
+    )
 
     internal_only = dict(manifest)
     internal_only.pop("external_quality_overlay")
@@ -719,6 +802,128 @@ def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> Non
     )
 
 
+@pytest.mark.parametrize(
+    ("attribute", "replacement"),
+    (
+        ("DET_FLUX_ADP_SML_scale", None),
+        ("DET_FLUX_ADP_SML_scale", 0.0),
+        ("injection_baseline_Small", np.nan),
+    ),
+)
+def test_injection_retention_rejects_missing_or_invalid_normalization(
+    tmp_path,
+    attribute: str,
+    replacement: float | None,
+) -> None:
+    shard = tmp_path / "injections.h5"
+    _write_injection_shard(shard)
+    with h5py.File(shard, "r+") as h5:
+        group = h5["injections/inj_00_000"]
+        if replacement is None:
+            del group.attrs[attribute]
+        else:
+            group.attrs[attribute] = replacement
+
+    cadence_path = tmp_path / "cadence.csv"
+    _, cadence_manifest = _write_cadence_evidence(cadence_path)
+    cadence_manifest_path = tmp_path / "cadence.json"
+    cadence_manifest_path.write_text(json.dumps(cadence_manifest) + "\n")
+    _bind_injection_shard_to_cadence_reference(
+        shard,
+        cadence_path,
+        cadence_manifest_path,
+    )
+    metrics, manifest = summarize_fixed_injection_shards(
+        [shard],
+        sector=56,
+        cadence_reference_path=cadence_path,
+        cadence_reference_manifest_path=cadence_manifest_path,
+    )
+
+    affected = metrics.loc[
+        metrics["injection_id"].eq("inj_00_000")
+        & metrics["aperture"].eq(ADP_ONLY_APERTURES[0])
+    ].iloc[0]
+    assert affected["status"] == "invalid_normalization_metadata"
+    assert not np.isfinite(affected["baseline_over_scale"])
+    assert manifest["malformed_shards"]
+
+    config = _small_injection_config(
+        expected_injection_shard_sha256=(file_sha256(shard),),
+        expected_cadence_reference_sha256=file_sha256(cadence_path),
+        expected_cadence_reference_manifest_sha256=file_sha256(
+            cadence_manifest_path
+        ),
+    )
+    gate = evaluate_fixed_injections(
+        metrics,
+        manifest,
+        sector=56,
+        config=config,
+    )
+    assert gate["status"] == "fail"
+    assert any("malformed" in reason for reason in gate["reasons"])
+
+
+def test_injection_retention_rejects_stale_epoch_quality_provenance_and_masks(
+    tmp_path,
+) -> None:
+    shard = tmp_path / "injections.h5"
+    _write_injection_shard(shard)
+    cadence_path = tmp_path / "cadence.csv"
+    _, cadence_manifest = _write_cadence_evidence(cadence_path)
+    cadence_manifest_path = tmp_path / "cadence.json"
+    cadence_manifest_path.write_text(json.dumps(cadence_manifest) + "\n")
+    _bind_injection_shard_to_cadence_reference(
+        shard,
+        cadence_path,
+        cadence_manifest_path,
+    )
+
+    with h5py.File(shard, "r+") as h5:
+        h5.attrs["cadence_reference_manifest_sha256"] = "f" * 64
+        group = h5["injections/inj_00_000"]
+        group["external_quality"][10] = 2048
+        group["effective_quality"][10] = 1
+
+    metrics, manifest = summarize_fixed_injection_shards(
+        [shard],
+        sector=56,
+        cadence_reference_path=cadence_path,
+        cadence_reference_manifest_path=cadence_manifest_path,
+    )
+    assert manifest["stored_epoch_quality_validation"]["status"] == "fail"
+    assert (
+        manifest["stored_epoch_quality_validation"]["n_provenance_failures"]
+        >= 1
+    )
+    assert manifest["stored_epoch_quality_validation"]["n_mask_failures"] >= 1
+    affected = metrics.loc[
+        metrics["injection_id"].eq("inj_00_000")
+    ]
+    assert affected["status"].eq("quality_overlay_error").all()
+    assert manifest["malformed_shards"]
+
+    config = _small_injection_config(
+        expected_injection_shard_sha256=(file_sha256(shard),),
+        expected_cadence_reference_sha256=file_sha256(cadence_path),
+        expected_cadence_reference_manifest_sha256=file_sha256(
+            cadence_manifest_path
+        ),
+    )
+    gate = evaluate_fixed_injections(
+        metrics,
+        manifest,
+        sector=56,
+        config=config,
+    )
+    assert gate["status"] == "fail"
+    assert any(
+        "epoch-quality" in reason or "malformed" in reason
+        for reason in gate["reasons"]
+    )
+
+
 def test_injection_gate_propagates_nonzero_authority_exclusion(tmp_path) -> None:
     shard = tmp_path / "injections.h5"
     _write_injection_shard(shard)
@@ -755,6 +960,11 @@ def test_injection_gate_propagates_nonzero_authority_exclusion(tmp_path) -> None
     cadence_manifest_path.write_text(
         json.dumps(cadence_manifest) + "\n",
         encoding="utf-8",
+    )
+    _bind_injection_shard_to_cadence_reference(
+        shard,
+        cadence_path,
+        cadence_manifest_path,
     )
 
     metrics, manifest = summarize_fixed_injection_shards(
@@ -1010,6 +1220,11 @@ def test_active_scope_can_be_enrichment_ready_but_not_science_ready(tmp_path) ->
     _, cadence_manifest = _write_cadence_evidence(cadence_path)
     cadence_manifest_path = tmp_path / "cadence.json"
     cadence_manifest_path.write_text(json.dumps(cadence_manifest) + "\n")
+    _bind_injection_shard_to_cadence_reference(
+        shard,
+        cadence_path,
+        cadence_manifest_path,
+    )
     config = _small_injection_config(
         min_population_targets=40,
         min_targets_per_magnitude_bin=3,
@@ -1121,8 +1336,14 @@ def test_end_to_end_runner_writes_a_scoped_pass(
     _, cadence_manifest = _write_cadence_evidence(cadence_path)
     cadence_manifest_path = tmp_path / "cadence.json"
     cadence_manifest_path.write_text(json.dumps(cadence_manifest))
+    _bind_injection_shard_to_cadence_reference(
+        shard,
+        cadence_path,
+        cadence_manifest_path,
+    )
     config = replace(
         config,
+        expected_injection_shard_sha256=(file_sha256(shard),),
         expected_cadence_reference_sha256=file_sha256(cadence_path),
         expected_cadence_reference_manifest_sha256=file_sha256(
             cadence_manifest_path
@@ -1244,6 +1465,55 @@ def test_end_to_end_runner_writes_a_scoped_pass(
     assert precomputed["provenance"]["injection_manifest_input_sha256"] == file_sha256(
         published_manifest_path
     )
+
+    failing_shard = tmp_path / "failing_injections.h5"
+    _write_injection_shard(failing_shard)
+    _bind_injection_shard_to_cadence_reference(
+        failing_shard,
+        cadence_path,
+        cadence_manifest_path,
+    )
+    with h5py.File(failing_shard, "r+") as h5:
+        del h5["injections/inj_00_000"].attrs["DET_FLUX_ADP_SML_scale"]
+    failure_config = replace(
+        config,
+        expected_injection_shard_sha256=(file_sha256(failing_shard),),
+    )
+    failure_config_path = tmp_path / "failure_config.json"
+    failure_config_path.write_text(json.dumps(asdict(failure_config)))
+    failure_out = tmp_path / "failure_out"
+    failure_gate_path = tmp_path / "failure_gate.json"
+    with pytest.raises(ValueError, match="fixed-injection preflight failed"):
+        run_a2v1_tier1_qa(
+            sector=56,
+            config_path=failure_config_path,
+            tier0_summary_path=tier0_path,
+            compact_lc=compact,
+            cadence_reference_path=cadence_path,
+            cadence_reference_manifest_path=cadence_manifest_path,
+            injection_source_parity_path=injection_parity_path,
+            injection_shards=[failing_shard],
+            independent_metrics_path=independent_path,
+            independent_manifest_path=independent_manifest_path,
+            out_dir=failure_out,
+            gate_json=failure_gate_path,
+        )
+    assert (failure_out / "fixed_injection_metrics.csv").exists()
+    failure_manifest_path = failure_out / "fixed_injection_manifest.json"
+    assert failure_manifest_path.exists()
+    failure_gate = json.loads(failure_gate_path.read_text())
+    assert failure_gate["status"] == "fail"
+    assert failure_gate["passed"] is False
+    assert failure_gate["enrichment_ready"] is False
+    assert failure_gate["science_ready"] is False
+    assert failure_gate["population_scan_started"] is False
+    assert failure_gate["failure_stage"] == "fixed_injection_preservation"
+    failure_manifest = json.loads(failure_manifest_path.read_text())
+    assert failure_manifest["preflight_failure"]["population_scan_started"] is False
+    assert failure_manifest["metrics_file_sha256"] == file_sha256(
+        failure_out / "fixed_injection_metrics.csv"
+    )
+    assert not (failure_out / "target_metrics.parquet").exists()
 
     original_plot = tier1_qa.plot_detector_eligibility
 

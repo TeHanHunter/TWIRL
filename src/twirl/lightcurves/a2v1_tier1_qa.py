@@ -25,6 +25,12 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from twirl.injections.a2v1_recovery import (
+    EPOCH_QUALITY_POLICY,
+    EPOCH_QUALITY_POLICY_CONTRACT,
+    epoch_quality_provenance,
+    epoch_quality_provenance_failures,
+)
 from twirl.io.hlsp import A2V1_APERTURES
 from twirl.lightcurves.a2v1_cadence_reference import (
     CADENCE_REFERENCE_BUILDER_VERSION,
@@ -48,7 +54,7 @@ from twirl.lightcurves.external_quality import (
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
 
-TIER1_QA_CONTRACT_VERSION = "a2v1_tier1_science_qa_v1"
+TIER1_QA_CONTRACT_VERSION = "a2v1_tier1_science_qa_v2"
 TIER1_SCOPES = ("active_search_pair", "full_a2v1_product")
 STATUS_ORDER = {"pass": 0, "review": 1, "fail": 2}
 TIER0_REQUIRED_GATES = (
@@ -83,6 +89,17 @@ INJECTION_QUALITY_COUNT_NAMES = (
     "n_cad_external_only_bad",
     "n_cad_effective_bad",
 )
+INJECTION_RETENTION_METRIC_VERSION = "normalized_depth_retention_v2"
+INJECTION_APERTURE_NORMALIZATION_ATTRS = {
+    "DET_FLUX_ADP_SML": (
+        "injection_baseline_Small",
+        "DET_FLUX_ADP_SML_scale",
+    ),
+    "DET_FLUX_ADP": (
+        "injection_baseline_Primary",
+        "DET_FLUX_ADP_scale",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -163,7 +180,7 @@ class Tier1QAConfig:
     aperture_pass_negative_correlation_fraction: float = 0.05
     aperture_review_negative_correlation_fraction: float = 0.10
 
-    injection_contract_template: str = "s{sector}_a2v1_fresh_injection_pair_v1"
+    injection_contract_template: str = "s{sector}_a2v1_fresh_injection_pair_v2"
     injection_selection_mode: str = "full_shard"
     injection_required_shard_indices: tuple[int, ...] = (0, 13, 26, 39)
     # Hashes are ordered exactly like ``injection_required_shard_indices``.
@@ -223,7 +240,7 @@ class Tier1QAConfig:
         if self.contract_version != TIER1_QA_CONTRACT_VERSION:
             raise ValueError("unsupported Tier-1 contract_version")
         if self.sector != 56:
-            raise ValueError("the locked Tier-1 v1 configuration is S56-specific")
+            raise ValueError("the locked Tier-1 v2 configuration is S56-specific")
         if self.scope not in TIER1_SCOPES:
             raise ValueError(f"unsupported Tier-1 scope: {self.scope}")
         if not self.apertures or len(set(self.apertures)) != len(self.apertures):
@@ -237,10 +254,10 @@ class Tier1QAConfig:
             raise ValueError("active_search_pair must use the two locked ADP apertures")
         if self.promotion_enabled:
             raise ValueError(
-                "promotion is disabled in Tier-1 v1 until the six-channel evaluator is implemented"
+                "promotion is disabled in Tier-1 v2 until the six-channel evaluator is implemented"
             )
         if self.sample_size != 0:
-            raise ValueError("Tier-1 v1 requires a full-population scan (sample_size=0)")
+            raise ValueError("Tier-1 v2 requires a full-population scan (sample_size=0)")
         if min(
             self.min_population_targets,
             self.min_targets_per_magnitude_bin,
@@ -318,7 +335,7 @@ class Tier1QAConfig:
         ):
             raise ValueError("invalid absolute RMS envelope")
         if self.injection_selection_mode != "full_shard":
-            raise ValueError("Tier-1 v1 requires complete, predeclared injection shards")
+            raise ValueError("Tier-1 v2 requires complete, predeclared injection shards")
         if (
             not self.injection_required_shard_indices
             or len(set(self.injection_required_shard_indices))
@@ -357,7 +374,7 @@ class Tier1QAConfig:
             raise ValueError("independent-extraction coverage counts must be positive")
         if self.independent_comparison_mode != "signal_timing_only":
             raise ValueError(
-                "Tier-1 v1 requires independent_comparison_mode="
+                "Tier-1 v2 requires independent_comparison_mode="
                 "'signal_timing_only'"
             )
         if not 0 < self.independent_max_time_delta_seconds <= 60.0:
@@ -1825,16 +1842,28 @@ def summarize_fixed_injection_shards(
     apertures: Sequence[str] = ADP_ONLY_APERTURES,
     selected_ids: set[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Fit model-weighted depth retention for stored fresh-injection groups."""
+    """Fit normalization-aware depth retention for fresh-injection groups.
+
+    A2v1 detrended flux is normalized by the detrending scale, while an
+    injection is applied in raw-flux units using the aperture baseline.  The
+    expected output-space signal is therefore
+    ``(baseline / scale) * (1 - transit_model)``.  Regressing against the
+    unscaled model delta measures the normalization transfer, not retention;
+    that legacy slope is retained explicitly as a diagnostic.
+    """
 
     if selected_ids is not None:
         raise ValueError(
-            "Tier-1 v1 forbids arbitrary injection-ID selection; provide complete shards"
+            "Tier-1 v2 forbids arbitrary injection-ID selection; provide complete shards"
         )
     quality_reference = load_external_quality_reference(
         table_path=cadence_reference_path,
         manifest_path=cadence_reference_manifest_path,
         sector=int(sector),
+    )
+    quality_reference.assert_unchanged()
+    expected_epoch_quality_provenance = epoch_quality_provenance(
+        quality_reference
     )
     rows: list[dict[str, Any]] = []
     contracts: set[str] = set()
@@ -1851,10 +1880,28 @@ def summarize_fixed_injection_shards(
     quality_totals = {name: 0 for name in INJECTION_QUALITY_COUNT_NAMES}
     quality_by_shard: dict[str, dict[str, int]] = {}
     n_quality_groups_applied = 0
+    n_epoch_quality_roots_validated = 0
+    n_epoch_quality_groups_validated = 0
+    n_epoch_quality_provenance_failures = 0
+    n_epoch_quality_mask_failures = 0
     for path in sorted(Path(item) for item in shard_paths):
         file_hashes[str(path)] = file_sha256(path)
         with h5py.File(path, "r") as h5:
             contracts.add(str(h5.attrs.get("contract_version", "")))
+            root_quality_failures = epoch_quality_provenance_failures(
+                h5.attrs,
+                expected_epoch_quality_provenance,
+            )
+            if root_quality_failures:
+                n_epoch_quality_provenance_failures += len(
+                    root_quality_failures
+                )
+                malformed_shards.extend(
+                    f"{path}: epoch-quality root provenance {detail}"
+                    for detail in root_quality_failures
+                )
+            else:
+                n_epoch_quality_roots_validated += 1
             if "injections" not in h5:
                 malformed_shards.append(f"{path}: missing /injections")
                 continue
@@ -1889,6 +1936,8 @@ def summarize_fixed_injection_shards(
                 group_sector = int(group.attrs.get("sector", sector))
                 required_datasets = (
                     "quality",
+                    "external_quality",
+                    "effective_quality",
                     "cadenceno",
                     "orbitid",
                     "transit_model",
@@ -1898,13 +1947,27 @@ def summarize_fixed_injection_shards(
                 ]
                 quality_overlay = None
                 quality_error = ""
+                group_quality_failures = epoch_quality_provenance_failures(
+                    group.attrs,
+                    expected_epoch_quality_provenance,
+                )
+                if group_quality_failures:
+                    n_epoch_quality_provenance_failures += len(
+                        group_quality_failures
+                    )
+                validation_errors = [
+                    f"epoch-quality group provenance {detail}"
+                    for detail in group_quality_failures
+                ]
                 if missing_datasets:
-                    quality_error = f"missing datasets {missing_datasets}"
+                    validation_errors.append(
+                        f"missing datasets {missing_datasets}"
+                    )
                 else:
                     quality = np.asarray(group["quality"], dtype=np.int64)
                     model = np.asarray(group["transit_model"], dtype=float)
                     try:
-                        quality_overlay = quality_reference.apply(
+                        authoritative_overlay = quality_reference.apply(
                             sector=group_sector,
                             camera=camera,
                             ccd=ccd,
@@ -1913,12 +1976,75 @@ def summarize_fixed_injection_shards(
                             internal_quality=quality,
                             context=f"injection {injection_id}",
                         )
-                        if len(model) != len(quality_overlay.quality):
+                        stored_external_quality = np.asarray(
+                            group["external_quality"],
+                            dtype=np.int64,
+                        )
+                        stored_effective_quality = np.asarray(
+                            group["effective_quality"],
+                            dtype=np.int32,
+                        )
+                        if len(model) != len(authoritative_overlay.quality):
                             raise ValueError(
                                 "transit_model length disagrees with cadence arrays"
                             )
+                        if not np.array_equal(
+                            stored_external_quality,
+                            np.asarray(
+                                authoritative_overlay.external_quality,
+                                dtype=np.int64,
+                            ),
+                        ):
+                            validation_errors.append(
+                                "stored external_quality disagrees with "
+                                "authoritative cadence reference"
+                            )
+                        if not np.array_equal(
+                            stored_effective_quality,
+                            np.asarray(
+                                authoritative_overlay.quality,
+                                dtype=np.int32,
+                            ),
+                        ):
+                            validation_errors.append(
+                                "stored effective_quality disagrees with "
+                                "authoritative cadence reference"
+                            )
+                        for name, expected_value in (
+                            authoritative_overlay.counts.items()
+                        ):
+                            attr_name = f"epoch_quality_{name}"
+                            try:
+                                observed_value = int(group.attrs[attr_name])
+                            except (
+                                KeyError,
+                                TypeError,
+                                ValueError,
+                                OverflowError,
+                            ):
+                                validation_errors.append(
+                                    f"missing or invalid {attr_name}"
+                                )
+                                continue
+                            if observed_value != int(expected_value):
+                                validation_errors.append(
+                                    f"{attr_name}={observed_value} does not "
+                                    f"match {int(expected_value)}"
+                                )
+                        if not validation_errors:
+                            quality_overlay = authoritative_overlay
+                            n_epoch_quality_groups_validated += 1
                     except (KeyError, TypeError, ValueError) as exc:
-                        quality_error = str(exc)
+                        validation_errors.append(str(exc))
+                if validation_errors:
+                    quality_error = "; ".join(validation_errors)
+                    if any(
+                        "external_quality" in value
+                        or "effective_quality" in value
+                        or "epoch_quality_n_cad" in value
+                        for value in validation_errors
+                    ):
+                        n_epoch_quality_mask_failures += 1
                 if quality_overlay is None:
                     malformed_shards.append(
                         f"{path}:/injections/{injection_id}: {quality_error}"
@@ -1935,6 +2061,54 @@ def summarize_fixed_injection_shards(
                 for aperture in apertures:
                     original_name = f"{aperture}_original"
                     injected_name = f"{aperture}_injected"
+                    normalization_attrs = INJECTION_APERTURE_NORMALIZATION_ATTRS.get(
+                        str(aperture)
+                    )
+                    injection_baseline = np.nan
+                    detrend_scale = np.nan
+                    baseline_over_scale = np.nan
+                    normalization_error = ""
+                    if normalization_attrs is None:
+                        normalization_error = (
+                            f"unsupported aperture normalization mapping: {aperture}"
+                        )
+                    else:
+                        baseline_attr, scale_attr = normalization_attrs
+                        missing_attrs = [
+                            name for name in normalization_attrs if name not in group.attrs
+                        ]
+                        if missing_attrs:
+                            normalization_error = (
+                                f"missing normalization attributes {missing_attrs}"
+                            )
+                        else:
+                            try:
+                                injection_baseline = float(group.attrs[baseline_attr])
+                                detrend_scale = float(group.attrs[scale_attr])
+                            except (TypeError, ValueError, OverflowError) as exc:
+                                normalization_error = (
+                                    f"invalid normalization attributes ({exc})"
+                                )
+                            if not normalization_error and not (
+                                np.isfinite(injection_baseline)
+                                and injection_baseline > 0
+                                and np.isfinite(detrend_scale)
+                                and detrend_scale > 0
+                            ):
+                                normalization_error = (
+                                    "normalization attributes must be finite and positive"
+                                )
+                            if not normalization_error:
+                                baseline_over_scale = (
+                                    injection_baseline / detrend_scale
+                                )
+                                if not (
+                                    np.isfinite(baseline_over_scale)
+                                    and baseline_over_scale > 0
+                                ):
+                                    normalization_error = (
+                                        "baseline_over_scale must be finite and positive"
+                                    )
                     base = {
                         "injection_id": str(injection_id),
                         "tic": int(group.attrs.get("tic", -1)),
@@ -1949,13 +2123,33 @@ def summarize_fixed_injection_shards(
                         "radius_rearth": float(group.attrs.get("radius_rearth", np.nan)),
                         "shard_index": shard_index,
                         "source_shard": str(path),
+                        "injection_baseline": float(injection_baseline),
+                        "detrend_scale": float(detrend_scale),
+                        "baseline_over_scale": float(baseline_over_scale),
+                        "raw_depth_response_slope": np.nan,
+                        "depth_retention_fraction": np.nan,
                     }
+                    if normalization_error:
+                        malformed_shards.append(
+                            f"{path}:/injections/{injection_id}/{aperture}: "
+                            f"{normalization_error}"
+                        )
                     if quality_overlay is None:
                         rows.append(
                             {
                                 **base,
                                 "status": "quality_overlay_error",
                                 "quality_error": quality_error,
+                                "normalization_error": normalization_error,
+                            }
+                        )
+                        continue
+                    if normalization_error:
+                        rows.append(
+                            {
+                                **base,
+                                "status": "invalid_normalization_metadata",
+                                "normalization_error": normalization_error,
                             }
                         )
                         continue
@@ -1974,9 +2168,20 @@ def summarize_fixed_injection_shards(
                     if np.count_nonzero(in_transit) < 2 or np.count_nonzero(good) < 20:
                         rows.append({**base, "status": "insufficient_cadences"})
                         continue
-                    design = np.column_stack([np.ones(np.count_nonzero(good)), x[good]])
-                    intercept, retention = np.linalg.lstsq(design, y[good], rcond=None)[0]
-                    prediction = intercept + retention * x[good]
+                    normalized_x = baseline_over_scale * x
+                    design = np.column_stack(
+                        [np.ones(np.count_nonzero(good)), normalized_x[good]]
+                    )
+                    intercept, retention = np.linalg.lstsq(
+                        design, y[good], rcond=None
+                    )[0]
+                    raw_design = np.column_stack(
+                        [np.ones(np.count_nonzero(good)), x[good]]
+                    )
+                    _, raw_depth_response_slope = np.linalg.lstsq(
+                        raw_design, y[good], rcond=None
+                    )[0]
+                    prediction = intercept + retention * normalized_x[good]
                     residual = y[good] - prediction
                     rows.append(
                         {
@@ -1985,9 +2190,14 @@ def summarize_fixed_injection_shards(
                             "n_quality0": int(np.count_nonzero(good)),
                             "n_in_transit": int(np.count_nonzero(in_transit)),
                             "depth_retention_fraction": float(retention),
+                            "raw_depth_response_slope": float(
+                                raw_depth_response_slope
+                            ),
                             "fit_intercept": float(intercept),
                             "fit_residual_mad": _robust_mad(residual),
-                            "model_delta_correlation": _correlation(x[good], y[good]),
+                            "model_delta_correlation": _correlation(
+                                normalized_x[good], y[good]
+                            ),
                         }
                     )
     metrics = pd.DataFrame(rows)
@@ -2024,6 +2234,37 @@ def summarize_fixed_injection_shards(
         "shard_sha256": file_hashes,
         "shard_index_sha256": shard_index_hashes,
         "metrics_content_sha256": _dataframe_content_sha256(metrics),
+        "retention_metric": {
+            "version": INJECTION_RETENTION_METRIC_VERSION,
+            "depth_retention_fraction": (
+                "slope of -(injected-original) versus "
+                "(injection_baseline/detrend_scale)*(1-transit_model)"
+            ),
+            "raw_depth_response_slope": (
+                "diagnostic slope of -(injected-original) versus "
+                "(1-transit_model)"
+            ),
+            "normalization_transfer": "baseline_over_scale",
+        },
+        "stored_epoch_quality_validation": {
+            "status": (
+                "pass"
+                if (
+                    n_epoch_quality_roots_validated == len(shard_paths)
+                    and n_epoch_quality_groups_validated == len(seen_ids)
+                    and n_epoch_quality_provenance_failures == 0
+                    and n_epoch_quality_mask_failures == 0
+                )
+                else "fail"
+            ),
+            "expected_provenance": expected_epoch_quality_provenance,
+            "n_roots_expected": len(shard_paths),
+            "n_roots_validated": n_epoch_quality_roots_validated,
+            "n_groups_expected": len(seen_ids),
+            "n_groups_validated": n_epoch_quality_groups_validated,
+            "n_provenance_failures": n_epoch_quality_provenance_failures,
+            "n_mask_failures": n_epoch_quality_mask_failures,
+        },
         "external_quality_overlay": {
             **quality_reference.provenance,
             "applied_before_retention_metrics": True,
@@ -2181,6 +2422,10 @@ def evaluate_fixed_injections(
         "aperture",
         "status",
         "depth_retention_fraction",
+        "raw_depth_response_slope",
+        "injection_baseline",
+        "detrend_scale",
+        "baseline_over_scale",
         "camera",
         "ccd",
         "detector",
@@ -2204,6 +2449,64 @@ def evaluate_fixed_injections(
             config=config,
         )
     )
+    retention_metric = manifest.get("retention_metric")
+    if (
+        not isinstance(retention_metric, Mapping)
+        or retention_metric.get("version") != INJECTION_RETENTION_METRIC_VERSION
+    ):
+        reasons.append("fixed-injection retention metric contract mismatch")
+    stored_epoch_quality = manifest.get("stored_epoch_quality_validation")
+    if not isinstance(stored_epoch_quality, Mapping):
+        reasons.append("stored injection epoch-quality validation is missing")
+    else:
+        expected_stored_provenance = {
+            "epoch_quality_policy_contract": EPOCH_QUALITY_POLICY_CONTRACT,
+            "epoch_quality_policy": EPOCH_QUALITY_POLICY,
+            "external_quality_policy_contract": EXTERNAL_QUALITY_POLICY_CONTRACT,
+            "effective_quality_policy": EFFECTIVE_QUALITY_POLICY,
+            "cadence_reference_sector": int(sector),
+            "cadence_reference_table_sha256": (
+                config.expected_cadence_reference_sha256
+            ),
+            "cadence_reference_manifest_sha256": (
+                config.expected_cadence_reference_manifest_sha256
+            ),
+        }
+        observed_stored_provenance = stored_epoch_quality.get(
+            "expected_provenance"
+        )
+        if (
+            stored_epoch_quality.get("status") != "pass"
+            or not isinstance(observed_stored_provenance, Mapping)
+            or any(
+                observed_stored_provenance.get(name) != expected_value
+                for name, expected_value in expected_stored_provenance.items()
+            )
+        ):
+            reasons.append(
+                "stored injection epoch-quality provenance or masks were not "
+                "authoritatively validated"
+            )
+        try:
+            stored_counts_match = bool(
+                int(stored_epoch_quality.get("n_roots_expected", -1))
+                == len(config.injection_required_shard_indices)
+                == int(stored_epoch_quality.get("n_roots_validated", -2))
+                and int(stored_epoch_quality.get("n_groups_expected", -1))
+                == config.injection_expected_ids
+                == int(stored_epoch_quality.get("n_groups_validated", -2))
+                and int(
+                    stored_epoch_quality.get("n_provenance_failures", -1)
+                )
+                == 0
+                and int(stored_epoch_quality.get("n_mask_failures", -1)) == 0
+            )
+        except (TypeError, ValueError, OverflowError):
+            stored_counts_match = False
+        if not stored_counts_match:
+            reasons.append(
+                "stored injection epoch-quality validation coverage is incomplete"
+            )
     if missing:
         reasons.append(f"missing columns: {missing}")
     if observed_contracts != [expected_contract]:
@@ -2295,8 +2598,32 @@ def evaluate_fixed_injections(
     valid_pairs = set(
         zip(work["injection_id"], work["aperture"].astype(str), strict=False)
     )
-    finite_retention = np.isfinite(
-        pd.to_numeric(work["depth_retention_fraction"], errors="coerce")
+    retention_values = pd.to_numeric(
+        work["depth_retention_fraction"], errors="coerce"
+    )
+    raw_response_values = pd.to_numeric(
+        work["raw_depth_response_slope"], errors="coerce"
+    )
+    baseline_values = pd.to_numeric(work["injection_baseline"], errors="coerce")
+    scale_values = pd.to_numeric(work["detrend_scale"], errors="coerce")
+    transfer_values = pd.to_numeric(
+        work["baseline_over_scale"], errors="coerce"
+    )
+    finite_retention = (
+        np.isfinite(retention_values)
+        & np.isfinite(raw_response_values)
+        & np.isfinite(baseline_values)
+        & baseline_values.gt(0)
+        & np.isfinite(scale_values)
+        & scale_values.gt(0)
+        & np.isfinite(transfer_values)
+        & transfer_values.gt(0)
+        & np.isclose(
+            transfer_values,
+            baseline_values / scale_values,
+            rtol=1.0e-12,
+            atol=0.0,
+        )
     )
     finite_pairs = set(
         zip(
@@ -2381,8 +2708,15 @@ def evaluate_fixed_injections(
     for aperture in config.apertures:
         rows = work.loc[work["aperture"].astype(str).eq(aperture)]
         retention = pd.to_numeric(rows["depth_retention_fraction"], errors="coerce")
+        raw_response = pd.to_numeric(
+            rows["raw_depth_response_slope"], errors="coerce"
+        )
+        normalization_transfer = pd.to_numeric(
+            rows["baseline_over_scale"], errors="coerce"
+        )
         median = _quantile(retention, 0.5)
         p10 = _quantile(retention, 0.1)
+        p90 = _quantile(retention, 0.9)
         finite = retention[np.isfinite(retention)]
         inband = (
             float(
@@ -2420,7 +2754,20 @@ def evaluate_fixed_injections(
                 "n_rows": int(len(rows)),
                 "median_depth_retention": median,
                 "p10_depth_retention": p10,
+                "p90_depth_retention": p90,
                 "inband_fraction": inband,
+                "median_raw_depth_response_slope": _quantile(raw_response, 0.5),
+                "p10_raw_depth_response_slope": _quantile(raw_response, 0.1),
+                "p90_raw_depth_response_slope": _quantile(raw_response, 0.9),
+                "median_baseline_over_scale": _quantile(
+                    normalization_transfer, 0.5
+                ),
+                "p10_baseline_over_scale": _quantile(
+                    normalization_transfer, 0.1
+                ),
+                "p90_baseline_over_scale": _quantile(
+                    normalization_transfer, 0.9
+                ),
                 "component_status": components,
             }
         )
@@ -4214,6 +4561,91 @@ def run_a2v1_tier1_qa(
         injection_metrics, injection_manifest, sector=sector, config=config
     )
     if injection_preflight["status"] == "fail":
+        # A failed frozen-canary preflight is itself durable evidence.  Publish
+        # the evaluated table, its manifest, and a compact fail-closed gate
+        # before returning nonzero, while explicitly recording that the
+        # population scan never started.
+        assert_inputs_unchanged()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        _write_table_atomic(injection_metrics, paths["injection_metrics"])
+        published_failure_metrics = _read_table(paths["injection_metrics"])
+        published_failure_manifest = dict(injection_manifest)
+        published_failure_manifest.update(
+            {
+                "metrics_file": str(paths["injection_metrics"]),
+                "metrics_file_sha256": file_sha256(paths["injection_metrics"]),
+                "metrics_content_sha256": _dataframe_content_sha256(
+                    published_failure_metrics
+                ),
+                "source_metrics_file": (
+                    str(injection_metrics_path)
+                    if injection_metrics_path is not None
+                    else None
+                ),
+                "source_metrics_file_sha256": (
+                    initial_sha256(injection_metrics_path)
+                    if injection_metrics_path is not None
+                    else None
+                ),
+                "source_manifest_file": (
+                    str(injection_manifest_path)
+                    if injection_manifest_path is not None
+                    else None
+                ),
+                "source_manifest_file_sha256": (
+                    initial_sha256(injection_manifest_path)
+                    if injection_manifest_path is not None
+                    else None
+                ),
+                "preflight_failure": {
+                    "stage": "fixed_injection_preservation",
+                    "population_scan_started": False,
+                    "gate": injection_preflight,
+                },
+            }
+        )
+        write_strict_json(
+            paths["injection_manifest"], published_failure_manifest
+        )
+        failure_gate = {
+            "created_utc": datetime.now(timezone.utc).isoformat(),
+            "contract_version": TIER1_QA_CONTRACT_VERSION,
+            "config_name": config.name,
+            "qa_tier": "tier1_bounded_enrichment_qa",
+            "scope": config.scope,
+            "sector": int(sector),
+            "status": "fail",
+            "passed": False,
+            "enrichment_ready": False,
+            "science_ready": False,
+            "promotion_enabled": False,
+            "population_scan_started": False,
+            "failure_stage": "fixed_injection_preservation",
+            "failure_reasons": list(injection_preflight["reasons"]),
+            "gates": {
+                "fixed_injection_preservation": injection_preflight,
+            },
+            "outputs": {
+                "injection_metrics": str(paths["injection_metrics"]),
+                "injection_manifest": str(paths["injection_manifest"]),
+                "gate_json": str(gate_json),
+            },
+            "provenance": {
+                "config": str(config_path),
+                "config_sha256": initial_sha256(config_path),
+                "injection_evidence_sha256": _sha256_text_mapping(
+                    injection_manifest
+                ),
+                "published_injection_metrics_sha256": file_sha256(
+                    paths["injection_metrics"]
+                ),
+                "published_injection_manifest_sha256": file_sha256(
+                    paths["injection_manifest"]
+                ),
+            },
+        }
+        write_strict_json(gate_json, failure_gate)
+        assert_inputs_unchanged()
         raise ValueError(
             "fixed-injection preflight failed before population scan: "
             + "; ".join(injection_preflight["reasons"])
