@@ -29,9 +29,10 @@ Last reconciled: `2026-07-23`.
   would veto otherwise searchable data: cam1/ccd1 retains thousands of usable
   cadences per target despite a `0.743` median. Tier-1 therefore now treats
   population, flag-fraction, scatter, and aperture-disagreement reviews as
-  sensitivity warnings. The v4 paired-input mask uses the exact shared BLS
-  preparation and excludes only structurally unsearchable inputs; its final
-  checksum-locked ORCD rerun is pending.
+  sensitivity warnings. The checksum-locked v4 audit passes for bounded
+  enrichment: `31,446/31,450` targets are paired-teacher eligible,
+  `31,449/31,450` retain at least one searchable aperture, and no target is
+  excluded from flagged fraction alone. It remains `science_ready=false`.
   The `s56_harmonic_cnn_v1` architecture and evaluation profile remain the
   active-learning baseline. Its old native-v1 checkpoint is not reused with
   the external-quality-aware S56 native-v2 tensors. Any S56 path-validation
@@ -121,7 +122,7 @@ The operational contract is defined in the
   ADP/ADP015 FITS writer, compact export, and edge-aware validator.
 - S56--S63 are complete through required HDF5/FITS validation. S56 also
   passes the replacement quality-aware Tier-0 integrity/benchmark QA. Its
-  full-population bounded Tier-1 enrichment gate is being rerun under the
+  full-population bounded Tier-1 gate now authorizes enrichment under the
   conservative exact-BLS paired-input contract.
 
 ### Current gate
@@ -189,16 +190,19 @@ unless a later factor-only review verifies them; injection truth and the
 existing explicitly verified S56 period decisions remain valid supervision.
 The next `3,000`-row S60--S62 handoff is complete on PDO and under active human
 review. Retrain teacher v1 once after that return is frozen rather than fitting
-an interim four-sector model.
+an interim four-sector model. The final Planet-like/EB consolidation path is
+preflighted through S59: it currently resolves to `223` candidate observations
+(`207` unique TICs), with all `223` local vet sheets present and all `65`
+previously verified S56 harmonic targets preserved. Do not begin this final
+pass until the accepted S60--S62 return has been appended, because the queue is
+frozen only after the user's row-level review.
 
-The immediate parallel work is to harden the existing S56 periodic/enrichment
-path, not to add search branches. Complete the exact-BLS Tier-1 rerun, then
-require its paired-input mask for teacher construction while retaining
-single-aperture-searchable cases for separate review. Freeze a
-candidate-level aperture rule that keeps the small ADP aperture as the search
-channel and primary ADP aperture as contamination evidence unless injection
-and real-data tests justify a change, complete the bounded S56 review, and
-freeze the resulting candidate/label set. Defer the non-periodic dip detector,
+The immediate work is to freeze the S56--S62 label set and its training inputs,
+not to add search branches or retune Tier-1. Apply the accepted v4 paired-input
+mask for teacher construction while retaining single-aperture-searchable cases
+for separate review. Keep the small ADP aperture as the search channel and the
+primary ADP aperture as contamination evidence unless later injection and
+real-data tests justify a change. Defer the non-periodic dip detector,
 multi-sector aggregation, and false-alarm/background calibration until this
 path is robust. Those capabilities remain mandatory before the full survey
 search or a science-ready candidate catalog.
@@ -352,11 +356,10 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Complete the checksum-locked S56 `active_search_pair` Tier-1 v4 rerun on
-   all 16 detector cells. Publish the paired-teacher mask only if the exact BLS
-   input predicate passes; do not veto detectors or targets from flagged
-   fraction alone. Preserve one-channel-searchable cases for manual or
-   single-aperture review and never use missing-channel cases as negatives.
+1. Ingest Franklin's final S60--S62 labels, then re-review every Planet-like
+   and EB example across S56--S62 in one local queue. Preserve original label
+   provenance, harmonic annotations, and missing-channel cases; freeze only
+   after the user's final pass.
 2. Complete the bounded S56 review and Franklin's active S60--S62 review, then
    freeze the seven-sector S56--S62 observation-level morphology corpus.
    Preserve raw label provenance and cross-sector differences, and resolve

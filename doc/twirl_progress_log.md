@@ -146,12 +146,31 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   The published target mask contains `30,115` pass, `1,303` review, and `32`
   fail rows. It is not authorized for enrichment while the overall gate
   remains review.
+- `2026-07-23`: Reinterpreted Tier-1 as a conservative input-usability gate
+  after the v2 result showed that detector-level flagged fraction could veto
+  thousands of otherwise searchable light curves. Contract v3 made
+  population, cadence-fraction, and aperture reviews nonblocking, retained
+  their metrics for sensitivity calibration, and kept all 16 detector cells.
+  ORCD job `18655927` completed successfully, but independent review found
+  that its target count used finite normalized flux without finite time and
+  could let flagged flux values influence normalization. The v3 mask was
+  therefore not promoted.
+- `2026-07-23`: Contract v4 at commit `2633e8b4` now shares the exact BLS input
+  preparation between search and Tier-1. ORCD job `18657818` completed in
+  `9 min 17 s` with `passed=true`, `enrichment_ready=true`, and
+  `science_ready=false`; the sole warning is the retained cadence-fraction
+  diagnostic. The paired teacher keeps `31,446/31,450` targets, while
+  `31,449/31,450` have at least one searchable aperture. Three exceptions have
+  an entirely nonfinite small aperture but a healthy primary aperture; only
+  one has neither channel. None is a negative label. The complete
+  `628,955`-row BLS binding and all published output hashes validate, and the
+  local suite passes `420` tests with `3` skips plus detection and docs checks.
 
 **Next:** Keep the gated S64-S69 source-only production queue active in
-parallel; preserve the reviewed result, choose an explicit enrichment-only
-cam1/ccd1 exclusion or other predeclared remediation without lowering the
-threshold, rerun the exact gate, and publish a mask only if that narrowed scope
-passes.
+parallel. Apply the v4 paired-input mask when the S56--S62 label corpus is
+frozen; retain the three primary-only cases for manual or single-aperture
+review and do not spend the current critical path on additional Tier-1
+threshold work.
 
 ### Catalog, archive index, and sample control
 
@@ -254,14 +273,32 @@ sample.
   S56--S62 checkpoint, calibration, thresholds, TIC-disjoint cohort, and
   metrics before blind S63 labeling; report repeated hosts separately and do
   not tune from the unblinded result.
+- `2026-07-23`: Preflighted one final local Planet-like/EB pass over the
+  accepted labels available through S59. The current queue has `223` candidate
+  observations across `207` TICs (`45` prior Planet-like and `178`
+  Eclipse/contact), preserves `230` source decisions and all `65` verified S56
+  harmonic targets, and resolves all `223/223` PNG sheets locally. Its buttons
+  are prefilled but `0/223` rows are marked reviewed; wait for the accepted
+  S60--S62 return, rebuild once, and then freeze TeHan's explicit row-level
+  pass.
+- `2026-07-23`: Added two bounded pre-training contracts. The split registry
+  deterministically fixes whole TICs into a nearest-feasible `20%` test
+  population plus five nonempty development folds, and training preparation
+  now consumes those assignments without recomputing them. The native registry
+  binds each `(sector, TIC)` observation to an explicit HDF5 file/group,
+  contract version, and SHA-256, preventing repeated hosts from colliding in
+  TIC-only storage. The full fast suite passes `446` tests with `3` skips.
+  Actual seven-sector registry artifacts and trainer/checkpoint binding remain
+  pending the frozen label corpus and regenerated per-sector native inputs.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Apply the Tier-1 target mask and complete the bounded S56 and active
-S60--S62 reviews. In parallel, design, implement, and validate an observation-
-keyed multi-sector native contract plus one immutable TIC-grouped split
-registry; only then assemble the seven-sector inputs. Freeze that corpus and
-retrain teacher v1 once with source-separated, calibrated evaluation and
+**Next:** Ingest the accepted S60--S62 return, append its Planet-like/EB rows
+to the prepared local queue, and freeze the user's final pass. Then instantiate
+the implemented `(sector, TIC)` native registry and immutable TIC-grouped split
+registry on the seven-sector corpus, bind those registry hashes into the
+trainer/checkpoints, and regenerate quality-aware inputs before training.
+Retrain teacher v1 once with source-separated, calibrated evaluation and
 bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches only
 after this path is robust.
 

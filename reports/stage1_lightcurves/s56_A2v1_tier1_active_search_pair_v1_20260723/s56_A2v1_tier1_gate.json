@@ -3,10 +3,11 @@
     "DET_FLUX_ADP_SML",
     "DET_FLUX_ADP"
   ],
+  "blocking_gates": [],
   "config_name": "a2v1_tier1_active_search_pair_v1",
-  "contract_version": "a2v1_tier1_science_qa_v2",
-  "created_utc": "2026-07-23T20:40:56.700513+00:00",
-  "enrichment_ready": false,
+  "contract_version": "a2v1_tier1_science_qa_v4",
+  "created_utc": "2026-07-23T21:51:53.812230+00:00",
+  "enrichment_ready": true,
   "gates": {
     "aperture_outliers": {
       "component_status": {
@@ -17,11 +18,11 @@
         "negative_correlation_fraction": "pass",
         "valid_fraction": "pass"
       },
-      "correlation_median": 0.3626618828961286,
+      "correlation_median": 0.36266188289612855,
       "correlation_valid_fraction": 0.999872813990461,
       "extreme_outlier_fraction": 0.0003180054696940787,
-      "mad_ratio_median": 0.8211679866381454,
-      "moderate_outlier_fraction": 0.036761432296635504,
+      "mad_ratio_median": 0.8212032756190436,
+      "moderate_outlier_fraction": 0.0359346180754309,
       "n_targets": 31450,
       "negative_correlation_fraction": 9.540164090822362e-05,
       "reasons": [],
@@ -515,9 +516,14 @@
       "finite_quality0_fraction_p05": 1.0,
       "internal_quality0_fraction_median": 0.958556263269639,
       "median_relative_cadence_loss": 0.0,
+      "min_searchable_cadences": 200,
+      "n_any_aperture_searchable": 31449,
+      "n_paired_teacher_eligible": 31446,
+      "n_target_excluded": 4,
       "n_target_qa_fail": 8,
       "n_target_qa_pass": 31442,
       "n_target_qa_review": 0,
+      "n_target_searchable": 31446,
       "p95_max_orbit_cadence_loss": 0.0,
       "p95_relative_cadence_loss": 0.0,
       "quality0_fraction_median": 0.9160084925690021,
@@ -857,9 +863,9 @@
           },
           "finite_metric_fraction": 0.999872813990461,
           "high_residual_fraction": 0.00019080328181644724,
-          "intercept_log10_mad": 1.1395546117328843,
+          "intercept_log10_mad": 1.1753397333167062,
           "n_targets": 31450,
-          "slope_log10_mad_per_mag": 0.23148554637610333,
+          "slope_log10_mad_per_mag": 0.2294722049543914,
           "status": "pass",
           "supported_magnitude_bins": 6
         },
@@ -874,10 +880,10 @@
             "slope": "pass"
           },
           "finite_metric_fraction": 0.9999682034976153,
-          "high_residual_fraction": 0.0002861776209100448,
-          "intercept_log10_mad": 2.9315173519022815,
+          "high_residual_fraction": 0.0002543801074755954,
+          "intercept_log10_mad": 2.9636868779226777,
           "n_targets": 31450,
-          "slope_log10_mad_per_mag": 0.13473633789116266,
+          "slope_log10_mad_per_mag": 0.1328960664711585,
           "status": "pass",
           "supported_magnitude_bins": 6
         }
@@ -904,23 +910,23 @@
     }
   },
   "outputs": {
-    "aperture_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/aperture_metrics.parquet",
-    "aperture_pair_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/aperture_pair_metrics.csv",
-    "detector_eligibility_pdf": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_detector_eligibility.pdf",
-    "detector_eligibility_png": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_detector_eligibility.png",
-    "detector_summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/detector_summary.csv",
-    "gate_json": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/s56_A2v1_tier1_gate.json",
-    "independent_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/independent_extraction_metrics.csv",
-    "injection_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/fixed_injection_manifest.json",
-    "injection_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/fixed_injection_metrics.csv",
-    "magnitude_bins": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/magnitude_bins.csv",
-    "qa_diagnostics_pdf": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_qa_diagnostics.pdf",
-    "qa_diagnostics_png": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_qa_diagnostics.png",
-    "summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/summary.json",
-    "target_eligibility": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/target_eligibility.csv",
-    "target_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/target_metrics.parquet"
+    "aperture_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/aperture_metrics.parquet",
+    "aperture_pair_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/aperture_pair_metrics.csv",
+    "detector_eligibility_pdf": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/tier1_detector_eligibility.pdf",
+    "detector_eligibility_png": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/tier1_detector_eligibility.png",
+    "detector_summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/detector_summary.csv",
+    "gate_json": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/s56_A2v1_tier1_gate.json",
+    "independent_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/independent_extraction_metrics.csv",
+    "injection_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/fixed_injection_manifest.json",
+    "injection_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/fixed_injection_metrics.csv",
+    "magnitude_bins": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/magnitude_bins.csv",
+    "qa_diagnostics_pdf": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/tier1_qa_diagnostics.pdf",
+    "qa_diagnostics_png": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/tier1_qa_diagnostics.png",
+    "summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/summary.json",
+    "target_eligibility": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/target_eligibility.csv",
+    "target_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/target_metrics.parquet"
   },
-  "passed": false,
+  "passed": true,
   "promotion_enabled": false,
   "provenance": {
     "cadence_reference": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_cadence_reference.csv",
@@ -929,8 +935,8 @@
     "cadence_reference_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a",
     "compact_lc": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair.h5",
     "compact_lc_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
-    "config": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_tier1_qa_v2_5adae3b6_20260723/configs/qa/a2v1_tier1_active_search_pair_v1.yaml",
-    "config_sha256": "342d4e21564178173c2bdb1d324726524129b3e6eb7e8f704005c041d5b8da21",
+    "config": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_tier1_qa_v4_2633e8b4_20260723/configs/qa/a2v1_tier1_active_search_pair_v1.yaml",
+    "config_sha256": "87a90004b2f89bfae43f289a7493be0bebb8acd3ed49d6112bb810ba8280f104",
     "independent_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/wd1856_tesscut_metrics_manifest.json",
     "independent_manifest_sha256": "50632bab106b19e59109b54c6f4ceb48df21c402c334b3d1455135ef7db32900",
     "independent_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/wd1856_tesscut_metrics.csv",
@@ -949,21 +955,21 @@
     "injection_source_parity": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/input_verification.json",
     "injection_source_parity_sha256": "f5e98f0e900beda0275d2a1d34ce592e799f5b0690db1490482c34c0f92360f9",
     "output_sha256": {
-      "aperture_metrics": "7a88307fce3f8ad97a5863a1fcd1d8f103fe9aa1c056f59fa2411605d1e4aef5",
-      "aperture_pair_metrics": "0d5372f712c6387b91c085f710511afdf9396cf113624a134eddaade767b5c9b",
-      "detector_eligibility_pdf": "4eedbb930f5487ba2c72dbcad3810233013d0890cced4eacbdcb690d537a5190",
-      "detector_eligibility_png": "1bed9fefc1bd9c15d3956fdf1496543dc1630ac3628adf8952a1298d038688e6",
-      "detector_summary": "4312fe2c8af4ca3d37564c4325bcafd68ccf1b7165ee97406664d3efbaf04da5",
+      "aperture_metrics": "a9890e66ddb8cc95ade95f9cb7941e21ed247895f82e1b2a0b1863bca7baf989",
+      "aperture_pair_metrics": "302df7b5a76df678f712868dabce0863d40eca82710ad8edaefd29d06fdfc9c4",
+      "detector_eligibility_pdf": "a3c9f9729394368c2381ae304f146cd4878c719f15a2ee97e29999e44cb35a6c",
+      "detector_eligibility_png": "2ac3f9d0a5eaa15e4f831032e5a773ba43bf2b6636ea73c80652ed2f05d643e0",
+      "detector_summary": "51adfee575372dd3e5a32e68ae9aa059d2098571989349d52b1baacc32e8704d",
       "independent_metrics": "6b3116f719a13d47c5c037d2e9e3035068aa3c80942e49ba020925e03e518975",
-      "injection_manifest": "4fe598fd514905511ab0876a994f1f64553051b1cb07e6ca39383bc5db40b19a",
+      "injection_manifest": "a7d79dd22c3695e2ce86b91dd10491072494e90a84330e3d00fa095c4f916eac",
       "injection_metrics": "cdc0a8def36011ff506c6471b637e02e939662b451e8e04e6e182015411d801a",
-      "magnitude_bins": "7e2389dad75e2556a4704b39239fc16a36d9961a7d97866a846f9b2900b9f23f",
-      "qa_diagnostics_pdf": "46204f80dea33d08f6ed61e6ef67ddd6ff7acaddae0ab254e69e0fd90ee37905",
-      "qa_diagnostics_png": "45e8910041ad93c62e42814068c1581148a3d96681310873e01a51cc9f220d2e",
-      "target_eligibility": "60945a24cdaaf6db014fb25f30c063cf5365f7044777ab7b1acd323095d16860",
-      "target_metrics": "d6830f32b62334a567d138c13aa53ab667afb9d40b80070e2250b973c9093ba2"
+      "magnitude_bins": "c2d6528fe266a357c1bb1d53ad5351d4d744de4def95cd0ef493f31466701670",
+      "qa_diagnostics_pdf": "c70d0a3149f7fa74e7403d5d7f0a43438e8c7801c11c619295a76da9de2e71f2",
+      "qa_diagnostics_png": "3d5d7af117d989258a8d2accbb59b62d6c29e670d67e51d8b4d61e802c179656",
+      "target_eligibility": "eb6dacefd8624c612f6c3b44fe6852f584ff05844cb4e9123ffcbead4968448b",
+      "target_metrics": "a42de6bffd67413a98e4fab7c11a4743bee611c925ffe9640e48dbfebefc1b75"
     },
-    "published_injection_manifest_sha256": "4fe598fd514905511ab0876a994f1f64553051b1cb07e6ca39383bc5db40b19a",
+    "published_injection_manifest_sha256": "a7d79dd22c3695e2ce86b91dd10491072494e90a84330e3d00fa095c4f916eac",
     "tier0_summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_photometric_qa_gate.json",
     "tier0_summary_sha256": "1f7865b9368095ae7b0dcee52f7ed3d6caeb7c5406caea18d9613ade3cf432ca"
   },
@@ -973,10 +979,15 @@
   "sector": 56,
   "status": "review",
   "target_qa": {
-    "candidate_teacher_filter": "tier1_target_qa_pass == True",
+    "candidate_teacher_filter": "tier1_target_searchable == True",
+    "min_searchable_cadences_per_aperture": 200,
+    "n_any_aperture_searchable": 31449,
+    "n_excluded": 4,
     "n_fail": 32,
-    "n_pass": 30115,
-    "n_review": 1303,
+    "n_paired_teacher_eligible": 31446,
+    "n_pass": 30178,
+    "n_review": 1240,
+    "n_searchable": 31446,
     "n_with_gaia_dr3_source_id": 0,
     "observation_key": [
       "sector",
@@ -997,6 +1008,13 @@
       "scatter_absolute_high",
       "unexpected_cadence",
       "usable_cadence"
+    ],
+    "searchability_reason_code_vocabulary": [
+      "aperture_missing",
+      "cadence_structure_invalid",
+      "search_baseline_invalid",
+      "search_normalization_invalid",
+      "too_few_effective_cadences"
     ]
   },
   "thresholds": {
@@ -1026,7 +1044,7 @@
     "cadence_reference_contract_template": "s{sector}_a2v1_cadence_reference_v1",
     "cadence_review_median_loss": 0.01,
     "cadence_review_p95_loss": 0.05,
-    "contract_version": "a2v1_tier1_science_qa_v2",
+    "contract_version": "a2v1_tier1_science_qa_v4",
     "expected_cadence_reference_manifest_sha256": "a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62",
     "expected_cadence_reference_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a",
     "expected_compact_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
@@ -1092,6 +1110,7 @@
     "min_injection_duration_ratio": 2.0,
     "min_injection_period_ratio": 30.0,
     "min_population_targets": 512,
+    "min_searchable_cadences": 200,
     "min_supported_magnitude_bins": 3,
     "min_targets_per_magnitude_bin": 30,
     "name": "a2v1_tier1_active_search_pair_v1",
@@ -1123,5 +1142,8 @@
     "wd1856_pass_period_relative_error": 0.0001,
     "wd1856_review_epoch_residual_min": 15.0,
     "wd1856_review_period_relative_error": 0.0005
-  }
+  },
+  "warning_gates": [
+    "cadence_and_finite_data"
+  ]
 }
