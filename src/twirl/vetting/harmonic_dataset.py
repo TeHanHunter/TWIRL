@@ -27,6 +27,7 @@ from twirl.vetting.harmonic_inputs import (
     read_native_light_curve_from_h5,
 )
 from twirl.vetting.recovery50_teacher import leakage_columns
+from twirl.vetting.teacher_split_registry import validate_tic_split_assignments
 
 
 HARMONIC_METADATA_CANDIDATES: tuple[str, ...] = (
@@ -96,6 +97,17 @@ def candidate_bls_ephemeris(row: Mapping[str, Any]) -> tuple[float, float, float
     if not np.isfinite(duration) or duration <= 0:
         raise ValueError("row has no finite positive BLS duration")
     return period, t0, duration
+
+
+def _explicit_or_legacy_native_group_path(row: Mapping[str, Any]) -> str:
+    """Preserve an observation-keyed group, with the S56 TIC fallback."""
+
+    explicit = row.get("native_group_path", "")
+    if explicit is not None and not pd.isna(explicit):
+        text = str(explicit).strip()
+        if text:
+            return text
+    return native_group_path(row)
 
 
 def _target_index(value: Any, classes: Sequence[str], include: Any) -> int:
@@ -169,6 +181,41 @@ def prepare_harmonic_training_rows(rows: pd.DataFrame, *, seed: int = 56) -> pd.
     if not policy.eq(HARMONIC_CNN_TARGET_POLICY).all():
         bad = sorted(policy[policy.ne(HARMONIC_CNN_TARGET_POLICY)].unique())
         raise ValueError(f"training rows contain unexpected target policies: {bad}")
+    has_fixed_split = "fixed_split" in work.columns
+    has_cv_fold = "cv_fold" in work.columns
+    if has_fixed_split != has_cv_fold:
+        raise ValueError(
+            "preassigned split columns are incomplete; fixed_split and cv_fold "
+            "must be supplied together"
+        )
+    if has_fixed_split:
+        # Validate the complete bound corpus before inactive target rows are
+        # removed, so a masked row cannot conceal TIC leakage.
+        validate_tic_split_assignments(
+            work,
+            require_unique_tics=False,
+            require_complete_partitions=True,
+        )
+    morphology = work["morphology_target_v1"].fillna("").astype(str)
+    broad = work["broad_preserve_only"]
+    if broad.dtype != bool:
+        broad = broad.fillna("").astype(str).str.lower().isin(
+            {"1", "true", "t", "yes", "y"}
+        )
+    derived_split_stratum = morphology.where(
+        morphology.ne(""), np.where(broad, "broad_preserve", "auxiliary")
+    )
+    if has_fixed_split and "split_stratum" in work:
+        declared_split_stratum = (
+            work["split_stratum"].fillna("").astype(str).str.strip()
+        )
+        mismatch = declared_split_stratum.ne(derived_split_stratum)
+        if mismatch.any():
+            raise ValueError(
+                "preassigned split_stratum disagrees with the current "
+                "Teacher-v1 target policy"
+            )
+    work["split_stratum"] = derived_split_stratum
     work["morphology_target_index"] = [
         _target_index(value, MORPHOLOGY_CLASSES, include)
         for value, include in zip(work["morphology_target_v1"], work["morphology_include_v1"])
@@ -187,22 +234,31 @@ def prepare_harmonic_training_rows(rows: pd.DataFrame, *, seed: int = 56) -> pd.
         | work["harmonic_target_index"].ge(0)
     )
     work = work.loc[active].copy().reset_index(drop=True)
-    work["native_group_path"] = [native_group_path(row) for row in work.to_dict("records")]
+    work["native_group_path"] = [
+        _explicit_or_legacy_native_group_path(row)
+        for row in work.to_dict("records")
+    ]
     # These placeholders are replaced from each fold's training partition.
     # Held-out label frequencies therefore cannot influence optimization.
     work["morphology_weight"] = work["morphology_target_index"].ge(0).astype(np.float32)
     work["preserve_weight"] = work["preserve_target_index"].ge(0).astype(np.float32)
     work["harmonic_weight"] = work["harmonic_target_index"].ge(0).astype(np.float32)
-    morphology = work["morphology_target_v1"].fillna("").astype(str)
-    broad = work["broad_preserve_only"]
-    if broad.dtype != bool:
-        broad = broad.fillna("").astype(str).str.lower().isin({"1", "true", "t", "yes", "y"})
-    work["split_stratum"] = morphology.where(
-        morphology.ne(""), np.where(broad, "broad_preserve", "auxiliary")
-    )
-    split = build_grouped_test_and_cv_folds(work, seed=seed)
-    work["fixed_split"] = split["fixed_split"].to_numpy()
-    work["cv_fold"] = split["cv_fold"].to_numpy()
+    if has_fixed_split:
+        validate_tic_split_assignments(
+            work,
+            require_unique_tics=False,
+            require_complete_partitions=True,
+        )
+        work["fixed_split"] = (
+            work["fixed_split"].fillna("").astype(str).str.strip().str.lower()
+        )
+        work["cv_fold"] = pd.to_numeric(
+            work["cv_fold"], errors="raise"
+        ).astype(np.int16)
+    else:
+        split = build_grouped_test_and_cv_folds(work, seed=seed)
+        work["fixed_split"] = split["fixed_split"].to_numpy()
+        work["cv_fold"] = split["cv_fold"].to_numpy()
     return work
 
 

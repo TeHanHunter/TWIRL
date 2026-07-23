@@ -6,6 +6,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
+import pytest
 
 from twirl.lightcurves.a2v1_cadence_reference import (
     AUTHORITY_EXCLUSION_EXTERNAL_BIT,
@@ -199,6 +200,109 @@ def test_training_rows_keep_broad_for_preserve_and_not_morphology() -> None:
     assert broad["preserve_target_index"].ge(0).all()
     assert broad["harmonic_target_index"].ge(0).all()
     assert set(prepared["fixed_split"]) == {"development", "test"}
+
+
+def _preassigned_training_rows() -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for index in range(30):
+        if index < 6:
+            fixed_split = "test"
+            cv_fold = -1
+        else:
+            fixed_split = "development"
+            cv_fold = (index - 6) % 5
+        rows.append(
+            {
+                "review_id": f"preassigned:{index}",
+                "tic": 10_000 + index,
+                "source_kind": "real_candidate",
+                "is_injected_row": False,
+                "human_label": "uncertain",
+                "period_d": 1.0,
+                "t0_bjd": 2459825.0,
+                "duration_min": 10.0,
+                "morphology_target_v1": "other",
+                "morphology_include_v1": True,
+                "preserve_target_v1": "reject",
+                "preserve_include_v1": True,
+                "harmonic_target_v1": "",
+                "harmonic_include_v1": False,
+                "broad_preserve_only": False,
+                "model_target_policy_version": HARMONIC_CNN_TARGET_POLICY,
+                "fixed_split": fixed_split,
+                "cv_fold": cv_fold,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def test_training_rows_consume_preassigned_tic_splits_without_recomputing() -> None:
+    source = _preassigned_training_rows()
+
+    prepared = prepare_harmonic_training_rows(source, seed=999)
+
+    expected = source.set_index("review_id")[["fixed_split", "cv_fold"]]
+    expected["cv_fold"] = expected["cv_fold"].astype(np.int16)
+    observed = prepared.set_index("review_id")[["fixed_split", "cv_fold"]]
+    pd.testing.assert_frame_equal(observed, expected)
+
+
+def test_training_rows_reject_partial_or_leaking_preassigned_splits() -> None:
+    partial = _preassigned_training_rows().drop(columns="cv_fold")
+    with pytest.raises(ValueError, match="supplied together"):
+        prepare_harmonic_training_rows(partial)
+
+    leaking = _preassigned_training_rows()
+    duplicate = leaking.iloc[[0]].copy()
+    duplicate["review_id"] = "preassigned:duplicate"
+    duplicate["fixed_split"] = "development"
+    duplicate["cv_fold"] = 0
+    leaking = pd.concat([leaking, duplicate], ignore_index=True)
+    with pytest.raises(ValueError, match="group leakage"):
+        prepare_harmonic_training_rows(leaking)
+
+    inactive_duplicate = _preassigned_training_rows().iloc[[0]].copy()
+    inactive_duplicate["review_id"] = "preassigned:inactive-duplicate"
+    inactive_duplicate["fixed_split"] = "development"
+    inactive_duplicate["cv_fold"] = 0
+    inactive_duplicate["morphology_target_v1"] = ""
+    inactive_duplicate["morphology_include_v1"] = False
+    inactive_duplicate["preserve_target_v1"] = ""
+    inactive_duplicate["preserve_include_v1"] = False
+    inactive_duplicate["harmonic_target_v1"] = ""
+    inactive_duplicate["harmonic_include_v1"] = False
+    leaking_inactive = pd.concat(
+        [_preassigned_training_rows(), inactive_duplicate], ignore_index=True
+    )
+    with pytest.raises(ValueError, match="group leakage"):
+        prepare_harmonic_training_rows(leaking_inactive)
+
+    wrong_stratum = _preassigned_training_rows()
+    wrong_stratum["split_stratum"] = "planet_like"
+    with pytest.raises(ValueError, match="split_stratum disagrees"):
+        prepare_harmonic_training_rows(wrong_stratum)
+
+    inactive_wrong_stratum = _preassigned_training_rows()
+    inactive_wrong_stratum["split_stratum"] = "other"
+    inactive_index = inactive_wrong_stratum.index[-1]
+    inactive_wrong_stratum.loc[
+        inactive_index,
+        [
+            "morphology_target_v1",
+            "preserve_target_v1",
+            "harmonic_target_v1",
+        ],
+    ] = ""
+    inactive_wrong_stratum.loc[
+        inactive_index,
+        [
+            "morphology_include_v1",
+            "preserve_include_v1",
+            "harmonic_include_v1",
+        ],
+    ] = False
+    with pytest.raises(ValueError, match="split_stratum disagrees"):
+        prepare_harmonic_training_rows(inactive_wrong_stratum)
 
 
 def test_metadata_normalization_uses_fit_rows_and_excludes_targets() -> None:
