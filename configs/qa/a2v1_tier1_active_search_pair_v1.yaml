@@ -4,10 +4,9 @@ sector: 56
 scope: active_search_pair
 promotion_enabled: false
 expected_tier0_contract: a2v1_tier0_integrity_qa_v2
-# Deliberate fail-closed placeholders. Replace only after rerunning and
-# reviewing Tier-0 with the quality-aware S56 BLS peak table.
-expected_tier0_summary_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-expected_tier0_bls_peaks_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+# Reviewed replacement Tier-0 report and its full quality-aware S56 BLS table.
+expected_tier0_summary_sha256: 1f7865b9368095ae7b0dcee52f7ed3d6caeb7c5406caea18d9613ade3cf432ca
+expected_tier0_bls_peaks_sha256: c3a7bd9f4953263950c27092d14962145eebaef714e6a60ce4fb178577410692
 apertures:
   - DET_FLUX_ADP_SML
   - DET_FLUX_ADP
@@ -21,10 +20,10 @@ min_population_targets: 512
 min_targets_per_magnitude_bin: 30
 min_supported_magnitude_bins: 3
 expected_compact_sha256: 703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40
-# Deliberate fail-closed placeholders. Replace both only after building and
-# reviewing the authoritative S56 QLP-quaternion/SPOC cadence artifact.
-expected_cadence_reference_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-expected_cadence_reference_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+# Reviewed v3 authority pair. The table is unchanged from v2; the manifest
+# additionally binds the four exact cam3 cadence-699957 exclusions.
+expected_cadence_reference_sha256: 6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a
+expected_cadence_reference_manifest_sha256: a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62
 
 scatter_pass_finite_fraction: 0.98
 scatter_review_finite_fraction: 0.95
@@ -111,11 +110,11 @@ injection_review_inband_fraction: 0.90
 # One truly independent WD 1856 reduction is enough for the enrichment scope.
 # A full-product promotion config must raise detector coverage to all 16 cells.
 independent_contract_template: "s{sector}_a2v1_independent_extraction_v2"
-# Deliberate fail-closed placeholders. Replace only after building and
-# reviewing the real external WD 1856 product and its emitted evidence pair.
-expected_independent_metrics_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-expected_independent_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-expected_independent_reference_product_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+# Reviewed official-MAST TESSCut reduction under the v2 external-quality
+# policy. Both active apertures independently recover the WD 1856 ephemeris.
+expected_independent_metrics_sha256: 6b3116f719a13d47c5c037d2e9e3035068aa3c80942e49ba020925e03e518975
+expected_independent_manifest_sha256: 50632bab106b19e59109b54c6f4ceb48df21c402c334b3d1455135ef7db32900
+expected_independent_reference_product_sha256: 4644df96e7d09d96fc22c97ca8dd2c59ea36feb688555116da9e5f7eabafe032
 min_independent_targets: 1
 min_independent_detectors: 1
 # Gate only on independent signal presence and ephemeris timing. Raw TESSCut

@@ -252,12 +252,13 @@ reference product. The official TESSCut comparison gates on signal presence
 and ephemeris timing; raw depth and scatter ratios are diagnostics because
 TESSCut aperture sums and decontaminated A2v1 flux do not share a dilution or
 noise transfer function.
-The locked configuration deliberately retains impossible authority, shard,
-and independent-product hashes until the real S56 artifacts are built and
-reviewed; placeholders must not be replaced with inferred values. The fixed-
-injection metric is the fitted slope between `1 - transit_model` and the
-negative injected-minus-original detrended flux; BLS recovery or teacher
-scores do not substitute for this Stage 1 signal-preservation measurement.
+The locked configuration pins every reviewed input: the compact product,
+quality-aware Tier-0 summary and BLS table, cadence authority, injection
+shards and source-parity report, and independent-product evidence. No hash may
+be replaced with an inferred value. The fixed-injection metric is the fitted
+slope between `1 - transit_model` and the negative injected-minus-original
+detrended flux; BLS recovery or teacher scores do not substitute for this
+Stage 1 signal-preservation measurement.
 
 Every required gate reports `pass`, `review`, or `fail`; missing evidence,
 contract mismatch, or a stale Tier-0 report fails closed. Overall `pass`
@@ -281,6 +282,20 @@ BLS peaks with this hash-bound overlay, and require candidate metadata and
 both real and injected teacher-native tensors to use the same cadence table
 and manifest. The BLS summary, scoring table, and native HDF5 must retain the
 table and manifest checksums; an older internal-only artifact is incompatible.
+
+The accepted immutable S56 compact product has one known orbit-boundary
+exception: cadence `699957` is present for camera 3 but absent from that
+camera's authoritative QLP quaternion timeline. The cadence-reference v3
+manifest binds the exact four affected detector keys (`cam3/ccd1` through
+`cam3/ccd4`) under `authority_exclusions`. Downstream overlays assign those
+exact rows reserved external-quality bit `62`, count them explicitly, and
+exclude them from every search, injection, independent-extraction, and model
+input metric. They are not filled or treated as inferred SPOC/QLP values.
+Every undeclared missing detector cadence still fails closed. This is a
+bounded compatibility rule for the frozen S56 compact product, not a general
+production waiver; future products should continue trimming upstream cadence
+mismatches to the quaternion authority before export.
+
 The S56 native-input contract is therefore v2, while candidate artifacts bind
 that input through their separately versioned provenance envelope. A
 checkpoint trained under native version 1 must fail compatibility checks

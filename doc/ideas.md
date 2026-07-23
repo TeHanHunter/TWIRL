@@ -74,8 +74,9 @@ Before any future teacher iteration is approved:
   calibration, and morphology metrics under both predicted and oracle factors.
 - Define the minimum advantage over teacher v1 and the external-sector
   retention gate before training, and keep S57 out of any "pristine holdout"
-  claim because its premature review queue contained six human labels at audit
-  close. Preserve all six and pause further S57 holdout consumption.
+  claim because it was consumed by the completed S57--S59 human-review return.
+  Preserve that label provenance and use a later sealed sector for prospective
+  evaluation.
 
 ## Catalog and contextual science
 

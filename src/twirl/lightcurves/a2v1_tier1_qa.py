@@ -3527,17 +3527,31 @@ def plot_tier1_diagnostics(
 
     ratio = pd.to_numeric(pair_metrics["mad_ratio"], errors="coerce")
     correlation = pd.to_numeric(pair_metrics["correlation"], errors="coerce")
-    pair_good = np.isfinite(ratio) & (ratio > 0) & np.isfinite(correlation)
-    axes[1, 0].scatter(
-        ratio[pair_good],
-        correlation[pair_good],
-        c=pd.to_numeric(pair_metrics.loc[pair_good, "tmag"], errors="coerce"),
-        cmap="viridis",
-        s=2.5,
-        alpha=0.3,
-        linewidths=0,
-        rasterized=True,
+    pair_tmag = pd.to_numeric(pair_metrics["tmag"], errors="coerce")
+    pair_good = (
+        np.isfinite(ratio)
+        & (ratio > 0)
+        & np.isfinite(correlation)
+        & np.isfinite(pair_tmag)
     )
+    if pair_good.any():
+        pair_scatter = axes[1, 0].scatter(
+            ratio[pair_good],
+            correlation[pair_good],
+            c=pair_tmag[pair_good],
+            cmap="viridis",
+            s=2.5,
+            alpha=0.3,
+            linewidths=0,
+            rasterized=True,
+        )
+        pair_colorbar = figure.colorbar(
+            pair_scatter,
+            ax=axes[1, 0],
+            pad=0.02,
+            fraction=0.05,
+        )
+        pair_colorbar.set_label("TESS magnitude")
     axes[1, 0].set_xscale("log")
     for boundary in (
         config.aperture_moderate_ratio_low,

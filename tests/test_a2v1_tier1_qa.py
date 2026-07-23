@@ -719,6 +719,73 @@ def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> Non
     )
 
 
+def test_injection_gate_propagates_nonzero_authority_exclusion(tmp_path) -> None:
+    shard = tmp_path / "injections.h5"
+    _write_injection_shard(shard)
+    cadence_path = tmp_path / "cadence.csv"
+    table, cadence_manifest = _write_cadence_evidence(cadence_path)
+    excluded_cadence = 10
+    table = table.loc[
+        ~(
+            table["camera"].eq(1)
+            & table["ccd"].eq(1)
+            & table["cadenceno"].eq(excluded_cadence)
+        )
+    ].reset_index(drop=True)
+    table.to_csv(cadence_path, index=False)
+    exclusion = cadence_manifest["authority_exclusions"]
+    exclusion["n_rows"] = 1
+    exclusion["by_detector"]["cam1_ccd1"] = {
+        "n_rows": 1,
+        "rows": [
+            {
+                "cadenceno": excluded_cadence,
+                "spoc_quality": 0,
+            }
+        ],
+    }
+    cadence_manifest["n_spoc_rows_excluded_by_quat"] = 1
+    cadence_manifest["authority_exclusions_sha256"] = (
+        authority_exclusions_sha256(exclusion)
+    )
+    cadence_manifest["table_sha256"] = file_sha256(cadence_path)
+    cadence_manifest["n_rows"] = len(table)
+    cadence_manifest["n_rows_by_detector"]["cam1_ccd1"] -= 1
+    cadence_manifest_path = tmp_path / "cadence.json"
+    cadence_manifest_path.write_text(
+        json.dumps(cadence_manifest) + "\n",
+        encoding="utf-8",
+    )
+
+    metrics, manifest = summarize_fixed_injection_shards(
+        [shard],
+        sector=56,
+        cadence_reference_path=cadence_path,
+        cadence_reference_manifest_path=cadence_manifest_path,
+    )
+
+    overlay = manifest["external_quality_overlay"]
+    assert overlay["aggregate_counts"]["n_cad_authority_excluded"] == 1
+    assert overlay["aggregate_counts"]["n_cad_external_bad"] == 17
+    assert overlay["aggregate_counts"]["n_cad_effective_bad"] == 17
+    shard_counts = next(iter(overlay["counts_by_shard"].values()))
+    assert shard_counts["n_cad_authority_excluded"] == 1
+    config = _small_injection_config(
+        expected_injection_shard_sha256=(file_sha256(shard),),
+        expected_cadence_reference_sha256=file_sha256(cadence_path),
+        expected_cadence_reference_manifest_sha256=file_sha256(
+            cadence_manifest_path
+        ),
+    )
+    gate = evaluate_fixed_injections(
+        metrics,
+        manifest,
+        sector=56,
+        config=config,
+    )
+    assert gate["status"] == "pass"
+
+
 def test_independent_gate_rejects_same_family_and_unphysical_depth() -> None:
     metrics, manifest = _passing_independent()
     passed = evaluate_independent_extraction(

@@ -40,6 +40,11 @@ if (( SECTOR < 56 )); then
   exit 2
 fi
 
+if (( SECTOR == 57 )); then
+  echo "Blocked: the legacy S57 recovery contract is retired. Build the observation-keyed, per-sector quality-aware S56-S62 teacher contract instead." >&2
+  exit 64
+fi
+
 probe() {
   "${SSH[@]}" "hostname"
 }

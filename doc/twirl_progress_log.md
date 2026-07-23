@@ -78,11 +78,38 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   S56 path-validation retrain uses a distinct native-v2 namespace; the planned
   seven-sector retrain first requires a new observation-keyed multi-sector
   native contract and cannot simply reuse the S56-only file.
+- `2026-07-23`: The first full quality-aware BLS attempt failed closed on
+  cadence `699957`, which is present in the frozen S56 compact product for all
+  camera-3 detectors but absent from the authoritative camera-3 quaternion
+  timeline. Cadence-reference builder v3 now publishes the exact four
+  detector/cadence rows in a hash-bound `authority_exclusions` sub-contract.
+  The v2 external overlay assigns only those declared rows reserved bit `62`,
+  masks and counts them, and still rejects every undeclared coverage gap.
+  This provenance propagates through real BLS, injection and independent
+  evidence, native HDF5, shard merging, candidate metadata, and teacher-input
+  validation. The combined suite passed `405` tests with `3` skips, plus the
+  detection sample and documentation checks; an independent review also
+  caught and fixed a shard-merge publish-order failure before deployment.
+- `2026-07-23`: Rebuilt the S56 cadence-reference manifest on PDO while
+  preserving the `188,396`-row table hash. The new manifest binds four exact
+  exclusions (`cam3/ccd1` through `cam3/ccd4`, cadence `699957`) and the
+  official TESSCut WD 1856 evidence was regenerated under the v2 overlay.
+  Both active apertures retain the accepted recovery: the 1x1 reference has
+  period `1.407960330 d` and depth S/N `11.87`; the WCS-defined 2x2 reference
+  has period `1.407896973 d` and depth S/N `11.33`. The frozen four-shard
+  injection canary was independently rehashed after its ORCD cleanup
+  relocation: all `2,000` injection IDs, immutable metadata, compact-source
+  parity, and ordered shard hashes match the locked contract. The restarted
+  `31,450`-target BLS run and its replacement Tier-0 audit both completed on
+  `pdogpu1`. The table contains all `62,900` expected target/aperture pairs,
+  with five `too_few_cadences` results and no missing pairs; all six Tier-0
+  gates pass. The reviewed Tier-0 report and BLS hashes are now locked before
+  the final ORCD Tier-1 population audit.
 
-**Next:** Run the gated S64-S69 source-only production queue while the real S56
-cadence/TESSCut evidence is published; regenerate the quality-aware BLS table,
-rerun and pin Tier 0, then execute the bounded Tier-1 CPU gate before
-enrichment uses S56.
+**Next:** Keep the gated S64-S69 source-only production queue active in
+parallel; execute the exact bounded Tier-1 CPU gate on ORCD, inspect its
+figures, and publish the target pass/review/fail mask before enrichment uses
+S56.
 
 ### Catalog, archive index, and sample control
 
@@ -177,6 +204,14 @@ sample.
   checkpoints remain hash-verified, but no retraining job was launched. The
   estimated merged S56--S59 corpus has about `42` unique real Planet-like TICs,
   still below the `50`-source student/promotion gate.
+- `2026-07-23`: A schema-aware scan of tracked artifacts and reachable git
+  history found S63 only in Stage-1 production/status QA, with no S63 rows in
+  candidate, vetting, label, training, scoring, or evaluation products. S63
+  can therefore be reserved conditionally for the first prospective teacher
+  evaluation after non-git PDO/ORCD/local exposure is also audited. Freeze the
+  S56--S62 checkpoint, calibration, thresholds, TIC-disjoint cohort, and
+  metrics before blind S63 labeling; report repeated hosts separately and do
+  not tune from the unblinded result.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
