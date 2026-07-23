@@ -1,0 +1,1127 @@
+{
+  "apertures": [
+    "DET_FLUX_ADP_SML",
+    "DET_FLUX_ADP"
+  ],
+  "config_name": "a2v1_tier1_active_search_pair_v1",
+  "contract_version": "a2v1_tier1_science_qa_v2",
+  "created_utc": "2026-07-23T20:40:56.700513+00:00",
+  "enrichment_ready": false,
+  "gates": {
+    "aperture_outliers": {
+      "component_status": {
+        "correlation_median": "pass",
+        "correlation_valid_fraction": "pass",
+        "extreme_outlier_fraction": "pass",
+        "moderate_outlier_fraction": "pass",
+        "negative_correlation_fraction": "pass",
+        "valid_fraction": "pass"
+      },
+      "correlation_median": 0.3626618828961286,
+      "correlation_valid_fraction": 0.999872813990461,
+      "extreme_outlier_fraction": 0.0003180054696940787,
+      "mad_ratio_median": 0.8211679866381454,
+      "moderate_outlier_fraction": 0.036761432296635504,
+      "n_targets": 31450,
+      "negative_correlation_fraction": 9.540164090822362e-05,
+      "reasons": [],
+      "status": "pass",
+      "valid_ratio_fraction": 0.999872813990461
+    },
+    "cadence_and_finite_data": {
+      "authoritative_reference_integrity": true,
+      "authority_excluded_cadences_total": 7360,
+      "cadence_reference": "authoritative detector/orbit cadence table",
+      "cadence_reference_contract": "s56_a2v1_cadence_reference_v1",
+      "component_status": {
+        "authoritative_reference_integrity": "pass",
+        "detector_stratified": "review",
+        "finite_quality0_median": "pass",
+        "finite_quality0_p05": "pass",
+        "median_relative_cadence_loss": "pass",
+        "p95_max_orbit_cadence_loss": "pass",
+        "p95_relative_cadence_loss": "pass",
+        "usable_cadence_median": "pass",
+        "usable_cadence_p05": "pass"
+      },
+      "detectors": [
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "review",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam1_ccd1",
+          "external_quality0_fraction_median": 0.8294692144373673,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.8041188959660297,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1656,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 2856144,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "review",
+          "usable_cadence_fraction_p05": 0.7183651804670913
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam1_ccd2",
+          "external_quality0_fraction_median": 0.8980891719745223,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.8580042462845011,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1761,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 2614425,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.7938853503184713
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam1_ccd3",
+          "external_quality0_fraction_median": 0.8980891719745223,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.876687898089172,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1487,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 2300461,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.7744373673036093
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam1_ccd4",
+          "external_quality0_fraction_median": 0.898343949044586,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.9635668789808918,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1534,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 1416985,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.8410488322717622
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam2_ccd1",
+          "external_quality0_fraction_median": 0.961104033970276,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.8335881104033971,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 2504,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 5439139,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.7462420382165605
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam2_ccd2",
+          "external_quality0_fraction_median": 0.9846284501061571,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.942972399150743,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 3474,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 3341751,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.8357537154989384
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam2_ccd3",
+          "external_quality0_fraction_median": 0.9751167728237792,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.9656900212314226,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 2579,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 2008453,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.8894267515923567
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam2_ccd4",
+          "external_quality0_fraction_median": 0.9385138004246284,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 1.0,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 2029,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 1553476,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.9211889596602972
+        },
+        {
+          "authority_excluded_cadences_total": 1756,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam3_ccd1",
+          "external_quality0_fraction_median": 0.9508280254777071,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.9771549893842888,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1756,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 1492034,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.8922292993630573
+        },
+        {
+          "authority_excluded_cadences_total": 1564,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam3_ccd2",
+          "external_quality0_fraction_median": 0.9699363057324841,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 1.0,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1564,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 621000,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.9491295116772823
+        },
+        {
+          "authority_excluded_cadences_total": 1478,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam3_ccd3",
+          "external_quality0_fraction_median": 0.9869214437367304,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.8670063694267516,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1478,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 2102648,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.7989384288747345
+        },
+        {
+          "authority_excluded_cadences_total": 2562,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam3_ccd4",
+          "external_quality0_fraction_median": 0.9859872611464968,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.9758811040339703,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 2562,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 1786986,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.8443312101910828
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam4_ccd1",
+          "external_quality0_fraction_median": 0.9568577494692144,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.9861571125265393,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 2074,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 1412561,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.915732484076433
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam4_ccd2",
+          "external_quality0_fraction_median": 0.9727388535031847,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 1.0,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1657,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 574670,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.9601698513800425
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam4_ccd3",
+          "external_quality0_fraction_median": 0.8392356687898089,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.8885774946921444,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1611,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 2295399,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.7529511677282378
+        },
+        {
+          "authority_excluded_cadences_total": 0,
+          "component_status": {
+            "finite_quality0_median": "pass",
+            "finite_quality0_p05": "pass",
+            "median_relative_cadence_loss": "pass",
+            "p95_max_orbit_cadence_loss": "pass",
+            "p95_relative_cadence_loss": "pass",
+            "reference_integrity": "pass",
+            "usable_cadence_median": "pass",
+            "usable_cadence_p05": "pass"
+          },
+          "detector": "cam4_ccd4",
+          "external_quality0_fraction_median": 0.9385987261146497,
+          "finite_quality0_fraction_p05": 1.0,
+          "internal_quality0_fraction_median": 0.93723991507431,
+          "median_relative_cadence_loss": 0.0,
+          "n_targets": 1724,
+          "p95_max_orbit_cadence_loss": 0.0,
+          "p95_relative_cadence_loss": 0.0,
+          "quality_mask_disagreements_total": 1692990,
+          "reference_anomaly_totals": {
+            "n_duplicate_cadences": 0,
+            "n_orbit_mismatches": 0,
+            "n_unexpected_cadences": 0
+          },
+          "status": "pass",
+          "usable_cadence_fraction_p05": 0.8580339702760085
+        }
+      ],
+      "external_quality0_fraction_median": 0.961104033970276,
+      "finite_quality0_fraction_median": 1.0,
+      "finite_quality0_fraction_p05": 1.0,
+      "internal_quality0_fraction_median": 0.958556263269639,
+      "median_relative_cadence_loss": 0.0,
+      "n_target_qa_fail": 8,
+      "n_target_qa_pass": 31442,
+      "n_target_qa_review": 0,
+      "p95_max_orbit_cadence_loss": 0.0,
+      "p95_relative_cadence_loss": 0.0,
+      "quality0_fraction_median": 0.9160084925690021,
+      "quality0_fraction_p05": 0.7543949044585987,
+      "quality_mask_disagreements_total": 33509122,
+      "reasons": [],
+      "reference_anomaly_totals": {
+        "n_duplicate_cadences": 0,
+        "n_orbit_mismatches": 0,
+        "n_unexpected_cadences": 0
+      },
+      "status": "review",
+      "usable_cadence_fraction_median": 0.9159660297239915,
+      "usable_cadence_fraction_p05": 0.7543099787685775
+    },
+    "cadence_reference_prerequisite": {
+      "authority_exclusions_sha256": "8d085c3305a9c46712409da60fe5691e2d47562135d4197956283f77c43edd6c",
+      "cadence_authority": "qlp_cam_quat",
+      "contract_version": "s56_a2v1_cadence_reference_v1",
+      "detectors": [
+        "cam1_ccd1",
+        "cam1_ccd2",
+        "cam1_ccd3",
+        "cam1_ccd4",
+        "cam2_ccd1",
+        "cam2_ccd2",
+        "cam2_ccd3",
+        "cam2_ccd4",
+        "cam3_ccd1",
+        "cam3_ccd2",
+        "cam3_ccd3",
+        "cam3_ccd4",
+        "cam4_ccd1",
+        "cam4_ccd2",
+        "cam4_ccd3",
+        "cam4_ccd4"
+      ],
+      "manifest_sha256": "a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62",
+      "n_authority_exclusions": 4,
+      "n_rows": 188396,
+      "orbits": [
+        119,
+        120
+      ],
+      "quality_authority": "spoc_and_qlp_quality_flags",
+      "reasons": [],
+      "status": "pass",
+      "table_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a"
+    },
+    "fixed_injection_preservation": {
+      "apertures": [
+        {
+          "aperture": "DET_FLUX_ADP_SML",
+          "component_status": {
+            "inband_fraction": "pass",
+            "median_retention": "pass",
+            "p10_retention": "pass"
+          },
+          "inband_fraction": 1.0,
+          "median_baseline_over_scale": 0.5368515594433709,
+          "median_depth_retention": 0.9908051770713365,
+          "median_raw_depth_response_slope": 0.5273402603325037,
+          "n_rows": 2000,
+          "p10_baseline_over_scale": 0.24311464215846426,
+          "p10_depth_retention": 0.9666094294770813,
+          "p10_raw_depth_response_slope": 0.2396941355707743,
+          "p90_baseline_over_scale": 0.8341941654124022,
+          "p90_depth_retention": 0.9996035796218162,
+          "p90_raw_depth_response_slope": 0.8239610414540819,
+          "status": "pass"
+        },
+        {
+          "aperture": "DET_FLUX_ADP",
+          "component_status": {
+            "inband_fraction": "pass",
+            "median_retention": "pass",
+            "p10_retention": "pass"
+          },
+          "inband_fraction": 1.0,
+          "median_baseline_over_scale": 0.29664578291130544,
+          "median_depth_retention": 0.9906007098551521,
+          "median_raw_depth_response_slope": 0.29427169385394447,
+          "n_rows": 2000,
+          "p10_baseline_over_scale": 0.08182743937250705,
+          "p10_depth_retention": 0.9660717776926909,
+          "p10_raw_depth_response_slope": 0.08015076677556933,
+          "p90_baseline_over_scale": 0.6440946607921636,
+          "p90_depth_retention": 0.9996111390846831,
+          "p90_raw_depth_response_slope": 0.6360840336284834,
+          "status": "pass"
+        }
+      ],
+      "coverage_status": "pass",
+      "depth_support_ratio": 2310.7702788334395,
+      "duration_support_ratio": 24.82254654782765,
+      "exact_injection_aperture_coverage": true,
+      "expected_contract": "s56_a2v1_fresh_injection_pair_v2",
+      "metadata_consistent_across_apertures": true,
+      "metadata_digest_matches_locked_config": true,
+      "metadata_sha256": "b56a0b841343e26a6e980d57a525ab01ab2c6d9ab039384d65479fcb06aaf0b0",
+      "n_detectors": 16,
+      "n_duplicate_injection_aperture_pairs": 0,
+      "n_faint_injection_ids": 1594,
+      "n_injection_ids": 2000,
+      "n_invalid_injection_aperture_pairs": 0,
+      "n_missing_injection_aperture_pairs": 0,
+      "n_unique_tics": 2000,
+      "observed_contracts": [
+        "s56_a2v1_fresh_injection_pair_v2"
+      ],
+      "period_support_ratio": 108.26267784483184,
+      "positive_finite_parameter_support": true,
+      "reasons": [],
+      "selection_digest_matches_locked_config": true,
+      "selection_sha256": "8ee40ea7e450d5c19027f2e6c0c02279a78102caa246aeac80e032278ede6c5a",
+      "status": "pass",
+      "valid_locked_metadata": true
+    },
+    "independent_extraction": {
+      "abs_log_scatter_ratio_max": 1.4212428883635653,
+      "abs_log_scatter_ratio_median": 1.0533262179903398,
+      "common_cadence_fraction_median": 1.0,
+      "common_cadence_fraction_min": 1.0,
+      "comparison_note": "Tier-1 gates on independent signal presence and ephemeris timing. Depth and scatter ratios are diagnostic because aperture dilution and decontamination differ between extraction families.",
+      "component_status": {
+        "common_cadence_fraction": "pass",
+        "coverage": "pass",
+        "wd1856": "pass"
+      },
+      "current_cadence_coverage_fraction_min": 1.0,
+      "n_detectors": 1,
+      "n_targets": 1,
+      "provenance": {
+        "bounded_bls": {
+          "durations_min": [
+            6.0,
+            8.0,
+            10.0
+          ],
+          "min_depth_snr": 5.0,
+          "n_periods": 4001,
+          "oversample": 20,
+          "period_relative_half_width": 0.01
+        },
+        "cadence_match_policy": "exact common CADENCENO intersection; joint current/reference effective QUALITY==0 and finite flux for photometric metrics; effective quality is native internal OR authoritative external",
+        "comparison_mode": "signal_timing_only",
+        "contract_version": "s56_a2v1_independent_extraction_v2",
+        "created_utc": "2026-07-23T15:07:24.564150+00:00",
+        "current_apertures": [
+          "DET_FLUX_ADP_SML",
+          "DET_FLUX_ADP"
+        ],
+        "current_compact_path": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/inputs/s56_A2v1_adp_pair.h5",
+        "current_compact_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
+        "current_extractor_family": "MIT TGLC A2v1",
+        "current_product_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
+        "current_repository": "https://github.com/TeHanHunter/TWIRL",
+        "current_revision": "a3d89c3f5993764940df90fc2f50cae7095abff3",
+        "current_time_system": "BJD-2457000 converted to BJD",
+        "depth_definition": "1 - median(matched normalized in-event flux) at fixed WD 1856 P=1.407939211 d, T0=2458779.375083 BJD, duration=8 min",
+        "ephemeris_recovery_definition": "independent bounded BoxLeastSquares recovery on each matched quality-zero flux series; published ephemeris only defines the predeclared search interval, fixed depth window, and later truth comparison",
+        "external_quality_overlay": {
+          "applied_before_common_cadence_metrics": true,
+          "authority_exclusion_external_bit": 62,
+          "authority_exclusion_policy_contract": "a2v1_quat_absent_spoc_cadence_exclusions_v1",
+          "authority_exclusions_sha256": "8d085c3305a9c46712409da60fe5691e2d47562135d4197956283f77c43edd6c",
+          "cadence_reference_cadence_authority": "qlp_cam_quat",
+          "cadence_reference_contract_version": "s56_a2v1_cadence_reference_v1",
+          "cadence_reference_manifest": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v2/inputs/s56_A2v1_cadence_reference_manifest.json",
+          "cadence_reference_manifest_sha256": "a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62",
+          "cadence_reference_quality_authority": "spoc_and_qlp_quality_flags",
+          "cadence_reference_source_declaration_sha256": "926ca0c5d20d69c105fc64322f0f9300bc496104dc03330e92545287327cfaa8",
+          "cadence_reference_table": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v2/inputs/s56_A2v1_cadence_reference.csv",
+          "cadence_reference_table_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a",
+          "current_common_audit_counts": {
+            "n_cad_authority_excluded": 0,
+            "n_cad_effective_bad": 1144,
+            "n_cad_external_bad": 508,
+            "n_cad_external_only_bad": 505,
+            "n_cad_internal_bad": 639,
+            "n_cad_total": 11775
+          },
+          "current_compact_full_audit_counts": {
+            "n_cad_authority_excluded": 0,
+            "n_cad_effective_bad": 1144,
+            "n_cad_external_bad": 508,
+            "n_cad_external_only_bad": 505,
+            "n_cad_internal_bad": 639,
+            "n_cad_total": 11775
+          },
+          "effective_quality_policy": "(internal_quality != 0) | (external_quality != 0), with exact manifest-declared quaternion-authority exclusions assigned reserved external bit 62",
+          "n_authority_exclusions": 4,
+          "policy_contract": "a2v1_native_internal_or_authoritative_external_quality_v2",
+          "reference_common_audit_counts": {
+            "n_cad_authority_excluded": 0,
+            "n_cad_effective_bad": 508,
+            "n_cad_external_bad": 508,
+            "n_cad_external_only_bad": 0,
+            "n_cad_internal_bad": 508,
+            "n_cad_total": 11775
+          },
+          "sector": 56
+        },
+        "fixed_ephemeris": {
+          "oot_exclusion_min": 30.0,
+          "period_d": 1.407939211,
+          "t0_bjd": 2458779.375083,
+          "transit_duration_min": 8.0
+        },
+        "independence_basis": "Official calibrated TESSCut pixels are extracted and detrended independently of MIT TGLC/A2v1; the compact product supplies cadence identity only.",
+        "independent": true,
+        "input_mtime_ns": {
+          "cadence_reference_manifest": 1784819092601448338,
+          "cadence_reference_table": 1784819091066415879,
+          "current_compact": 1783923517923844329,
+          "reference_product": 1784819229733348010,
+          "reference_table": 1784819229733348010
+        },
+        "input_size_bytes": {
+          "cadence_reference_manifest": 26675,
+          "cadence_reference_table": 4632104,
+          "current_compact": 4379183054,
+          "reference_product": 552960,
+          "reference_table": 552960
+        },
+        "max_time_delta_seconds_allowed": 60.0,
+        "metrics_content_sha256": "90ddee159857e9ed2b3489057fdac815d7a178216e9d535eb591cfa881e9f9db",
+        "metrics_file_sha256": "6b3116f719a13d47c5c037d2e9e3035068aa3c80942e49ba020925e03e518975",
+        "metrics_path": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v2/independent/wd1856_tesscut_metrics.csv",
+        "n_common_cadences": 11775,
+        "n_current_cadences": 11775,
+        "n_reference_cadences": 11775,
+        "pixel_source": "official MAST TESSCut calibrated FLUX cube",
+        "reference_columns": {
+          "cadence": "CADENCENO",
+          "flux_by_current_aperture": {
+            "DET_FLUX_ADP": "TESSCUT_FLUX",
+            "DET_FLUX_ADP_SML": "TESSCUT_FLUX_SML"
+          },
+          "quality": "QUALITY",
+          "sector": "FITS:SECTOR",
+          "tic": "FITS:TICID",
+          "time": "TIME"
+        },
+        "reference_extractor_family": "MAST TESSCut Astrocut aperture photometry",
+        "reference_flux_columns": {
+          "DET_FLUX_ADP": "TESSCUT_FLUX",
+          "DET_FLUX_ADP_SML": "TESSCUT_FLUX_SML"
+        },
+        "reference_product_aperture": "WCS-nearest 1x1 pixel and WCS-bracketing 2x2 sum",
+        "reference_product_identity": {
+          "format": "fits",
+          "identity_source": {
+            "sector": "FITS:SECTOR",
+            "tic": "FITS:TICID"
+          },
+          "sector": 56,
+          "tic": 267574918
+        },
+        "reference_product_path": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v2/independent/wd1856_tesscut_reference.fits",
+        "reference_product_sha256": "4644df96e7d09d96fc22c97ca8dd2c59ea36feb688555116da9e5f7eabafe032",
+        "reference_repository": "https://github.com/spacetelescope/astrocut",
+        "reference_revision": "astrocut 0.11.1",
+        "reference_table_identity": {
+          "format": "fits",
+          "identity_source": {
+            "sector": "FITS:SECTOR",
+            "tic": "FITS:TICID"
+          },
+          "sector": 56,
+          "tic": 267574918
+        },
+        "reference_table_path": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v2/independent/wd1856_tesscut_reference.fits",
+        "reference_table_sha256": "4644df96e7d09d96fc22c97ca8dd2c59ea36feb688555116da9e5f7eabafe032",
+        "reference_target_id": "TIC 267574918",
+        "reference_time_system": "BTJD",
+        "scatter_definition": "1.4826*MAD in ppm after each series is normalized by its matched out-of-event median; |phase| >= 30 min",
+        "sector": 56,
+        "tic": 267574918
+      },
+      "reasons": [],
+      "reference_cadence_coverage_fraction_min": 1.0,
+      "scatter_ratio_is_diagnostic_only": true,
+      "status": "pass",
+      "wd1856": {
+        "apertures": [
+          {
+            "aperture": "DET_FLUX_ADP_SML",
+            "current_depth": 0.08195635682400537,
+            "current_epoch_residual_min": 0.38162495861270507,
+            "current_period_relative_error": 1.4999999999876223e-05,
+            "depth_ratio_is_diagnostic_only": true,
+            "reference_depth": 0.015133650823244249,
+            "reference_epoch_residual_min": 1.2731905644644004,
+            "reference_period_relative_error": 1.4999999999876223e-05,
+            "reference_to_current_depth_ratio": 0.18465499699727425,
+            "status": "pass"
+          },
+          {
+            "aperture": "DET_FLUX_ADP",
+            "current_depth": 0.2252914973629062,
+            "current_epoch_residual_min": 0.9683750951500892,
+            "current_period_relative_error": 1.4999999999987246e-05,
+            "depth_ratio_is_diagnostic_only": true,
+            "reference_depth": 0.006778092224856813,
+            "reference_epoch_residual_min": 0.2268093460666334,
+            "reference_period_relative_error": 3.0000000000085514e-05,
+            "reference_to_current_depth_ratio": 0.030085876760535094,
+            "status": "pass"
+          }
+        ],
+        "status": "pass"
+      }
+    },
+    "injection_source_parity_prerequisite": {
+      "current_compact_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
+      "injection_source_adp_sha256": "03f041bc66f09158d7740eaf9116b081d2184b7844720778d74f7ec0cf3b4505",
+      "n_dataset_comparisons": 188700,
+      "reasons": [],
+      "report_sha256": "f5e98f0e900beda0275d2a1d34ce592e799f5b0690db1490482c34c0f92360f9",
+      "source_adp_h5": [
+        "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair_rebuilt.h5"
+      ],
+      "status": "pass"
+    },
+    "population_scatter": {
+      "apertures": [
+        {
+          "aperture": "DET_FLUX_ADP_SML",
+          "component_status": {
+            "absolute_mad_envelope": "pass",
+            "absolute_rms_envelope": "pass",
+            "coverage": "pass",
+            "finite_metrics": "pass",
+            "outliers": "pass",
+            "slope": "pass"
+          },
+          "finite_metric_fraction": 0.999872813990461,
+          "high_residual_fraction": 0.00019080328181644724,
+          "intercept_log10_mad": 1.1395546117328843,
+          "n_targets": 31450,
+          "slope_log10_mad_per_mag": 0.23148554637610333,
+          "status": "pass",
+          "supported_magnitude_bins": 6
+        },
+        {
+          "aperture": "DET_FLUX_ADP",
+          "component_status": {
+            "absolute_mad_envelope": "pass",
+            "absolute_rms_envelope": "pass",
+            "coverage": "pass",
+            "finite_metrics": "pass",
+            "outliers": "pass",
+            "slope": "pass"
+          },
+          "finite_metric_fraction": 0.9999682034976153,
+          "high_residual_fraction": 0.0002861776209100448,
+          "intercept_log10_mad": 2.9315173519022815,
+          "n_targets": 31450,
+          "slope_log10_mad_per_mag": 0.13473633789116266,
+          "status": "pass",
+          "supported_magnitude_bins": 6
+        }
+      ],
+      "reasons": [],
+      "status": "pass"
+    },
+    "tier0_prerequisite": {
+      "bls_peaks_sha256": "c3a7bd9f4953263950c27092d14962145eebaef714e6a60ce4fb178577410692",
+      "compact_lc_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
+      "contract_version": "a2v1_tier0_integrity_qa_v2",
+      "reasons": [],
+      "required_gates": [
+        "schema_and_completeness",
+        "bls_target_aperture_coverage",
+        "sampled_adp_photometry",
+        "aperture_consistency",
+        "prior_extraction_tree_comparison",
+        "benchmark"
+      ],
+      "sector": 56,
+      "status": "pass",
+      "tier0_summary_sha256": "1f7865b9368095ae7b0dcee52f7ed3d6caeb7c5406caea18d9613ade3cf432ca"
+    }
+  },
+  "outputs": {
+    "aperture_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/aperture_metrics.parquet",
+    "aperture_pair_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/aperture_pair_metrics.csv",
+    "detector_eligibility_pdf": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_detector_eligibility.pdf",
+    "detector_eligibility_png": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_detector_eligibility.png",
+    "detector_summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/detector_summary.csv",
+    "gate_json": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/s56_A2v1_tier1_gate.json",
+    "independent_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/independent_extraction_metrics.csv",
+    "injection_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/fixed_injection_manifest.json",
+    "injection_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/fixed_injection_metrics.csv",
+    "magnitude_bins": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/magnitude_bins.csv",
+    "qa_diagnostics_pdf": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_qa_diagnostics.pdf",
+    "qa_diagnostics_png": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/tier1_qa_diagnostics.png",
+    "summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/summary.json",
+    "target_eligibility": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/target_eligibility.csv",
+    "target_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v2_5adae3b6_20260723/tier1_qa/target_metrics.parquet"
+  },
+  "passed": false,
+  "promotion_enabled": false,
+  "provenance": {
+    "cadence_reference": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_cadence_reference.csv",
+    "cadence_reference_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_cadence_reference_manifest.json",
+    "cadence_reference_manifest_sha256": "a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62",
+    "cadence_reference_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a",
+    "compact_lc": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair.h5",
+    "compact_lc_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
+    "config": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_tier1_qa_v2_5adae3b6_20260723/configs/qa/a2v1_tier1_active_search_pair_v1.yaml",
+    "config_sha256": "342d4e21564178173c2bdb1d324726524129b3e6eb7e8f704005c041d5b8da21",
+    "independent_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/wd1856_tesscut_metrics_manifest.json",
+    "independent_manifest_sha256": "50632bab106b19e59109b54c6f4ceb48df21c402c334b3d1455135ef7db32900",
+    "independent_metrics": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/wd1856_tesscut_metrics.csv",
+    "independent_metrics_sha256": "6b3116f719a13d47c5c037d2e9e3035068aa3c80942e49ba020925e03e518975",
+    "injection_evidence_sha256": "03a0d8abfe1c9f66e1800bee309f90583a568285fc743539d5178bf91374f06c",
+    "injection_manifest_input": null,
+    "injection_manifest_input_sha256": null,
+    "injection_metrics_input": null,
+    "injection_metrics_input_sha256": null,
+    "injection_shards": [
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_00.h5",
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_13.h5",
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_26.h5",
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_39.h5"
+    ],
+    "injection_source_parity": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/input_verification.json",
+    "injection_source_parity_sha256": "f5e98f0e900beda0275d2a1d34ce592e799f5b0690db1490482c34c0f92360f9",
+    "output_sha256": {
+      "aperture_metrics": "7a88307fce3f8ad97a5863a1fcd1d8f103fe9aa1c056f59fa2411605d1e4aef5",
+      "aperture_pair_metrics": "0d5372f712c6387b91c085f710511afdf9396cf113624a134eddaade767b5c9b",
+      "detector_eligibility_pdf": "4eedbb930f5487ba2c72dbcad3810233013d0890cced4eacbdcb690d537a5190",
+      "detector_eligibility_png": "1bed9fefc1bd9c15d3956fdf1496543dc1630ac3628adf8952a1298d038688e6",
+      "detector_summary": "4312fe2c8af4ca3d37564c4325bcafd68ccf1b7165ee97406664d3efbaf04da5",
+      "independent_metrics": "6b3116f719a13d47c5c037d2e9e3035068aa3c80942e49ba020925e03e518975",
+      "injection_manifest": "4fe598fd514905511ab0876a994f1f64553051b1cb07e6ca39383bc5db40b19a",
+      "injection_metrics": "cdc0a8def36011ff506c6471b637e02e939662b451e8e04e6e182015411d801a",
+      "magnitude_bins": "7e2389dad75e2556a4704b39239fc16a36d9961a7d97866a846f9b2900b9f23f",
+      "qa_diagnostics_pdf": "46204f80dea33d08f6ed61e6ef67ddd6ff7acaddae0ab254e69e0fd90ee37905",
+      "qa_diagnostics_png": "45e8910041ad93c62e42814068c1581148a3d96681310873e01a51cc9f220d2e",
+      "target_eligibility": "60945a24cdaaf6db014fb25f30c063cf5365f7044777ab7b1acd323095d16860",
+      "target_metrics": "d6830f32b62334a567d138c13aa53ab667afb9d40b80070e2250b973c9093ba2"
+    },
+    "published_injection_manifest_sha256": "4fe598fd514905511ab0876a994f1f64553051b1cb07e6ca39383bc5db40b19a",
+    "tier0_summary": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_photometric_qa_gate.json",
+    "tier0_summary_sha256": "1f7865b9368095ae7b0dcee52f7ed3d6caeb7c5406caea18d9613ade3cf432ca"
+  },
+  "qa_tier": "tier1_bounded_enrichment_qa",
+  "science_ready": false,
+  "scope": "active_search_pair",
+  "sector": 56,
+  "status": "review",
+  "target_qa": {
+    "candidate_teacher_filter": "tier1_target_qa_pass == True",
+    "n_fail": 32,
+    "n_pass": 30115,
+    "n_review": 1303,
+    "n_with_gaia_dr3_source_id": 0,
+    "observation_key": [
+      "sector",
+      "tic"
+    ],
+    "reason_code_vocabulary": [
+      "aperture_anticorrelation",
+      "aperture_correlation_missing",
+      "aperture_correlation_low",
+      "aperture_mad_ratio",
+      "aperture_missing",
+      "cadence_loss",
+      "duplicate_cadence",
+      "finite_flux",
+      "orbit_cadence_loss",
+      "orbit_mismatch",
+      "orbit_missing",
+      "scatter_absolute_high",
+      "unexpected_cadence",
+      "usable_cadence"
+    ]
+  },
+  "thresholds": {
+    "aperture_extreme_ratio_high": 10.0,
+    "aperture_extreme_ratio_low": 0.1,
+    "aperture_moderate_ratio_high": 3.0,
+    "aperture_moderate_ratio_low": 0.3333333333333333,
+    "aperture_negative_correlation_threshold": -0.2,
+    "aperture_pass_correlation_median": 0.1,
+    "aperture_pass_correlation_valid_fraction": 0.98,
+    "aperture_pass_extreme_outlier_fraction": 0.005,
+    "aperture_pass_moderate_outlier_fraction": 0.05,
+    "aperture_pass_negative_correlation_fraction": 0.05,
+    "aperture_pass_valid_fraction": 0.98,
+    "aperture_review_correlation_median": 0.0,
+    "aperture_review_correlation_valid_fraction": 0.95,
+    "aperture_review_extreme_outlier_fraction": 0.01,
+    "aperture_review_moderate_outlier_fraction": 0.1,
+    "aperture_review_negative_correlation_fraction": 0.1,
+    "aperture_review_valid_fraction": 0.95,
+    "apertures": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_ADP"
+    ],
+    "cadence_pass_median_loss": 0.005,
+    "cadence_pass_p95_loss": 0.02,
+    "cadence_reference_contract_template": "s{sector}_a2v1_cadence_reference_v1",
+    "cadence_review_median_loss": 0.01,
+    "cadence_review_p95_loss": 0.05,
+    "contract_version": "a2v1_tier1_science_qa_v2",
+    "expected_cadence_reference_manifest_sha256": "a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62",
+    "expected_cadence_reference_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a",
+    "expected_compact_sha256": "703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40",
+    "expected_independent_manifest_sha256": "50632bab106b19e59109b54c6f4ceb48df21c402c334b3d1455135ef7db32900",
+    "expected_independent_metrics_sha256": "6b3116f719a13d47c5c037d2e9e3035068aa3c80942e49ba020925e03e518975",
+    "expected_independent_reference_product_sha256": "4644df96e7d09d96fc22c97ca8dd2c59ea36feb688555116da9e5f7eabafe032",
+    "expected_injection_metadata_sha256": "b56a0b841343e26a6e980d57a525ab01ab2c6d9ab039384d65479fcb06aaf0b0",
+    "expected_injection_parity_report_sha256": "f5e98f0e900beda0275d2a1d34ce592e799f5b0690db1490482c34c0f92360f9",
+    "expected_injection_selection_sha256": "8ee40ea7e450d5c19027f2e6c0c02279a78102caa246aeac80e032278ede6c5a",
+    "expected_injection_shard_sha256": [
+      "fe9996515fca53a8b3efd29a523ce88ac1016f905b02bb4326406df881b36525",
+      "7b166ddfbeb305c37b40e3853b0dd600a91b92af2e241f04d041b64f231bfa07",
+      "4d6f8f1154b396024c858c2da87df249bb960be4a4bfebfc88c6476199cace9b",
+      "9e309d6b02d7bf7bfcb10682eee416b3c0e236b802a10aa83869cc2b1b47e5a4"
+    ],
+    "expected_injection_source_adp_sha256": "03f041bc66f09158d7740eaf9116b081d2184b7844720778d74f7ec0cf3b4505",
+    "expected_tier0_bls_peaks_sha256": "c3a7bd9f4953263950c27092d14962145eebaef714e6a60ce4fb178577410692",
+    "expected_tier0_contract": "a2v1_tier0_integrity_qa_v2",
+    "expected_tier0_summary_sha256": "1f7865b9368095ae7b0dcee52f7ed3d6caeb7c5406caea18d9613ade3cf432ca",
+    "finite_pass_median": 0.99,
+    "finite_pass_p05": 0.95,
+    "finite_review_median": 0.95,
+    "finite_review_p05": 0.9,
+    "independent_comparison_mode": "signal_timing_only",
+    "independent_contract_template": "s{sector}_a2v1_independent_extraction_v2",
+    "independent_max_time_delta_seconds": 60.0,
+    "independent_pass_common_fraction": 0.9,
+    "independent_review_common_fraction": 0.8,
+    "injection_contract_template": "s{sector}_a2v1_fresh_injection_pair_v2",
+    "injection_expected_ids": 2000,
+    "injection_faint_tmag_min": 19.0,
+    "injection_inband_high": 1.5,
+    "injection_inband_low": 0.5,
+    "injection_pass_inband_fraction": 0.95,
+    "injection_pass_p10": 0.7,
+    "injection_pass_retention_high": 1.15,
+    "injection_pass_retention_low": 0.85,
+    "injection_required_shard_indices": [
+      0,
+      13,
+      26,
+      39
+    ],
+    "injection_review_inband_fraction": 0.9,
+    "injection_review_p10": 0.5,
+    "injection_review_retention_high": 1.3,
+    "injection_review_retention_low": 0.7,
+    "injection_selection_mode": "full_shard",
+    "magnitude_edges": [
+      0.0,
+      18.0,
+      19.0,
+      19.5,
+      20.0,
+      20.5,
+      30.0
+    ],
+    "min_faint_injection_ids": 32,
+    "min_independent_detectors": 1,
+    "min_independent_targets": 1,
+    "min_injection_depth_ratio": 5.0,
+    "min_injection_detectors": 8,
+    "min_injection_duration_ratio": 2.0,
+    "min_injection_period_ratio": 30.0,
+    "min_population_targets": 512,
+    "min_supported_magnitude_bins": 3,
+    "min_targets_per_magnitude_bin": 30,
+    "name": "a2v1_tier1_active_search_pair_v1",
+    "promotion_enabled": false,
+    "sample_seed": 560101,
+    "sample_size": 0,
+    "scatter_envelope_dex_per_mag": 0.25,
+    "scatter_envelope_reference_tmag": 18.0,
+    "scatter_high_residual_dex": 0.5,
+    "scatter_pass_finite_fraction": 0.98,
+    "scatter_pass_mad_ppm_at_reference": 400000.0,
+    "scatter_pass_outlier_fraction": 0.05,
+    "scatter_pass_rms5_ppm_at_reference": 600000.0,
+    "scatter_pass_slope_max": 0.6,
+    "scatter_pass_slope_min": -0.1,
+    "scatter_review_finite_fraction": 0.95,
+    "scatter_review_mad_ppm_at_reference": 700000.0,
+    "scatter_review_outlier_fraction": 0.1,
+    "scatter_review_rms5_ppm_at_reference": 1000000.0,
+    "scatter_review_slope_max": 0.8,
+    "scatter_review_slope_min": -0.2,
+    "scope": "active_search_pair",
+    "sector": 56,
+    "usable_pass_median": 0.8,
+    "usable_pass_p05": 0.5,
+    "usable_review_median": 0.5,
+    "usable_review_p05": 0.3,
+    "wd1856_pass_epoch_residual_min": 5.0,
+    "wd1856_pass_period_relative_error": 0.0001,
+    "wd1856_review_epoch_residual_min": 15.0,
+    "wd1856_review_period_relative_error": 0.0005
+  }
+}

@@ -131,11 +131,27 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   `b56a0b84…f0b0`, so the v2 lock was updated without changing the sample or
   thresholds. A future contract should separate schedule/host and
   epoch-realization digests explicitly.
+- `2026-07-23`: The exact full-population v2 evaluator at commit `5adae3b6`
+  completed on ORCD as CPU job `18652943` in `4 min 58 s`. Seven of eight
+  gates pass: cadence authority, source parity, Tier-0, population scatter,
+  aperture behavior, fixed injections, and independent WD 1856 extraction.
+  The overall status is `review`, with `passed=false`,
+  `enrichment_ready=false`, and `science_ready=false`, because the
+  detector-stratified cadence gate is review for cam1/ccd1. Its median usable
+  fraction is `0.7434`, below the predeclared `0.80` pass threshold despite
+  zero cadence loss and every cam1/ccd1 target passing its individual cadence
+  check. The locked external mask isolates the cause to orbit 119
+  (`65.5%` quality-zero versus `99.0%` in orbit 120), dominated by one
+  contiguous `1,929`-cadence flagged interval rather than a cadence-join gap.
+  The published target mask contains `30,115` pass, `1,303` review, and `32`
+  fail rows. It is not authorized for enrichment while the overall gate
+  remains review.
 
 **Next:** Keep the gated S64-S69 source-only production queue active in
-parallel; commit and deploy the v2 hash lock, execute the exact bounded Tier-1
-CPU gate on ORCD, inspect its figures, and publish the target pass/review/fail
-mask before enrichment uses S56.
+parallel; preserve the reviewed result, choose an explicit enrichment-only
+cam1/ccd1 exclusion or other predeclared remediation without lowering the
+threshold, rerun the exact gate, and publish a mask only if that narrowed scope
+passes.
 
 ### Catalog, archive index, and sample control
 

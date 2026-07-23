@@ -20,9 +20,11 @@ cadence/quality reference with four declared authority exclusions, a
 quality-aware 2,000-injection v2 canary regenerated from the unchanged frozen
 schedule, aperture behavior, and an independent
 official-TESSCut recovery of WD 1856 b. The final bounded-gate outcome is
-**[PENDING ORCD TIER-1: overall status, pass flag, and `enrichment_ready`]**.
-Regardless of that result, this two-aperture assessment cannot promote the
-six-channel A2v1 product and must retain `science_ready=false`.
+**review** (`passed=false`, `enrichment_ready=false`). Seven of eight gates
+pass; the cadence/finite-data gate is review because the cam1/ccd1 median
+usable-cadence fraction is 0.743, below the predeclared 0.80 pass line.
+This two-aperture assessment cannot promote the six-channel A2v1 product and
+retains `science_ready=false`.
 
 ## Methods
 
@@ -58,8 +60,8 @@ TGLC production tree. WD 1856 b is recovered in its 1x1 reference aperture at
 period 1.407960330 d with BLS S/N 11.87 and an approximately 1.27 min epoch
 residual. The WCS-defined 2x2 reference aperture gives period 1.407896973 d,
 BLS S/N 11.33, and an approximately 0.23 min epoch residual. These
-measurements establish the independent evidence input; the final gate status
-still depends on the locked end-to-end audit.
+measurements establish the independent evidence input and pass the locked
+end-to-end audit.
 
 ## Results
 
@@ -84,39 +86,47 @@ recalculation replacing only `model_depth` transforms the v1 digest
 `54996889…1910` into the v2 digest `b56a0b84…f0b0`. The v2 realization hash
 was therefore relocked without changing the sample or any gate threshold.
 
+The exact full-population run (ORCD CPU job `18652943`) completed in 4 min
+58 s from evaluator/config commit `5adae3b6`. It returned exit code 1 because
+the contract encodes review as non-passing, not because the program crashed.
+
 | Gate | Status | Principal result |
 |---|---:|---|
-| Cadence-reference prerequisite | **[PENDING ORCD TIER-1]** | 188,396 rows; 4 declared authority exclusions |
-| Injection-source parity prerequisite | **[PENDING ORCD TIER-1]** | **[PENDING ORCD TIER-1: comparison count and mismatch count]** |
-| Tier-0 prerequisite | **[PENDING ORCD TIER-1 HASH CHECK]** | Tier-0 passed all 6 nested gates; summary `1f7865b9…432ca`, BLS table `c3a7bd9f…10692` |
-| Population scatter | **[PENDING ORCD TIER-1]** | **[PENDING ORCD TIER-1: supported magnitude bins, slopes, and outlier fractions]** |
-| Cadence and finite data | **[PENDING ORCD TIER-1]** | **[PENDING ORCD TIER-1: loss, finite-flux, and usable-cadence quantiles]** |
-| Aperture outliers | **[PENDING ORCD TIER-1]** | **[PENDING ORCD TIER-1: valid, ratio-outlier, correlation, and anticorrelation fractions]** |
-| Fixed-injection preservation | **[PENDING ORCD TIER-1]** | Quality-aware v2 canary; 2,000 unique injection IDs; **[PENDING: retention quantiles and in-band fraction]** |
-| Independent extraction | **[PENDING ORCD TIER-1]** | WD 1856 b recovered in both independent apertures; **[PENDING: common-cadence fraction and final gate status]** |
+| Cadence-reference prerequisite | **Pass** | 188,396 rows; 4 declared authority exclusions |
+| Injection-source parity prerequisite | **Pass** | 188,700 dataset comparisons; 0 target mismatches |
+| Tier-0 prerequisite | **Pass** | All 6 nested gates; summary `1f7865b9…432ca`, BLS table `c3a7bd9f…10692` |
+| Population scatter | **Pass** | 6 supported bins per aperture; log-MAD slopes 0.231 and 0.135; high-residual fractions 0.019% and 0.029% |
+| Cadence and finite data | **Review** | Zero median/p95 cadence loss and 100% finite quality-zero flux; usable fraction median 0.916, p05 0.754; cam1/ccd1 detector median 0.743 |
+| Aperture outliers | **Pass** | 99.987% valid ratios; 3.676% moderate and 0.032% extreme outliers; median correlation 0.363 |
+| Fixed-injection preservation | **Pass** | 2,000 IDs on 16 detectors; median retention 0.991 in both apertures, p10 0.967 and 0.966, 100% in-band |
+| Independent extraction | **Pass** | 100% common-cadence coverage; WD 1856 b passes in both independent apertures |
 
-**Overall status:** **[PENDING ORCD TIER-1: `status` and `passed`]**
+**Overall status:** **review** (`passed=false`)
 
-**Target eligibility:** **[PENDING ORCD TIER-1: pass/review/fail counts and
-Gaia-identified count]**
+**Target eligibility:** 30,115 pass; 1,303 review; 32 fail. The main review
+reasons are aperture MAD ratio (1,160) and absolute scatter (159).
 
-**Enrichment ready:** **[PENDING ORCD TIER-1: `enrichment_ready`]**
+**Enrichment ready:** `false`
 
 **Science ready:** `false` (fixed by scope, not a pending measurement)
 
 ## Figures
 
-> **Figure 1 slot — `tier1_qa_diagnostics.png`.** Full-population diagnostic
-> panels for MAD and five-point RMS versus TESS magnitude, primary-to-small
-> aperture MAD ratio versus aperture correlation with magnitude color coding,
-> and injected-depth retention. Pass and review boundaries are the locked
-> configuration thresholds. **[PENDING ORCD TIER-1: insert rendered figure and
-> summarize the dominant visible trend.]**
+![Full-population Tier-1 diagnostics](tier1_qa_diagnostics.png)
 
-> **Figure 2 slot — `tier1_detector_eligibility.png`.** Camera-by-CCD map of
-> the fraction of S56 targets passing the final Tier-1 target filter.
-> **[PENDING ORCD TIER-1: insert rendered figure and identify any
-> detector-localized deficit.]**
+*Figure 1.* Full-population MAD and 5-sigma-clipped RMS versus TESS magnitude,
+aperture MAD ratio versus correlation, and injected-depth retention. Both
+scatter loci remain below the pass envelopes; the injection distributions are
+tightly centered near one with no values clipped below zero or above two.
+[Vector PDF](tier1_qa_diagnostics.pdf)
+
+![Tier-1 detector eligibility](tier1_detector_eligibility.png)
+
+*Figure 2.* Fraction and count of targets passing the final target-level
+filter by camera and CCD. All 16 cells are populated, with pass fractions from
+0.931 to 0.989. The overall review is not a missing-cell or target-pass
+deficit: it is the separate detector-level usable-cadence check for cam1/ccd1.
+[Vector PDF](tier1_detector_eligibility.pdf)
 
 ## Limitations
 
@@ -127,7 +137,11 @@ search-to-vetting completeness. WD 1856 b is a necessary benchmark but one
 favorable system cannot establish survey-wide sensitivity. Passing this gate
 would therefore authorize only the use of target-filtered S56 inputs for
 bounded enrichment; a review or failure would require remediation before that
-use.
+use. The current review does not authorize enrichment.
+
+The published mask is keyed by `(sector, TIC)`. Its Gaia DR3 column is empty in
+the compact export, so the mask must be joined back to the authoritative
+master catalog before a candidate corpus or release-facing table is frozen.
 
 ## Repository audit and reproducibility
 
@@ -151,15 +165,31 @@ BLS table (`c3a7bd9f…10692`) checksums, and v2 shard-producer commit
 `f1b8b53c7f2b2c62912e9d240b595458cbbd5d14`. The ordered v2 shard hashes are
 `fe999651…6525`, `7b166ddf…fa07`, `4d6f8f11…ce9b`, and
 `9e309d6b…e5a4`. The selection digest remains `8ee40ea7…6c5a`, while the v2
-epoch-realization metadata digest is `b56a0b84…f0b0`. The final
-evaluator/config revision remains **[PENDING FINAL HASH-LOCK COMMIT]**.
+epoch-realization metadata digest is `b56a0b84…f0b0`. The final locked
+evaluator/config revision is
+`5adae3b62fe9bc6785e7df754a57e06eb85a00a9`.
 
 ## Verdict
 
-**[PENDING ORCD TIER-1: state pass/review/fail and whether S56 may enter the
-target-filtered enrichment workflow.]** The non-negotiable interpretation is
-that `science_ready=false`: even a clean pass is evidence for bounded
-enrichment, not a science-ready search pipeline or survey release.
+**S56 should not yet enter the target-filtered enrichment workflow.** The
+result is close and scientifically informative, but the predeclared contract
+correctly returns review. Cam1/ccd1 has zero missing-cadence loss, yet its
+internal-or-external quality union leaves a median usable fraction of 0.743.
+The cause is concentrated in orbit 119: the locked external mask is good for
+65.5% of cadences there versus 99.0% in orbit 120, dominated by one contiguous
+1,929-cadence flagged interval rather than a cadence-join bug.
+
+The cleanest remediation is conservative: define a new enrichment-only scope
+that excludes cam1/ccd1, retain all thresholds, and rerun the same gate. That
+would remove 1,656 targets from this enrichment pass while leaving 28,489
+already-pass targets in the other 15 detector cells. The excluded detector
+should remain in the survey archive for later quality-mask calibration; this
+is not a change to the statistical parent sample. Retrospectively lowering the
+0.80 detector threshold is not recommended.
+
+The non-negotiable interpretation remains `science_ready=false`: even a later
+clean pass is evidence for bounded enrichment, not a science-ready search
+pipeline or survey release.
 
 The teacher-model bottleneck is presently data and evaluation infrastructure,
 not a demonstrated lack of model capacity. Teacher v1 should remain the
@@ -171,13 +201,13 @@ pseudo-labeling, and architecture sweeps should remain off the critical path.
 
 ## Adjusted next steps
 
-1. **Close this bounded gate.** Review and pin the PDO Tier-0/BLS outputs,
-   execute the exact ORCD Tier-1 audit, inspect both figures, and publish the
-   target pass/review/fail mask.
+1. **Resolve the one detector review without relaxing thresholds.** Prefer a
+   predeclared enrichment-only exclusion of cam1/ccd1, rerun the exact gate,
+   and publish a mask only if the narrowed scope passes.
 2. **Freeze the seven-sector enrichment corpus.** Finish S56 and S60–S62 human
    review, preserve observation-level `(sector, TIC, candidate_key)` labels,
-   and publish the sibling candidate table/TIC roll-up without implying
-   multi-sector confirmation.
+   join the Tier-1 mask to Gaia DR3, and publish the sibling candidate
+   table/TIC roll-up without implying multi-sector confirmation.
 3. **Build the training contract before retraining.** Regenerate per-sector
    quality-aware BLS/native inputs, route ephemeris-incompatible labels to
    re-review, freeze one TIC split registry, and report calibration plus
