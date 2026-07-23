@@ -78,8 +78,9 @@ TEST_INJECTION_METADATA_SHA256 = injection_metadata_sha256(
 )
 
 
-def _write_compact(path, *, n_targets: int = 40, n_cadences: int = 200) -> None:
+def _write_compact(path, *, n_targets: int = 40, n_cadences: int = 202) -> None:
     rng = np.random.default_rng(56)
+    orbit_boundary = min(100, n_cadences // 2)
     with h5py.File(path, "w") as h5:
         h5.attrs["sector"] = 56
         targets = h5.create_group("targets")
@@ -100,7 +101,7 @@ def _write_compact(path, *, n_targets: int = 40, n_cadences: int = 200) -> None:
             group.create_dataset("quality", data=quality)
             group.create_dataset(
                 "orbitid",
-                data=np.where(np.arange(n_cadences) < n_cadences // 2, 119, 120),
+                data=np.where(np.arange(n_cadences) < orbit_boundary, 119, 120),
             )
             sigma = 0.002 * 10 ** (0.12 * (float(group.attrs["tessmag"]) - 17.0))
             base = 1.0 + rng.normal(0.0, sigma, n_cadences)
@@ -110,15 +111,16 @@ def _write_compact(path, *, n_targets: int = 40, n_cadences: int = 200) -> None:
             )
 
 
-def _cadence_reference(*, n_cadences: int = 200) -> pd.DataFrame:
+def _cadence_reference(*, n_cadences: int = 202) -> pd.DataFrame:
     rows: list[dict] = []
+    orbit_boundary = min(100, n_cadences // 2)
     for camera in range(1, 5):
         for ccd in range(1, 5):
             for cadence in range(n_cadences):
                 rows.append(
                     {
                         "sector": 56,
-                        "orbitid": 119 if cadence < n_cadences // 2 else 120,
+                        "orbitid": 119 if cadence < orbit_boundary else 120,
                         "camera": camera,
                         "ccd": ccd,
                         "cadenceno": cadence,
@@ -560,6 +562,8 @@ def test_tier1_config_is_strict_and_scoped(tmp_path) -> None:
             Tier1QAConfig(),
             contract_version="a2v1_tier1_science_qa_v1",
         ).validate()
+    with pytest.raises(ValueError, match="locked A2v1 BLS minimum"):
+        replace(Tier1QAConfig(), min_searchable_cadences=199).validate()
 
 
 def test_tier0_prerequisite_is_hash_bound_and_checks_every_nested_gate() -> None:
@@ -623,9 +627,9 @@ def test_compact_population_uses_authoritative_cadence_reference(tmp_path) -> No
         cadence_reference=external_mask,
     )
     assert masked_targets["n_quality_mask_disagreements"].eq(1).all()
-    assert masked_targets["internal_quality0_fraction"].eq(0.99).all()
-    assert masked_targets["external_quality0_fraction"].eq(0.985).all()
-    assert masked_targets["quality0_fraction"].eq(0.985).all()
+    assert masked_targets["internal_quality0_fraction"].eq(200 / 202).all()
+    assert masked_targets["external_quality0_fraction"].eq(199 / 202).all()
+    assert masked_targets["quality0_fraction"].eq(199 / 202).all()
     cadence_gate, _ = evaluate_cadence_quality(
         masked_targets, masked_apertures, Tier1QAConfig()
     )
@@ -656,7 +660,7 @@ def test_compact_population_masks_only_declared_authority_exclusions(
 
     assert targets["n_authority_excluded_cadences"].eq(1).all()
     assert targets["n_unexpected_cadences"].eq(0).all()
-    assert targets["quality0_fraction"].eq(0.985).all()
+    assert targets["quality0_fraction"].eq(199 / 202).all()
     gate, _ = evaluate_cadence_quality(targets, apertures, Tier1QAConfig())
     assert gate["status"] == "pass"
     assert gate["authority_excluded_cadences_total"] == len(targets)
@@ -676,6 +680,48 @@ def test_compact_population_masks_only_declared_authority_exclusions(
         unknown_targets, unknown_apertures, Tier1QAConfig()
     )
     assert unknown_gate["status"] == "fail"
+
+
+def test_flagged_fraction_is_diagnostic_until_bls_cadence_floor(tmp_path) -> None:
+    searchable_compact = tmp_path / "searchable.h5"
+    _write_compact(searchable_compact, n_targets=2, n_cadences=500)
+    with h5py.File(searchable_compact, "r+") as handle:
+        for group in handle["targets"].values():
+            quality = np.zeros(500, dtype=np.int32)
+            quality[:250] = 1
+            group["quality"][:] = quality
+    targets, apertures, _ = audit_compact_population(
+        searchable_compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=_cadence_reference(n_cadences=500),
+    )
+    gate, flagged = evaluate_cadence_quality(
+        targets, apertures, Tier1QAConfig()
+    )
+    assert gate["status"] == "review"
+    assert flagged["n_finite_quality0_min"].eq(250).all()
+    assert flagged["usable_cadence_fraction_min"].eq(0.5).all()
+    assert flagged["tier1_target_searchable"].all()
+    assert flagged["tier1_target_searchability_reasons"].eq("").all()
+
+    excluded_compact = tmp_path / "excluded.h5"
+    _write_compact(excluded_compact, n_targets=2, n_cadences=500)
+    with h5py.File(excluded_compact, "r+") as handle:
+        for group in handle["targets"].values():
+            quality = np.zeros(500, dtype=np.int32)
+            quality[:301] = 1
+            group["quality"][:] = quality
+    targets, apertures, _ = audit_compact_population(
+        excluded_compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=_cadence_reference(n_cadences=500),
+    )
+    _, flagged = evaluate_cadence_quality(targets, apertures, Tier1QAConfig())
+    assert flagged["n_finite_quality0_min"].eq(199).all()
+    assert not flagged["tier1_target_searchable"].any()
+    assert flagged["tier1_target_searchability_reasons"].eq(
+        "too_few_effective_cadences"
+    ).all()
 
 
 def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> None:
@@ -1145,6 +1191,8 @@ def test_target_aperture_correlation_has_review_band() -> None:
             "tmag": [18.0],
             "tier1_cadence_qa_status": ["pass"],
             "tier1_cadence_qa_reasons": [""],
+            "tier1_target_searchable": [True],
+            "tier1_target_searchability_reasons": [""],
         }
     )
     apertures = pd.DataFrame(
@@ -1182,6 +1230,12 @@ def test_target_eligibility_rejects_coerced_or_inconsistent_pass_flags() -> None
             "tier1_target_qa_status": ["fail"],
             "tier1_target_qa_reasons": ["finite_flux"],
             "tier1_target_qa_pass": ["False"],
+            "tier1_target_searchable": [False],
+            "tier1_target_searchability_reasons": [
+                "too_few_effective_cadences"
+            ],
+            "n_finite_quality0_min": [0],
+            "usable_cadence_fraction_min": [0.0],
         }
     )
     with pytest.raises(ValueError, match="non-null booleans"):
@@ -1274,6 +1328,33 @@ def test_active_scope_can_be_enrichment_ready_but_not_science_ready(tmp_path) ->
     assert len(bins) >= 6
     assert target_flags["relative_cadence_loss"].max() == 0.0
     assert target_flags["tier1_target_qa_pass"].all()
+    assert target_flags["tier1_target_searchable"].all()
+
+    review_targets = targets.copy()
+    review_targets["quality0_fraction"] = 0.75
+    reviewed, _, reviewed_target_flags = evaluate_tier1_gates(
+        sector=56,
+        config=config,
+        tier0_summary=_passing_tier0(TEST_COMPACT_SHA256),
+        tier0_summary_sha256=TEST_TIER0_SUMMARY_SHA256,
+        target_metrics=review_targets,
+        aperture_metrics=apertures,
+        pair_metrics=pairs,
+        injection_metrics=injections,
+        injection_manifest=injection_manifest,
+        independent_metrics=independent,
+        independent_manifest=independent_manifest,
+        current_compact_sha256=TEST_COMPACT_SHA256,
+        catalog_detectors={WD1856_TIC: "cam4_ccd1"},
+        cadence_reference_gate={"status": "pass", "reasons": []},
+        injection_source_parity_gate={"status": "pass", "reasons": []},
+    )
+    assert reviewed["status"] == "review"
+    assert reviewed["passed"] is True
+    assert reviewed["enrichment_ready"] is True
+    assert reviewed["blocking_gates"] == []
+    assert reviewed["warning_gates"] == ["cadence_and_finite_data"]
+    assert reviewed_target_flags["tier1_target_searchable"].all()
 
     old_tier0 = _passing_tier0(TEST_COMPACT_SHA256)
     old_tier0["contract_version"] = "a2v1_photometric_qa_v1"
@@ -1399,6 +1480,8 @@ def test_end_to_end_runner_writes_a_scoped_pass(
     assert summary["enrichment_ready"] is True
     assert summary["science_ready"] is False
     assert summary["target_qa"]["n_pass"] == 40
+    assert summary["target_qa"]["n_searchable"] == 40
+    assert summary["target_qa"]["n_excluded"] == 0
     assert summary["target_qa"]["observation_key"] == ["sector", "tic"]
     assert gate_json.exists()
     assert (out_dir / "target_metrics.parquet").exists()

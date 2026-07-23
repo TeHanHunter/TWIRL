@@ -57,6 +57,10 @@ TIER1_ELIGIBILITY_PROVENANCE_FIELDS: tuple[str, ...] = (
     "tier1_target_qa_status",
     "tier1_target_qa_reasons",
     "tier1_target_qa_pass",
+    "tier1_target_searchable",
+    "tier1_target_searchability_reasons",
+    "n_finite_quality0_min",
+    "usable_cadence_fraction_min",
 )
 
 A2V1_BLS_EXTERNAL_QUALITY_CONTRACT = (
@@ -74,6 +78,9 @@ TIER1_REQUIRED_ENRICHMENT_GATES: tuple[str, ...] = (
     "aperture_outliers",
     "fixed_injection_preservation",
     "independent_extraction",
+)
+TIER1_NONBLOCKING_REVIEW_GATES: frozenset[str] = frozenset(
+    ("population_scatter", "cadence_and_finite_data", "aperture_outliers")
 )
 _METADATA_QUALITY_REFERENCE: ExternalQualityReference | None = None
 
@@ -96,12 +103,13 @@ def validate_tier1_enrichment_gate(
     target_eligibility_sha256: str,
     compact_lc_sha256: str,
 ) -> dict[str, Any]:
-    """Validate that target eligibility came from a passed enrichment gate."""
+    """Validate target eligibility from a nonblocking enrichment evaluation."""
 
     if not isinstance(gate_summary, Mapping):
         raise TypeError("Tier-1 gate summary must be a JSON object")
-    if gate_summary.get("status") != "pass":
-        raise ValueError("Tier-1 gate summary status is not pass")
+    summary_status = gate_summary.get("status")
+    if summary_status not in ("pass", "review"):
+        raise ValueError("Tier-1 gate summary has a blocking status")
     if gate_summary.get("passed") is not True:
         raise ValueError("Tier-1 gate summary passed is not true")
     if gate_summary.get("enrichment_ready") is not True:
@@ -123,8 +131,16 @@ def validate_tier1_enrichment_gate(
         raise ValueError("Tier-1 nested gate inventory is incompatible")
     for gate_name in TIER1_REQUIRED_ENRICHMENT_GATES:
         nested = gates.get(gate_name)
-        if not isinstance(nested, Mapping) or nested.get("status") != "pass":
-            raise ValueError(f"Tier-1 nested gate {gate_name} did not pass")
+        if not isinstance(nested, Mapping):
+            raise ValueError(f"Tier-1 nested gate {gate_name} is blocking")
+        nested_status = nested.get("status")
+        allowed = (
+            {"pass", "review"}
+            if gate_name in TIER1_NONBLOCKING_REVIEW_GATES
+            else {"pass"}
+        )
+        if nested_status not in allowed:
+            raise ValueError(f"Tier-1 nested gate {gate_name} is blocking")
 
     summary_sector = gate_summary.get("sector")
     if type(summary_sector) is not int or summary_sector <= 0:
@@ -138,6 +154,7 @@ def validate_tier1_enrichment_gate(
         "sector",
         "tier1_target_qa_status",
         "tier1_target_qa_pass",
+        "tier1_target_searchable",
         *summary_identity,
     }
     missing = sorted(required_columns - set(target_eligibility.columns))
@@ -171,7 +188,7 @@ def validate_tier1_enrichment_gate(
     if target_qa.get("observation_key") != list(TIER1_ELIGIBILITY_KEY):
         raise ValueError("Tier-1 gate summary has an incompatible observation key")
     if target_qa.get("candidate_teacher_filter") != (
-        "tier1_target_qa_pass == True"
+        "tier1_target_searchable == True"
     ):
         raise ValueError("Tier-1 gate summary has an incompatible candidate filter")
     eligibility_status = target_eligibility["tier1_target_qa_status"].astype("string")
@@ -185,10 +202,16 @@ def validate_tier1_enrichment_gate(
     )
     if not eligibility_pass.eq(eligibility_status.eq("pass")).all():
         raise ValueError("Tier-1 target eligibility status/pass values disagree")
+    eligibility_searchable = _normalize_strict_boolean(
+        target_eligibility["tier1_target_searchable"],
+        column="tier1_target_searchable",
+    )
     expected_counts = {
         "n_pass": int(eligibility_status.eq("pass").sum()),
         "n_review": int(eligibility_status.eq("review").sum()),
         "n_fail": int(eligibility_status.eq("fail").sum()),
+        "n_searchable": int(eligibility_searchable.sum()),
+        "n_excluded": int((~eligibility_searchable).sum()),
     }
     for field, expected in expected_counts.items():
         observed = target_qa.get(field)
@@ -225,7 +248,7 @@ def validate_tier1_enrichment_gate(
         raise ValueError("compact LC SHA-256 does not match the Tier-1 gate summary")
 
     return {
-        "status": "pass",
+        "status": str(summary_status),
         "passed": True,
         "enrichment_ready": True,
         "sector": summary_sector,
@@ -486,10 +509,21 @@ def validate_quality_bound_bls_evidence(
         target_eligibility["tier1_target_qa_pass"],
         column="tier1_target_qa_pass",
     )
+    eligible_searchable = _normalize_strict_boolean(
+        target_eligibility["tier1_target_searchable"],
+        column="tier1_target_searchable",
+    )
     passing_keys = set(
         zip(
             eligibility_sector.loc[eligible_pass],
             eligibility_tic.loc[eligible_pass],
+            strict=True,
+        )
+    )
+    searchable_keys = set(
+        zip(
+            eligibility_sector.loc[eligible_searchable],
+            eligibility_tic.loc[eligible_searchable],
             strict=True,
         )
     )
@@ -504,12 +538,12 @@ def validate_quality_bound_bls_evidence(
     }
     incomplete = sorted(
         key
-        for key in passing_keys
+        for key in searchable_keys
         if coverage.get(key, set()) != set(ADP_ONLY_APERTURES)
     )
     if incomplete:
         raise ValueError(
-            "Tier-1-passing targets lack rank-1 BLS results in both apertures; "
+            "Tier-1-searchable targets lack rank-1 BLS results in both apertures; "
             f"examples={incomplete[:10]}"
         )
     return {
@@ -526,6 +560,7 @@ def validate_quality_bound_bls_evidence(
         "bls_config_sha256": expected_bls_config_sha256,
         "n_targets": len(peak_keys),
         "n_tier1_passing_targets": len(passing_keys),
+        "n_tier1_searchable_targets": len(searchable_keys),
         "n_rows": len(peaks),
     }
 
@@ -566,7 +601,7 @@ def filter_tier1_eligible_candidates(
     candidates: pd.DataFrame,
     target_eligibility: pd.DataFrame,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Attach the exact Tier-1 target decision and retain only passing rows.
+    """Attach Tier-1 decisions and retain structurally searchable rows.
 
     The observation key is exactly ``(sector, tic)``.  Candidate rows may repeat
     an observation (for example, one row per BLS peak), while the eligibility
@@ -650,6 +685,10 @@ def filter_tier1_eligible_candidates(
         raise ValueError(
             "Tier-1 eligibility target QA status and pass flag are inconsistent"
         )
+    eligibility["tier1_target_searchable"] = _normalize_strict_boolean(
+        eligibility["tier1_target_searchable"],
+        column="tier1_target_searchable",
+    )
 
     reasons = eligibility["tier1_target_qa_reasons"].fillna("").astype(str)
     missing_failure_reason = ~expected_pass & reasons.str.strip().eq("")
@@ -663,6 +702,29 @@ def filter_tier1_eligible_candidates(
             f"Tier-1 review/fail decisions require reason provenance; keys={bad_keys}"
         )
     eligibility["tier1_target_qa_reasons"] = reasons
+    searchability_reasons = (
+        eligibility["tier1_target_searchability_reasons"].fillna("").astype(str)
+    )
+    inconsistent_searchability = (
+        eligibility["tier1_target_searchable"]
+        & searchability_reasons.str.strip().ne("")
+    ) | (
+        ~eligibility["tier1_target_searchable"]
+        & searchability_reasons.str.strip().eq("")
+    )
+    if inconsistent_searchability.any():
+        bad_keys = (
+            eligibility.loc[
+                inconsistent_searchability, list(TIER1_ELIGIBILITY_KEY)
+            ]
+            .head(5)
+            .to_dict("records")
+        )
+        raise ValueError(
+            "Tier-1 searchability flags and reasons are inconsistent; "
+            f"keys={bad_keys}"
+        )
+    eligibility["tier1_target_searchability_reasons"] = searchability_reasons
 
     for column in ("tier1_contract_version", "tier1_config_name", "tier1_scope"):
         values = eligibility[column].astype("string")
@@ -710,12 +772,12 @@ def filter_tier1_eligible_candidates(
     joined = joined.drop(columns="_tier1_eligibility_merge")
 
     before_keys = joined.drop_duplicates(list(TIER1_ELIGIBILITY_KEY))
-    passing = joined["tier1_target_qa_pass"]
-    filtered = joined.loc[passing].copy().reset_index(drop=True)
+    searchable = joined["tier1_target_searchable"]
+    filtered = joined.loc[searchable].copy().reset_index(drop=True)
     after_keys = filtered.drop_duplicates(list(TIER1_ELIGIBILITY_KEY))
     summary = {
         "join_key": list(TIER1_ELIGIBILITY_KEY),
-        "filter_expression": "tier1_target_qa_pass == True",
+        "filter_expression": "tier1_target_searchable == True",
         "provenance_columns": list(TIER1_ELIGIBILITY_PROVENANCE_FIELDS),
         "n_eligibility_rows": int(len(eligibility)),
         "n_candidates_before": int(len(joined)),
@@ -724,7 +786,7 @@ def filter_tier1_eligible_candidates(
         "n_candidate_tics_after": int(filtered["tic"].nunique()),
         "n_candidate_observations_before": int(len(before_keys)),
         "n_candidate_observations_after": int(len(after_keys)),
-        "n_candidates_excluded": int((~passing).sum()),
+        "n_candidates_excluded": int((~searchable).sum()),
         "candidate_status_counts": {
             str(key): int(value)
             for key, value in joined["tier1_target_qa_status"]

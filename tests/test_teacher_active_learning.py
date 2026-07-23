@@ -162,6 +162,14 @@ def _tier1_target_eligibility() -> pd.DataFrame:
                 "finite_flux",
             ],
             "tier1_target_qa_pass": ["True", "False", "False"],
+            "tier1_target_searchable": ["True", "True", "False"],
+            "tier1_target_searchability_reasons": [
+                "",
+                "",
+                "too_few_effective_cadences",
+            ],
+            "n_finite_quality0_min": [500, 300, 50],
+            "usable_cadence_fraction_min": [0.9, 0.6, 0.1],
         }
     )
 
@@ -190,13 +198,14 @@ def _tier1_gate_summary(eligibility_sha256: str = "a" * 64) -> dict:
             "n_authority_exclusions": 4,
         }
     )
+    gates["cadence_and_finite_data"]["status"] = "review"
     return {
         "contract_version": "tier1-v1",
         "config_name": "active-pair-v1",
         "qa_tier": "tier1_bounded_enrichment_qa",
         "scope": "active_search_pair",
         "sector": 56,
-        "status": "pass",
+        "status": "review",
         "passed": True,
         "enrichment_ready": True,
         "science_ready": False,
@@ -204,10 +213,12 @@ def _tier1_gate_summary(eligibility_sha256: str = "a" * 64) -> dict:
         "apertures": ["DET_FLUX_ADP_SML", "DET_FLUX_ADP"],
         "target_qa": {
             "observation_key": ["sector", "tic"],
-            "candidate_teacher_filter": "tier1_target_qa_pass == True",
+            "candidate_teacher_filter": "tier1_target_searchable == True",
             "n_pass": 1,
             "n_review": 1,
             "n_fail": 0,
+            "n_searchable": 2,
+            "n_excluded": 0,
         },
         "provenance": {
             "compact_lc_sha256": "c" * 64,
@@ -289,6 +300,7 @@ def test_quality_bound_bls_evidence_binds_tier1_and_target_coverage() -> None:
     assert audit["status"] == "pass"
     assert audit["n_targets"] == 2
     assert audit["n_tier1_passing_targets"] == 1
+    assert audit["n_tier1_searchable_targets"] == 2
 
     stale = dict(summary)
     stale["cadence_reference_sha256"] = "9" * 64
@@ -347,6 +359,7 @@ def test_tier1_enrichment_gate_binds_passed_summary_to_eligibility() -> None:
 
     assert audit["passed"]
     assert audit["enrichment_ready"]
+    assert audit["status"] == "review"
     assert audit["sector"] == 56
     assert audit["contract_version"] == "tier1-v1"
     assert audit["target_eligibility_sha256"] == "a" * 64
@@ -386,6 +399,18 @@ def test_tier1_enrichment_gate_rejects_global_failure_or_nonready_run() -> None:
             compact_lc_sha256="c" * 64,
         )
 
+    blocking_review = _tier1_gate_summary()
+    blocking_review["gates"]["independent_extraction"]["status"] = "review"
+    with np.testing.assert_raises_regex(
+        ValueError, "nested gate independent_extraction"
+    ):
+        validate_tier1_enrichment_gate(
+            blocking_review,
+            _tier1_gate_eligibility(),
+            target_eligibility_sha256="a" * 64,
+            compact_lc_sha256="c" * 64,
+        )
+
 
 def test_tier1_enrichment_gate_rejects_unbound_or_incompatible_eligibility() -> None:
     with np.testing.assert_raises_regex(ValueError, "SHA-256 does not match"):
@@ -418,28 +443,37 @@ def test_tier1_enrichment_gate_rejects_unbound_or_incompatible_eligibility() -> 
 def test_tier1_filter_uses_exact_sector_tic_key_and_keeps_provenance() -> None:
     candidates = pd.DataFrame(
         {
-            "review_id": ["a", "b", "c"],
-            "sector": [56, 56, 56],
-            "tic": [10, 10, 20],
+            "review_id": ["a", "b", "c", "d"],
+            "sector": [56, 56, 56, 57],
+            "tic": [10, 10, 20, 10],
         }
     )
     filtered, summary = filter_tier1_eligible_candidates(
         candidates, _tier1_target_eligibility()
     )
 
-    assert filtered["review_id"].tolist() == ["a", "b"]
-    assert filtered["tier1_target_qa_pass"].all()
-    assert filtered["tier1_target_qa_status"].eq("pass").all()
-    assert filtered["tier1_target_qa_reasons"].eq("").all()
+    assert filtered["review_id"].tolist() == ["a", "b", "c"]
+    assert filtered["tier1_target_searchable"].all()
+    assert filtered["tier1_target_qa_status"].tolist() == ["pass", "pass", "review"]
+    assert filtered["tier1_target_qa_reasons"].tolist() == [
+        "",
+        "",
+        "scatter_absolute_high",
+    ]
     assert filtered["tier1_contract_version"].eq("tier1-v1").all()
     assert summary["join_key"] == ["sector", "tic"]
-    assert summary["n_candidates_before"] == 3
-    assert summary["n_candidates_after"] == 2
+    assert summary["n_candidates_before"] == 4
+    assert summary["n_candidates_after"] == 3
     assert summary["n_candidate_tics_before"] == 2
-    assert summary["n_candidate_tics_after"] == 1
-    assert summary["n_candidate_observations_before"] == 2
-    assert summary["n_candidate_observations_after"] == 1
-    assert summary["candidate_status_counts"] == {"pass": 2, "review": 1}
+    assert summary["n_candidate_tics_after"] == 2
+    assert summary["n_candidate_observations_before"] == 3
+    assert summary["n_candidate_observations_after"] == 2
+    assert summary["n_candidates_excluded"] == 1
+    assert summary["candidate_status_counts"] == {
+        "fail": 1,
+        "pass": 2,
+        "review": 1,
+    }
 
 
 def test_tier1_candidate_filter_rejects_duplicate_eligibility_keys() -> None:

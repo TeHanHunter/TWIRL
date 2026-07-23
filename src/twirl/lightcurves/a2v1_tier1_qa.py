@@ -6,10 +6,12 @@ extraction evidence needed before the active search channels are trusted for
 enrichment.  It deliberately distinguishes that bounded scope from promotion
 of the complete six-aperture A2v1 product.
 
-The gate is fail-closed: missing or stale evidence is a failure, not a warning.
-An ``active_search_pair`` pass may set ``enrichment_ready`` but can never set
-``science_ready``.  Only a future ``full_a2v1_product`` configuration with
-promotion explicitly enabled can do that.
+The evidence contract is fail-closed: missing or stale evidence is a failure,
+not a warning.  Population ``review`` findings remain visible but do not block
+bounded enrichment.  Target inclusion is deliberately narrower than the
+diagnostic QA status: a target is searchable when both active apertures satisfy
+the locked BLS minimum and its cadence structure is internally valid.  An
+``active_search_pair`` evaluation can never set ``science_ready``.
 """
 from __future__ import annotations
 
@@ -51,12 +53,18 @@ from twirl.lightcurves.external_quality import (
     EXTERNAL_QUALITY_POLICY_CONTRACT,
     load_external_quality_reference,
 )
+from twirl.search.a2v1_bls_contract import A2V1_TEACHER_MIN_CADENCES
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
 
-TIER1_QA_CONTRACT_VERSION = "a2v1_tier1_science_qa_v2"
+TIER1_QA_CONTRACT_VERSION = "a2v1_tier1_science_qa_v3"
 TIER1_SCOPES = ("active_search_pair", "full_a2v1_product")
 STATUS_ORDER = {"pass": 0, "review": 1, "fail": 2}
+TIER1_NONBLOCKING_REVIEW_GATES = (
+    "population_scatter",
+    "cadence_and_finite_data",
+    "aperture_outliers",
+)
 TIER0_REQUIRED_GATES = (
     "schema_and_completeness",
     "bls_target_aperture_coverage",
@@ -80,6 +88,11 @@ TIER1_TARGET_REASON_CODES = (
     "scatter_absolute_high",
     "unexpected_cadence",
     "usable_cadence",
+)
+TIER1_SEARCHABILITY_REASON_CODES = (
+    "aperture_missing",
+    "cadence_structure_invalid",
+    "too_few_effective_cadences",
 )
 INJECTION_QUALITY_COUNT_NAMES = (
     "n_cad_total",
@@ -161,6 +174,7 @@ class Tier1QAConfig:
     usable_review_median: float = 0.50
     usable_pass_p05: float = 0.50
     usable_review_p05: float = 0.30
+    min_searchable_cadences: int = A2V1_TEACHER_MIN_CADENCES
 
     aperture_pass_valid_fraction: float = 0.98
     aperture_review_valid_fraction: float = 0.95
@@ -264,6 +278,10 @@ class Tier1QAConfig:
             self.min_supported_magnitude_bins,
         ) < 1:
             raise ValueError("population coverage counts must be positive")
+        if self.min_searchable_cadences != A2V1_TEACHER_MIN_CADENCES:
+            raise ValueError(
+                "Tier-1 searchability must match the locked A2v1 BLS minimum"
+            )
         for value, label in (
             (self.expected_compact_sha256, "expected_compact_sha256"),
             (
@@ -1237,7 +1255,12 @@ def evaluate_cadence_quality(
         "external_quality0_fraction",
         "n_quality_mask_disagreements",
     }
-    aperture_required = {"tic", "aperture", "finite_quality0_fraction"}
+    aperture_required = {
+        "tic",
+        "aperture",
+        "n_finite_quality0",
+        "finite_quality0_fraction",
+    }
     missing = sorted(
         (target_required - set(target_metrics.columns))
         | (aperture_required - set(aperture_metrics.columns))
@@ -1467,6 +1490,7 @@ def evaluate_cadence_quality(
         selected.groupby("tic", as_index=False)
         .agg(
             n_tier1_apertures=("aperture", "nunique"),
+            n_finite_quality0_min=("n_finite_quality0", "min"),
             finite_quality0_fraction_min=("finite_quality0_fraction", "min"),
             usable_cadence_fraction_min=("usable_cadence_fraction", "min"),
         )
@@ -1538,6 +1562,45 @@ def evaluate_cadence_quality(
     targets["tier1_cadence_qa_status"] = target_flags[0]
     targets["tier1_cadence_qa_reasons"] = target_flags[1]
     targets["tier1_cadence_qa_pass"] = targets["tier1_cadence_qa_status"].eq("pass")
+
+    def _target_searchability(row: pd.Series) -> tuple[bool, str]:
+        reasons: list[str] = []
+        n_apertures = pd.to_numeric(
+            pd.Series([row.get("n_tier1_apertures", np.nan)]), errors="coerce"
+        ).iloc[0]
+        if not np.isfinite(n_apertures) or int(n_apertures) != len(config.apertures):
+            reasons.append("aperture_missing")
+        n_effective = pd.to_numeric(
+            pd.Series([row.get("n_finite_quality0_min", np.nan)]), errors="coerce"
+        ).iloc[0]
+        if (
+            not np.isfinite(n_effective)
+            or int(n_effective) < config.min_searchable_cadences
+        ):
+            reasons.append("too_few_effective_cadences")
+        structural_columns = (
+            "n_unexpected_cadences",
+            "n_duplicate_cadences",
+            "n_orbit_mismatches",
+        )
+        structural_invalid = (
+            int(row["n_expected_cadences"]) <= 0
+            or int(row["n_observed_expected_orbits"]) <= 0
+            or any(int(row[column]) != 0 for column in structural_columns)
+        )
+        if structural_invalid:
+            reasons.append("cadence_structure_invalid")
+        unknown = sorted(set(reasons) - set(TIER1_SEARCHABILITY_REASON_CODES))
+        if unknown:
+            raise RuntimeError(f"unknown Tier-1 searchability reasons: {unknown}")
+        reasons = list(dict.fromkeys(reasons))
+        return not reasons, ";".join(reasons)
+
+    searchability = targets.apply(
+        _target_searchability, axis=1, result_type="expand"
+    )
+    targets["tier1_target_searchable"] = searchability[0].astype(bool)
+    targets["tier1_target_searchability_reasons"] = searchability[1]
     status = _worst_status(statuses.values())
     return {
         "status": status,
@@ -1580,6 +1643,9 @@ def evaluate_cadence_quality(
         "n_target_qa_pass": int(targets["tier1_cadence_qa_pass"].sum()),
         "n_target_qa_review": int(targets["tier1_cadence_qa_status"].eq("review").sum()),
         "n_target_qa_fail": int(targets["tier1_cadence_qa_status"].eq("fail").sum()),
+        "n_target_searchable": int(targets["tier1_target_searchable"].sum()),
+        "n_target_excluded": int((~targets["tier1_target_searchable"]).sum()),
+        "min_searchable_cadences": int(config.min_searchable_cadences),
         "detectors": detector_summaries,
         "component_status": statuses,
     }, targets
@@ -1677,7 +1743,14 @@ def attach_target_qa_flags(
 ) -> pd.DataFrame:
     """Attach fail-closed target flags suitable for candidate/teacher joins."""
 
-    required = {"tic", "tmag", "tier1_cadence_qa_status", "tier1_cadence_qa_reasons"}
+    required = {
+        "tic",
+        "tmag",
+        "tier1_cadence_qa_status",
+        "tier1_cadence_qa_reasons",
+        "tier1_target_searchable",
+        "tier1_target_searchability_reasons",
+    }
     missing = sorted(required - set(targets.columns))
     if missing:
         raise KeyError(f"target QA inputs are missing columns: {missing}")
@@ -3618,21 +3691,41 @@ def evaluate_tier1_gates(
         targets_with_loss, aperture_metrics, pair_metrics, config
     )
     overall_status = _worst_status(gate["status"] for gate in gates.values())
-    passed = overall_status == "pass"
+    blocking_gates = sorted(
+        name
+        for name, gate in gates.items()
+        if gate["status"] == "fail"
+        or (
+            gate["status"] == "review"
+            and name not in TIER1_NONBLOCKING_REVIEW_GATES
+        )
+    )
+    warning_gates = sorted(
+        name
+        for name, gate in gates.items()
+        if gate["status"] == "review"
+        and name in TIER1_NONBLOCKING_REVIEW_GATES
+    )
+    passed = not blocking_gates
     enrichment_ready = bool(passed and config.scope == "active_search_pair")
     science_ready = False
+    searchable = targets_with_loss["tier1_target_searchable"].astype(bool)
     return {
         "status": overall_status,
         "passed": passed,
         "enrichment_ready": enrichment_ready,
         "science_ready": science_ready,
+        "blocking_gates": blocking_gates,
+        "warning_gates": warning_gates,
         "target_qa": {
             "n_pass": int(targets_with_loss["tier1_target_qa_pass"].sum()),
             "n_review": int(
                 targets_with_loss["tier1_target_qa_status"].eq("review").sum()
             ),
             "n_fail": int(targets_with_loss["tier1_target_qa_status"].eq("fail").sum()),
-            "candidate_teacher_filter": "tier1_target_qa_pass == True",
+            "n_searchable": int(searchable.sum()),
+            "n_excluded": int((~searchable).sum()),
+            "candidate_teacher_filter": "tier1_target_searchable == True",
         },
         "gates": gates,
     }, magnitude_bins, targets_with_loss
@@ -3656,6 +3749,10 @@ def build_target_eligibility(
         "tier1_target_qa_status",
         "tier1_target_qa_reasons",
         "tier1_target_qa_pass",
+        "tier1_target_searchable",
+        "tier1_target_searchability_reasons",
+        "n_finite_quality0_min",
+        "usable_cadence_fraction_min",
     }
     missing = sorted(required - set(targets.columns))
     if missing:
@@ -3685,6 +3782,34 @@ def build_target_eligibility(
     expected_pass = status.eq("pass")
     if not pass_values.eq(expected_pass).all():
         raise ValueError("target eligibility status and pass flag are inconsistent")
+    searchable_values = targets["tier1_target_searchable"]
+    if (
+        not pd.api.types.is_bool_dtype(searchable_values.dtype)
+        or searchable_values.isna().any()
+    ):
+        raise ValueError("target searchability flags must be non-null booleans")
+    searchability_reasons = (
+        targets["tier1_target_searchability_reasons"].fillna("").astype(str)
+    )
+    inconsistent_searchability = (
+        searchable_values & searchability_reasons.str.strip().ne("")
+    ) | (~searchable_values & searchability_reasons.str.strip().eq(""))
+    if inconsistent_searchability.any():
+        raise ValueError("target searchability flags and reasons are inconsistent")
+    observed_searchability_reasons = {
+        reason
+        for value in searchability_reasons
+        for reason in value.split(";")
+        if reason
+    }
+    unknown_searchability = sorted(
+        observed_searchability_reasons - set(TIER1_SEARCHABILITY_REASON_CODES)
+    )
+    if unknown_searchability:
+        raise ValueError(
+            "target eligibility has unknown searchability reason codes: "
+            f"{unknown_searchability}"
+        )
 
     columns = [
         "sector",
@@ -3700,6 +3825,10 @@ def build_target_eligibility(
         "tier1_target_qa_status",
         "tier1_target_qa_reasons",
         "tier1_target_qa_pass",
+        "tier1_target_searchable",
+        "tier1_target_searchability_reasons",
+        "n_finite_quality0_min",
+        "usable_cadence_fraction_min",
     ]
     work = targets.copy()
     if "gaia_dr3_source_id" not in work:
@@ -3717,6 +3846,10 @@ def build_target_eligibility(
         ],
     )
     output["tier1_target_qa_pass"] = expected_pass.astype(bool).to_numpy()
+    output["tier1_target_searchable"] = searchable_values.astype(bool).to_numpy()
+    output["tier1_target_searchability_reasons"] = (
+        searchability_reasons.to_numpy()
+    )
     return output.sort_values(["sector", "tic"], kind="stable").reset_index(drop=True)
 
 
@@ -3729,6 +3862,7 @@ def summarize_target_eligibility(eligibility: pd.DataFrame) -> pd.DataFrame:
         "detector",
         "tier1_target_qa_status",
         "tier1_target_qa_pass",
+        "tier1_target_searchable",
     }
     missing = sorted(required - set(eligibility.columns))
     if missing:
@@ -3740,6 +3874,7 @@ def summarize_target_eligibility(eligibility: pd.DataFrame) -> pd.DataFrame:
         status = group["tier1_target_qa_status"].astype(str)
         n_targets = int(len(group))
         n_pass = int(status.eq("pass").sum())
+        n_searchable = int(group["tier1_target_searchable"].astype(bool).sum())
         rows.append(
             {
                 "camera": int(camera),
@@ -3750,6 +3885,11 @@ def summarize_target_eligibility(eligibility: pd.DataFrame) -> pd.DataFrame:
                 "n_review": int(status.eq("review").sum()),
                 "n_fail": int(status.eq("fail").sum()),
                 "pass_fraction": float(n_pass / n_targets) if n_targets else np.nan,
+                "n_searchable": n_searchable,
+                "n_excluded": int(n_targets - n_searchable),
+                "searchable_fraction": (
+                    float(n_searchable / n_targets) if n_targets else np.nan
+                ),
             }
         )
     return pd.DataFrame(rows).sort_values(["camera", "ccd"], kind="stable").reset_index(
@@ -3981,7 +4121,7 @@ def plot_tier1_diagnostics(
 def plot_detector_eligibility(
     detector_summary: pd.DataFrame, *, output_png: Path, output_pdf: Path
 ) -> None:
-    """Render the 4x4 target-pass fraction map for one TESS sector."""
+    """Render the 4x4 searchable-target fraction map for one TESS sector."""
 
     import matplotlib.pyplot as plt
 
@@ -3993,8 +4133,10 @@ def plot_detector_eligibility(
     for row in detector_summary.itertuples(index=False):
         camera = int(row.camera)
         ccd = int(row.ccd)
-        values[camera - 1, ccd - 1] = float(row.pass_fraction)
-        labels[(camera - 1, ccd - 1)] = f"{int(row.n_pass)}/{int(row.n_targets)}"
+        values[camera - 1, ccd - 1] = float(row.searchable_fraction)
+        labels[(camera - 1, ccd - 1)] = (
+            f"{int(row.n_searchable)}/{int(row.n_targets)}"
+        )
     colormap = plt.get_cmap("viridis").copy()
     colormap.set_bad("0.9")
     figure, axis = plt.subplots(figsize=(template["figsize"][0], 3.0))
@@ -4008,7 +4150,7 @@ def plot_detector_eligibility(
     axis.set_xlabel("CCD")
     axis.set_ylabel("Camera")
     colorbar = figure.colorbar(image, ax=axis, pad=0.03, fraction=0.05)
-    colorbar.set_label("Tier-1 target pass fraction")
+    colorbar.set_label("Tier-1 searchable fraction")
     _save_figure_atomic(figure, output_png, dpi=220)
     _save_figure_atomic(figure, output_pdf)
     plt.close(figure)
@@ -4709,6 +4851,12 @@ def run_a2v1_tier1_qa(
         {
             "observation_key": ["sector", "tic"],
             "reason_code_vocabulary": list(TIER1_TARGET_REASON_CODES),
+            "searchability_reason_code_vocabulary": list(
+                TIER1_SEARCHABILITY_REASON_CODES
+            ),
+            "min_searchable_cadences_per_aperture": int(
+                config.min_searchable_cadences
+            ),
             "n_with_gaia_dr3_source_id": int(
                 target_eligibility["gaia_dr3_source_id"].notna().sum()
             ),
@@ -4844,6 +4992,8 @@ def run_a2v1_tier1_qa(
         "passed": evaluated["passed"],
         "enrichment_ready": evaluated["enrichment_ready"],
         "science_ready": evaluated["science_ready"],
+        "blocking_gates": evaluated["blocking_gates"],
+        "warning_gates": evaluated["warning_gates"],
         "promotion_enabled": config.promotion_enabled,
         "apertures": list(config.apertures),
         "target_qa": evaluated["target_qa"],
@@ -4879,6 +5029,8 @@ def run_a2v1_tier1_qa(
 
 __all__ = [
     "TIER1_QA_CONTRACT_VERSION",
+    "TIER1_NONBLOCKING_REVIEW_GATES",
+    "TIER1_SEARCHABILITY_REASON_CODES",
     "TIER1_TARGET_REASON_CODES",
     "Tier1QAConfig",
     "attach_target_qa_flags",

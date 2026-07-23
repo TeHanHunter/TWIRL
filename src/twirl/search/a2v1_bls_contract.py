@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 
 A2V1_TEACHER_BLS_SEARCH_CONTRACT = "s56_a2v1_teacher_bls_search_v1"
+A2V1_TEACHER_MIN_CADENCES = 200
 
 
 def approved_a2v1_teacher_bls_config() -> dict[str, Any]:
@@ -23,7 +24,7 @@ def approved_a2v1_teacher_bls_config() -> dict[str, Any]:
         "period_mask_frac": 0.005,
         "period_bin_edges": [],
         "max_peaks_per_period_bin": 0,
-        "min_cadences": 200,
+        "min_cadences": A2V1_TEACHER_MIN_CADENCES,
         "sigma_clip": 5.0,
         "orbit_edge_trim_d": 0.0,
         "source_product_tag": "A2v1",
@@ -41,6 +42,7 @@ def bls_config_sha256(config: Mapping[str, Any]) -> str:
 
 __all__ = [
     "A2V1_TEACHER_BLS_SEARCH_CONTRACT",
+    "A2V1_TEACHER_MIN_CADENCES",
     "approved_a2v1_teacher_bls_config",
     "bls_config_sha256",
 ]

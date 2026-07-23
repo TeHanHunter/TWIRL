@@ -1,5 +1,5 @@
 name: a2v1_tier1_active_search_pair_v1
-contract_version: a2v1_tier1_science_qa_v2
+contract_version: a2v1_tier1_science_qa_v3
 sector: 56
 scope: active_search_pair
 promotion_enabled: false
@@ -56,6 +56,11 @@ usable_pass_median: 0.80
 usable_review_median: 0.50
 usable_pass_p05: 0.50
 usable_review_p05: 0.30
+# Usable fractions above remain population/window-function diagnostics. Target
+# searchability is the simple hard floor used by the locked BLS search; review
+# targets remain eligible and only structurally invalid or sub-floor targets
+# are excluded.
+min_searchable_cadences: 200
 
 aperture_pass_valid_fraction: 0.98
 aperture_review_valid_fraction: 0.95

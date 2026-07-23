@@ -261,16 +261,22 @@ detrended flux; BLS recovery or teacher scores do not substitute for this
 Stage 1 signal-preservation measurement.
 
 Every required gate reports `pass`, `review`, or `fail`; missing evidence,
-contract mismatch, or a stale Tier-0 report fails closed. Overall `pass`
-requires every gate to pass, while any review result keeps the overall state at
-`review`.
+contract mismatch, or a stale Tier-0 report fails closed. A `review` from the
+population-scatter, cadence/finite-data, or aperture-outlier diagnostics is
+retained as a sensitivity warning but is nonblocking for bounded enrichment.
+Reviews in the prerequisite, signal-preservation, or independent-extraction
+gates remain blocking; any `fail` remains blocking.
 
 The Tier-1 target table is a downstream data contract. Candidate generation,
 enrichment review, and teacher-set assembly must join it by exact
-`(sector, TIC)` and retain only `tier1_target_qa_pass == True`; a sector-level
-pass does not license failed or review-status targets. The published summary
-includes the complete fixed-injection manifest and hashes all input and output
-evidence.
+`(sector, TIC)` and retain only `tier1_target_searchable == True`. Searchability
+is intentionally a minimal catastrophic-data check: both active apertures must
+have at least the locked BLS minimum of `200` effective-good finite cadences,
+and cadence/aperture structure must be valid. Target `review` rows remain
+searchable. Flagged-cadence fraction, scatter, and aperture disagreement remain
+diagnostics and model/vetting features; they are not automatic target or
+detector exclusions. The published summary includes the complete
+fixed-injection manifest and hashes all input and output evidence.
 
 Custom TWIRL/A2v1 FITS and compact products preserve the TGLC internal quality
 flag; they do **not** already contain the sector-level SPOC and QLP flags that
