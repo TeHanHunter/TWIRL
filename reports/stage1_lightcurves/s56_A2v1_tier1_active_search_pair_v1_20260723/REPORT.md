@@ -3,7 +3,7 @@
 **Scope:** bounded enrichment QA for `DET_FLUX_ADP_SML` and
 `DET_FLUX_ADP`
 
-**Contract:** `a2v1_tier1_science_qa_v1`
+**Contract:** `a2v1_tier1_science_qa_v2`
 
 **Assessment date:** 2026-07-23
 
@@ -17,7 +17,8 @@ We assess whether the Sector 56 A2v1 active search pair is sufficiently
 controlled for target-filtered candidate enrichment. The audit covers the full
 compact population of 31,450 targets, a hash-bound 188,396-row external
 cadence/quality reference with four declared authority exclusions, a
-2,000-injection fixed canary, aperture behavior, and an independent
+quality-aware 2,000-injection v2 canary regenerated from the unchanged frozen
+schedule, aperture behavior, and an independent
 official-TESSCut recovery of WD 1856 b. The final bounded-gate outcome is
 **[PENDING ORCD TIER-1: overall status, pass flag, and `enrichment_ready`]**.
 Regardless of that result, this two-aperture assessment cannot promote the
@@ -45,9 +46,12 @@ Eight fail-closed gates test: cadence-reference provenance, compact-to-injection
 source parity, the quality-aware Tier-0 prerequisite, scatter versus TESS
 magnitude, cadence retention and finite flux, aperture outliers, injected-depth
 preservation, and independent extraction. The fixed canary comprises four
-reviewed shards and 2,000 unique injected hosts. Every evidence input is
-checksum-bound before the population scan and rechecked before output
-publication.
+reviewed shards and 2,000 unique injected hosts. Injected-depth retention is
+the fitted response against
+`(injection_baseline / detrend_scale) * (1 - transit_model)`; the corresponding
+raw-depth slope is retained only as a diagnostic of normalization transfer.
+Every evidence input is checksum-bound before the population scan and
+rechecked before output publication.
 
 The independent benchmark uses official MAST TESSCut data rather than another
 TGLC production tree. WD 1856 b is recovered in its 1x1 reference aperture at
@@ -62,6 +66,14 @@ still depends on the locked end-to-end audit.
 The PDO quality-aware BLS and replacement Tier-0 products passed review and
 are checksum-pinned before the ORCD population audit.
 
+The first v1 evaluator run (ORCD job `18641848`) failed before the population
+scan. Its retention predictor omitted the stored injection-baseline and
+detrending-scale normalization, and one frozen epoch had no effective-good
+in-transit samples after the external-quality overlay. Correcting the
+definition gave median retention near 0.991 in both apertures, while the v2
+epoch policy moved only the affected injection to an eligible epoch. This was
+a fail-closed contract-remediation event, not a scientific Tier-1 failure.
+
 | Gate | Status | Principal result |
 |---|---:|---|
 | Cadence-reference prerequisite | **[PENDING ORCD TIER-1]** | 188,396 rows; 4 declared authority exclusions |
@@ -70,7 +82,7 @@ are checksum-pinned before the ORCD population audit.
 | Population scatter | **[PENDING ORCD TIER-1]** | **[PENDING ORCD TIER-1: supported magnitude bins, slopes, and outlier fractions]** |
 | Cadence and finite data | **[PENDING ORCD TIER-1]** | **[PENDING ORCD TIER-1: loss, finite-flux, and usable-cadence quantiles]** |
 | Aperture outliers | **[PENDING ORCD TIER-1]** | **[PENDING ORCD TIER-1: valid, ratio-outlier, correlation, and anticorrelation fractions]** |
-| Fixed-injection preservation | **[PENDING ORCD TIER-1]** | 2,000 unique injection IDs; **[PENDING: retention quantiles and in-band fraction]** |
+| Fixed-injection preservation | **[PENDING ORCD TIER-1]** | Quality-aware v2 canary; 2,000 unique injection IDs; **[PENDING: retention quantiles and in-band fraction]** |
 | Independent extraction | **[PENDING ORCD TIER-1]** | WD 1856 b recovered in both independent apertures; **[PENDING: common-cadence fraction and final gate status]** |
 
 **Overall status:** **[PENDING ORCD TIER-1: `status` and `passed`]**
@@ -109,13 +121,13 @@ use.
 
 ## Repository audit and reproducibility
 
-The accompanying repository scan found 2,181 tracked files occupying
+The accompanying repository scan found 2,183 tracked files occupying
 approximately 802 MB, dominated by `reports/` (630 MB) and `outputs/`
 (167 MB); `.git` occupies approximately 14 GiB. Fifteen tracked files are at
 least 10 MB, and 80 already-tracked files now match ignore rules
 (approximately 47 MB). No secret-scan, broken-symlink, cache, syntax, or
 untracked-file hygiene blocker was identified. The current validation suite
-passes 405 tests with 3 skips, together with the detection sample and
+passes 413 tests with 3 skips, together with the detection sample and
 documentation checks.
 
 These figures argue for a later, explicit artifact-retention migration rather
@@ -125,8 +137,12 @@ scratch products before large files are untracked. Reproducibility of this
 assessment rests on the locked configuration, exact compact checksum, cadence
 table and manifest checksums, injection shard and source-parity checksums,
 independent-extraction checksums, the Tier-0 summary (`1f7865b9…432ca`) and
-BLS table (`c3a7bd9f…10692`) checksums, and **[PENDING DEPLOYED PRODUCER
-COMMIT: code revision]**.
+BLS table (`c3a7bd9f…10692`) checksums, and v2 shard-producer commit
+`f1b8b53c7f2b2c62912e9d240b595458cbbd5d14`. The ordered v2 shard hashes are
+`fe999651…6525`, `7b166ddf…fa07`, `4d6f8f11…ce9b`, and
+`9e309d6b…e5a4`; their unchanged selection and metadata digests are
+`8ee40ea7…6c5a` and `54996889…1910`, respectively. The final evaluator/config
+revision remains **[PENDING FINAL HASH-LOCK COMMIT]**.
 
 ## Verdict
 

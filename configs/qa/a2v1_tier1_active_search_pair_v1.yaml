@@ -1,5 +1,5 @@
 name: a2v1_tier1_active_search_pair_v1
-contract_version: a2v1_tier1_science_qa_v1
+contract_version: a2v1_tier1_science_qa_v2
 sector: 56
 scope: active_search_pair
 promotion_enabled: false
@@ -75,16 +75,16 @@ aperture_negative_correlation_threshold: -0.20
 aperture_pass_negative_correlation_fraction: 0.05
 aperture_review_negative_correlation_fraction: 0.10
 
-injection_contract_template: "s{sector}_a2v1_fresh_injection_pair_v1"
+injection_contract_template: "s{sector}_a2v1_fresh_injection_pair_v2"
 injection_selection_mode: full_shard
 injection_required_shard_indices: [0, 13, 26, 39]
-# Ordered hashes reverified at the accepted ORCD evidence location after the
-# 2026-07-17 worktree cleanup: shard indices 00, 13, 26, and 39.
+# Ordered v2 hashes regenerated on ORCD from producer commit
+# f1b8b53c7f2b2c62912e9d240b595458cbbd5d14: shard indices 00, 13, 26, and 39.
 expected_injection_shard_sha256:
-  - b4790ea98260f23ad0b76a93f18dc4b7b09ea3a457cd69320762b2f990cf5f9a
-  - 9eadc3191bcba0c0577639c0956f59b69ac0755deb571143e05bfe7fb1458382
-  - da78deb91febd1939eb023075b6ff236d4bd36759d385e56b3bbce8fcbf9b42f
-  - c53fc92a97825bc3dcf981cde58eaea23cab6ad22a56d2219d31a50a1fac4d7c
+  - fe9996515fca53a8b3efd29a523ce88ac1016f905b02bb4326406df881b36525
+  - 7b166ddfbeb305c37b40e3853b0dd600a91b92af2e241f04d041b64f231bfa07
+  - 4d6f8f1154b396024c858c2da87df249bb960be4a4bfebfc88c6476199cace9b
+  - 9e309d6b02d7bf7bfcb10682eee416b3c0e236b802a10aa83869cc2b1b47e5a4
 injection_expected_ids: 2000
 expected_injection_selection_sha256: 8ee40ea7e450d5c19027f2e6c0c02279a78102caa246aeac80e032278ede6c5a
 expected_injection_metadata_sha256: 549968899c236387d65700aa1e6d0d84a45ccff63cdf97d0b647f4d19cef1910

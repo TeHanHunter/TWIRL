@@ -87,7 +87,7 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   masks and counts them, and still rejects every undeclared coverage gap.
   This provenance propagates through real BLS, injection and independent
   evidence, native HDF5, shard merging, candidate metadata, and teacher-input
-  validation. The combined suite passed `405` tests with `3` skips, plus the
+  validation. The combined suite passed `413` tests with `3` skips, plus the
   detection sample and documentation checks; an independent review also
   caught and fixed a shard-merge publish-order failure before deployment.
 - `2026-07-23`: Rebuilt the S56 cadence-reference manifest on PDO while
@@ -96,20 +96,37 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   official TESSCut WD 1856 evidence was regenerated under the v2 overlay.
   Both active apertures retain the accepted recovery: the 1x1 reference has
   period `1.407960330 d` and depth S/N `11.87`; the WCS-defined 2x2 reference
-  has period `1.407896973 d` and depth S/N `11.33`. The frozen four-shard
+  has period `1.407896973 d` and depth S/N `11.33`. The legacy v1 four-shard
   injection canary was independently rehashed after its ORCD cleanup
   relocation: all `2,000` injection IDs, immutable metadata, compact-source
-  parity, and ordered shard hashes match the locked contract. The restarted
+  parity, and ordered shard hashes match that frozen contract. The restarted
   `31,450`-target BLS run and its replacement Tier-0 audit both completed on
   `pdogpu1`. The table contains all `62,900` expected target/aperture pairs,
   with five `too_few_cadences` results and no missing pairs; all six Tier-0
   gates pass. The reviewed Tier-0 report and BLS hashes are now locked before
-  the final ORCD Tier-1 population audit.
+  the final ORCD Tier-1 population audit. Exact v1 evaluator commit
+  `4831713f` was pushed and deployed, but CPU job `18641848` failed closed
+  before the population scan: the v1 retention predictor measured
+  normalization transfer rather than normalized depth retention, and one
+  frozen epoch had no effective-good in-transit samples. Correcting for the
+  stored injection baseline and detrending scale gives median retention
+  `0.9908` in both apertures with tenth percentiles near `0.966`; no population
+  products or scientific Tier-1 conclusion were emitted by the failed run.
+- `2026-07-23`: Tier-1 contract v2 and the quality-aware epoch policy were
+  locked in producer commit `f1b8b53c`, pushed, and deployed as a clean
+  detached ORCD worktree. CPU array job `18650874` regenerated shard indices
+  `00`, `13`, `26`, and `39` from the unchanged frozen schedule. Independent
+  audit job `18651439` passed all `2,000` injection IDs and `2,000` unique
+  hosts with a minimum of two effective-good in-transit cadences and zero
+  alignment, copied-flux, raw-equation, uncertainty-equation, stored-quality,
+  or provenance failures. The ordered shard hashes are `fe999651…6525`,
+  `7b166ddf…fa07`, `4d6f8f11…ce9b`, and `9e309d6b…e5a4`; thresholds were not
+  relaxed.
 
 **Next:** Keep the gated S64-S69 source-only production queue active in
-parallel; execute the exact bounded Tier-1 CPU gate on ORCD, inspect its
-figures, and publish the target pass/review/fail mask before enrichment uses
-S56.
+parallel; commit and deploy the v2 hash lock, execute the exact bounded Tier-1
+CPU gate on ORCD, inspect its figures, and publish the target pass/review/fail
+mask before enrichment uses S56.
 
 ### Catalog, archive index, and sample control
 
