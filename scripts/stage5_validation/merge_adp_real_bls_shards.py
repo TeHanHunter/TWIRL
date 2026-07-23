@@ -31,6 +31,10 @@ _INVARIANT_SUMMARY_FIELDS = (
     "cadence_reference_cadence_authority",
     "cadence_reference_quality_authority",
     "cadence_reference_source_hashes_sha256",
+    "authority_exclusion_policy_contract",
+    "authority_exclusion_external_bit",
+    "authority_exclusions_sha256",
+    "n_authority_exclusions",
     "apertures",
     "n_targets_total",
     "n_periods",
@@ -143,8 +147,74 @@ def merge_shards(
         raise ValueError(
             f"real-BLS target coverage is incomplete: {observed_targets} != {expected_targets}"
         )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
     frame = frame.sort_values(key, kind="stable").reset_index(drop=True)
+    status = frame["status"].fillna("").astype(str)
+    valid = status.eq("ok") & pd.to_numeric(
+        frame.get("peak_rank"), errors="coerce"
+    ).gt(0)
+    quality_count_columns = (
+        "n_cad_internal_bad",
+        "n_cad_external_bad",
+        "n_cad_external_only_bad",
+        "n_cad_effective_bad",
+        "n_cad_authority_excluded",
+    )
+    missing_quality_columns = sorted(set(quality_count_columns) - set(frame))
+    if missing_quality_columns:
+        raise ValueError(
+            "real-BLS shards lack quality-count columns: "
+            f"{missing_quality_columns}"
+        )
+    if "n_cad_total" not in frame:
+        raise ValueError("real-BLS shards lack n_cad_total")
+    quality_numeric = frame.loc[
+        :, ["tic", "n_cad_total", *quality_count_columns]
+    ].copy()
+    for column in ("n_cad_total", *quality_count_columns):
+        values = pd.to_numeric(quality_numeric[column], errors="coerce")
+        if (
+            values.isna().any()
+            or (values < 0).any()
+            or (values != np.floor(values)).any()
+        ):
+            raise ValueError(f"real-BLS shards have invalid {column}")
+        quality_numeric[column] = values.astype(np.int64)
+    if (
+        quality_numeric.groupby("tic", sort=False)[
+            ["n_cad_total", *quality_count_columns]
+        ]
+        .nunique()
+        .gt(1)
+        .any()
+        .any()
+    ):
+        raise ValueError("real-BLS quality counts disagree across target rows")
+    if (
+        quality_numeric["n_cad_external_only_bad"]
+        > quality_numeric["n_cad_external_bad"]
+    ).any() or (
+        quality_numeric["n_cad_authority_excluded"]
+        > quality_numeric["n_cad_external_bad"]
+    ).any():
+        raise ValueError("real-BLS external quality counts are inconsistent")
+    if not quality_numeric["n_cad_effective_bad"].eq(
+        quality_numeric["n_cad_internal_bad"]
+        + quality_numeric["n_cad_external_only_bad"]
+    ).all():
+        raise ValueError("real-BLS effective quality counts are inconsistent")
+    if (
+        quality_numeric.loc[:, quality_count_columns]
+        .gt(quality_numeric["n_cad_total"], axis=0)
+        .any()
+        .any()
+    ):
+        raise ValueError("real-BLS quality counts exceed n_cad_total")
+    target_quality = frame.drop_duplicates("tic", keep="first")
+    quality_counts_over_unique_targets = {
+        column: int(pd.to_numeric(target_quality[column], errors="raise").sum())
+        for column in quality_count_columns
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = out_path.with_suffix(out_path.suffix + ".tmp.parquet")
     temporary.unlink(missing_ok=True)
     frame.to_parquet(temporary, compression="zstd", index=False)
@@ -155,10 +225,6 @@ def merge_shards(
         temporary.unlink(missing_ok=True)
         raise RuntimeError("real-BLS shard inputs changed during merge")
     temporary.replace(out_path)
-    status = frame["status"].fillna("").astype(str)
-    valid = status.eq("ok") & pd.to_numeric(
-        frame.get("peak_rank"), errors="coerce"
-    ).gt(0)
     summary: dict[str, Any] = {
         field: baseline[field] for field in _INVARIANT_SUMMARY_FIELDS
     }
@@ -189,6 +255,9 @@ def merge_shards(
                 .sort_index()
                 .items()
             },
+            "quality_counts_over_unique_targets": (
+                quality_counts_over_unique_targets
+            ),
             "source_shards": [
                 {
                     "shard_index": index,

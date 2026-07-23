@@ -18,16 +18,25 @@ import numpy as np
 import pandas as pd
 
 from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
     CADENCE_REFERENCE_COLUMNS,
+    CADENCE_REFERENCE_BUILDER_VERSION,
     QLP_QUALITY_EXTERNAL_BIT,
+    authority_exclusions_sha256,
     file_sha256,
 )
 
 
 EXTERNAL_QUALITY_POLICY_CONTRACT = (
-    "a2v1_native_internal_or_authoritative_external_quality_v1"
+    "a2v1_native_internal_or_authoritative_external_quality_v2"
 )
-EFFECTIVE_QUALITY_POLICY = "(internal_quality != 0) | (external_quality != 0)"
+EFFECTIVE_QUALITY_POLICY = (
+    "(internal_quality != 0) | (external_quality != 0), with exact "
+    "manifest-declared quaternion-authority exclusions assigned reserved "
+    f"external bit {AUTHORITY_EXCLUSION_EXTERNAL_BIT}"
+)
 CADENCE_REFERENCE_CONTRACT_TEMPLATE = "s{sector}_a2v1_cadence_reference_v1"
 EXPECTED_CADENCE_AUTHORITY = "qlp_cam_quat"
 EXPECTED_QUALITY_AUTHORITY = "spoc_and_qlp_quality_flags"
@@ -55,6 +64,17 @@ def _integer_array(values: Any, *, context: str) -> np.ndarray:
     if not np.all(np.isfinite(array)) or not np.all(array == np.floor(array)):
         raise ValueError(f"{context} must contain finite integers")
     return array.astype(np.int64)
+
+
+def _nonnegative_int64_scalar(value: Any, *, context: str) -> int:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, np.integer)
+    ):
+        raise ValueError(f"{context} must be a nonnegative int64 integer")
+    numeric = int(value)
+    if numeric < 0 or numeric > np.iinfo(np.int64).max:
+        raise ValueError(f"{context} must be a nonnegative int64 integer")
+    return numeric
 
 
 def _canonical_json_sha256(payload: Mapping[str, Any]) -> str:
@@ -148,6 +168,140 @@ def _validate_source_inventory(
     )
 
 
+def _validate_authority_exclusions(
+    manifest: Mapping[str, Any],
+    *,
+    sector: int,
+    observed_detectors: Sequence[tuple[int, int]],
+    frame: pd.DataFrame,
+) -> tuple[dict[tuple[int, int, int], np.ndarray], str]:
+    """Validate exact detector cadences excluded by quaternion authority."""
+
+    payload = manifest.get("authority_exclusions")
+    if not isinstance(payload, Mapping):
+        raise ValueError("cadence-reference authority_exclusions is missing")
+    required_payload = {
+        "contract_version",
+        "policy",
+        "external_bit",
+        "n_rows",
+        "by_detector",
+    }
+    if set(payload) != required_payload:
+        raise ValueError(
+            "cadence-reference authority_exclusions has the wrong fields"
+        )
+    if str(payload["contract_version"]) != AUTHORITY_EXCLUSION_POLICY_CONTRACT:
+        raise ValueError("cadence-reference authority-exclusion contract mismatch")
+    if str(payload["policy"]) != AUTHORITY_EXCLUSION_POLICY:
+        raise ValueError("cadence-reference authority-exclusion policy mismatch")
+    external_bit = _nonnegative_int64_scalar(
+        payload["external_bit"],
+        context="cadence-reference authority-exclusion external_bit",
+    )
+    declared_rows = _nonnegative_int64_scalar(
+        payload["n_rows"],
+        context="cadence-reference authority-exclusion n_rows",
+    )
+    manifest_rows = _nonnegative_int64_scalar(
+        manifest["n_spoc_rows_excluded_by_quat"],
+        context="cadence-reference n_spoc_rows_excluded_by_quat",
+    )
+    if external_bit != AUTHORITY_EXCLUSION_EXTERNAL_BIT:
+        raise ValueError("cadence-reference authority-exclusion bit mismatch")
+    if declared_rows < 0 or manifest_rows != declared_rows:
+        raise ValueError("cadence-reference authority-exclusion count mismatch")
+    observed_digest = authority_exclusions_sha256(payload)
+    if str(manifest.get("authority_exclusions_sha256", "")).lower() != (
+        observed_digest
+    ):
+        raise ValueError("cadence-reference authority-exclusion hash mismatch")
+
+    by_detector = payload["by_detector"]
+    if not isinstance(by_detector, Mapping):
+        raise ValueError(
+            "cadence-reference authority-exclusion by_detector must be an object"
+        )
+    detector_names = {
+        f"cam{int(camera)}_ccd{int(ccd)}"
+        for camera, ccd in observed_detectors
+    }
+    if set(str(value) for value in by_detector) != detector_names:
+        raise ValueError(
+            "cadence-reference authority-exclusion detector inventory mismatch"
+        )
+    table_keys = {
+        (
+            int(row.sector),
+            int(row.camera),
+            int(row.ccd),
+            int(row.cadenceno),
+        )
+        for row in frame.itertuples(index=False)
+    }
+    exclusions: dict[tuple[int, int, int], np.ndarray] = {}
+    observed_keys: set[tuple[int, int, int, int]] = set()
+    total = 0
+    for camera, ccd in observed_detectors:
+        detector_name = f"cam{int(camera)}_ccd{int(ccd)}"
+        entry = by_detector[detector_name]
+        if not isinstance(entry, Mapping) or set(entry) != {"n_rows", "rows"}:
+            raise ValueError(
+                "cadence-reference authority-exclusion detector entry is malformed"
+            )
+        rows = entry["rows"]
+        if not isinstance(rows, list):
+            raise ValueError(
+                "cadence-reference authority-exclusion rows must be a list"
+            )
+        n_rows = _nonnegative_int64_scalar(
+            entry["n_rows"],
+            context=(
+                "cadence-reference authority-exclusion detector n_rows"
+            ),
+        )
+        if n_rows < 0 or n_rows != len(rows):
+            raise ValueError(
+                "cadence-reference authority-exclusion detector count mismatch"
+            )
+        detector_cadences: list[int] = []
+        for row in rows:
+            if not isinstance(row, Mapping) or set(row) != {
+                "cadenceno",
+                "spoc_quality",
+            }:
+                raise ValueError(
+                    "cadence-reference authority-exclusion row is malformed"
+                )
+            cadence = _nonnegative_int64_scalar(
+                row["cadenceno"],
+                context="cadence-reference authority-exclusion cadenceno",
+            )
+            spoc_quality = _nonnegative_int64_scalar(
+                row["spoc_quality"],
+                context="cadence-reference authority-exclusion spoc_quality",
+            )
+            key = (int(sector), int(camera), int(ccd), int(cadence))
+            if key in observed_keys:
+                raise ValueError(
+                    "cadence-reference authority exclusions contain duplicates"
+                )
+            if key in table_keys:
+                raise ValueError(
+                    "cadence-reference authority exclusion is present in the "
+                    "authoritative cadence table"
+                )
+            observed_keys.add(key)
+            detector_cadences.append(int(cadence))
+        exclusions[(int(sector), int(camera), int(ccd))] = np.asarray(
+            sorted(detector_cadences), dtype=np.int64
+        )
+        total += n_rows
+    if total != declared_rows:
+        raise ValueError("cadence-reference authority-exclusion total mismatch")
+    return exclusions, observed_digest
+
+
 @dataclass(frozen=True)
 class QualityOverlayResult:
     """Effective binary quality plus exact external values and audit counts."""
@@ -171,6 +325,8 @@ class ExternalQualityReference:
     cadence_authority: str
     quality_authority: str
     by_detector: Mapping[tuple[int, int, int], tuple[np.ndarray, np.ndarray, np.ndarray]]
+    authority_exclusions: Mapping[tuple[int, int, int], np.ndarray]
+    authority_exclusions_sha256: str
 
     @property
     def provenance(self) -> dict[str, Any]:
@@ -187,6 +343,16 @@ class ExternalQualityReference:
             "cadence_reference_manifest_sha256": self.manifest_sha256,
             "cadence_reference_source_declaration_sha256": (
                 self.source_declaration_sha256
+            ),
+            "authority_exclusion_policy_contract": (
+                AUTHORITY_EXCLUSION_POLICY_CONTRACT
+            ),
+            "authority_exclusion_external_bit": (
+                AUTHORITY_EXCLUSION_EXTERNAL_BIT
+            ),
+            "authority_exclusions_sha256": self.authority_exclusions_sha256,
+            "n_authority_exclusions": int(
+                sum(len(values) for values in self.authority_exclusions.values())
             ),
         }
 
@@ -245,14 +411,31 @@ class ExternalQualityReference:
         matched[in_bounds] = (
             reference_cadence[positions[in_bounds]] == cadences[in_bounds]
         )
+        authority_excluded = np.zeros(len(cadences), dtype=bool)
         if not matched.all():
-            missing = cadences[~matched][:20].astype(int).tolist()
+            declared = self.authority_exclusions.get(key)
+            if declared is not None and len(declared):
+                missing_indices = np.flatnonzero(~matched)
+                exclusion_positions = np.searchsorted(
+                    declared, cadences[missing_indices]
+                )
+                exclusion_in_bounds = exclusion_positions < len(declared)
+                exclusion_matched = np.zeros(len(missing_indices), dtype=bool)
+                exclusion_matched[exclusion_in_bounds] = (
+                    declared[exclusion_positions[exclusion_in_bounds]]
+                    == cadences[missing_indices[exclusion_in_bounds]]
+                )
+                authority_excluded[missing_indices] = exclusion_matched
+        uncovered = ~matched & ~authority_excluded
+        if uncovered.any():
+            missing = cadences[uncovered][:20].astype(int).tolist()
             raise ValueError(
                 f"{context}: external-quality coverage is missing cadences for "
                 f"{key}: {missing}"
             )
-        mapped_orbits = reference_orbit[positions]
-        mismatch = mapped_orbits != orbits
+        mapped_orbits = np.zeros(len(cadences), dtype=np.int64)
+        mapped_orbits[matched] = reference_orbit[positions[matched]]
+        mismatch = matched & (mapped_orbits != orbits)
         if mismatch.any():
             examples = [
                 {
@@ -266,7 +449,11 @@ class ExternalQualityReference:
                 f"{context}: external-quality orbit mapping mismatch: {examples}"
             )
 
-        external = reference_quality[positions]
+        external = np.zeros(len(cadences), dtype=np.int64)
+        external[matched] = reference_quality[positions[matched]]
+        external[authority_excluded] = np.int64(
+            1 << AUTHORITY_EXCLUSION_EXTERNAL_BIT
+        )
         internal_bad = internal != 0
         external_bad = external != 0
         effective_bad = internal_bad | external_bad
@@ -276,6 +463,9 @@ class ExternalQualityReference:
             "n_cad_external_bad": int(np.count_nonzero(external_bad)),
             "n_cad_external_only_bad": int(
                 np.count_nonzero(external_bad & ~internal_bad)
+            ),
+            "n_cad_authority_excluded": int(
+                np.count_nonzero(authority_excluded)
             ),
             "n_cad_effective_bad": int(np.count_nonzero(effective_bad)),
         }
@@ -307,6 +497,7 @@ def load_external_quality_reference(
 
     required = {
         "contract_version",
+        "builder_version",
         "sector",
         "cadence_authority",
         "quality_authority",
@@ -322,6 +513,9 @@ def load_external_quality_reference(
         "n_nonzero_external_quality",
         "n_spoc_authority_files_verified",
         "n_qlp_qflag_files_verified",
+        "n_spoc_rows_excluded_by_quat",
+        "authority_exclusions",
+        "authority_exclusions_sha256",
         "source_file_sha256",
         "sources",
     }
@@ -332,6 +526,8 @@ def load_external_quality_reference(
     contract = CADENCE_REFERENCE_CONTRACT_TEMPLATE.format(sector=sector)
     if str(manifest["contract_version"]) != contract:
         raise ValueError("cadence-reference contract mismatch")
+    if str(manifest["builder_version"]) != CADENCE_REFERENCE_BUILDER_VERSION:
+        raise ValueError("cadence-reference builder version mismatch")
     if int(manifest["sector"]) != sector:
         raise ValueError("cadence-reference manifest sector mismatch")
     if str(manifest["cadence_authority"]) != EXPECTED_CADENCE_AUTHORITY:
@@ -400,6 +596,14 @@ def load_external_quality_reference(
         int(value) for value in expected_orbits
     }:
         raise ValueError("cadence-reference does not cover the expected orbits")
+    authority_exclusions, authority_exclusions_digest = (
+        _validate_authority_exclusions(
+            manifest,
+            sector=sector,
+            observed_detectors=observed_detectors,
+            frame=frame,
+        )
+    )
 
     observed_rows_by_detector = {
         f"cam{int(camera)}_ccd{int(ccd)}": int(len(group))
@@ -489,10 +693,15 @@ def load_external_quality_reference(
         cadence_authority=EXPECTED_CADENCE_AUTHORITY,
         quality_authority=EXPECTED_QUALITY_AUTHORITY,
         by_detector=by_detector,
+        authority_exclusions=authority_exclusions,
+        authority_exclusions_sha256=authority_exclusions_digest,
     )
 
 
 __all__ = [
+    "AUTHORITY_EXCLUSION_EXTERNAL_BIT",
+    "AUTHORITY_EXCLUSION_POLICY_CONTRACT",
+    "authority_exclusions_sha256",
     "CADENCE_REFERENCE_CONTRACT_TEMPLATE",
     "EFFECTIVE_QUALITY_POLICY",
     "EXPECTED_CADENCE_AUTHORITY",

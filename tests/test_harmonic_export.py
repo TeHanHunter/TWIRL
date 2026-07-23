@@ -9,7 +9,11 @@ import pandas as pd
 import pytest
 
 from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
     CADENCE_REFERENCE_COLUMNS,
+    authority_exclusions_sha256,
     file_sha256,
 )
 from twirl.lightcurves.external_quality import (
@@ -113,8 +117,24 @@ def _write_s56_reference(
             add_source("spoc_flag_file", camera=camera, ccd=ccd)
     add_source("spoc_quality_table")
     add_source("spoc_quality_provenance")
+    detector_names = [
+        f"cam{camera}_ccd{ccd}"
+        for camera in range(1, 5)
+        for ccd in range(1, 5)
+    ]
+    authority_exclusions = {
+        "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+        "policy": AUTHORITY_EXCLUSION_POLICY,
+        "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "n_rows": 0,
+        "by_detector": {
+            detector: {"n_rows": 0, "rows": []}
+            for detector in detector_names
+        },
+    }
     manifest = {
         "contract_version": "s56_a2v1_cadence_reference_v1",
+        "builder_version": "a2v1_cadence_reference_builder_v3",
         "sector": 56,
         "cadence_authority": "qlp_cam_quat",
         "quality_authority": "spoc_and_qlp_quality_flags",
@@ -126,11 +146,7 @@ def _write_s56_reference(
         "table_sha256": file_sha256(table),
         "table_columns": list(CADENCE_REFERENCE_COLUMNS),
         "n_rows": len(frame),
-        "detectors": [
-            f"cam{camera}_ccd{ccd}"
-            for camera in range(1, 5)
-            for ccd in range(1, 5)
-        ],
+        "detectors": detector_names,
         "orbits": [119, 120],
         "n_rows_by_detector": {
             f"cam{int(camera)}_ccd{int(ccd)}": int(len(group))
@@ -143,6 +159,11 @@ def _write_s56_reference(
         ),
         "n_spoc_authority_files_verified": 16,
         "n_qlp_qflag_files_verified": 32,
+        "n_spoc_rows_excluded_by_quat": 0,
+        "authority_exclusions": authority_exclusions,
+        "authority_exclusions_sha256": authority_exclusions_sha256(
+            authority_exclusions
+        ),
         "source_file_sha256": {
             str(source["path"]): str(source["sha256"]) for source in sources
         },
@@ -436,6 +457,7 @@ def test_real_only_raw_pair_export_writes_full_contract(
         assert np.flatnonzero(group["quality"][:]).tolist() == [3, 5]
         assert group.attrs["n_cad_internal_bad"] == 1
         assert group.attrs["n_cad_external_bad"] == 1
+        assert group.attrs["n_cad_authority_excluded"] == 0
         assert h5.attrs["external_quality_policy_contract"] == (
             EXTERNAL_QUALITY_POLICY_CONTRACT
         )
@@ -443,9 +465,19 @@ def test_real_only_raw_pair_export_writes_full_contract(
         assert h5.attrs["cadence_reference_table_sha256"] == file_sha256(
             cadence_table
         )
+        assert h5.attrs["authority_exclusion_policy_contract"] == (
+            AUTHORITY_EXCLUSION_POLICY_CONTRACT
+        )
+        assert h5.attrs["authority_exclusion_external_bit"] == (
+            AUTHORITY_EXCLUSION_EXTERNAL_BIT
+        )
+        assert len(h5.attrs["authority_exclusions_sha256"]) == 64
+        assert h5.attrs["n_authority_exclusions"] == 0
         assert h5.attrs["compact_adp_h5_sha256"] == file_sha256(adp_source)
         assert h5.attrs["compact_lc_sha256"] == file_sha256(adp_source)
+        assert h5.attrs["quality_overlay_n_cad_authority_excluded"] == 0
     assert summary["external_quality"]["counts"]["n_cad_effective_bad"] == 2
+    assert summary["external_quality"]["counts"]["n_cad_authority_excluded"] == 0
 
 
 def test_raw_pair_export_rejects_compact_not_bound_by_candidate_summary(
@@ -687,6 +719,14 @@ def test_shard_merge_rejects_no_data_loss(
             h5.attrs["cadence_reference_table_sha256"] = "1" * 64
             h5.attrs["cadence_reference_manifest_sha256"] = "2" * 64
             h5.attrs["cadence_reference_source_declaration_sha256"] = "3" * 64
+            h5.attrs["authority_exclusion_policy_contract"] = (
+                AUTHORITY_EXCLUSION_POLICY_CONTRACT
+            )
+            h5.attrs["authority_exclusion_external_bit"] = (
+                AUTHORITY_EXCLUSION_EXTERNAL_BIT
+            )
+            h5.attrs["authority_exclusions_sha256"] = "4" * 64
+            h5.attrs["n_authority_exclusions"] = 0
             h5.attrs["training_table_sha256"] = "a" * 64
             for name, channels in CHANNEL_CONTRACT.items():
                 h5.attrs[name] = json.dumps(channels)
@@ -714,6 +754,7 @@ def test_shard_merge_rejects_no_data_loss(
                 "n_cad_internal_bad": 4,
                 "n_cad_external_bad": 0,
                 "n_cad_external_only_bad": 0,
+                "n_cad_authority_excluded": 0,
                 "n_cad_effective_bad": 4,
             }
             for name, value in quality_counts.items():

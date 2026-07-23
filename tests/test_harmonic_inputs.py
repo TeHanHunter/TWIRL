@@ -8,6 +8,10 @@ import h5py
 import numpy as np
 import pytest
 
+from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+)
 from twirl.lightcurves.external_quality import (
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
@@ -50,13 +54,22 @@ def _set_quality_contract(h5: h5py.File, group: h5py.Group, quality: np.ndarray)
         ("cadence_reference_table_sha256", "1" * 64),
         ("cadence_reference_manifest_sha256", "2" * 64),
         ("cadence_reference_source_declaration_sha256", "3" * 64),
+        ("authority_exclusions_sha256", "4" * 64),
     ):
         h5.attrs[name] = digest
+    h5.attrs["authority_exclusion_policy_contract"] = (
+        AUTHORITY_EXCLUSION_POLICY_CONTRACT
+    )
+    h5.attrs["authority_exclusion_external_bit"] = (
+        AUTHORITY_EXCLUSION_EXTERNAL_BIT
+    )
+    h5.attrs["n_authority_exclusions"] = 0
     counts = {
         "n_cad_total": n_total,
         "n_cad_internal_bad": n_bad,
         "n_cad_external_bad": 0,
         "n_cad_external_only_bad": 0,
+        "n_cad_authority_excluded": 0,
         "n_cad_effective_bad": n_bad,
     }
     group.attrs["quality_policy_contract"] = EXTERNAL_QUALITY_POLICY_CONTRACT
@@ -200,6 +213,16 @@ def test_hdf5_contract_reader_and_verifier(tmp_path: Path) -> None:
 
     with h5py.File(path, "r+") as h5:
         group = h5["targets/0000000000000001"]
+        group.attrs["n_cad_authority_excluded"] = 1
+    corrupted = verify_raw_pair_contract(path)
+    assert not corrupted["passed"]
+    assert any(
+        "authority-excluded count exceeds external count" in value
+        for value in corrupted["failures"]
+    )
+    with h5py.File(path, "r+") as h5:
+        group = h5["targets/0000000000000001"]
+        group.attrs["n_cad_authority_excluded"] = 0
         original = int(group.attrs["n_cad_effective_bad"])
         group.attrs["n_cad_effective_bad"] = original + 1
     corrupted = verify_raw_pair_contract(path)

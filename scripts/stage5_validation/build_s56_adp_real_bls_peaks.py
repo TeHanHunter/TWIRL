@@ -22,6 +22,15 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from twirl.io.compact_export import read_compact_lc_export  # noqa: E402
+from twirl.lightcurves.a2v1_cadence_reference import (  # noqa: E402
+    AUTHORITY_EXCLUSION_POLICY,
+    CADENCE_REFERENCE_BUILDER_VERSION,
+)
+from twirl.lightcurves.external_quality import (  # noqa: E402
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+    authority_exclusions_sha256,
+)
 from twirl.search.a2v1_bls_contract import (  # noqa: E402
     A2V1_TEACHER_BLS_SEARCH_CONTRACT,
     approved_a2v1_teacher_bls_config,
@@ -44,7 +53,7 @@ DEFAULT_COMPACT_LC = (
 DEFAULT_OUT_DIR = REPO_ROOT / "reports/stage5_validation/s56_adp_real_bls_peaks"
 
 EXTERNAL_QUALITY_POLICY_CONTRACT = (
-    "a2v1_bls_internal_or_authoritative_external_quality_v1"
+    "a2v1_bls_internal_or_authoritative_external_quality_v2"
 )
 CADENCE_REFERENCE_CONTRACT_TEMPLATE = "s{sector}_a2v1_cadence_reference_v1"
 CADENCE_REFERENCE_COLUMNS = (
@@ -72,7 +81,10 @@ EXPECTED_QUALITY_COMPOSITION = {
 _EXTERNAL_QUALITY_BY_DETECTOR: dict[
     tuple[int, int, int], tuple[np.ndarray, np.ndarray, np.ndarray]
 ] | None = None
-_EXTERNAL_QUALITY_PROVENANCE: dict[str, str] | None = None
+_EXTERNAL_QUALITY_AUTHORITY_EXCLUSIONS: dict[
+    tuple[int, int, int], np.ndarray
+] | None = None
+_EXTERNAL_QUALITY_PROVENANCE: dict[str, Any] | None = None
 
 
 def _sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
@@ -101,8 +113,176 @@ def _integer_column(frame: pd.DataFrame, column: str) -> pd.Series:
 
 
 def _canonical_json_sha256(payload: Mapping[str, Any]) -> str:
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    text = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _manifest_integer(value: Any, *, context: str) -> int:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, np.integer)
+    ):
+        raise ValueError(f"{context} must be an integer")
+    numeric = int(value)
+    if numeric < 0 or numeric > np.iinfo(np.int64).max:
+        raise ValueError(f"{context} must be a nonnegative int64 integer")
+    return numeric
+
+
+def _validate_authority_exclusions(
+    *,
+    manifest: Mapping[str, Any],
+    frame: pd.DataFrame,
+    sector: int,
+    detector_names: list[str],
+) -> tuple[dict[tuple[int, int, int], np.ndarray], str, int]:
+    """Validate the exact cadence exclusions copied from SPOC provenance."""
+
+    declaration = manifest.get("authority_exclusions")
+    if not isinstance(declaration, Mapping):
+        raise ValueError("cadence-reference authority_exclusions must be an object")
+    required_fields = {
+        "contract_version",
+        "policy",
+        "external_bit",
+        "n_rows",
+        "by_detector",
+    }
+    if set(declaration) != required_fields:
+        raise ValueError(
+            "cadence-reference authority_exclusions has the wrong fields"
+        )
+    if str(declaration["contract_version"]) != AUTHORITY_EXCLUSION_POLICY_CONTRACT:
+        raise ValueError("cadence-reference authority-exclusion contract mismatch")
+    if str(declaration["policy"]) != AUTHORITY_EXCLUSION_POLICY:
+        raise ValueError("cadence-reference authority-exclusion policy mismatch")
+    external_bit = _manifest_integer(
+        declaration["external_bit"],
+        context="cadence-reference authority-exclusion external_bit",
+    )
+    if external_bit != AUTHORITY_EXCLUSION_EXTERNAL_BIT:
+        raise ValueError("cadence-reference authority-exclusion bit mismatch")
+
+    declared_sha256 = str(manifest.get("authority_exclusions_sha256", "")).lower()
+    observed_sha256 = authority_exclusions_sha256(declaration)
+    if declared_sha256 != observed_sha256:
+        raise ValueError("cadence-reference authority-exclusions hash mismatch")
+
+    declared_total = _manifest_integer(
+        declaration["n_rows"],
+        context="cadence-reference authority-exclusion n_rows",
+    )
+    aggregate_total = _manifest_integer(
+        manifest.get("n_spoc_rows_excluded_by_quat"),
+        context="cadence-reference n_spoc_rows_excluded_by_quat",
+    )
+    if aggregate_total != declared_total:
+        raise ValueError(
+            "cadence-reference authority-exclusion count disagrees with "
+            "n_spoc_rows_excluded_by_quat"
+        )
+    by_detector = declaration["by_detector"]
+    if not isinstance(by_detector, Mapping):
+        raise ValueError(
+            "cadence-reference authority-exclusion by_detector must be an object"
+        )
+    if set(str(value) for value in by_detector) != set(detector_names):
+        raise ValueError(
+            "cadence-reference authority-exclusion detector inventory mismatch"
+        )
+
+    output: dict[tuple[int, int, int], np.ndarray] = {}
+    observed_total = 0
+    for camera, ccd in sorted(
+        {
+            (int(camera), int(ccd))
+            for camera, ccd in zip(
+                frame["camera"], frame["ccd"], strict=True
+            )
+        }
+    ):
+        name = f"cam{camera}_ccd{ccd}"
+        detector = by_detector[name]
+        if not isinstance(detector, Mapping):
+            raise ValueError(
+                f"cadence-reference authority exclusion {name} must be an object"
+            )
+        if set(detector) != {"n_rows", "rows"}:
+            raise ValueError(
+                f"cadence-reference authority exclusion {name} has the wrong fields"
+            )
+        rows = detector["rows"]
+        if not isinstance(rows, list):
+            raise ValueError(
+                f"cadence-reference authority exclusion {name} rows must be a list"
+            )
+        declared_detector_rows = _manifest_integer(
+            detector["n_rows"],
+            context=f"cadence-reference authority exclusion {name} n_rows",
+        )
+        if declared_detector_rows != len(rows):
+            raise ValueError(
+                f"cadence-reference authority exclusion {name} row-count mismatch"
+            )
+        cadences: list[int] = []
+        for index, row in enumerate(rows):
+            if not isinstance(row, Mapping):
+                raise ValueError(
+                    f"cadence-reference authority exclusion {name} row {index} "
+                    "must be an object"
+                )
+            if set(row) != {"cadenceno", "spoc_quality"}:
+                raise ValueError(
+                    f"cadence-reference authority exclusion {name} row {index} "
+                    "has the wrong fields"
+                )
+            cadences.append(
+                _manifest_integer(
+                    row["cadenceno"],
+                    context=(
+                        f"cadence-reference authority exclusion {name} "
+                        f"row {index} cadenceno"
+                    ),
+                )
+            )
+            _manifest_integer(
+                row["spoc_quality"],
+                context=(
+                    f"cadence-reference authority exclusion {name} "
+                    f"row {index} spoc_quality"
+                ),
+            )
+        if len(cadences) != len(set(cadences)):
+            raise ValueError(
+                f"cadence-reference authority exclusion {name} has duplicate cadences"
+            )
+        declared_cadences = np.asarray(sorted(cadences), dtype=np.int64)
+        retained_cadences = frame.loc[
+            (frame["camera"] == camera) & (frame["ccd"] == ccd),
+            "cadenceno",
+        ].to_numpy(dtype=np.int64)
+        overlap = np.intersect1d(
+            declared_cadences,
+            retained_cadences,
+            assume_unique=True,
+        )
+        if len(overlap):
+            raise ValueError(
+                f"cadence-reference authority exclusion {name} is still present "
+                f"in the table: {overlap[:20].astype(int).tolist()}"
+            )
+        output[(int(sector), camera, ccd)] = declared_cadences
+        observed_total += len(declared_cadences)
+    if observed_total != declared_total:
+        raise ValueError(
+            "cadence-reference authority-exclusion total disagrees with "
+            "detector rows"
+        )
+    return output, observed_sha256, declared_total
 
 
 def _validate_source_hash_declarations(manifest: Mapping[str, Any]) -> str:
@@ -176,6 +356,7 @@ def load_external_quality_reference(
 
     required_manifest = {
         "contract_version",
+        "builder_version",
         "sector",
         "cadence_authority",
         "quality_authority",
@@ -189,6 +370,9 @@ def load_external_quality_reference(
         "n_nonzero_spoc_quality",
         "n_nonzero_qlp_quality",
         "n_nonzero_external_quality",
+        "n_spoc_rows_excluded_by_quat",
+        "authority_exclusions",
+        "authority_exclusions_sha256",
     }
     missing_manifest = sorted(required_manifest - set(manifest))
     if missing_manifest:
@@ -198,6 +382,8 @@ def load_external_quality_reference(
     expected_contract = CADENCE_REFERENCE_CONTRACT_TEMPLATE.format(sector=int(sector))
     if str(manifest["contract_version"]) != expected_contract:
         raise ValueError("cadence-reference manifest contract mismatch")
+    if str(manifest["builder_version"]) != CADENCE_REFERENCE_BUILDER_VERSION:
+        raise ValueError("cadence-reference manifest builder version mismatch")
     if int(manifest["sector"]) != int(sector):
         raise ValueError("cadence-reference manifest sector mismatch")
     if str(manifest["cadence_authority"]) != EXPECTED_CADENCE_AUTHORITY:
@@ -273,6 +459,14 @@ def load_external_quality_reference(
                 f"cadence-reference {manifest_field} disagrees with the table"
             )
 
+    authority_exclusions, authority_exclusions_sha256, n_authority_exclusions = (
+        _validate_authority_exclusions(
+            manifest=manifest,
+            frame=frame,
+            sector=int(sector),
+            detector_names=observed_detectors,
+        )
+    )
     source_hashes_sha256 = _validate_source_hash_declarations(manifest)
     frame = frame.sort_values(
         ["sector", "camera", "ccd", "cadenceno"], kind="stable"
@@ -284,6 +478,13 @@ def load_external_quality_reference(
         "table_sha256": table_sha256,
         "manifest_sha256": manifest_sha256,
         "source_file_sha256_declaration_sha256": source_hashes_sha256,
+        "authority_exclusion_policy_contract": (
+            AUTHORITY_EXCLUSION_POLICY_CONTRACT
+        ),
+        "authority_exclusion_external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "authority_exclusions_sha256": authority_exclusions_sha256,
+        "n_authority_exclusions": n_authority_exclusions,
+        "_authority_exclusions_by_detector": authority_exclusions,
     }
 
 
@@ -309,15 +510,33 @@ def _initialize_external_quality_worker(
     reference_by_detector: dict[
         tuple[int, int, int], tuple[np.ndarray, np.ndarray, np.ndarray]
     ],
-    provenance: dict[str, str],
+    provenance: dict[str, Any],
 ) -> None:
-    global _EXTERNAL_QUALITY_BY_DETECTOR, _EXTERNAL_QUALITY_PROVENANCE
+    global _EXTERNAL_QUALITY_BY_DETECTOR
+    global _EXTERNAL_QUALITY_AUTHORITY_EXCLUSIONS
+    global _EXTERNAL_QUALITY_PROVENANCE
+    exclusions = provenance.get("_authority_exclusions_by_detector")
+    if not isinstance(exclusions, Mapping):
+        raise ValueError(
+            "external-quality provenance lacks validated authority exclusions"
+        )
     _EXTERNAL_QUALITY_BY_DETECTOR = reference_by_detector
-    _EXTERNAL_QUALITY_PROVENANCE = provenance
+    _EXTERNAL_QUALITY_AUTHORITY_EXCLUSIONS = {
+        key: np.asarray(values, dtype=np.int64)
+        for key, values in exclusions.items()
+    }
+    _EXTERNAL_QUALITY_PROVENANCE = {
+        key: value
+        for key, value in provenance.items()
+        if key != "_authority_exclusions_by_detector"
+    }
 
 
 def _apply_external_quality(lc: Any) -> dict[str, int]:
-    if _EXTERNAL_QUALITY_BY_DETECTOR is None:
+    if (
+        _EXTERNAL_QUALITY_BY_DETECTOR is None
+        or _EXTERNAL_QUALITY_AUTHORITY_EXCLUSIONS is None
+    ):
         raise RuntimeError("external-quality worker state was not initialized")
     lengths = {
         "time": len(lc.time),
@@ -343,14 +562,25 @@ def _apply_external_quality(lc: Any) -> dict[str, int]:
     in_bounds = positions < len(reference_cadence)
     matched = np.zeros(len(cadences), dtype=bool)
     matched[in_bounds] = reference_cadence[positions[in_bounds]] == cadences[in_bounds]
-    if not matched.all():
-        missing = cadences[~matched][:20].astype(int).tolist()
+    declared_exclusions = _EXTERNAL_QUALITY_AUTHORITY_EXCLUSIONS.get(
+        detector_key,
+        np.asarray([], dtype=np.int64),
+    )
+    authority_excluded = (~matched) & np.isin(
+        cadences,
+        declared_exclusions,
+        assume_unique=True,
+    )
+    undeclared_missing = ~matched & ~authority_excluded
+    if undeclared_missing.any():
+        missing = cadences[undeclared_missing][:20].astype(int).tolist()
         raise ValueError(
             f"TIC {lc.tic}: external-quality coverage is missing compact cadences "
             f"for {detector_key}: {missing}"
         )
-    mapped_orbits = reference_orbit[positions]
-    orbit_mismatch = mapped_orbits != orbits
+    mapped_orbits = np.zeros(len(cadences), dtype=np.int64)
+    mapped_orbits[matched] = reference_orbit[positions[matched]]
+    orbit_mismatch = matched & (mapped_orbits != orbits)
     if orbit_mismatch.any():
         examples = [
             {
@@ -363,7 +593,11 @@ def _apply_external_quality(lc: Any) -> dict[str, int]:
         raise ValueError(
             f"TIC {lc.tic}: external-quality orbit mapping mismatch: {examples}"
         )
-    external_quality = reference_quality[positions]
+    external_quality = np.zeros(len(cadences), dtype=np.int64)
+    external_quality[matched] = reference_quality[positions[matched]]
+    external_quality[authority_excluded] = np.int64(
+        1 << AUTHORITY_EXCLUSION_EXTERNAL_BIT
+    )
     internal_bad = internal_quality != 0
     external_bad = external_quality != 0
     effective_bad = internal_bad | external_bad
@@ -373,6 +607,7 @@ def _apply_external_quality(lc: Any) -> dict[str, int]:
         "n_cad_external_bad": int(np.count_nonzero(external_bad)),
         "n_cad_external_only_bad": int(np.count_nonzero(external_bad & ~internal_bad)),
         "n_cad_effective_bad": int(np.count_nonzero(effective_bad)),
+        "n_cad_authority_excluded": int(np.count_nonzero(authority_excluded)),
     }
 
 
@@ -492,6 +727,22 @@ def _process_target(payload: tuple[int, str, dict[str, Any]]) -> list[dict[str, 
             row["cadence_reference_manifest_sha256"] = (
                 _EXTERNAL_QUALITY_PROVENANCE["manifest_sha256"]
             )
+            row["authority_exclusion_policy_contract"] = (
+                _EXTERNAL_QUALITY_PROVENANCE[
+                    "authority_exclusion_policy_contract"
+                ]
+            )
+            row["authority_exclusion_external_bit"] = int(
+                _EXTERNAL_QUALITY_PROVENANCE[
+                    "authority_exclusion_external_bit"
+                ]
+            )
+            row["authority_exclusions_sha256"] = (
+                _EXTERNAL_QUALITY_PROVENANCE["authority_exclusions_sha256"]
+            )
+            row["n_authority_exclusions"] = int(
+                _EXTERNAL_QUALITY_PROVENANCE["n_authority_exclusions"]
+            )
         rows.extend(current)
     return rows
 
@@ -583,6 +834,14 @@ def build_peak_table(
             == reference_provenance["quality_authority"]
             and summary.get("cadence_reference_source_hashes_sha256")
             == reference_provenance["source_file_sha256_declaration_sha256"]
+            and summary.get("authority_exclusion_policy_contract")
+            == reference_provenance["authority_exclusion_policy_contract"]
+            and int(summary.get("authority_exclusion_external_bit", -1))
+            == int(reference_provenance["authority_exclusion_external_bit"])
+            and summary.get("authority_exclusions_sha256")
+            == reference_provenance["authority_exclusions_sha256"]
+            and int(summary.get("n_authority_exclusions", -1))
+            == int(reference_provenance["n_authority_exclusions"])
             and int(summary.get("shard_index", -1)) == int(shard_index)
             and int(summary.get("n_shards", -1)) == int(n_shards)
             and int(summary.get("n_targets", -1)) == len(tics)
@@ -635,6 +894,24 @@ def build_peak_table(
     valid = status.eq("ok") & pd.to_numeric(
         peaks.get("peak_rank"), errors="coerce"
     ).gt(0)
+    quality_count_columns = (
+        "n_cad_internal_bad",
+        "n_cad_external_bad",
+        "n_cad_external_only_bad",
+        "n_cad_effective_bad",
+        "n_cad_authority_excluded",
+    )
+    quality_counts_over_unique_targets = {
+        column: 0 for column in quality_count_columns
+    }
+    if {"tic", *quality_count_columns}.issubset(peaks.columns):
+        target_quality = peaks.drop_duplicates("tic", keep="first")
+        quality_counts_over_unique_targets = {
+            column: int(
+                pd.to_numeric(target_quality[column], errors="raise").sum()
+            )
+            for column in quality_count_columns
+        }
     summary = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "sector": int(sector),
@@ -662,6 +939,18 @@ def build_peak_table(
         "cadence_reference_source_hashes_sha256": reference_provenance[
             "source_file_sha256_declaration_sha256"
         ],
+        "authority_exclusion_policy_contract": reference_provenance[
+            "authority_exclusion_policy_contract"
+        ],
+        "authority_exclusion_external_bit": int(
+            reference_provenance["authority_exclusion_external_bit"]
+        ),
+        "authority_exclusions_sha256": reference_provenance[
+            "authority_exclusions_sha256"
+        ],
+        "n_authority_exclusions": int(
+            reference_provenance["n_authority_exclusions"]
+        ),
         "out_dir": str(out_dir),
         "apertures": list(ADP_ONLY_APERTURES),
         "n_targets": int(len(tics)),
@@ -689,6 +978,9 @@ def build_peak_table(
             .sort_index()
             .items()
         },
+        "quality_counts_over_unique_targets": (
+            quality_counts_over_unique_targets
+        ),
         "outputs": {
             "peak_table": str(output_path),
             "summary": str(summary_path),

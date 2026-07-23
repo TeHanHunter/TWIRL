@@ -11,6 +11,8 @@ import pandas as pd
 
 from twirl.io.compact_export import read_compact_lc_export
 from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
     S56_EXPECTED_DETECTORS,
     S56_EXPECTED_ORBITS,
 )
@@ -58,7 +60,7 @@ TIER1_ELIGIBILITY_PROVENANCE_FIELDS: tuple[str, ...] = (
 )
 
 A2V1_BLS_EXTERNAL_QUALITY_CONTRACT = (
-    "a2v1_bls_internal_or_authoritative_external_quality_v1"
+    "a2v1_bls_internal_or_authoritative_external_quality_v2"
 )
 A2V1_CADENCE_REFERENCE_CONTRACT_TEMPLATE = "s{sector}_a2v1_cadence_reference_v1"
 A2V1_CADENCE_AUTHORITY = "qlp_cam_quat"
@@ -364,6 +366,36 @@ def validate_quality_bound_bls_evidence(
         summary.get("cadence_reference_source_hashes_sha256"),
         label="A2v1 BLS cadence source declarations",
     )
+    if summary.get("authority_exclusion_policy_contract") != (
+        AUTHORITY_EXCLUSION_POLICY_CONTRACT
+    ):
+        raise ValueError("A2v1 BLS authority-exclusion contract mismatch")
+    if summary.get("authority_exclusion_external_bit") != (
+        AUTHORITY_EXCLUSION_EXTERNAL_BIT
+    ):
+        raise ValueError("A2v1 BLS authority-exclusion bit mismatch")
+    summary_exclusion_sha = _validated_sha256(
+        summary.get("authority_exclusions_sha256"),
+        label="A2v1 BLS authority exclusions",
+    )
+    gate_exclusion_sha = _validated_sha256(
+        cadence_gate.get("authority_exclusions_sha256"),
+        label="Tier-1 cadence authority exclusions",
+    )
+    if summary_exclusion_sha != gate_exclusion_sha:
+        raise ValueError(
+            "A2v1 BLS authority exclusions do not match the Tier-1 gate"
+        )
+    n_authority_exclusions = summary.get("n_authority_exclusions")
+    if (
+        type(n_authority_exclusions) is not int
+        or n_authority_exclusions < 0
+        or n_authority_exclusions
+        != cadence_gate.get("n_authority_exclusions")
+    ):
+        raise ValueError(
+            "A2v1 BLS authority-exclusion count does not match the Tier-1 gate"
+        )
 
     required_peak_columns = {
         "sector",
@@ -378,6 +410,10 @@ def validate_quality_bound_bls_evidence(
         "bls_config_sha256",
         "cadence_reference_sha256",
         "cadence_reference_manifest_sha256",
+        "authority_exclusion_policy_contract",
+        "authority_exclusion_external_bit",
+        "authority_exclusions_sha256",
+        "n_authority_exclusions",
     }
     missing = sorted(required_peak_columns - set(peaks.columns))
     if missing:
@@ -402,10 +438,24 @@ def validate_quality_bound_bls_evidence(
         "cadence_reference_manifest_sha256": str(
             summary["cadence_reference_manifest_sha256"]
         ),
+        "authority_exclusion_policy_contract": (
+            AUTHORITY_EXCLUSION_POLICY_CONTRACT
+        ),
+        "authority_exclusions_sha256": summary_exclusion_sha,
     }
     for column, expected in exact_row_values.items():
         values = peaks[column].astype("string")
         if values.isna().any() or set(values.tolist()) != {expected}:
+            raise ValueError(f"A2v1 BLS rows have inconsistent {column}")
+    for column, expected in (
+        (
+            "authority_exclusion_external_bit",
+            AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        ),
+        ("n_authority_exclusions", n_authority_exclusions),
+    ):
+        values = pd.to_numeric(peaks[column], errors="coerce")
+        if values.isna().any() or not values.eq(expected).all():
             raise ValueError(f"A2v1 BLS rows have inconsistent {column}")
 
     eligibility_sector = _normalize_positive_integer_key(
@@ -939,6 +989,7 @@ def enrich_candidate_metadata(
             "n_cad_internal_bad",
             "n_cad_external_bad",
             "n_cad_external_only_bad",
+            "n_cad_authority_excluded",
             "n_cad_effective_bad",
         )
     ]

@@ -11,6 +11,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+    authority_exclusions_sha256,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = (
@@ -86,7 +93,10 @@ def _reference_frame(cadences: np.ndarray) -> pd.DataFrame:
 
 
 def _write_reference_pair(
-    tmp_path: Path, frame: pd.DataFrame
+    tmp_path: Path,
+    frame: pd.DataFrame,
+    *,
+    authority_exclusion_rows: list[dict[str, int]] | None = None,
 ) -> tuple[Path, Path]:
     table_path = tmp_path / "cadence_reference.csv"
     manifest_path = tmp_path / "cadence_reference.json"
@@ -96,8 +106,23 @@ def _write_reference_pair(
     source_hash = _sha256(source_path)
     external_quality = frame.get("external_quality", frame.get("quality"))
     assert external_quality is not None
+    exclusion_rows = authority_exclusion_rows or []
+    authority_exclusions = {
+        "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+        "policy": AUTHORITY_EXCLUSION_POLICY,
+        "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "n_rows": len(exclusion_rows),
+        "by_detector": {
+            "cam1_ccd1": {
+                "n_rows": len(exclusion_rows),
+                "rows": exclusion_rows,
+            }
+        },
+    }
+    exclusions_sha256 = authority_exclusions_sha256(authority_exclusions)
     manifest = {
         "contract_version": "s56_a2v1_cadence_reference_v1",
+        "builder_version": "a2v1_cadence_reference_builder_v3",
         "sector": 56,
         "cadence_authority": "qlp_cam_quat",
         "quality_authority": "spoc_and_qlp_quality_flags",
@@ -115,6 +140,9 @@ def _write_reference_pair(
         "n_nonzero_external_quality": int(
             np.count_nonzero(external_quality)
         ),
+        "n_spoc_rows_excluded_by_quat": len(exclusion_rows),
+        "authority_exclusions": authority_exclusions,
+        "authority_exclusions_sha256": exclusions_sha256,
         "source_file_sha256": {str(source_path): source_hash},
         "sources": [
             {
@@ -199,9 +227,59 @@ def test_external_bad_cadences_are_combined_before_bls(
     assert {row["n_cad_external_bad"] for row in rows} == {2}
     assert {row["n_cad_external_only_bad"] for row in rows} == {2}
     assert {row["n_cad_effective_bad"] for row in rows} == {3}
+    assert {row["n_cad_authority_excluded"] for row in rows} == {0}
     assert {row["n_cad_quality"] for row in rows} == {len(cadences) - 3}
     assert {row["external_quality_policy_contract"] for row in rows} == {
         module.EXTERNAL_QUALITY_POLICY_CONTRACT
+    }
+
+
+def test_exact_declared_authority_exclusion_is_masked_before_bls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    compact_path = tmp_path / "compact.h5"
+    tic, cadences = _write_compact(compact_path)
+    excluded_cadence = int(cadences[-1])
+    incomplete = _reference_frame(cadences).iloc[:-1].copy()
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path,
+        incomplete,
+        authority_exclusion_rows=[
+            {"cadenceno": excluded_cadence, "spoc_quality": 0}
+        ],
+    )
+    reference, provenance = module.load_external_quality_reference(
+        table_path=table_path, manifest_path=manifest_path, sector=56
+    )
+    module._initialize_external_quality_worker(
+        module._reference_worker_payload(reference), provenance
+    )
+    captured: list[np.ndarray] = []
+    monkeypatch.setattr(module, "run_bls_on_lc", _fake_bls_runner(captured))
+
+    rows = module._process_target((tic, str(compact_path), _cfg_payload()))
+
+    assert len(captured) == 2
+    for effective_quality in captured:
+        assert np.flatnonzero(effective_quality).tolist() == [
+            3,
+            10,
+            11,
+            len(cadences) - 1,
+        ]
+    assert {row["n_cad_external_bad"] for row in rows} == {3}
+    assert {row["n_cad_external_only_bad"] for row in rows} == {3}
+    assert {row["n_cad_effective_bad"] for row in rows} == {4}
+    assert {row["n_cad_authority_excluded"] for row in rows} == {1}
+    assert {row["authority_exclusion_external_bit"] for row in rows} == {
+        AUTHORITY_EXCLUSION_EXTERNAL_BIT
+    }
+    assert {row["authority_exclusion_policy_contract"] for row in rows} == {
+        AUTHORITY_EXCLUSION_POLICY_CONTRACT
+    }
+    assert {row["authority_exclusions_sha256"] for row in rows} == {
+        provenance["authority_exclusions_sha256"]
     }
 
 
@@ -223,6 +301,46 @@ def test_missing_external_cadence_coverage_fails_closed(
 
     with pytest.raises(ValueError, match="coverage is missing compact cadences"):
         module._process_target((tic, str(compact_path), _cfg_payload()))
+
+
+def test_reference_rejects_declared_exclusion_still_present_in_table(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    _, cadences = _write_compact(tmp_path / "compact.h5")
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path,
+        _reference_frame(cadences),
+        authority_exclusion_rows=[
+            {"cadenceno": int(cadences[-1]), "spoc_quality": 0}
+        ],
+    )
+
+    with pytest.raises(ValueError, match="is still present in the table"):
+        module.load_external_quality_reference(
+            table_path=table_path, manifest_path=manifest_path, sector=56
+        )
+
+
+def test_reference_rejects_authority_exclusion_hash_mismatch(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    _, cadences = _write_compact(tmp_path / "compact.h5")
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path, _reference_frame(cadences)
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["authority_exclusions_sha256"] = "0" * 64
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="authority-exclusions hash mismatch"):
+        module.load_external_quality_reference(
+            table_path=table_path, manifest_path=manifest_path, sector=56
+        )
 
 
 def test_reference_rejects_legacy_generic_quality_column(tmp_path: Path) -> None:
@@ -276,6 +394,20 @@ def test_summary_and_resume_bind_all_quality_inputs(
     assert summary["cadence_reference_quality_authority"] == (
         "spoc_and_qlp_quality_flags"
     )
+    assert summary["authority_exclusion_external_bit"] == (
+        AUTHORITY_EXCLUSION_EXTERNAL_BIT
+    )
+    assert summary["authority_exclusion_policy_contract"] == (
+        AUTHORITY_EXCLUSION_POLICY_CONTRACT
+    )
+    assert summary["n_authority_exclusions"] == 0
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert summary["authority_exclusions_sha256"] == (
+        manifest["authority_exclusions_sha256"]
+    )
+    assert summary["quality_counts_over_unique_targets"][
+        "n_cad_authority_excluded"
+    ] == 0
     assert summary["peak_table_sha256"] == _sha256(
         Path(summary["outputs"]["peak_table"])
     )

@@ -46,6 +46,12 @@ def _write_shards(tmp_path: Path) -> tuple[object, Path]:
                 "peak_rank": [1, 1],
                 "status": ["ok", "ok"],
                 "period_d": [0.5 + shard_index, 0.5 + shard_index],
+                "n_cad_total": [100, 100],
+                "n_cad_internal_bad": [1, 1],
+                "n_cad_external_bad": [2, 2],
+                "n_cad_external_only_bad": [2, 2],
+                "n_cad_effective_bad": [3, 3],
+                "n_cad_authority_excluded": [shard_index, shard_index],
             }
         )
         frame.to_parquet(table_path, index=False)
@@ -65,6 +71,12 @@ def _write_shards(tmp_path: Path) -> tuple[object, Path]:
             "cadence_reference_cadence_authority": "qlp_cam_quat",
             "cadence_reference_quality_authority": "spoc_and_qlp_quality_flags",
             "cadence_reference_source_hashes_sha256": "e" * 64,
+            "authority_exclusion_policy_contract": (
+                "a2v1_quat_absent_spoc_cadence_exclusions_v1"
+            ),
+            "authority_exclusion_external_bit": 62,
+            "authority_exclusions_sha256": "f" * 64,
+            "n_authority_exclusions": 4,
             "apertures": apertures,
             "n_targets_total": 2,
             "n_periods": 50000,
@@ -109,6 +121,15 @@ def test_merge_revalidates_provenance_and_emits_validator_summary(
     assert summary["n_source_shards"] == 2
     assert summary["n_targets"] == summary["n_targets_total"] == 2
     assert summary["peak_table_sha256"] == _sha256(out_path)
+    assert summary["authority_exclusion_external_bit"] == 62
+    assert summary["n_authority_exclusions"] == 4
+    assert summary["quality_counts_over_unique_targets"] == {
+        "n_cad_internal_bad": 2,
+        "n_cad_external_bad": 4,
+        "n_cad_external_only_bad": 4,
+        "n_cad_effective_bad": 6,
+        "n_cad_authority_excluded": 1,
+    }
     assert summary["outputs"]["peak_table"] == str(out_path)
     assert len(summary["source_shards"]) == 2
     persisted = json.loads(
@@ -133,6 +154,34 @@ def test_merge_rejects_shard_provenance_disagreement(tmp_path: Path) -> None:
             out_path=tmp_path / "merged.parquet",
             n_shards=2,
         )
+
+
+def test_merge_does_not_publish_before_quality_validation(tmp_path: Path) -> None:
+    module, shard_dir = _write_shards(tmp_path)
+    shard_path = shard_dir / "real_adp_bls_peaks_001.parquet"
+    frame = pd.read_parquet(shard_path)
+    frame.loc[0, "n_cad_effective_bad"] = 99
+    frame.to_parquet(shard_path, index=False)
+    summary_path = shard_dir / "summary_001.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["peak_table_sha256"] = _sha256(shard_path)
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "merged.parquet"
+    accepted = pd.DataFrame({"tic": [9999], "status": ["accepted"]})
+    accepted.to_parquet(out_path, index=False)
+    accepted_sha256 = _sha256(out_path)
+
+    with pytest.raises(ValueError, match="counts disagree across target rows"):
+        module.merge_shards(
+            shard_dir=shard_dir,
+            out_path=out_path,
+            n_shards=2,
+        )
+
+    assert _sha256(out_path) == accepted_sha256
 
 
 def test_merge_rejects_shard_table_hash_mismatch(tmp_path: Path) -> None:

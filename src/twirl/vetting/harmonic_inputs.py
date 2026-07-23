@@ -9,6 +9,10 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
+from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+)
 from twirl.lightcurves.external_quality import (
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
@@ -102,12 +106,17 @@ RAW_PAIR_EXTERNAL_QUALITY_ATTRS: tuple[str, ...] = (
     "cadence_reference_table_sha256",
     "cadence_reference_manifest_sha256",
     "cadence_reference_source_declaration_sha256",
+    "authority_exclusion_policy_contract",
+    "authority_exclusion_external_bit",
+    "authority_exclusions_sha256",
+    "n_authority_exclusions",
 )
 RAW_PAIR_QUALITY_COUNT_NAMES: tuple[str, ...] = (
     "n_cad_total",
     "n_cad_internal_bad",
     "n_cad_external_bad",
     "n_cad_external_only_bad",
+    "n_cad_authority_excluded",
     "n_cad_effective_bad",
 )
 RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS: tuple[str, ...] = (
@@ -704,6 +713,25 @@ def _external_quality_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         failures.append("external_quality_policy_contract mismatch")
     if str(attrs["effective_quality_policy"]) != EFFECTIVE_QUALITY_POLICY:
         failures.append("effective_quality_policy mismatch")
+    if str(attrs["authority_exclusion_policy_contract"]) != (
+        AUTHORITY_EXCLUSION_POLICY_CONTRACT
+    ):
+        failures.append("authority_exclusion_policy_contract mismatch")
+    try:
+        exclusion_bit = int(attrs["authority_exclusion_external_bit"])
+    except (TypeError, ValueError):
+        failures.append("authority_exclusion_external_bit is not an integer")
+    else:
+        if exclusion_bit != AUTHORITY_EXCLUSION_EXTERNAL_BIT:
+            failures.append("authority_exclusion_external_bit mismatch")
+    try:
+        n_authority_exclusions = int(attrs["n_authority_exclusions"])
+    except (TypeError, ValueError):
+        n_authority_exclusions = None
+        failures.append("n_authority_exclusions is not an integer")
+    else:
+        if n_authority_exclusions < 0:
+            failures.append("n_authority_exclusions is negative")
     if str(attrs["cadence_reference_cadence_authority"]) != (
         EXPECTED_CADENCE_AUTHORITY
     ):
@@ -721,6 +749,7 @@ def _external_quality_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         "cadence_reference_table_sha256",
         "cadence_reference_manifest_sha256",
         "cadence_reference_source_declaration_sha256",
+        "authority_exclusions_sha256",
     ):
         digest = str(attrs[name]).lower()
         if len(digest) != 64 or any(
@@ -742,6 +771,17 @@ def _external_quality_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             failures.append(f"{attr} is negative")
         quality_counts[name] = value
     if len(quality_counts) == len(RAW_PAIR_QUALITY_COUNT_NAMES):
+        if quality_counts["n_cad_authority_excluded"] > quality_counts[
+            "n_cad_external_bad"
+        ]:
+            failures.append("root authority-excluded count exceeds external count")
+        if (
+            n_authority_exclusions == 0
+            and quality_counts["n_cad_authority_excluded"] != 0
+        ):
+            failures.append(
+                "root authority-excluded count is nonzero without declarations"
+            )
         if quality_counts["n_cad_external_only_bad"] > quality_counts[
             "n_cad_external_bad"
         ]:
@@ -774,6 +814,8 @@ def _external_quality_group_failures(group: Any, *, context: str) -> list[str]:
     n_total = values["n_cad_total"]
     if n_total < 0 or any(value < 0 or value > n_total for value in values.values()):
         failures.append(f"{context}:quality counts are outside [0,n_cad_total]")
+    if values["n_cad_authority_excluded"] > values["n_cad_external_bad"]:
+        failures.append(f"{context}:authority-excluded count exceeds external count")
     if values["n_cad_external_only_bad"] > values["n_cad_external_bad"]:
         failures.append(f"{context}:external-only count exceeds external count")
     if values["n_cad_effective_bad"] != (

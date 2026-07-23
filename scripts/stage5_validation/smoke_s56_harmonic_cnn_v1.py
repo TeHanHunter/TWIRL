@@ -15,6 +15,10 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
+from twirl.lightcurves.a2v1_cadence_reference import (  # noqa: E402
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+)
 from twirl.lightcurves.external_quality import (  # noqa: E402
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
@@ -194,6 +198,14 @@ def build_smoke_fixture(out_dir: Path, *, seed: int = 56) -> tuple[Path, Path]:
         h5.attrs["cadence_reference_table_sha256"] = "1" * 64
         h5.attrs["cadence_reference_manifest_sha256"] = "2" * 64
         h5.attrs["cadence_reference_source_declaration_sha256"] = "3" * 64
+        h5.attrs["authority_exclusion_policy_contract"] = (
+            AUTHORITY_EXCLUSION_POLICY_CONTRACT
+        )
+        h5.attrs["authority_exclusion_external_bit"] = (
+            AUTHORITY_EXCLUSION_EXTERNAL_BIT
+        )
+        h5.attrs["authority_exclusions_sha256"] = "4" * 64
+        h5.attrs["n_authority_exclusions"] = 0
         for name, channels in CHANNEL_CONTRACT.items():
             h5.attrs[name] = json.dumps(channels)
         h5.create_group("targets")
@@ -214,6 +226,7 @@ def build_smoke_fixture(out_dir: Path, *, seed: int = 56) -> tuple[Path, Path]:
             group.attrs["n_cad_internal_bad"] = 0
             group.attrs["n_cad_external_bad"] = 0
             group.attrs["n_cad_external_only_bad"] = 0
+            group.attrs["n_cad_authority_excluded"] = 0
             group.attrs["n_cad_effective_bad"] = 0
             if bool(row["is_injected_row"]):
                 _write_paired_original(group, payload)
@@ -222,6 +235,7 @@ def build_smoke_fixture(out_dir: Path, *, seed: int = 56) -> tuple[Path, Path]:
             "n_cad_internal_bad",
             "n_cad_external_bad",
             "n_cad_external_only_bad",
+            "n_cad_authority_excluded",
             "n_cad_effective_bad",
         ):
             h5.attrs[f"quality_overlay_{name}"] = 0

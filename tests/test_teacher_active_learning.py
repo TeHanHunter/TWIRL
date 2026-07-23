@@ -3,6 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+)
 from twirl.search.a2v1_bls_contract import (
     A2V1_TEACHER_BLS_SEARCH_CONTRACT,
     approved_a2v1_teacher_bls_config,
@@ -182,6 +186,8 @@ def _tier1_gate_summary(eligibility_sha256: str = "a" * 64) -> dict:
             "manifest_sha256": "e" * 64,
             "cadence_authority": "qlp_cam_quat",
             "quality_authority": "spoc_and_qlp_quality_flags",
+            "authority_exclusions_sha256": "1" * 64,
+            "n_authority_exclusions": 4,
         }
     )
     return {
@@ -222,10 +228,16 @@ def _quality_bound_bls_evidence() -> tuple[pd.DataFrame, dict]:
     config_sha256 = bls_config_sha256(config)
     peaks = _a2v1_peaks().assign(
         external_quality_policy_contract=(
-            "a2v1_bls_internal_or_authoritative_external_quality_v1"
+            "a2v1_bls_internal_or_authoritative_external_quality_v2"
         ),
         cadence_reference_sha256="d" * 64,
         cadence_reference_manifest_sha256="e" * 64,
+        authority_exclusion_policy_contract=(
+            AUTHORITY_EXCLUSION_POLICY_CONTRACT
+        ),
+        authority_exclusion_external_bit=AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        authority_exclusions_sha256="1" * 64,
+        n_authority_exclusions=4,
         bls_search_contract_version=A2V1_TEACHER_BLS_SEARCH_CONTRACT,
         bls_config_sha256=config_sha256,
     )
@@ -236,7 +248,7 @@ def _quality_bound_bls_evidence() -> tuple[pd.DataFrame, dict]:
         "bls_config_sha256": config_sha256,
         "config": config,
         "external_quality_policy_contract": (
-            "a2v1_bls_internal_or_authoritative_external_quality_v1"
+            "a2v1_bls_internal_or_authoritative_external_quality_v2"
         ),
         "compact_lc_sha256": "c" * 64,
         "cadence_reference_sha256": "d" * 64,
@@ -245,6 +257,12 @@ def _quality_bound_bls_evidence() -> tuple[pd.DataFrame, dict]:
         "cadence_reference_cadence_authority": "qlp_cam_quat",
         "cadence_reference_quality_authority": "spoc_and_qlp_quality_flags",
         "cadence_reference_source_hashes_sha256": "f" * 64,
+        "authority_exclusion_policy_contract": (
+            AUTHORITY_EXCLUSION_POLICY_CONTRACT
+        ),
+        "authority_exclusion_external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "authority_exclusions_sha256": "1" * 64,
+        "n_authority_exclusions": 4,
         "apertures": ["DET_FLUX_ADP_SML", "DET_FLUX_ADP"],
         "source_product_tag": "A2v1",
         "n_shards": 1,

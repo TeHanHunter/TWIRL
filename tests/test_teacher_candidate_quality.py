@@ -8,7 +8,11 @@ import numpy as np
 import pandas as pd
 
 from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
     CADENCE_REFERENCE_COLUMNS,
+    authority_exclusions_sha256,
     file_sha256,
 )
 from twirl.lightcurves.external_quality import load_external_quality_reference
@@ -67,8 +71,16 @@ def _write_reference(root: Path) -> tuple[Path, Path]:
             }
         )
         index += 1
+    authority_exclusions = {
+        "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+        "policy": AUTHORITY_EXCLUSION_POLICY,
+        "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "n_rows": 0,
+        "by_detector": {"cam1_ccd1": {"n_rows": 0, "rows": []}},
+    }
     payload = {
         "contract_version": "s56_a2v1_cadence_reference_v1",
+        "builder_version": "a2v1_cadence_reference_builder_v3",
         "sector": 56,
         "cadence_authority": "qlp_cam_quat",
         "quality_authority": "spoc_and_qlp_quality_flags",
@@ -88,6 +100,11 @@ def _write_reference(root: Path) -> tuple[Path, Path]:
         "n_nonzero_external_quality": 1,
         "n_spoc_authority_files_verified": 1,
         "n_qlp_qflag_files_verified": 2,
+        "n_spoc_rows_excluded_by_quat": 0,
+        "authority_exclusions": authority_exclusions,
+        "authority_exclusions_sha256": authority_exclusions_sha256(
+            authority_exclusions
+        ),
         "source_file_sha256": {
             source["path"]: source["sha256"] for source in sources
         },
@@ -139,5 +156,6 @@ def test_candidate_metadata_uses_effective_quality_overlay(
     assert captured[0].tolist() == [0, 1, 1, 0]
     assert rows[0]["metadata_status"] == "ok"
     assert rows[0]["metadata_quality_n_cad_internal_bad"] == 1
+    assert rows[0]["metadata_quality_n_cad_authority_excluded"] == 0
     assert rows[0]["metadata_quality_n_cad_external_only_bad"] == 1
     assert rows[0]["metadata_quality_n_cad_effective_bad"] == 2

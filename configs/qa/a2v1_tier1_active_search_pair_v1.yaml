@@ -79,13 +79,13 @@ aperture_review_negative_correlation_fraction: 0.10
 injection_contract_template: "s{sector}_a2v1_fresh_injection_pair_v1"
 injection_selection_mode: full_shard
 injection_required_shard_indices: [0, 13, 26, 39]
-# Deliberate fail-closed placeholders until the exact four source HDF5 shards
-# are rehashed at their accepted evidence location.
+# Ordered hashes reverified at the accepted ORCD evidence location after the
+# 2026-07-17 worktree cleanup: shard indices 00, 13, 26, and 39.
 expected_injection_shard_sha256:
-  - "0000000000000000000000000000000000000000000000000000000000000000"
-  - "0000000000000000000000000000000000000000000000000000000000000000"
-  - "0000000000000000000000000000000000000000000000000000000000000000"
-  - "0000000000000000000000000000000000000000000000000000000000000000"
+  - b4790ea98260f23ad0b76a93f18dc4b7b09ea3a457cd69320762b2f990cf5f9a
+  - 9eadc3191bcba0c0577639c0956f59b69ac0755deb571143e05bfe7fb1458382
+  - da78deb91febd1939eb023075b6ff236d4bd36759d385e56b3bbce8fcbf9b42f
+  - c53fc92a97825bc3dcf981cde58eaea23cab6ad22a56d2219d31a50a1fac4d7c
 injection_expected_ids: 2000
 expected_injection_selection_sha256: 8ee40ea7e450d5c19027f2e6c0c02279a78102caa246aeac80e032278ede6c5a
 expected_injection_metadata_sha256: 549968899c236387d65700aa1e6d0d84a45ccff63cdf97d0b647f4d19cef1910

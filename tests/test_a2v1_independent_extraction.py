@@ -12,7 +12,13 @@ import pandas as pd
 import pytest
 
 import twirl.lightcurves.a2v1_independent_extraction as independent_module
-from twirl.lightcurves.a2v1_cadence_reference import CADENCE_REFERENCE_COLUMNS
+from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+    CADENCE_REFERENCE_COLUMNS,
+    authority_exclusions_sha256,
+)
 from twirl.lightcurves.a2v1_independent_extraction import (
     IndependentExtractionProvenance,
     build_wd1856_independent_metrics,
@@ -145,8 +151,16 @@ def _write_quality_reference(root: Path, cadence: np.ndarray) -> tuple[Path, Pat
     add_source("spoc_flag_file", 5, camera=4, ccd=1)
     add_source("spoc_quality_table", 6)
     add_source("spoc_quality_provenance", 7)
+    authority_exclusions = {
+        "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+        "policy": AUTHORITY_EXCLUSION_POLICY,
+        "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "n_rows": 0,
+        "by_detector": {"cam4_ccd1": {"n_rows": 0, "rows": []}},
+    }
     manifest = {
         "contract_version": "s56_a2v1_cadence_reference_v1",
+        "builder_version": "a2v1_cadence_reference_builder_v3",
         "sector": 56,
         "cadence_authority": "qlp_cam_quat",
         "quality_authority": "spoc_and_qlp_quality_flags",
@@ -166,6 +180,11 @@ def _write_quality_reference(root: Path, cadence: np.ndarray) -> tuple[Path, Pat
         "n_nonzero_external_quality": 2,
         "n_spoc_authority_files_verified": 1,
         "n_qlp_qflag_files_verified": 2,
+        "n_spoc_rows_excluded_by_quat": 0,
+        "authority_exclusions": authority_exclusions,
+        "authority_exclusions_sha256": authority_exclusions_sha256(
+            authority_exclusions
+        ),
         "source_file_sha256": {
             str(source["path"]): str(source["sha256"]) for source in sources
         },
@@ -298,6 +317,7 @@ def test_builder_writes_exact_tier1_metrics_and_manifest(tmp_path: Path) -> None
         "n_cad_total": 8_000,
         "n_cad_internal_bad": 3,
         "n_cad_external_bad": 2,
+        "n_cad_authority_excluded": 0,
         "n_cad_external_only_bad": 2,
         "n_cad_effective_bad": 5,
     }

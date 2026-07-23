@@ -8,7 +8,12 @@ import pandas as pd
 import pytest
 
 from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
     CADENCE_REFERENCE_COLUMNS,
+    CADENCE_REFERENCE_BUILDER_VERSION,
+    authority_exclusions_sha256,
     file_sha256,
 )
 from twirl.lightcurves.external_quality import (
@@ -18,7 +23,11 @@ from twirl.lightcurves.external_quality import (
 )
 
 
-def _write_reference(root: Path) -> tuple[Path, Path]:
+def _write_reference(
+    root: Path,
+    *,
+    authority_excluded_cadences: tuple[int, ...] = (),
+) -> tuple[Path, Path]:
     table_path = root / "reference.csv"
     manifest_path = root / "reference.json"
     frame = pd.DataFrame(
@@ -57,8 +66,24 @@ def _write_reference(root: Path) -> tuple[Path, Path]:
     source_hashes = {
         str(source["path"]): str(source["sha256"]) for source in sources
     }
+    authority_exclusions = {
+        "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+        "policy": AUTHORITY_EXCLUSION_POLICY,
+        "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "n_rows": len(authority_excluded_cadences),
+        "by_detector": {
+            "cam1_ccd1": {
+                "n_rows": len(authority_excluded_cadences),
+                "rows": [
+                    {"cadenceno": int(cadence), "spoc_quality": 0}
+                    for cadence in authority_excluded_cadences
+                ],
+            }
+        },
+    }
     manifest = {
         "contract_version": "s56_a2v1_cadence_reference_v1",
+        "builder_version": CADENCE_REFERENCE_BUILDER_VERSION,
         "sector": 56,
         "cadence_authority": "qlp_cam_quat",
         "quality_authority": "spoc_and_qlp_quality_flags",
@@ -78,6 +103,11 @@ def _write_reference(root: Path) -> tuple[Path, Path]:
         "n_nonzero_external_quality": 2,
         "n_spoc_authority_files_verified": 1,
         "n_qlp_qflag_files_verified": 2,
+        "n_spoc_rows_excluded_by_quat": len(authority_excluded_cadences),
+        "authority_exclusions": authority_exclusions,
+        "authority_exclusions_sha256": authority_exclusions_sha256(
+            authority_exclusions
+        ),
         "source_file_sha256": source_hashes,
         "sources": sources,
     }
@@ -116,6 +146,7 @@ def test_reference_applies_internal_or_external_quality_exactly(
         "n_cad_internal_bad": 1,
         "n_cad_external_bad": 2,
         "n_cad_external_only_bad": 1,
+        "n_cad_authority_excluded": 0,
         "n_cad_effective_bad": 2,
     }
     assert reference.provenance["policy_contract"] == (
@@ -151,6 +182,88 @@ def test_reference_fails_closed_on_missing_cadence_or_orbit_mismatch(
             cadenceno=[100],
             orbitid=[120],
             internal_quality=[0],
+        )
+
+
+def test_reference_masks_only_exact_declared_authority_exclusion(
+    tmp_path: Path,
+) -> None:
+    table, manifest = _write_reference(
+        tmp_path, authority_excluded_cadences=(999,)
+    )
+    reference = load_external_quality_reference(
+        table_path=table, manifest_path=manifest, sector=56
+    )
+
+    result = reference.apply(
+        sector=56,
+        camera=1,
+        ccd=1,
+        cadenceno=[100, 999, 103],
+        orbitid=[119, 120, 120],
+        internal_quality=[0, 0, 0],
+    )
+
+    assert result.quality.tolist() == [0, 1, 1]
+    assert result.external_quality.tolist() == [
+        0,
+        1 << AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        8,
+    ]
+    assert result.counts == {
+        "n_cad_total": 3,
+        "n_cad_internal_bad": 0,
+        "n_cad_external_bad": 2,
+        "n_cad_external_only_bad": 2,
+        "n_cad_authority_excluded": 1,
+        "n_cad_effective_bad": 2,
+    }
+    assert reference.authority_exclusions[(56, 1, 1)].tolist() == [999]
+    assert reference.provenance["n_authority_exclusions"] == 1
+    assert reference.provenance["authority_exclusion_external_bit"] == (
+        AUTHORITY_EXCLUSION_EXTERNAL_BIT
+    )
+
+    with pytest.raises(ValueError, match="coverage is missing cadences"):
+        reference.apply(
+            sector=56,
+            camera=1,
+            ccd=1,
+            cadenceno=[998, 999],
+            orbitid=[120, 120],
+            internal_quality=[0, 0],
+        )
+
+
+def test_reference_rejects_exclusion_that_is_present_in_authority_table(
+    tmp_path: Path,
+) -> None:
+    table, manifest = _write_reference(
+        tmp_path, authority_excluded_cadences=(100,)
+    )
+
+    with pytest.raises(ValueError, match="present in the authoritative cadence table"):
+        load_external_quality_reference(
+            table_path=table, manifest_path=manifest, sector=56
+        )
+
+
+def test_reference_rejects_fractional_exclusion_counts(tmp_path: Path) -> None:
+    table, manifest_path = _write_reference(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["n_spoc_rows_excluded_by_quat"] = 0.5
+    manifest["authority_exclusions"]["n_rows"] = 0.5
+    manifest["authority_exclusions_sha256"] = authority_exclusions_sha256(
+        manifest["authority_exclusions"]
+    )
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="nonnegative int64 integer"):
+        load_external_quality_reference(
+            table_path=table, manifest_path=manifest_path, sector=56
         )
 
 

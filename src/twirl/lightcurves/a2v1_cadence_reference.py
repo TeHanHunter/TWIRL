@@ -32,9 +32,20 @@ import numpy as np
 import pandas as pd
 
 
-CADENCE_REFERENCE_BUILDER_VERSION = "a2v1_cadence_reference_builder_v2"
+CADENCE_REFERENCE_BUILDER_VERSION = "a2v1_cadence_reference_builder_v3"
 SPOC_QUALITY_TABLE_BUILDER_VERSION = "spoc_quality_table_builder_v1"
 SPOC_QUALITY_DERIVATION_CONTRACT = "spocffiflag_detector_cadence_quality_v1"
+AUTHORITY_EXCLUSION_POLICY_CONTRACT = (
+    "a2v1_quat_absent_spoc_cadence_exclusions_v1"
+)
+AUTHORITY_EXCLUSION_POLICY = (
+    "exclude only detector cadences present in the verified SPOC authority "
+    "but absent from the QLP quaternion cadence authority"
+)
+# This is an index, matching ``QLP_QUALITY_EXTERNAL_BIT`` below.  The reserved
+# bit is applied only in downstream effective-quality arrays; it is never
+# written into the cadence-reference table as an inferred SPOC/QLP value.
+AUTHORITY_EXCLUSION_EXTERNAL_BIT = 62
 SPOC_QUALITY_TABLE_COLUMNS = (
     "sector",
     "orbitid",
@@ -147,6 +158,18 @@ def file_sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
         while chunk := handle.read(chunk_size):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def authority_exclusions_sha256(payload: Any) -> str:
+    """Return the canonical digest of one authority-exclusion sub-contract."""
+
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def parse_quat_spec(value: str) -> QuatSource:
@@ -1260,10 +1283,31 @@ def write_cadence_reference(
             }
         )
         n_raw_rows = 0
+        authority_exclusions_by_detector: dict[str, dict[str, Any]] = {}
         for source in spoc_sources:
             digest = initial_source_hashes[str(source.path)]
-            raw_rows = len(read_spoc_flag_file(source.path))
+            raw_quality = read_spoc_flag_file(source.path)
+            raw_rows = len(raw_quality)
             n_raw_rows += raw_rows
+            retained = set(
+                frame.loc[
+                    (frame["camera"] == source.camera)
+                    & (frame["ccd"] == source.ccd),
+                    "cadenceno",
+                ].astype(int)
+            )
+            excluded = sorted(set(raw_quality) - retained)
+            detector_name = f"cam{source.camera}_ccd{source.ccd}"
+            authority_exclusions_by_detector[detector_name] = {
+                "n_rows": int(len(excluded)),
+                "rows": [
+                    {
+                        "cadenceno": int(cadence),
+                        "spoc_quality": int(raw_quality[cadence]),
+                    }
+                    for cadence in excluded
+                ],
+            }
             sources.append(
                 {
                     "role": "spoc_flag_file",
@@ -1275,6 +1319,38 @@ def write_cadence_reference(
                 }
             )
         detector_pairs = _normalize_pairs(expected_detectors)
+        detector_names = [
+            f"cam{camera}_ccd{ccd}" for camera, ccd in detector_pairs
+        ]
+        if set(authority_exclusions_by_detector) != set(detector_names):
+            raise RuntimeError(
+                "internal error: authority-exclusion detector inventory is incomplete"
+            )
+        n_authority_exclusions = int(
+            sum(
+                int(value["n_rows"])
+                for value in authority_exclusions_by_detector.values()
+            )
+        )
+        expected_exclusions = n_raw_rows - int(len(frame))
+        if n_authority_exclusions != expected_exclusions:
+            raise RuntimeError(
+                "internal error: authority-exclusion count disagrees with "
+                "SPOC/quaternion coverage"
+            )
+        authority_exclusions = {
+            "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+            "policy": AUTHORITY_EXCLUSION_POLICY,
+            "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+            "n_rows": n_authority_exclusions,
+            "by_detector": {
+                name: authority_exclusions_by_detector[name]
+                for name in detector_names
+            },
+        }
+        authority_exclusions_digest = authority_exclusions_sha256(
+            authority_exclusions
+        )
         manifest: dict[str, Any] = {
             "contract_version": f"s{int(sector)}_a2v1_cadence_reference_v1",
             "builder_version": CADENCE_REFERENCE_BUILDER_VERSION,
@@ -1295,11 +1371,13 @@ def write_cadence_reference(
             "n_qlp_qflag_files_verified": len(ordered_qflag_sources),
             "n_qlp_qflag_rows": n_qflag_rows,
             "n_spoc_raw_rows": n_raw_rows,
-            "n_spoc_rows_excluded_by_quat": n_raw_rows - int(len(frame)),
+            "n_spoc_rows_excluded_by_quat": expected_exclusions,
+            "authority_exclusions": authority_exclusions,
+            "authority_exclusions_sha256": authority_exclusions_digest,
             "table_sha256": table_hash,
             "table_columns": list(CADENCE_REFERENCE_COLUMNS),
             "n_rows": int(len(frame)),
-            "detectors": [f"cam{camera}_ccd{ccd}" for camera, ccd in detector_pairs],
+            "detectors": detector_names,
             "orbits": sorted({int(value) for value in expected_orbits}),
             "n_rows_by_detector": {
                 f"cam{int(camera)}_ccd{int(ccd)}": int(len(group))

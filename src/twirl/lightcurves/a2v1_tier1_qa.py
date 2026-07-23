@@ -26,6 +26,10 @@ import numpy as np
 import pandas as pd
 
 from twirl.io.hlsp import A2V1_APERTURES
+from twirl.lightcurves.a2v1_cadence_reference import (
+    CADENCE_REFERENCE_BUILDER_VERSION,
+    authority_exclusions_sha256,
+)
 from twirl.lightcurves.a2v1_qa import (
     A2V1_PHOTOMETRIC_QA_VERSION,
     WD1856_PERIOD_D,
@@ -36,6 +40,7 @@ from twirl.lightcurves.a2v1_qa import (
     stratified_target_sample,
 )
 from twirl.lightcurves.external_quality import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
     load_external_quality_reference,
@@ -74,6 +79,7 @@ INJECTION_QUALITY_COUNT_NAMES = (
     "n_cad_total",
     "n_cad_internal_bad",
     "n_cad_external_bad",
+    "n_cad_authority_excluded",
     "n_cad_external_only_bad",
     "n_cad_effective_bad",
 )
@@ -721,6 +727,9 @@ def audit_compact_population(
     *,
     apertures: Sequence[str],
     cadence_reference: pd.DataFrame,
+    authority_exclusions: Mapping[
+        tuple[int, int, int], Sequence[int]
+    ] | None = None,
     sample_size: int = 0,
     seed: int = 560101,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -752,6 +761,21 @@ def audit_compact_population(
             "cadence reference sector mismatch: "
             f"reference={observed_reference_sectors}, compact={observed_catalog_sectors}"
         )
+    normalized_exclusions: dict[tuple[int, int, int], frozenset[int]] = {}
+    for raw_key, raw_cadences in (authority_exclusions or {}).items():
+        if len(raw_key) != 3:
+            raise ValueError(
+                "authority-exclusion keys must be (sector, camera, ccd)"
+            )
+        key = tuple(int(value) for value in raw_key)
+        if key[0] not in observed_catalog_sectors:
+            raise ValueError(
+                f"authority exclusion has unexpected sector/detector key: {key}"
+            )
+        cadences = frozenset(int(value) for value in raw_cadences)
+        if any(value < 0 for value in cadences):
+            raise ValueError("authority-exclusion cadences must be nonnegative")
+        normalized_exclusions[key] = cadences
     spoc_quality = reference["spoc_quality"].to_numpy(dtype=np.int64)
     qlp_quality = reference["qlp_quality"].to_numpy(dtype=np.int64)
     external_quality = reference["external_quality"].to_numpy(dtype=np.int64)
@@ -813,13 +837,38 @@ def audit_compact_population(
             observed_ids = set(int(value) for value in cadence)
             duplicate_cadences = int(len(cadence) - len(observed_ids))
             missing_cadences = reference_ids - observed_ids
-            unexpected_cadences = observed_ids - reference_ids
+            declared_exclusions = normalized_exclusions.get(
+                (
+                    int(record.sector),
+                    int(record.camera),
+                    int(record.ccd),
+                ),
+                frozenset(),
+            )
+            if reference_ids & set(declared_exclusions):
+                raise ValueError(
+                    f"cadence reference includes declared authority exclusions for "
+                    f"cam{record.camera}/ccd{record.ccd}"
+                )
+            unexpected_ids = observed_ids - reference_ids
+            authority_excluded_cadences = unexpected_ids & set(
+                declared_exclusions
+            )
+            unexpected_cadences = unexpected_ids - authority_excluded_cadences
             first_index: dict[int, int] = {}
             for index, cadence_id in enumerate(cadence):
                 first_index.setdefault(int(cadence_id), int(index))
             external_quality = np.fromiter(
                 (
-                    int(reference_map.get(int(cadence_id), (-1, -1))[0])
+                    (
+                        int(reference_map[int(cadence_id)][0])
+                        if int(cadence_id) in reference_map
+                        else (
+                            1 << AUTHORITY_EXCLUSION_EXTERNAL_BIT
+                            if int(cadence_id) in authority_excluded_cadences
+                            else -1
+                        )
+                    )
                     for cadence_id in cadence
                 ),
                 dtype=np.int64,
@@ -920,6 +969,9 @@ def audit_compact_population(
                         else np.nan
                     ),
                     "n_unexpected_cadences": int(len(unexpected_cadences)),
+                    "n_authority_excluded_cadences": int(
+                        len(authority_excluded_cadences)
+                    ),
                     "n_duplicate_cadences": duplicate_cadences,
                     "n_orbit_mismatches": int(orbit_mismatches),
                 }
@@ -1160,6 +1212,7 @@ def evaluate_cadence_quality(
         "missing_orbit_ids",
         "max_orbit_missing_cadence_fraction",
         "n_unexpected_cadences",
+        "n_authority_excluded_cadences",
         "n_duplicate_cadences",
         "n_orbit_mismatches",
         "quality0_fraction",
@@ -1379,6 +1432,14 @@ def evaluate_cadence_quality(
                     detector_external_good, 0.5
                 ),
                 "quality_mask_disagreements_total": detector_quality_disagreements,
+                "authority_excluded_cadences_total": int(
+                    pd.to_numeric(
+                        detector_targets["n_authority_excluded_cadences"],
+                        errors="coerce",
+                    )
+                    .fillna(0)
+                    .sum()
+                ),
                 "reference_anomaly_totals": detector_anomalies,
                 "component_status": detector_components,
             }
@@ -1484,6 +1545,13 @@ def evaluate_cadence_quality(
         "quality_mask_disagreements_total": int(
             pd.to_numeric(
                 targets["n_quality_mask_disagreements"], errors="coerce"
+            )
+            .fillna(0)
+            .sum()
+        ),
+        "authority_excluded_cadences_total": int(
+            pd.to_numeric(
+                targets["n_authority_excluded_cadences"], errors="coerce"
             )
             .fillna(0)
             .sum()
@@ -2043,6 +2111,8 @@ def _fixed_injection_quality_overlay_failures(
             reasons.append(f"{context} has counts above n_cad_total")
         if parsed["n_cad_external_only_bad"] > parsed["n_cad_external_bad"]:
             reasons.append(f"{context} has impossible external-only count")
+        if parsed["n_cad_authority_excluded"] > parsed["n_cad_external_bad"]:
+            reasons.append(f"{context} has impossible authority-excluded count")
         if parsed["n_cad_effective_bad"] != (
             parsed["n_cad_internal_bad"] + parsed["n_cad_external_only_bad"]
         ):
@@ -2411,6 +2481,7 @@ _INDEPENDENT_QUALITY_COUNT_KEYS = {
     "n_cad_total",
     "n_cad_internal_bad",
     "n_cad_external_bad",
+    "n_cad_authority_excluded",
     "n_cad_external_only_bad",
     "n_cad_effective_bad",
 }
@@ -2498,12 +2569,15 @@ def _validate_independent_quality_overlay(
             for name in (
                 "n_cad_internal_bad",
                 "n_cad_external_bad",
+                "n_cad_authority_excluded",
                 "n_cad_external_only_bad",
                 "n_cad_effective_bad",
             )
         )
         arithmetic = (
             counts["n_cad_external_only_bad"]
+            <= counts["n_cad_external_bad"]
+            and counts["n_cad_authority_excluded"]
             <= counts["n_cad_external_bad"]
             and counts["n_cad_effective_bad"]
             == counts["n_cad_internal_bad"]
@@ -3622,6 +3696,9 @@ def evaluate_cadence_reference_evidence(
         "n_nonzero_spoc_quality",
         "n_nonzero_qlp_quality",
         "n_nonzero_external_quality",
+        "n_spoc_rows_excluded_by_quat",
+        "authority_exclusions",
+        "authority_exclusions_sha256",
     }
     reasons: list[str] = []
     missing = sorted(required - set(manifest))
@@ -3631,6 +3708,8 @@ def evaluate_cadence_reference_evidence(
     expected_contract = config.cadence_reference_contract_template.format(sector=sector)
     if str(manifest["contract_version"]) != expected_contract:
         reasons.append("cadence-reference contract mismatch")
+    if str(manifest["builder_version"]) != CADENCE_REFERENCE_BUILDER_VERSION:
+        reasons.append("cadence-reference builder version mismatch")
     try:
         manifest_sector = int(manifest["sector"])
         n_rows = int(manifest["n_rows"])
@@ -3784,6 +3863,25 @@ def evaluate_cadence_reference_evidence(
         n_spoc_sources, n_qlp_sources = -1, -1
     if sector == 56 and (n_spoc_sources != 16 or n_qlp_sources != 32):
         reasons.append("S56 cadence reference lacks all 16 SPOC and 32 QLP inputs")
+    authority_exclusions = manifest["authority_exclusions"]
+    try:
+        n_authority_exclusions = int(authority_exclusions["n_rows"])
+        n_spoc_excluded = int(manifest["n_spoc_rows_excluded_by_quat"])
+    except (KeyError, TypeError, ValueError):
+        n_authority_exclusions = n_spoc_excluded = -1
+        reasons.append("cadence-reference authority exclusions are malformed")
+    if n_authority_exclusions != n_spoc_excluded or n_authority_exclusions < 0:
+        reasons.append("cadence-reference authority-exclusion count mismatch")
+    try:
+        observed_exclusions_sha256 = authority_exclusions_sha256(
+            authority_exclusions
+        )
+    except (TypeError, ValueError):
+        observed_exclusions_sha256 = ""
+    if str(manifest["authority_exclusions_sha256"]) != (
+        observed_exclusions_sha256
+    ):
+        reasons.append("cadence-reference authority-exclusion hash mismatch")
     return {
         "status": "fail" if reasons else "pass",
         "reasons": reasons,
@@ -3795,6 +3893,8 @@ def evaluate_cadence_reference_evidence(
         "orbits": observed_orbits,
         "cadence_authority": manifest.get("cadence_authority"),
         "quality_authority": manifest.get("quality_authority"),
+        "authority_exclusions_sha256": observed_exclusions_sha256,
+        "n_authority_exclusions": n_authority_exclusions,
     }
 
 
@@ -4060,7 +4160,7 @@ def run_a2v1_tier1_qa(
         )
     # Use the central immutable reference loader as the final authority for all
     # downstream masks, including the precomputed-injection branch.
-    load_external_quality_reference(
+    quality_reference = load_external_quality_reference(
         table_path=cadence_reference_path,
         manifest_path=cadence_reference_manifest_path,
         sector=sector,
@@ -4136,6 +4236,7 @@ def run_a2v1_tier1_qa(
         compact_lc,
         apertures=config.apertures,
         cadence_reference=cadence_reference,
+        authority_exclusions=quality_reference.authority_exclusions,
         sample_size=config.sample_size,
         seed=config.sample_seed,
     )

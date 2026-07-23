@@ -7,6 +7,10 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+)
 from twirl.lightcurves.external_quality import (
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
@@ -67,11 +71,20 @@ def _write_native_target(path: Path) -> None:
         h5.attrs["cadence_reference_table_sha256"] = "1" * 64
         h5.attrs["cadence_reference_manifest_sha256"] = "2" * 64
         h5.attrs["cadence_reference_source_declaration_sha256"] = "3" * 64
+        h5.attrs["authority_exclusion_policy_contract"] = (
+            AUTHORITY_EXCLUSION_POLICY_CONTRACT
+        )
+        h5.attrs["authority_exclusion_external_bit"] = (
+            AUTHORITY_EXCLUSION_EXTERNAL_BIT
+        )
+        h5.attrs["authority_exclusions_sha256"] = "4" * 64
+        h5.attrs["n_authority_exclusions"] = 0
         quality_counts = {
             "n_cad_total": n_cadences,
             "n_cad_internal_bad": 0,
             "n_cad_external_bad": 0,
             "n_cad_external_only_bad": 0,
+            "n_cad_authority_excluded": 0,
             "n_cad_effective_bad": 0,
         }
         group.attrs["quality_policy_contract"] = EXTERNAL_QUALITY_POLICY_CONTRACT

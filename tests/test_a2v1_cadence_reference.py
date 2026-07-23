@@ -11,13 +11,18 @@ import pytest
 
 import twirl.lightcurves.a2v1_cadence_reference as cadence_reference
 from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
     CADENCE_REFERENCE_COLUMNS,
+    CADENCE_REFERENCE_BUILDER_VERSION,
     QLP_QUALITY_EXTERNAL_BIT,
     SPOC_QUALITY_TABLE_COLUMNS,
     QlpQflagSource,
     QuatSource,
     SPOC_QUALITY_DERIVATION_CONTRACT,
     SpocFlagInput,
+    authority_exclusions_sha256,
     build_cadence_reference,
     file_sha256,
     load_spoc_quality_provenance,
@@ -404,6 +409,7 @@ def test_build_and_publish_hash_bound_reference_with_stable_permissions(
         for row in table.itertuples(index=False)
     } == cadence_orbits
     assert manifest["contract_version"] == "s56_a2v1_cadence_reference_v1"
+    assert manifest["builder_version"] == CADENCE_REFERENCE_BUILDER_VERSION
     assert manifest["cadence_authority"] == "qlp_cam_quat"
     assert manifest["quality_authority"] == "spoc_and_qlp_quality_flags"
     assert manifest["quality_composition"] == {
@@ -417,6 +423,21 @@ def test_build_and_publish_hash_bound_reference_with_stable_permissions(
     assert manifest["orbits"] == [119, 120]
     assert manifest["n_spoc_authority_files_verified"] == len(detectors)
     assert manifest["n_qlp_qflag_files_verified"] == 2 * len(detectors)
+    assert manifest["n_spoc_rows_excluded_by_quat"] == 0
+    assert manifest["authority_exclusions"] == {
+        "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+        "policy": AUTHORITY_EXCLUSION_POLICY,
+        "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "n_rows": 0,
+        "by_detector": {
+            "cam1_ccd1": {"n_rows": 0, "rows": []},
+            "cam1_ccd2": {"n_rows": 0, "rows": []},
+            "cam2_ccd3": {"n_rows": 0, "rows": []},
+        },
+    }
+    assert manifest["authority_exclusions_sha256"] == (
+        authority_exclusions_sha256(manifest["authority_exclusions"])
+    )
     assert manifest["spoc_quality_provenance_sha256"] == file_sha256(
         provenance_path
     )
@@ -763,4 +784,16 @@ def test_s56_cli_builds_full_detector_reference(tmp_path: Path) -> None:
     assert manifest["n_qlp_qflag_files_verified"] == 32
     assert manifest["quality_authority"] == "spoc_and_qlp_quality_flags"
     assert manifest["n_spoc_rows_excluded_by_quat"] == 4
+    exclusions = manifest["authority_exclusions"]
+    assert exclusions["contract_version"] == AUTHORITY_EXCLUSION_POLICY_CONTRACT
+    assert exclusions["external_bit"] == AUTHORITY_EXCLUSION_EXTERNAL_BIT
+    assert exclusions["n_rows"] == 4
+    for ccd in range(1, 5):
+        assert exclusions["by_detector"][f"cam3_ccd{ccd}"] == {
+            "n_rows": 1,
+            "rows": [{"cadenceno": 199999, "spoc_quality": 0}],
+        }
+    assert manifest["authority_exclusions_sha256"] == (
+        authority_exclusions_sha256(exclusions)
+    )
     assert file_sha256(table_path) == manifest["table_sha256"]

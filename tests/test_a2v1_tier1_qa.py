@@ -10,6 +10,13 @@ import pandas as pd
 import pytest
 
 import twirl.lightcurves.a2v1_tier1_qa as tier1_qa
+from twirl.lightcurves.a2v1_cadence_reference import (
+    AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+    AUTHORITY_EXCLUSION_POLICY,
+    AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+    CADENCE_REFERENCE_BUILDER_VERSION,
+    authority_exclusions_sha256,
+)
 from twirl.lightcurves.a2v1_qa import (
     A2V1_PHOTOMETRIC_QA_VERSION,
     WD1856_PERIOD_D,
@@ -156,9 +163,18 @@ def _write_cadence_evidence(path) -> tuple[pd.DataFrame, dict]:
         for camera in range(1, 5)
         for ccd in range(1, 5)
     ]
+    authority_exclusions = {
+        "contract_version": AUTHORITY_EXCLUSION_POLICY_CONTRACT,
+        "policy": AUTHORITY_EXCLUSION_POLICY,
+        "external_bit": AUTHORITY_EXCLUSION_EXTERNAL_BIT,
+        "n_rows": 0,
+        "by_detector": {
+            detector: {"n_rows": 0, "rows": []} for detector in detectors
+        },
+    }
     manifest = {
         "contract_version": "s56_a2v1_cadence_reference_v1",
-        "builder_version": "a2v1_cadence_reference_builder_v2",
+        "builder_version": CADENCE_REFERENCE_BUILDER_VERSION,
         "sector": 56,
         "cadence_authority": "qlp_cam_quat",
         "quality_authority": "spoc_and_qlp_quality_flags",
@@ -182,6 +198,11 @@ def _write_cadence_evidence(path) -> tuple[pd.DataFrame, dict]:
         "n_nonzero_spoc_quality": int((table["spoc_quality"] != 0).sum()),
         "n_nonzero_qlp_quality": int((table["qlp_quality"] != 0).sum()),
         "n_nonzero_external_quality": int((table["external_quality"] != 0).sum()),
+        "n_spoc_rows_excluded_by_quat": 0,
+        "authority_exclusions": authority_exclusions,
+        "authority_exclusions_sha256": authority_exclusions_sha256(
+            authority_exclusions
+        ),
     }
     return table, manifest
 
@@ -382,6 +403,7 @@ def _passing_independent(
                 "n_cad_total": 11_775,
                 "n_cad_internal_bad": 100,
                 "n_cad_external_bad": 80,
+                "n_cad_authority_excluded": 0,
                 "n_cad_external_only_bad": 30,
                 "n_cad_effective_bad": 130,
             },
@@ -389,6 +411,7 @@ def _passing_independent(
                 "n_cad_total": 11_760,
                 "n_cad_internal_bad": 99,
                 "n_cad_external_bad": 79,
+                "n_cad_authority_excluded": 0,
                 "n_cad_external_only_bad": 29,
                 "n_cad_effective_bad": 128,
             },
@@ -396,6 +419,7 @@ def _passing_independent(
                 "n_cad_total": 11_760,
                 "n_cad_internal_bad": 50,
                 "n_cad_external_bad": 79,
+                "n_cad_authority_excluded": 0,
                 "n_cad_external_only_bad": 40,
                 "n_cad_effective_bad": 90,
             },
@@ -542,6 +566,52 @@ def test_compact_population_uses_authoritative_cadence_reference(tmp_path) -> No
         masked_targets, masked_apertures, Tier1QAConfig()
     )
     assert cadence_gate["status"] == "pass"
+
+
+def test_compact_population_masks_only_declared_authority_exclusions(
+    tmp_path,
+) -> None:
+    compact = tmp_path / "compact.h5"
+    _write_compact(compact)
+    cadence_reference = _cadence_reference()
+    cadence_reference = cadence_reference.loc[
+        ~cadence_reference["cadenceno"].eq(3)
+    ].reset_index(drop=True)
+    exclusions = {
+        (56, camera, ccd): frozenset({3})
+        for camera in range(1, 5)
+        for ccd in range(1, 5)
+    }
+
+    targets, apertures, _ = audit_compact_population(
+        compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=cadence_reference,
+        authority_exclusions=exclusions,
+    )
+
+    assert targets["n_authority_excluded_cadences"].eq(1).all()
+    assert targets["n_unexpected_cadences"].eq(0).all()
+    assert targets["quality0_fraction"].eq(0.985).all()
+    gate, _ = evaluate_cadence_quality(targets, apertures, Tier1QAConfig())
+    assert gate["status"] == "pass"
+    assert gate["authority_excluded_cadences_total"] == len(targets)
+
+    unknown_reference = cadence_reference.loc[
+        ~cadence_reference["cadenceno"].eq(4)
+    ].reset_index(drop=True)
+    unknown_targets, unknown_apertures, _ = audit_compact_population(
+        compact,
+        apertures=ADP_ONLY_APERTURES,
+        cadence_reference=unknown_reference,
+        authority_exclusions=exclusions,
+    )
+    assert unknown_targets["n_authority_excluded_cadences"].eq(1).all()
+    assert unknown_targets["n_unexpected_cadences"].eq(1).all()
+    unknown_gate, _ = evaluate_cadence_quality(
+        unknown_targets, unknown_apertures, Tier1QAConfig()
+    )
+    assert unknown_gate["status"] == "fail"
 
 
 def test_model_weighted_injection_retention_and_full_shard_gate(tmp_path) -> None:
