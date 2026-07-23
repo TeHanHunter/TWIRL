@@ -217,12 +217,31 @@ def test_leakage_columns_are_detected_and_allowlist_is_clean() -> None:
             "recovery_status",
             "source_kind",
             "pseudo_label",
+            "reported_period_factor",
+            "factor_review_status",
+            "label_return_policy_version",
+            "pipeline_candidate_key",
+            "standalone_app_candidate_key",
+            "native_h5_path",
+            "label_unit",
             "adp_sml_sde",
             "shape_flux_adp_sml_bin_000",
         ]
     )
 
-    assert leaks == ["pseudo_label", "recovery_status", "source_kind", "truth_period_d"]
+    assert leaks == [
+        "factor_review_status",
+        "label_return_policy_version",
+        "label_unit",
+        "native_h5_path",
+        "pipeline_candidate_key",
+        "pseudo_label",
+        "recovery_status",
+        "reported_period_factor",
+        "source_kind",
+        "standalone_app_candidate_key",
+        "truth_period_d",
+    ]
     df = pd.DataFrame(
         {"adp_sml_sde": [1.0], "truth_period_d": [2.0], "source_kind": ["real_candidate"]}
     )

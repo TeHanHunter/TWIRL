@@ -1,0 +1,156 @@
+{
+  "actual_injections_by_shard": {
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_00.h5": 500,
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_13.h5": 500,
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_26.h5": 500,
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_39.h5": 500
+  },
+  "contracts": [
+    "s56_a2v1_fresh_injection_pair_v2"
+  ],
+  "declared_injections_by_shard": {
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_00.h5": 500,
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_13.h5": 500,
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_26.h5": 500,
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_39.h5": 500
+  },
+  "duplicate_injection_id_examples": [],
+  "external_quality_overlay": {
+    "aggregate_counts": {
+      "n_cad_authority_excluded": 492,
+      "n_cad_effective_bad": 2613094,
+      "n_cad_external_bad": 1347221,
+      "n_cad_external_only_bad": 895060,
+      "n_cad_internal_bad": 1718034,
+      "n_cad_total": 23550000
+    },
+    "applied_before_retention_metrics": true,
+    "authority_exclusion_external_bit": 62,
+    "authority_exclusion_policy_contract": "a2v1_quat_absent_spoc_cadence_exclusions_v1",
+    "authority_exclusions_sha256": "8d085c3305a9c46712409da60fe5691e2d47562135d4197956283f77c43edd6c",
+    "cadence_reference_cadence_authority": "qlp_cam_quat",
+    "cadence_reference_contract_version": "s56_a2v1_cadence_reference_v1",
+    "cadence_reference_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_cadence_reference_manifest.json",
+    "cadence_reference_manifest_sha256": "a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62",
+    "cadence_reference_quality_authority": "spoc_and_qlp_quality_flags",
+    "cadence_reference_source_declaration_sha256": "926ca0c5d20d69c105fc64322f0f9300bc496104dc03330e92545287327cfaa8",
+    "cadence_reference_table": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_cadence_reference.csv",
+    "cadence_reference_table_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a",
+    "counts_by_shard": {
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_00.h5": {
+        "n_cad_authority_excluded": 135,
+        "n_cad_effective_bad": 653720,
+        "n_cad_external_bad": 347016,
+        "n_cad_external_only_bad": 228811,
+        "n_cad_internal_bad": 424909,
+        "n_cad_total": 5887500,
+        "n_groups_applied": 500
+      },
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_13.h5": {
+        "n_cad_authority_excluded": 132,
+        "n_cad_effective_bad": 647217,
+        "n_cad_external_bad": 340005,
+        "n_cad_external_only_bad": 223401,
+        "n_cad_internal_bad": 423816,
+        "n_cad_total": 5887500,
+        "n_groups_applied": 500
+      },
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_26.h5": {
+        "n_cad_authority_excluded": 115,
+        "n_cad_effective_bad": 653528,
+        "n_cad_external_bad": 331377,
+        "n_cad_external_only_bad": 224892,
+        "n_cad_internal_bad": 428636,
+        "n_cad_total": 5887500,
+        "n_groups_applied": 500
+      },
+      "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_39.h5": {
+        "n_cad_authority_excluded": 110,
+        "n_cad_effective_bad": 658629,
+        "n_cad_external_bad": 328823,
+        "n_cad_external_only_bad": 217956,
+        "n_cad_internal_bad": 440673,
+        "n_cad_total": 5887500,
+        "n_groups_applied": 500
+      }
+    },
+    "effective_quality_policy": "(internal_quality != 0) | (external_quality != 0), with exact manifest-declared quaternion-authority exclusions assigned reserved external bit 62",
+    "n_authority_exclusions": 4,
+    "n_groups_applied": 2000,
+    "policy_contract": "a2v1_native_internal_or_authoritative_external_quality_v2",
+    "sector": 56
+  },
+  "malformed_shards": [],
+  "metadata_sha256": "b56a0b841343e26a6e980d57a525ab01ab2c6d9ab039384d65479fcb06aaf0b0",
+  "metrics_content_sha256": "2e4989e6e1955fbac0271e16c6de3623ea3684f07b8d59b6f6ca1753247779fa",
+  "metrics_file": "/orcd/data/mki_aryeh/001/twirl/data_local/stage5_validation/s56_A2v1_tier1_active_search_pair_v4_2633e8b4_20260723/tier1_qa/fixed_injection_metrics.csv",
+  "metrics_file_sha256": "cdc0a8def36011ff506c6471b637e02e939662b451e8e04e6e182015411d801a",
+  "n_duplicate_injection_ids": 0,
+  "n_injection_ids": 2000,
+  "n_shards": 4,
+  "n_unique_tics": 2000,
+  "retention_metric": {
+    "depth_retention_fraction": "slope of -(injected-original) versus (injection_baseline/detrend_scale)*(1-transit_model)",
+    "normalization_transfer": "baseline_over_scale",
+    "raw_depth_response_slope": "diagnostic slope of -(injected-original) versus (1-transit_model)",
+    "version": "normalized_depth_retention_v2"
+  },
+  "selection_mode": "full_shard",
+  "selection_sha256": "8ee40ea7e450d5c19027f2e6c0c02279a78102caa246aeac80e032278ede6c5a",
+  "shard_index_sha256": {
+    "0": "fe9996515fca53a8b3efd29a523ce88ac1016f905b02bb4326406df881b36525",
+    "13": "7b166ddfbeb305c37b40e3853b0dd600a91b92af2e241f04d041b64f231bfa07",
+    "26": "4d6f8f1154b396024c858c2da87df249bb960be4a4bfebfc88c6476199cace9b",
+    "39": "9e309d6b02d7bf7bfcb10682eee416b3c0e236b802a10aa83869cc2b1b47e5a4"
+  },
+  "shard_indices": [
+    0,
+    13,
+    26,
+    39
+  ],
+  "shard_sha256": {
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_00.h5": "fe9996515fca53a8b3efd29a523ce88ac1016f905b02bb4326406df881b36525",
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_13.h5": "7b166ddfbeb305c37b40e3853b0dd600a91b92af2e241f04d041b64f231bfa07",
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_26.h5": "4d6f8f1154b396024c858c2da87df249bb960be4a4bfebfc88c6476199cace9b",
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage3_injections/s56_A2v1_tier1_canary_v2_f1b8b53c_20260723/injection_shards/injections_39.h5": "9e309d6b02d7bf7bfcb10682eee416b3c0e236b802a10aa83869cc2b1b47e5a4"
+  },
+  "source_adp_h5": [
+    "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair_rebuilt.h5"
+  ],
+  "source_manifest_file": null,
+  "source_manifest_file_sha256": null,
+  "source_metrics_file": null,
+  "source_metrics_file_sha256": null,
+  "source_selection_modes": [
+    "shard"
+  ],
+  "stored_epoch_quality_validation": {
+    "expected_provenance": {
+      "authority_exclusion_external_bit": 62,
+      "authority_exclusion_policy_contract": "a2v1_quat_absent_spoc_cadence_exclusions_v1",
+      "authority_exclusions_sha256": "8d085c3305a9c46712409da60fe5691e2d47562135d4197956283f77c43edd6c",
+      "cadence_reference_cadence_authority": "qlp_cam_quat",
+      "cadence_reference_contract_version": "s56_a2v1_cadence_reference_v1",
+      "cadence_reference_manifest": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_cadence_reference_manifest.json",
+      "cadence_reference_manifest_sha256": "a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62",
+      "cadence_reference_quality_authority": "spoc_and_qlp_quality_flags",
+      "cadence_reference_sector": 56,
+      "cadence_reference_source_declaration_sha256": "926ca0c5d20d69c105fc64322f0f9300bc496104dc03330e92545287327cfaa8",
+      "cadence_reference_table": "/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1/tier1_active_search_pair_v1/evidence/s56_A2v1_cadence_reference.csv",
+      "cadence_reference_table_sha256": "6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a",
+      "effective_quality_policy": "(internal_quality != 0) | (external_quality != 0), with exact manifest-declared quaternion-authority exclusions assigned reserved external bit 62",
+      "epoch_quality_policy": "epoch/t0 eligibility uses finite raw/error cadences with effective quality zero under the authoritative internal-or-external policy; A2v1 detrending and the stored quality dataset retain the internal production quality",
+      "epoch_quality_policy_contract": "a2v1_fresh_injection_epoch_quality_v2",
+      "external_quality_policy_contract": "a2v1_native_internal_or_authoritative_external_quality_v2",
+      "n_authority_exclusions": 4
+    },
+    "n_groups_expected": 2000,
+    "n_groups_validated": 2000,
+    "n_mask_failures": 0,
+    "n_provenance_failures": 0,
+    "n_roots_expected": 4,
+    "n_roots_validated": 4,
+    "status": "pass"
+  }
+}

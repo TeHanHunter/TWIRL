@@ -23,9 +23,12 @@ def main() -> int:
     parser.add_argument("--pair-h5", type=Path, required=True)
     parser.add_argument("--raw-h5", type=Path, required=True)
     parser.add_argument("--adp-h5", type=Path, required=True)
+    parser.add_argument("--cadence-reference-table", type=Path, required=True)
+    parser.add_argument("--cadence-reference-manifest", type=Path, required=True)
     parser.add_argument("--out-candidates", type=Path, required=True)
     parser.add_argument("--out-native-h5", type=Path, required=True)
     parser.add_argument("--n-periods", type=int, default=4096)
+    parser.add_argument("--sector", type=int, default=56)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
@@ -52,8 +55,11 @@ def main() -> int:
         raw_source_h5=args.raw_h5,
         compact_adp_h5=args.adp_h5,
         injection_pair_h5=args.pair_h5,
+        cadence_reference_table=args.cadence_reference_table,
+        cadence_reference_manifest=args.cadence_reference_manifest,
         out_h5=args.out_native_h5,
         repo_root=Path.cwd(),
+        sector=args.sector,
         n_periods=args.n_periods,
     )
     verification = verify_raw_pair_contract(

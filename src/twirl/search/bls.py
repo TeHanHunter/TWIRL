@@ -12,7 +12,12 @@ from pathlib import Path
 import numpy as np
 from astropy.timeseries import BoxLeastSquares
 
-from twirl.io.hlsp import APERTURES, BJDREFI, HLSPLightCurve, quality_mask
+from twirl.io.hlsp import (
+    APERTURES,
+    BJDREFI,
+    HLSPLightCurve,
+    quality_mask_from_arrays,
+)
 from twirl.search.candidates import (
     BLSPeak,
     BLSResult,
@@ -57,6 +62,163 @@ class BLSConfig:
                                     # practice for noisy CCDs (scattered-light wings).
 
 
+@dataclass(frozen=True)
+class BLSPreparedInputs:
+    """Exact pre-search state shared by BLS and upstream eligibility checks."""
+
+    status: str
+    initial_mask: np.ndarray
+    time: np.ndarray
+    normalized_flux: np.ndarray
+    orbitid: np.ndarray
+    n_total: int
+    n_cad_quality: int
+    n_cad_kept: int
+    n_cad_edge_trimmed: int
+    n_cad_sigma_clipped: int
+    flux_median: float
+    baseline_d: float
+
+    @property
+    def ready(self) -> bool:
+        return self.status == "ok"
+
+
+def prepare_bls_inputs_from_arrays(
+    *,
+    time: np.ndarray,
+    flux: np.ndarray,
+    quality: np.ndarray,
+    orbitid: np.ndarray,
+    cfg: BLSConfig,
+) -> BLSPreparedInputs:
+    """Apply the exact BLS pre-search validity and cleaning semantics.
+
+    This deliberately stops before constructing the full configured period
+    grid or evaluating :class:`~astropy.timeseries.BoxLeastSquares`.  A small
+    grid probe uses the same grid builder to determine whether the cleaned
+    baseline supports at least two trial periods.
+    """
+
+    time_array = np.asarray(time)
+    flux_array = np.asarray(flux)
+    quality_array = np.asarray(quality)
+    orbitid_array = np.asarray(orbitid)
+    if orbitid_array.shape != time_array.shape:
+        raise ValueError("time and orbitid arrays must have identical shapes")
+
+    initial_mask = quality_mask_from_arrays(
+        time_array,
+        flux_array,
+        quality_array,
+    )
+    n_total = int(time_array.size)
+    n_cad_quality = int(initial_mask.sum())
+    selected_time = time_array[initial_mask].astype(np.float64)
+    selected_flux = flux_array[initial_mask].astype(np.float64)
+    selected_orbitid = orbitid_array[initial_mask]
+
+    def _result(
+        status: str,
+        *,
+        normalized_flux: np.ndarray | None = None,
+        n_cad_kept: int | None = None,
+        n_cad_edge_trimmed: int = 0,
+        n_cad_sigma_clipped: int = 0,
+        flux_median: float = np.nan,
+        baseline_d: float = 0.0,
+    ) -> BLSPreparedInputs:
+        normalized = (
+            np.asarray(normalized_flux, dtype=np.float64)
+            if normalized_flux is not None
+            else np.asarray([], dtype=np.float64)
+        )
+        return BLSPreparedInputs(
+            status=status,
+            initial_mask=initial_mask,
+            time=selected_time,
+            normalized_flux=normalized,
+            orbitid=selected_orbitid,
+            n_total=n_total,
+            n_cad_quality=n_cad_quality,
+            n_cad_kept=(
+                n_cad_quality if n_cad_kept is None else int(n_cad_kept)
+            ),
+            n_cad_edge_trimmed=int(n_cad_edge_trimmed),
+            n_cad_sigma_clipped=int(n_cad_sigma_clipped),
+            flux_median=float(flux_median),
+            baseline_d=float(baseline_d),
+        )
+
+    if n_cad_quality < cfg.min_cadences:
+        return _result("too_few_cadences")
+
+    n_cad_kept = n_cad_quality
+    n_cad_edge_trimmed = 0
+    if cfg.orbit_edge_trim_d and cfg.orbit_edge_trim_d > 0:
+        edge_keep = np.ones_like(selected_time, dtype=bool)
+        for oid in np.unique(selected_orbitid):
+            selected = selected_orbitid == oid
+            if selected.sum() < 2:
+                continue
+            orbit_time = selected_time[selected]
+            lower = orbit_time.min() + cfg.orbit_edge_trim_d
+            upper = orbit_time.max() - cfg.orbit_edge_trim_d
+            edge_keep[selected] = (orbit_time >= lower) & (orbit_time <= upper)
+        if edge_keep.sum() >= cfg.min_cadences:
+            n_cad_edge_trimmed = int((~edge_keep).sum())
+            selected_time = selected_time[edge_keep]
+            selected_flux = selected_flux[edge_keep]
+            selected_orbitid = selected_orbitid[edge_keep]
+            n_cad_kept = int(edge_keep.sum())
+
+    median = float(np.nanmedian(selected_flux))
+    if not np.isfinite(median) or median == 0.0:
+        return _result(
+            "all_nan",
+            n_cad_kept=n_cad_kept,
+            n_cad_edge_trimmed=n_cad_edge_trimmed,
+            flux_median=median,
+        )
+    normalized_flux = selected_flux / median
+
+    n_cad_sigma_clipped = 0
+    if cfg.sigma_clip and cfg.sigma_clip > 0:
+        mad = float(np.nanmedian(np.abs(normalized_flux - 1.0)))
+        if mad > 0 and np.isfinite(mad):
+            sigma = 1.4826 * mad
+            keep = (
+                normalized_flux - 1.0
+            ) <= cfg.sigma_clip * sigma
+            if keep.sum() >= cfg.min_cadences:
+                n_cad_sigma_clipped = int((~keep).sum())
+                selected_time = selected_time[keep]
+                normalized_flux = normalized_flux[keep]
+                selected_orbitid = selected_orbitid[keep]
+                n_cad_kept = int(keep.sum())
+
+    baseline_d = float(selected_time.max() - selected_time.min())
+    durations_d = duration_grid_days(cfg.durations_min)
+    grid_probe = build_period_grid(
+        baseline_d=baseline_d,
+        p_min_d=cfg.p_min_d,
+        max_period_fraction=cfg.max_period_fraction,
+        p_max_cap_d=cfg.p_max_cap_d,
+        n_periods=2,
+        durations_d=durations_d,
+    )
+    status = "ok" if grid_probe.size >= 2 else "degenerate_grid"
+    return _result(
+        status,
+        normalized_flux=normalized_flux,
+        n_cad_kept=n_cad_kept,
+        n_cad_edge_trimmed=n_cad_edge_trimmed,
+        n_cad_sigma_clipped=n_cad_sigma_clipped,
+        flux_median=median,
+        baseline_d=baseline_d,
+    )
+
+
 def _empty_result(
     lc: HLSPLightCurve, aperture: str, status: str, n_total: int, n_kept: int,
     cfg: BLSConfig,
@@ -98,65 +260,33 @@ def run_bls_on_lc(lc: HLSPLightCurve, cfg: BLSConfig | None = None,
         res = _empty_result(lc, aperture, "missing_aperture", len(lc.time), 0, cfg)
         return _maybe_with_periodogram(res, return_periodogram)
 
-    t_all = lc.time
-    f_all = lc.flux[aperture]
-    n_total = int(t_all.size)
-    mask = quality_mask(lc, aperture)
-    n_cad_quality = int(mask.sum())
-    if n_cad_quality < cfg.min_cadences:
-        res = _empty_result(lc, aperture, "too_few_cadences", n_total, n_cad_quality, cfg)
+    prepared = prepare_bls_inputs_from_arrays(
+        time=lc.time,
+        flux=lc.flux[aperture],
+        quality=lc.quality,
+        orbitid=lc.orbitid,
+        cfg=cfg,
+    )
+    n_total = prepared.n_total
+    if not prepared.ready:
+        res = _empty_result(
+            lc,
+            aperture,
+            prepared.status,
+            n_total,
+            prepared.n_cad_kept,
+            cfg,
+        )
         return _maybe_with_periodogram(res, return_periodogram)
 
-    t = t_all[mask].astype(np.float64)
-    f = f_all[mask].astype(np.float64)
-    orbitid_kept = lc.orbitid[mask]
-    n_kept = n_cad_quality
-    n_cad_edge_trimmed = 0
-    n_cad_sigma_clipped = 0
-
-    # Optional orbit-edge trim: drop cadences within trim_d of each orbit's
-    # first/last good cadence. Targets the scattered-light wings around
-    # spacecraft thermal recovery and momentum dumps.
-    if cfg.orbit_edge_trim_d and cfg.orbit_edge_trim_d > 0:
-        edge_keep = np.ones_like(t, dtype=bool)
-        for oid in np.unique(orbitid_kept):
-            sel = orbitid_kept == oid
-            if sel.sum() < 2:
-                continue
-            t_orbit = t[sel]
-            t_lo = t_orbit.min() + cfg.orbit_edge_trim_d
-            t_hi = t_orbit.max() - cfg.orbit_edge_trim_d
-            edge_keep[sel] = (t_orbit >= t_lo) & (t_orbit <= t_hi)
-        if edge_keep.sum() >= cfg.min_cadences:
-            n_cad_edge_trimmed = int((~edge_keep).sum())
-            t = t[edge_keep]
-            f = f[edge_keep]
-            orbitid_kept = orbitid_kept[edge_keep]
-            n_kept = int(edge_keep.sum())
-
-    med = float(np.nanmedian(f))
-    if not np.isfinite(med) or med == 0.0:
-        res = _empty_result(lc, aperture, "all_nan", n_total, n_kept, cfg)
-        return _maybe_with_periodogram(res, return_periodogram)
-    y = f / med
-
-    # Upper-tail-only sigma clip to suppress scattered-light spikes (always
-    # positive excursions) without touching transit dips (always negative).
-    # This asymmetry matters: a 57%-deep transit at MAD-RMS=0.10 is a 5.7σ
-    # negative excursion that a symmetric clip would erase.
-    if cfg.sigma_clip and cfg.sigma_clip > 0:
-        mad = float(np.nanmedian(np.abs(y - 1.0)))
-        if mad > 0 and np.isfinite(mad):
-            sigma = 1.4826 * mad
-            keep = (y - 1.0) <= cfg.sigma_clip * sigma
-            if keep.sum() >= cfg.min_cadences:
-                n_cad_sigma_clipped = int((~keep).sum())
-                t = t[keep]
-                y = y[keep]
-                orbitid_kept = orbitid_kept[keep]
-                n_kept = int(keep.sum())
-
-    baseline_d = float(t.max() - t.min())
+    t = prepared.time
+    y = prepared.normalized_flux
+    orbitid_kept = prepared.orbitid
+    n_kept = prepared.n_cad_kept
+    n_cad_quality = prepared.n_cad_quality
+    n_cad_edge_trimmed = prepared.n_cad_edge_trimmed
+    n_cad_sigma_clipped = prepared.n_cad_sigma_clipped
+    baseline_d = prepared.baseline_d
     n_orbits = int(np.unique(orbitid_kept).size) if orbitid_kept.size else 0
 
     durations_d = duration_grid_days(cfg.durations_min)
@@ -249,4 +379,11 @@ def save_periodogram(spectrum: dict, out_path: Path) -> None:
     np.savez_compressed(out_path, **spectrum)
 
 
-__all__ = ["BLSConfig", "run_bls_on_lc", "save_periodogram", "APERTURES"]
+__all__ = [
+    "APERTURES",
+    "BLSConfig",
+    "BLSPreparedInputs",
+    "prepare_bls_inputs_from_arrays",
+    "run_bls_on_lc",
+    "save_periodogram",
+]

@@ -20,6 +20,12 @@ import pandas as pd
 
 from twirl.io.hlsp import BJDREFI
 from twirl.lightcurves.detrend_presets import adp03q_config
+from twirl.lightcurves.external_quality import (
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+    ExternalQualityReference,
+    load_external_quality_reference,
+)
 from twirl.lightcurves.flux_detrend import flux_space_detrend_result
 from twirl.search.injections import inject_batman_transit
 from twirl.vetting.harmonic_inputs import injected_raw_uncertainty
@@ -28,7 +34,7 @@ from twirl.vetting.harmonic_inputs import injected_raw_uncertainty
 def fresh_injection_contract(sector: int) -> str:
     """Return the immutable injection-pair contract for one sector."""
 
-    return f"s{int(sector)}_a2v1_fresh_injection_pair_v1"
+    return f"s{int(sector)}_a2v1_fresh_injection_pair_v2"
 
 
 def schedule_contract(sector: int) -> str:
@@ -40,6 +46,12 @@ def schedule_contract(sector: int) -> str:
 FRESH_INJECTION_CONTRACT = fresh_injection_contract(56)
 SCHEDULE_CONTRACT = schedule_contract(56)
 RAW_SOURCE_CONTRACT = "s56_tglc_raw_pair_v1"
+EPOCH_QUALITY_POLICY_CONTRACT = "a2v1_fresh_injection_epoch_quality_v2"
+EPOCH_QUALITY_POLICY = (
+    "epoch/t0 eligibility uses finite raw/error cadences with effective quality "
+    "zero under the authoritative internal-or-external policy; A2v1 detrending "
+    "and the stored quality dataset retain the internal production quality"
+)
 ADP_APERTURES: tuple[str, str] = ("DET_FLUX_ADP_SML", "DET_FLUX_ADP")
 T_MAG_EDGES: tuple[float, ...] = (-np.inf, 17.0, 18.0, 19.0, np.inf)
 T_MAG_LABELS: tuple[str, ...] = (
@@ -1018,10 +1030,107 @@ def _attr_value(value: Any) -> Any:
     return json.dumps(value, default=_json_default)
 
 
+EPOCH_QUALITY_PROVENANCE_FIELDS = (
+    "epoch_quality_policy_contract",
+    "epoch_quality_policy",
+    "external_quality_policy_contract",
+    "effective_quality_policy",
+    "cadence_reference_sector",
+    "cadence_reference_contract_version",
+    "cadence_reference_cadence_authority",
+    "cadence_reference_quality_authority",
+    "cadence_reference_table_sha256",
+    "cadence_reference_manifest_sha256",
+    "cadence_reference_source_declaration_sha256",
+    "authority_exclusion_policy_contract",
+    "authority_exclusion_external_bit",
+    "authority_exclusions_sha256",
+    "n_authority_exclusions",
+)
+
+
+def epoch_quality_provenance(
+    reference: ExternalQualityReference,
+) -> dict[str, Any]:
+    """Return the immutable cadence evidence bound to a v2 injection shard."""
+
+    source = reference.provenance
+    return {
+        "epoch_quality_policy_contract": EPOCH_QUALITY_POLICY_CONTRACT,
+        "epoch_quality_policy": EPOCH_QUALITY_POLICY,
+        "external_quality_policy_contract": source["policy_contract"],
+        "effective_quality_policy": source["effective_quality_policy"],
+        "cadence_reference_sector": int(source["sector"]),
+        "cadence_reference_contract_version": source[
+            "cadence_reference_contract_version"
+        ],
+        "cadence_reference_cadence_authority": source[
+            "cadence_reference_cadence_authority"
+        ],
+        "cadence_reference_quality_authority": source[
+            "cadence_reference_quality_authority"
+        ],
+        "cadence_reference_table": source["cadence_reference_table"],
+        "cadence_reference_manifest": source["cadence_reference_manifest"],
+        "cadence_reference_table_sha256": source[
+            "cadence_reference_table_sha256"
+        ],
+        "cadence_reference_manifest_sha256": source[
+            "cadence_reference_manifest_sha256"
+        ],
+        "cadence_reference_source_declaration_sha256": source[
+            "cadence_reference_source_declaration_sha256"
+        ],
+        "authority_exclusion_policy_contract": source[
+            "authority_exclusion_policy_contract"
+        ],
+        "authority_exclusion_external_bit": source[
+            "authority_exclusion_external_bit"
+        ],
+        "authority_exclusions_sha256": source["authority_exclusions_sha256"],
+        "n_authority_exclusions": int(source["n_authority_exclusions"]),
+    }
+
+
+def epoch_quality_provenance_failures(
+    attrs: Any,
+    expected: Mapping[str, Any],
+) -> list[str]:
+    """Return missing or incompatible immutable epoch-quality attributes."""
+
+    failures: list[str] = []
+    for name in EPOCH_QUALITY_PROVENANCE_FIELDS:
+        if name not in attrs:
+            failures.append(f"missing {name}")
+            continue
+        observed = attrs[name]
+        if isinstance(observed, bytes):
+            observed = observed.decode("utf-8")
+        if isinstance(observed, np.generic):
+            observed = observed.item()
+        expected_value = expected[name]
+        if isinstance(expected_value, (int, np.integer)) and not isinstance(
+            expected_value, (bool, np.bool_)
+        ):
+            try:
+                matches = int(observed) == int(expected_value)
+            except (TypeError, ValueError, OverflowError):
+                matches = False
+        else:
+            matches = str(observed) == str(expected_value)
+        if not matches:
+            failures.append(
+                f"{name}={observed!r} does not match {expected_value!r}"
+            )
+    return failures
+
+
 def write_fresh_injection_shard(
     *,
     raw_h5: Path,
     adp_h5: Path,
+    cadence_reference_table: Path,
+    cadence_reference_manifest: Path,
     schedule: pd.DataFrame,
     shard_index: int,
     config: A2V1RecoveryConfig,
@@ -1035,6 +1144,20 @@ def write_fresh_injection_shard(
 
     config.validate()
     contract = fresh_injection_contract(config.sector)
+    quality_reference = load_external_quality_reference(
+        table_path=Path(cadence_reference_table),
+        manifest_path=Path(cadence_reference_manifest),
+        sector=config.sector,
+    )
+    quality_reference.assert_unchanged()
+    quality_provenance = epoch_quality_provenance(quality_reference)
+    if (
+        quality_provenance["external_quality_policy_contract"]
+        != EXTERNAL_QUALITY_POLICY_CONTRACT
+        or quality_provenance["effective_quality_policy"]
+        != EFFECTIVE_QUALITY_POLICY
+    ):
+        raise ValueError("cadence-reference effective-quality policy mismatch")
     if shard_index < 0 or shard_index >= config.n_shards:
         raise ValueError("invalid shard_index")
     if selection_mode == "shard":
@@ -1082,6 +1205,8 @@ def write_fresh_injection_shard(
             output.attrs["n_injections"] = int(len(rows))
             output.attrs["selection_mode"] = str(selection_mode)
             output.attrs["apertures"] = json.dumps(list(ADP_APERTURES))
+            for name, value in quality_provenance.items():
+                output.attrs[name] = _attr_value(value)
             root = output.create_group("injections")
             for count, row in enumerate(rows.to_dict("records"), start=1):
                 tic = int(row["tic"])
@@ -1098,7 +1223,49 @@ def write_fresh_injection_shard(
                 if float(np.nanmax(delta_s)) > config.max_time_error_s:
                     raise ValueError(f"TIC {tic}: time mismatch during shard build")
                 quality = np.asarray(adp["quality"], dtype=np.int32)
+                raw_quality = np.asarray(raw["quality"], dtype=np.int32)
+                if not np.array_equal(raw_quality, quality):
+                    raise ValueError(
+                        f"TIC {tic}: internal quality mismatch during shard build"
+                    )
                 orbitid = np.asarray(adp["orbitid"], dtype=np.int32)
+                sector = int(adp.attrs.get("sector", config.sector))
+                camera = int(adp.attrs.get("camera", -1))
+                ccd = int(adp.attrs.get("ccd", -1))
+                if sector != config.sector:
+                    raise ValueError(
+                        f"TIC {tic}: sector {sector} does not match {config.sector}"
+                    )
+                for field, observed in (
+                    ("camera", camera),
+                    ("ccd", ccd),
+                ):
+                    try:
+                        scheduled = int(row[field])
+                    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                        raise ValueError(
+                            f"TIC {tic}: invalid scheduled {field}"
+                        ) from exc
+                    if scheduled != observed:
+                        raise ValueError(
+                            f"TIC {tic}: scheduled {field} {scheduled} does not "
+                            f"match source {observed}"
+                        )
+                quality_overlay = quality_reference.apply(
+                    sector=sector,
+                    camera=camera,
+                    ccd=ccd,
+                    cadenceno=cadence_adp,
+                    orbitid=orbitid,
+                    internal_quality=quality,
+                    context=f"injection {row['injection_id']} TIC {tic}",
+                )
+                effective_quality = np.asarray(
+                    quality_overlay.quality, dtype=np.int32
+                )
+                external_quality = np.asarray(
+                    quality_overlay.external_quality, dtype=np.int64
+                )
                 raw_small = np.asarray(raw["raw_flux_small"], dtype=float)
                 err_small = np.asarray(raw["raw_flux_err_small"], dtype=float)
                 raw_primary = np.asarray(raw["raw_flux_primary"], dtype=float)
@@ -1115,7 +1282,7 @@ def write_fresh_injection_shard(
                 t0_d, injected_small, model = _inject_at_sampled_epoch(
                     time=adp_time,
                     flux=raw_small,
-                    quality=quality,
+                    quality=effective_quality,
                     finite_mask=finite,
                     period_d=float(row["period_d"]),
                     duration_min=float(row["duration_min"]),
@@ -1127,7 +1294,25 @@ def write_fresh_injection_shard(
                     min_sampled_cadences=config.min_in_transit,
                     rng=epoch_rng,
                 )
-                transit_mask = finite & (quality == 0) & (model < 1.0 - 1.0e-10)
+                model = np.asarray(model, dtype=float)
+                transit_model_mask = np.isfinite(model) & (
+                    model < 1.0 - 1.0e-10
+                )
+                final_good_transit = (
+                    finite & (effective_quality == 0) & transit_model_mask
+                )
+                internal_good_transit = (
+                    finite & (quality == 0) & transit_model_mask
+                )
+                n_final_good_in_transit = int(
+                    np.count_nonzero(final_good_transit)
+                )
+                if n_final_good_in_transit < config.min_in_transit:
+                    raise RuntimeError(
+                        f"TIC {tic}: sampled epoch has "
+                        f"{n_final_good_in_transit} final-good in-transit "
+                        f"cadences; need {config.min_in_transit}"
+                    )
                 injected_primary = raw_primary + baseline_primary * (model - 1.0)
                 injected_err_small = injected_raw_uncertainty(
                     err_small,
@@ -1154,19 +1339,24 @@ def write_fresh_injection_shard(
                     "injection_id": injection_id,
                     "sector": config.sector,
                     "tic": tic,
+                    "camera": camera,
+                    "ccd": ccd,
+                    "tessmag": float(adp.attrs.get("tessmag", np.nan)),
                     "t0_d": t0_d,
                     "t0_bjd": t0_d + BJDREFI,
                     "depth": float(1.0 - np.nanmin(model)),
                     "model_depth": float(1.0 - np.nanmin(model)),
                     "sampled_model_depth": float(1.0 - np.nanmin(model)),
-                    "n_good_in_transit": int(
-                        np.count_nonzero(transit_mask & (quality == 0) & finite)
+                    "n_good_in_transit": n_final_good_in_transit,
+                    "n_effective_good_in_transit": n_final_good_in_transit,
+                    "n_internal_good_in_transit": int(
+                        np.count_nonzero(internal_good_transit)
                     ),
                     "cadence_s": config.cadence_s,
                     "injection_level": "raw_flux_pre_detrend",
                     "injection_model": "batman_quadratic",
                     "duration_model": "wd_density_batman",
-                    "epoch_sampling_policy": "finite_exposure_model_min_sampled_cadences",
+                    "epoch_sampling_policy": EPOCH_QUALITY_POLICY,
                     "sampling_mode": "period_radius_grid",
                     "baseline_source": "raw_median_per_aperture",
                     "injection_baseline_Small": baseline_small,
@@ -1181,6 +1371,13 @@ def write_fresh_injection_shard(
                     "contract_version": contract,
                     "raw_adp_time_delta_max_s": float(np.nanmax(delta_s)),
                 }
+                attrs.update(quality_provenance)
+                attrs.update(
+                    {
+                        f"epoch_quality_{name}": int(value)
+                        for name, value in quality_overlay.counts.items()
+                    }
+                )
                 for name, value in attrs.items():
                     group.attrs[str(name)] = _attr_value(value)
                 for prefix, diagnostics in (
@@ -1194,6 +1391,8 @@ def write_fresh_injection_shard(
                     "cadenceno": cadence_adp,
                     "orbitid": orbitid,
                     "quality": quality,
+                    "external_quality": external_quality,
+                    "effective_quality": effective_quality,
                     "transit_model": model.astype(np.float32),
                     "RAW_FLUX_Small_original": raw_small,
                     "RAW_FLUX_Small_injected": injected_small,
@@ -1220,12 +1419,28 @@ def write_fresh_injection_shard(
                         "model_depth": float(1.0 - np.nanmin(model)),
                         "sampled_model_depth": float(1.0 - np.nanmin(model)),
                         "n_good_in_transit": attrs["n_good_in_transit"],
+                        "n_effective_good_in_transit": attrs[
+                            "n_effective_good_in_transit"
+                        ],
+                        "n_internal_good_in_transit": attrs[
+                            "n_internal_good_in_transit"
+                        ],
+                        "epoch_quality_policy_contract": (
+                            EPOCH_QUALITY_POLICY_CONTRACT
+                        ),
+                        "cadence_reference_table_sha256": quality_provenance[
+                            "cadence_reference_table_sha256"
+                        ],
+                        "cadence_reference_manifest_sha256": quality_provenance[
+                            "cadence_reference_manifest_sha256"
+                        ],
                         "source_h5": str(out_h5.resolve()),
                         "h5_group": f"/injections/{injection_id}",
                     }
                 )
                 if count % 50 == 0:
                     print(f"[a2v1-injection-shard] {count:,}/{len(rows):,}", flush=True)
+            quality_reference.assert_unchanged()
         temporary.replace(out_h5)
     except Exception:
         temporary.unlink(missing_ok=True)
@@ -1241,6 +1456,9 @@ def write_fresh_injection_shard(
         "n_injections": int(len(manifest)),
         "n_unique_tics": int(manifest["tic"].nunique()),
         "selection_mode": str(selection_mode),
+        "epoch_quality_policy_contract": EPOCH_QUALITY_POLICY_CONTRACT,
+        "epoch_quality_policy": EPOCH_QUALITY_POLICY,
+        "cadence_reference": quality_provenance,
         "out_h5": str(out_h5),
         "manifest": str(manifest_path),
         "sha256": _sha256_file(out_h5),
@@ -1257,6 +1475,8 @@ def audit_fresh_injection_shards(
     schedule: pd.DataFrame,
     raw_h5: Path,
     adp_h5: Path,
+    cadence_reference_table: Path,
+    cadence_reference_manifest: Path,
     config: A2V1RecoveryConfig,
     relative_tolerance: float = 1.0e-6,
     model_absolute_tolerance: float = 5.0e-7,
@@ -1268,6 +1488,13 @@ def audit_fresh_injection_shards(
     config.validate()
     paths = sorted(Path(path) for path in shard_paths)
     expected_contract = fresh_injection_contract(config.sector)
+    quality_reference = load_external_quality_reference(
+        table_path=Path(cadence_reference_table),
+        manifest_path=Path(cadence_reference_manifest),
+        sector=config.sector,
+    )
+    quality_reference.assert_unchanged()
+    expected_quality_provenance = epoch_quality_provenance(quality_reference)
     expected_ids = set(schedule["injection_id"].astype(str))
     expected_tics = set(pd.to_numeric(schedule["tic"], errors="raise").astype(int))
     seen_ids: set[str] = set()
@@ -1275,6 +1502,8 @@ def audit_fresh_injection_shards(
     failures: list[dict[str, Any]] = []
     n_groups = 0
     n_alignment_failures = 0
+    n_epoch_quality_provenance_failures = 0
+    n_epoch_quality_mask_failures = 0
     n_original_copy_failures = 0
     n_negative_original_points = 0
     n_negative_preservation_failures = 0
@@ -1299,6 +1528,17 @@ def audit_fresh_injection_shards(
                         path=str(path),
                         observed=observed_contract,
                         expected=expected_contract,
+                    )
+                root_provenance_failures = epoch_quality_provenance_failures(
+                    shard.attrs,
+                    expected_quality_provenance,
+                )
+                for detail in root_provenance_failures:
+                    n_epoch_quality_provenance_failures += 1
+                    record_failure(
+                        "epoch_quality_root_provenance_mismatch",
+                        path=str(path),
+                        detail=detail,
                     )
                 if "injections" not in shard:
                     record_failure("missing_injections_group", path=str(path))
@@ -1326,9 +1566,27 @@ def audit_fresh_injection_shards(
                         continue
                     raw = raw_file[f"targets/{key}"]
                     adp = adp_file[f"targets/{key}"]
+                    group_provenance_failures = epoch_quality_provenance_failures(
+                        group.attrs,
+                        expected_quality_provenance,
+                    )
+                    for detail in group_provenance_failures:
+                        n_epoch_quality_provenance_failures += 1
+                        record_failure(
+                            "epoch_quality_group_provenance_mismatch",
+                            injection_id=injection_id,
+                            tic=tic,
+                            detail=detail,
+                        )
                     try:
                         cadence = np.asarray(group["cadenceno"], dtype=np.int64)
                         quality = np.asarray(group["quality"], dtype=np.int32)
+                        external_quality = np.asarray(
+                            group["external_quality"], dtype=np.int64
+                        )
+                        effective_quality = np.asarray(
+                            group["effective_quality"], dtype=np.int32
+                        )
                         orbitid = np.asarray(group["orbitid"], dtype=np.int32)
                         time = np.asarray(group["time"], dtype=float)
                     except KeyError as exc:
@@ -1338,6 +1596,79 @@ def audit_fresh_injection_shards(
                             dataset=str(exc),
                         )
                         n_alignment_failures += 1
+                        continue
+                    source_sector = int(adp.attrs.get("sector", config.sector))
+                    source_camera = int(adp.attrs.get("camera", -1))
+                    source_ccd = int(adp.attrs.get("ccd", -1))
+                    try:
+                        authoritative_overlay = quality_reference.apply(
+                            sector=source_sector,
+                            camera=source_camera,
+                            ccd=source_ccd,
+                            cadenceno=cadence,
+                            orbitid=orbitid,
+                            internal_quality=quality,
+                            context=f"audit injection {injection_id} TIC {tic}",
+                        )
+                    except (KeyError, TypeError, ValueError) as exc:
+                        n_epoch_quality_mask_failures += 1
+                        record_failure(
+                            "authoritative_epoch_quality_overlay_error",
+                            injection_id=injection_id,
+                            tic=tic,
+                            error=str(exc),
+                        )
+                        continue
+                    detector_metadata_aligned = (
+                        int(group.attrs.get("sector", -1)) == source_sector
+                        and int(group.attrs.get("camera", -1)) == source_camera
+                        and int(group.attrs.get("ccd", -1)) == source_ccd
+                    )
+                    quality_overlay_aligned = (
+                        len(external_quality) == len(quality)
+                        and len(effective_quality) == len(quality)
+                        and np.array_equal(
+                            external_quality,
+                            np.asarray(
+                                authoritative_overlay.external_quality,
+                                dtype=np.int64,
+                            ),
+                        )
+                        and np.array_equal(
+                            effective_quality,
+                            np.asarray(
+                                authoritative_overlay.quality,
+                                dtype=np.int32,
+                            ),
+                        )
+                    )
+                    count_metadata_aligned = True
+                    for name, expected_value in authoritative_overlay.counts.items():
+                        try:
+                            observed_value = int(
+                                group.attrs[f"epoch_quality_{name}"]
+                            )
+                        except (KeyError, TypeError, ValueError, OverflowError):
+                            count_metadata_aligned = False
+                            break
+                        if observed_value != int(expected_value):
+                            count_metadata_aligned = False
+                            break
+                    if not (
+                        detector_metadata_aligned
+                        and quality_overlay_aligned
+                        and count_metadata_aligned
+                    ):
+                        n_alignment_failures += 1
+                        n_epoch_quality_mask_failures += 1
+                        record_failure(
+                            "stored_epoch_quality_mismatch",
+                            injection_id=injection_id,
+                            tic=tic,
+                            detector_metadata_aligned=detector_metadata_aligned,
+                            quality_arrays_aligned=quality_overlay_aligned,
+                            quality_counts_aligned=count_metadata_aligned,
+                        )
                         continue
                     aligned = (
                         np.array_equal(
@@ -1430,10 +1761,12 @@ def audit_fresh_injection_shards(
                             limit=model_absolute_tolerance,
                         )
                     good_transit = (
-                        (quality == 0) & np.isfinite(model) & (model < 1.0 - 1.0e-10)
+                        (effective_quality == 0)
+                        & np.isfinite(model)
+                        & (model < 1.0 - 1.0e-10)
                     )
                     stored_good_transit = (
-                        (quality == 0)
+                        (effective_quality == 0)
                         & np.isfinite(stored_model)
                         & (stored_model < 1.0 - 1.0e-10)
                     )
@@ -1600,6 +1933,7 @@ def audit_fresh_injection_shards(
             observed=max_error_equation_relative_residual,
             limit=relative_tolerance,
         )
+    quality_reference.assert_unchanged()
     return {
         "created_utc": _utcnow(),
         "contract": expected_contract,
@@ -1614,6 +1948,11 @@ def audit_fresh_injection_shards(
         "n_missing_host_tics": len(missing_tics),
         "n_extra_host_tics": len(extra_tics),
         "n_alignment_failures": n_alignment_failures,
+        "n_epoch_quality_provenance_failures": (
+            n_epoch_quality_provenance_failures
+        ),
+        "n_epoch_quality_mask_failures": n_epoch_quality_mask_failures,
+        "epoch_quality_provenance": expected_quality_provenance,
         "n_original_copy_failures": n_original_copy_failures,
         "n_negative_original_points": n_negative_original_points,
         "n_negative_preservation_failures": n_negative_preservation_failures,
@@ -1767,15 +2106,20 @@ def select_parameter_spanning_rows(
 __all__ = [
     "ADP_APERTURES",
     "A2V1RecoveryConfig",
+    "EPOCH_QUALITY_POLICY",
+    "EPOCH_QUALITY_POLICY_CONTRACT",
+    "EPOCH_QUALITY_PROVENANCE_FIELDS",
     "FRESH_INJECTION_CONTRACT",
     "SCHEDULE_CONTRACT",
-    "fresh_injection_contract",
-    "schedule_contract",
-    "build_fresh_injection_schedule",
     "audit_fresh_injection_shards",
+    "build_fresh_injection_schedule",
+    "epoch_quality_provenance",
+    "epoch_quality_provenance_failures",
+    "fresh_injection_contract",
     "load_recovery_config",
     "numeric_arrays_match_with_ulp_budget",
     "run_adp_roundtrip_parity",
+    "schedule_contract",
     "select_parameter_spanning_rows",
     "write_fresh_injection_shard",
 ]

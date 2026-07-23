@@ -16,6 +16,7 @@ Makefile text eol=lf
 # whitespace diagnostics that would otherwise treat every record terminator
 # as trailing space.
 reports/stage5_validation/s56_A2v1_teacher_v2/orcd_final_artifacts/source_snapshots/franklin_labels_vetted.csv binary
+reports/stage5_validation/franklin_s57_s59_label_return_20260721/franklin_labels_returned.csv binary
 
 # Scientific data, rendered artifacts, and office documents are binary.
 *.fits binary

@@ -12,25 +12,27 @@ The active TWIRL I manuscript is maintained separately in the sibling
 
 ## Current checkpoint
 
-As of `2026-07-16`:
+As of `2026-07-23`:
 
-- **S56 A2v1 is product-complete and passes Tier-0 QA.** HDF5 coverage and all
-  `31,450` ADP/ADP015-only FITS products passed product validation, and WD 1856
-  is recovered at BLS rank one in both ADP apertures. Tier-1 science QA remains
-  required before survey release.
-- **S57 A2v1 is product-complete.** Its `27,213` FITS products and compact ADP
-  export passed validation. At audit close, an experimental S57 review queue
-  had been created prematurely and contained six human labels. Preserve all
-  six, pause further S57 holdout consumption, and do not describe S57 as a
-  pristine external holdout.
-- **S58-S63 A2v1 production is in progress.** A targeted S58 HDF5 repair passed
-  the strengthened openability gate, and the serial queue resumed with S58
-  FITS rebuilding. HDF5 completion remains an intermediate checkpoint.
+- **S56-S63 A2v1 products pass their product gates.** S56 contains `31,450`
+  ADP/ADP015-only FITS products, S57 contains `27,213`, and S58-S63 completed
+  their edge-aware HDF5/FITS schema validation. The S64-S69 source-only,
+  all-ePSF-refit queue is the parallel Stage-1 production lane.
+- **S56 passes Tier-0 QA; bounded Tier-1 is running.** WD 1856 is recovered at
+  BLS rank one in both active ADP apertures. The full-population
+  `active_search_pair` audit can qualify target-filtered enrichment only; it
+  cannot set `science_ready=true` or promote the six-channel product.
+- **Seven-sector human morphology labeling is the near-term data goal.**
+  Franklin's accepted S57-S59 return adds `3,000` sector observations, and the
+  separate `3,000`-row S60-S62 handoff is under review. These are enrichment
+  morphology labels, not confirmed planets or eclipsing binaries. S57 is not
+  a pristine holdout.
 - **S56 active learning is a pilot, not a survey classifier.** The
-  `s56_harmonic_cnn_v1` teacher remains the enrichment baseline, and its first
-  `1,000`-TIC review batch is partially labeled. Teacher v2 was completed as an
-  exploratory comparison but missed promotion gates; student/self-training
-  remains blocked.
+  seven-harmonic teacher-v1 architecture remains the enrichment baseline.
+  Teacher v2 missed promotion gates, and student/self-training remains blocked.
+  Before the S56-S62 retrain, TWIRL needs quality-aware per-sector native
+  inputs, one immutable TIC-grouped split registry, and hash-bound corpus and
+  checkpoint provenance.
 
 The authoritative current status and priorities are in
 [the project plan](doc/twirl_plan.md); dated runs and benchmarks belong in
@@ -56,10 +58,11 @@ trees are not moved to ORCD.
 ## Pipeline status
 
 1. **Stage 1 — catalogs, extraction, A2v1 products, indexing, and photometric
-   QA.** S56 passes product validation and Tier-0 integrity/benchmark QA, S57
-   is product-validated, and the S58-S63 queue is active. Tier-1 science QA,
-   the consolidated archive/index, a frozen release manifest/sector cutoff,
-   and the Gaia-first no-TIC bridge remain open.
+   QA.** S56-S63 are product-validated, S56 passes Tier-0
+   integrity/benchmark QA, and its bounded active-pair Tier-1 audit is active.
+   Full six-channel Tier-1 release QA, the consolidated archive/index, a
+   frozen release manifest/sector cutoff, and the Gaia-first no-TIC bridge
+   remain open.
 2. **Stage 2 — transparent search and candidate generation.** The sector-level
    periodic BLS, cross-aperture consolidation, diagnostics, heuristic checks,
    and WD 1856 smoke paths exist. The co-equal non-periodic dip baseline and

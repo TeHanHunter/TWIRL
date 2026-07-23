@@ -22,6 +22,12 @@ from twirl.injections.a2v1_recovery import (
     select_parameter_spanning_rows,
     write_fresh_injection_shard,
 )
+from scripts.stage3_injections.run_s56_a2v1_injection_shard import _complete
+from twirl.lightcurves.external_quality import (
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+    QualityOverlayResult,
+)
 from twirl.vetting.injection_teacher_recovery import (
     build_teacher_injection_holdout,
     normalize_injection_peak_candidates,
@@ -126,6 +132,117 @@ def _write_sources(
                 for name, value in values.items():
                     group.create_dataset(name, data=value)
     return raw_path, adp_path
+
+
+class _FakeExternalQualityReference:
+    def __init__(
+        self,
+        *,
+        table_path: Path,
+        manifest_path: Path,
+        external_bad_indices: tuple[int, ...] = (),
+    ) -> None:
+        self.sector = 56
+        self.table_path = table_path.resolve()
+        self.manifest_path = manifest_path.resolve()
+        self.external_bad_indices = external_bad_indices
+        self.n_assert_unchanged = 0
+
+    @property
+    def provenance(self) -> dict[str, object]:
+        return {
+            "policy_contract": EXTERNAL_QUALITY_POLICY_CONTRACT,
+            "effective_quality_policy": EFFECTIVE_QUALITY_POLICY,
+            "sector": self.sector,
+            "cadence_reference_contract_version": (
+                "s56_a2v1_cadence_reference_v1"
+            ),
+            "cadence_reference_cadence_authority": "qlp_cam_quat",
+            "cadence_reference_quality_authority": (
+                "spoc_and_qlp_quality_flags"
+            ),
+            "cadence_reference_table": str(self.table_path),
+            "cadence_reference_manifest": str(self.manifest_path),
+            "cadence_reference_table_sha256": "a" * 64,
+            "cadence_reference_manifest_sha256": "b" * 64,
+            "cadence_reference_source_declaration_sha256": "c" * 64,
+            "authority_exclusion_policy_contract": (
+                "a2v1_quaternion_authority_exclusions_v1"
+            ),
+            "authority_exclusion_external_bit": 29,
+            "authority_exclusions_sha256": "d" * 64,
+            "n_authority_exclusions": 0,
+        }
+
+    def assert_unchanged(self) -> None:
+        self.n_assert_unchanged += 1
+
+    def apply(
+        self,
+        *,
+        sector: int,
+        camera: int,
+        ccd: int,
+        cadenceno: np.ndarray,
+        orbitid: np.ndarray,
+        internal_quality: np.ndarray,
+        context: str,
+    ) -> QualityOverlayResult:
+        assert sector == self.sector
+        assert (camera, ccd) == (1, 1)
+        assert len(cadenceno) == len(orbitid) == len(internal_quality)
+        assert context
+        internal = np.asarray(internal_quality)
+        external = np.zeros(len(internal), dtype=np.int64)
+        external[list(self.external_bad_indices)] = 2048
+        internal_bad = internal != 0
+        external_bad = external != 0
+        effective_bad = internal_bad | external_bad
+        return QualityOverlayResult(
+            quality=effective_bad.astype(np.int32),
+            external_quality=external,
+            counts={
+                "n_cad_total": len(internal),
+                "n_cad_internal_bad": int(np.count_nonzero(internal_bad)),
+                "n_cad_external_bad": int(np.count_nonzero(external_bad)),
+                "n_cad_external_only_bad": int(
+                    np.count_nonzero(external_bad & ~internal_bad)
+                ),
+                "n_cad_authority_excluded": 0,
+                "n_cad_effective_bad": int(np.count_nonzero(effective_bad)),
+            },
+        )
+
+
+def _install_fake_quality_reference(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    external_bad_indices: tuple[int, ...] = (),
+) -> tuple[Path, Path, _FakeExternalQualityReference]:
+    table_path = tmp_path / "cadence_reference.csv"
+    manifest_path = tmp_path / "cadence_reference.json"
+    table_path.write_text("fixture\n")
+    manifest_path.write_text("{}\n")
+    reference = _FakeExternalQualityReference(
+        table_path=table_path,
+        manifest_path=manifest_path,
+        external_bad_indices=external_bad_indices,
+    )
+
+    def fake_load(
+        *,
+        table_path: Path,
+        manifest_path: Path,
+        sector: int,
+    ) -> _FakeExternalQualityReference:
+        assert Path(table_path).resolve() == reference.table_path
+        assert Path(manifest_path).resolve() == reference.manifest_path
+        assert sector == reference.sector
+        return reference
+
+    monkeypatch.setattr(recovery, "load_external_quality_reference", fake_load)
+    return table_path, manifest_path, reference
 
 
 def test_fresh_schedule_is_unique_host_disjoint_and_grid_complete(
@@ -295,6 +412,9 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
     tmp_path: Path, monkeypatch
 ) -> None:
     raw_h5, adp_h5 = _write_sources(tmp_path)
+    cadence_table, cadence_manifest, quality_reference = (
+        _install_fake_quality_reference(monkeypatch, tmp_path)
+    )
     teacher = tmp_path / "teacher.csv"
     pd.DataFrame({"tic": [99_999]}).to_csv(teacher, index=False)
     schedule, _, _ = build_fresh_injection_schedule(
@@ -321,6 +441,8 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
     summary = write_fresh_injection_shard(
         raw_h5=raw_h5,
         adp_h5=adp_h5,
+        cadence_reference_table=cadence_table,
+        cadence_reference_manifest=cadence_manifest,
         schedule=schedule,
         shard_index=shard_index,
         config=_config(),
@@ -329,6 +451,11 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
     assert summary["n_injections"] == 4
     with h5py.File(out_h5, "r") as h5:
         assert h5.attrs["contract_version"] == FRESH_INJECTION_CONTRACT
+        assert (
+            h5.attrs["epoch_quality_policy_contract"]
+            == recovery.EPOCH_QUALITY_POLICY_CONTRACT
+        )
+        assert h5.attrs["cadence_reference_table_sha256"] == "a" * 64
         assert len(h5["injections"]) == 4
         group = next(
             group
@@ -340,18 +467,33 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
         original_error = np.asarray(group["RAW_FLUX_ERR_Small_original"])
         injected_error = np.asarray(group["RAW_FLUX_ERR_Small_injected"])
         model = np.asarray(group["transit_model"])
+        np.testing.assert_array_equal(
+            np.asarray(group["quality"]),
+            np.zeros_like(np.asarray(group["quality"])),
+        )
+        np.testing.assert_array_equal(
+            np.asarray(group["effective_quality"]),
+            np.asarray(group["quality"]) != 0,
+        )
+        assert (
+            group.attrs["epoch_quality_policy_contract"]
+            == recovery.EPOCH_QUALITY_POLICY_CONTRACT
+        )
         assert np.any(injected < 0)
         np.testing.assert_allclose(
             injected,
             original + float(group.attrs["injection_baseline_Small"]) * (model - 1.0),
         )
         assert np.all(injected_error[model < 1.0] <= original_error[model < 1.0])
+    assert quality_reference.n_assert_unchanged == 2
     shard_schedule = schedule.loc[schedule["shard_index"].eq(shard_index)].copy()
     audit = audit_fresh_injection_shards(
         shard_paths=[out_h5],
         schedule=shard_schedule,
         raw_h5=raw_h5,
         adp_h5=adp_h5,
+        cadence_reference_table=cadence_table,
+        cadence_reference_manifest=cadence_manifest,
         config=_config(),
     )
     assert audit["passed"]
@@ -365,8 +507,76 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
     assert (
         audit["max_stored_model_absolute_residual"] <= audit["model_absolute_tolerance"]
     )
+    assert audit["n_epoch_quality_provenance_failures"] == 0
+    assert audit["n_epoch_quality_mask_failures"] == 0
+    assert _complete(
+        out_h5,
+        4,
+        "shard",
+        FRESH_INJECTION_CONTRACT,
+        "a" * 64,
+        "b" * 64,
+    )
+    assert not _complete(
+        out_h5,
+        4,
+        "shard",
+        FRESH_INJECTION_CONTRACT,
+        "e" * 64,
+        "b" * 64,
+    )
 
     with h5py.File(out_h5, "r+") as h5:
+        group = next(iter(h5["injections"].values()))
+        group["external_quality"][0] = 2048
+        group["effective_quality"][0] = 1
+    corrupted_quality = audit_fresh_injection_shards(
+        shard_paths=[out_h5],
+        schedule=shard_schedule,
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        cadence_reference_table=cadence_table,
+        cadence_reference_manifest=cadence_manifest,
+        config=_config(),
+    )
+    assert not corrupted_quality["passed"]
+    assert corrupted_quality["n_epoch_quality_mask_failures"] >= 1
+    assert any(
+        failure["kind"] == "stored_epoch_quality_mismatch"
+        for failure in corrupted_quality["failures"]
+    )
+
+    with h5py.File(out_h5, "r+") as h5:
+        group = next(iter(h5["injections"].values()))
+        group["external_quality"][0] = 0
+        group["effective_quality"][0] = 0
+        h5.attrs["cadence_reference_table_sha256"] = "e" * 64
+    corrupted_provenance = audit_fresh_injection_shards(
+        shard_paths=[out_h5],
+        schedule=shard_schedule,
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        cadence_reference_table=cadence_table,
+        cadence_reference_manifest=cadence_manifest,
+        config=_config(),
+    )
+    assert not corrupted_provenance["passed"]
+    assert corrupted_provenance["n_epoch_quality_provenance_failures"] >= 1
+    assert any(
+        failure["kind"] == "epoch_quality_root_provenance_mismatch"
+        for failure in corrupted_provenance["failures"]
+    )
+    assert not _complete(
+        out_h5,
+        4,
+        "shard",
+        FRESH_INJECTION_CONTRACT,
+        "a" * 64,
+        "b" * 64,
+    )
+
+    with h5py.File(out_h5, "r+") as h5:
+        h5.attrs["cadence_reference_table_sha256"] = "a" * 64
         group = next(iter(h5["injections"].values()))
         group["transit_model"][0] = 0.8
     corrupted = audit_fresh_injection_shards(
@@ -374,6 +584,8 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
         schedule=shard_schedule,
         raw_h5=raw_h5,
         adp_h5=adp_h5,
+        cadence_reference_table=cadence_table,
+        cadence_reference_manifest=cadence_manifest,
         config=_config(),
     )
     assert not corrupted["passed"]
@@ -381,6 +593,121 @@ def test_injection_shard_preserves_negative_flux_and_adjusts_errors(
         failure["kind"] == "transit_model_value_mismatch"
         for failure in corrupted["failures"]
     )
+
+
+def test_injection_epoch_uses_effective_quality_but_detrend_keeps_internal_quality(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw_h5, adp_h5 = _write_sources(tmp_path)
+    cadence_table, cadence_manifest, _ = _install_fake_quality_reference(
+        monkeypatch,
+        tmp_path,
+        external_bad_indices=(0, 1, 2),
+    )
+    teacher = tmp_path / "teacher.csv"
+    pd.DataFrame({"tic": [99_999]}).to_csv(teacher, index=False)
+    schedule, _, _ = build_fresh_injection_schedule(
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        teacher_table=teacher,
+        config=_config(),
+        out_dir=tmp_path / "schedule",
+    )
+
+    epoch_quality_inputs: list[np.ndarray] = []
+    detrend_quality_inputs: list[np.ndarray] = []
+    real_detrend = recovery._adp_detrend
+
+    def fake_epoch(**kwargs):
+        quality = np.asarray(kwargs["quality"], dtype=np.int32)
+        epoch_quality_inputs.append(quality.copy())
+        good = np.flatnonzero(
+            (quality == 0) & np.asarray(kwargs["finite_mask"], dtype=bool)
+        )
+        assert len(good) >= kwargs["min_sampled_cadences"]
+        transit_indices = good[: int(kwargs["min_sampled_cadences"])]
+        model = np.ones(len(quality), dtype=float)
+        model[transit_indices] = 0.5
+        flux = np.asarray(kwargs["flux"], dtype=float)
+        injected = flux + float(kwargs["baseline"]) * (model - 1.0)
+        return float(np.asarray(kwargs["time"])[transit_indices[0]]), injected, model
+
+    def recording_detrend(time, raw_flux, raw_error, quality):
+        detrend_quality_inputs.append(np.asarray(quality).copy())
+        return real_detrend(time, raw_flux, raw_error, quality)
+
+    monkeypatch.setattr(recovery, "_inject_at_sampled_epoch", fake_epoch)
+    monkeypatch.setattr(recovery, "_adp_detrend", recording_detrend)
+    out_h5 = tmp_path / "quality_aware.h5"
+    write_fresh_injection_shard(
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        cadence_reference_table=cadence_table,
+        cadence_reference_manifest=cadence_manifest,
+        schedule=schedule,
+        shard_index=0,
+        config=_config(),
+        out_h5=out_h5,
+        limit=1,
+    )
+
+    assert len(epoch_quality_inputs) == 1
+    np.testing.assert_array_equal(epoch_quality_inputs[0][:3], [1, 1, 1])
+    assert len(detrend_quality_inputs) == 2
+    for quality in detrend_quality_inputs:
+        np.testing.assert_array_equal(quality, np.zeros_like(quality))
+    with h5py.File(out_h5, "r") as h5:
+        group = next(iter(h5["injections"].values()))
+        stored_internal = np.asarray(group["quality"])
+        stored_external = np.asarray(group["external_quality"])
+        stored_effective = np.asarray(group["effective_quality"])
+        np.testing.assert_array_equal(stored_internal, np.zeros_like(stored_internal))
+        np.testing.assert_array_equal(stored_external[:3], [2048, 2048, 2048])
+        np.testing.assert_array_equal(stored_effective[:3], [1, 1, 1])
+        model = np.asarray(group["transit_model"])
+        final_good = (stored_effective == 0) & (model < 1.0 - 1.0e-10)
+        assert np.count_nonzero(final_good) >= _config().min_in_transit
+        assert int(group.attrs["n_good_in_transit"]) == np.count_nonzero(
+            final_good
+        )
+
+
+def test_injection_shard_fails_closed_on_external_quality_coverage_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw_h5, adp_h5 = _write_sources(tmp_path)
+    cadence_table, cadence_manifest, reference = (
+        _install_fake_quality_reference(monkeypatch, tmp_path)
+    )
+    teacher = tmp_path / "teacher.csv"
+    pd.DataFrame({"tic": [99_999]}).to_csv(teacher, index=False)
+    schedule, _, _ = build_fresh_injection_schedule(
+        raw_h5=raw_h5,
+        adp_h5=adp_h5,
+        teacher_table=teacher,
+        config=_config(),
+        out_dir=tmp_path / "schedule",
+    )
+
+    def reject_coverage(**kwargs):
+        raise ValueError("external-quality coverage is missing cadences")
+
+    monkeypatch.setattr(reference, "apply", reject_coverage)
+    out_h5 = tmp_path / "must_not_publish.h5"
+    with pytest.raises(ValueError, match="coverage is missing"):
+        write_fresh_injection_shard(
+            raw_h5=raw_h5,
+            adp_h5=adp_h5,
+            cadence_reference_table=cadence_table,
+            cadence_reference_manifest=cadence_manifest,
+            schedule=schedule,
+            shard_index=0,
+            config=_config(),
+            out_h5=out_h5,
+            limit=1,
+        )
+    assert not out_h5.exists()
+    assert not out_h5.with_suffix(".h5.tmp").exists()
 
 
 def test_fresh_manifest_truth_normalization_uses_established_radius_name() -> None:

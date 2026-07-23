@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from twirl.injections.a2v1_recovery import (
     numeric_arrays_match_with_ulp_budget,
     schedule_contract,
 )
+from twirl.vetting.harmonic_inference import RECOVERY_SCORE_ARTIFACT_CONTRACT
 from twirl.vetting.recovery50_teacher import leakage_columns
 
 
@@ -31,6 +33,14 @@ CANDIDATE_CSV_ULP_BUDGET = {
 
 def _json(path: Path) -> dict:
     return json.loads(path.read_text())
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _bool_series(values: pd.Series) -> pd.Series:
@@ -245,6 +255,20 @@ def main() -> int:
         "Teacher candidate truth-match audit flags differ from the stored top five",
     )
     require(len(scores) == expected_candidate_rows, "Teacher score row count mismatch")
+    require(
+        teacher_summary.get("artifact_contract_version")
+        == RECOVERY_SCORE_ARTIFACT_CONTRACT,
+        "Teacher scores have the wrong strict artifact contract",
+    )
+    require(
+        teacher_summary.get("strict_provenance_passed") is True,
+        "Teacher scores did not pass strict provenance",
+    )
+    require(
+        teacher_summary.get("out_scores_sha256")
+        == _sha256(full / "teacher_scores.parquet"),
+        "Teacher score SHA256 disagrees with its summary",
+    )
     require(scores["review_id"].is_unique, "Teacher score review IDs are duplicated")
     require(
         candidates["review_id"].astype(str).tolist()
@@ -278,6 +302,16 @@ def main() -> int:
     require(
         run_manifest.get("workflow") == config.name,
         "run manifest workflow mismatch",
+    )
+    require(
+        run_manifest.get("checkpoint_sha256")
+        == teacher_summary.get("checkpoint_sha256"),
+        "run manifest and Teacher summary checkpoint hashes disagree",
+    )
+    require(
+        run_manifest.get("checkpoint_manifest_sha256")
+        == teacher_summary.get("checkpoint_manifest", {}).get("sha256"),
+        "run manifest and Teacher summary checkpoint-manifest hashes disagree",
     )
     require(
         bool(run_manifest.get("evaluation_only"))

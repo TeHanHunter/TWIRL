@@ -31,6 +31,12 @@ and benchmark evidence from Tier-1 science QA, and treats teacher-v2 and the
 premature S57 review queue as exploratory artifacts rather than accepted
 pipeline stages.
 
+The current bounded S56 result is the
+[active-search-pair Tier-1 quality assessment](stage1_lightcurves/s56_A2v1_tier1_active_search_pair_v1_20260723/REPORT.md).
+Its scope is target-filtered candidate enrichment only; consult its final gate
+fields before reusing the target mask, and do not interpret it as
+science-release approval.
+
 ## Layout
 
 - `stage1_lightcurves/`: catalog, extraction, A2v1, photometric, and production

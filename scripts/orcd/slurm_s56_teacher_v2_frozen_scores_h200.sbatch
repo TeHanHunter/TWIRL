@@ -13,12 +13,16 @@
 
 set -euo pipefail
 
+echo "Blocked: this historical Teacher-v2 comparison references frozen native-v1 recovery artifacts; preserve its published outputs and do not rerun it with native-v2 checkpoints." >&2
+exit 64
+
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
 PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56-torch/bin/python}"
 OUT_ROOT="${TWIRL_TEACHER_V2_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v2}"
 S56_RECOVERY="${TWIRL_S56_RECOVERY_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_s56_a2v1_recovery_2b4f57bb/reports/stage5_validation/s56_A2v1_teacher_v1_recovery}"
 S57_RECOVERY="${TWIRL_S57_RECOVERY_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_a2v1_recovery_1090f011/reports/stage5_validation/s57_A2v1_teacher_v1_recovery}"
-V1_ROOT="${TWIRL_TEACHER_V1_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/shape_plus_periodogram_bls}"
+V1_ROOT="${TWIRL_TEACHER_V1_ROOT:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1_native_v2/shape_plus_periodogram_bls}"
+V1_MANIFEST="${TWIRL_TEACHER_V1_MANIFEST:-$(dirname "${V1_ROOT}")/selected_checkpoint_manifest.json}"
 FROZEN="${OUT_ROOT}/frozen/frozen_selection.json"
 TASK="${SLURM_ARRAY_TASK_ID}"
 
@@ -70,6 +74,7 @@ v1_score() {
       "${V1_ROOT}/fold_2/teacher.pt" \
       "${V1_ROOT}/fold_3/teacher.pt" \
       "${V1_ROOT}/fold_4/teacher.pt" \
+    --checkpoint-manifest "${V1_MANIFEST}" \
     --out-scores "${output}" \
     --batch-size 32 \
     --workers 8 \

@@ -16,6 +16,7 @@ if str(SRC_ROOT) not in sys.path:
 from twirl.lightcurves.a2v1_cadence_reference import (  # noqa: E402
     S56_EXPECTED_DETECTORS,
     S56_EXPECTED_ORBITS,
+    parse_qlp_qflag_spec,
     parse_quat_spec,
     write_cadence_reference,
 )
@@ -37,6 +38,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help=(
             "QLP camC_quat.txt with explicit orbit and camera; repeat for all "
             "eight S56 orbit/camera combinations."
+        ),
+    )
+    parser.add_argument(
+        "--qlp-qflag",
+        action="append",
+        required=True,
+        metavar="ORBIT,CAMERA,CCD,PATH",
+        help=(
+            "Headerless QLP cadence/qflag authority with explicit orbit and "
+            "detector; repeat for all 32 S56 orbit/camera/CCD combinations."
         ),
     )
     parser.add_argument(
@@ -76,11 +87,15 @@ def main(argv: list[str] | None = None) -> int:
         )
     try:
         quat_sources = tuple(parse_quat_spec(value) for value in args.quat)
+        qlp_qflag_sources = tuple(
+            parse_qlp_qflag_spec(value) for value in args.qlp_qflag
+        )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     manifest = write_cadence_reference(
         sector=args.sector,
         quat_sources=quat_sources,
+        qlp_qflag_sources=qlp_qflag_sources,
         spoc_quality_table=args.spoc_quality_table,
         spoc_quality_provenance=args.spoc_quality_provenance,
         output_table=args.output_table,

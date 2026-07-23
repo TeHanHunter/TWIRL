@@ -11,6 +11,11 @@
 
 set -euo pipefail
 
+if [[ "${TWIRL_ALLOW_EXPLORATORY_UNGATED_SECTOR_CHAIN:-0}" != "1" ]]; then
+  echo "Blocked: generic sector native merge is not bound to an accepted Tier-1 candidate summary." >&2
+  exit 64
+fi
+
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
 SECTOR="${TWIRL_ENRICH_SECTOR:?set TWIRL_ENRICH_SECTOR}"

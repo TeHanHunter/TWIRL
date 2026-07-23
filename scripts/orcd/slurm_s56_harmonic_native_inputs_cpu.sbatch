@@ -18,7 +18,9 @@ TRAINING="${ROOT}/adjudicated_training_table/human_vetting_training_table_adjudi
 RAW_SOURCE="${TWIRL_HARMONIC_RAW_SOURCE_H5:-${ROOT}/native_inputs/s56_tglc_raw_sources.h5}"
 COMPACT_ADP="${TWIRL_HARMONIC_COMPACT_ADP_H5:-data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5}"
 INJECTION_PAIR="${TWIRL_HARMONIC_INJECTION_PAIR_H5:-${ROOT}/native_inputs/s56_adjudicated_injected_adp_pair_v1.h5}"
-FINAL="${TWIRL_HARMONIC_NATIVE_H5:-${ROOT}/native_inputs/s56_adp_raw_pair_v1.h5}"
+CADENCE_REFERENCE_TABLE="${TWIRL_A2V1_CADENCE_REFERENCE:?set TWIRL_A2V1_CADENCE_REFERENCE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST:?set TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST}"
+FINAL="${TWIRL_HARMONIC_NATIVE_H5:-${ROOT}/native_inputs/s56_adp_raw_pair_v2.h5}"
 N_SHARDS="${TWIRL_HARMONIC_INPUT_SHARDS:-32}"
 RUN_DIR="${ROOT}/native_inputs/shards_${SLURM_JOB_ID}"
 
@@ -41,6 +43,12 @@ if [[ ! -s "${INJECTION_PAIR}" ]]; then
   echo "Missing exact adjudicated injection pair product: ${INJECTION_PAIR}" >&2
   exit 6
 fi
+for evidence in "${CADENCE_REFERENCE_TABLE}" "${CADENCE_REFERENCE_MANIFEST}"; do
+  if [[ ! -s "${evidence}" ]]; then
+    echo "Missing cadence-reference evidence: ${evidence}" >&2
+    exit 7
+  fi
+done
 if [[ -e "${FINAL}" && "${TWIRL_OVERWRITE_HARMONIC_NATIVE:-0}" != "1" ]]; then
   echo "Refusing to overwrite ${FINAL}; set TWIRL_OVERWRITE_HARMONIC_NATIVE=1 for an intentional rebuild." >&2
   exit 4
@@ -59,6 +67,8 @@ for ((shard=0; shard<N_SHARDS; shard++)); do
     --raw-source-h5 "${RAW_SOURCE}" \
     --compact-adp-h5 "${COMPACT_ADP}" \
     --injection-pair-h5 "${INJECTION_PAIR}" \
+    --cadence-reference-table "${CADENCE_REFERENCE_TABLE}" \
+    --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
     --out-h5 "${shard_path}" \
     --repo-root "${REPO}" \
     --n-periods 4096 \

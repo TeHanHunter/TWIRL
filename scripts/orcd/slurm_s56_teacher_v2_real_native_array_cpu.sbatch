@@ -18,6 +18,8 @@ DATA_ROOT="${TWIRL_A2V1_S56_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stag
 OUT_ROOT="${TWIRL_TEACHER_V2_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v2}"
 N_SHARDS="${TWIRL_TEACHER_V2_NATIVE_SHARDS:-32}"
 SHARD_INDEX="${SLURM_ARRAY_TASK_ID}"
+CADENCE_REFERENCE_TABLE="${TWIRL_A2V1_CADENCE_REFERENCE:?set TWIRL_A2V1_CADENCE_REFERENCE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST:?set TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST}"
 
 mkdir -p /orcd/data/mki_aryeh/001/twirl/logs/s56_teacher_v2 "${OUT_ROOT}/real_native/shards"
 cd "${REPO}"
@@ -30,6 +32,8 @@ export HDF5_USE_FILE_LOCKING=FALSE
   --training-table "${OUT_ROOT}/human_transfer/s56_a2v1_real_candidates_top5.parquet" \
   --raw-source-h5 "${DATA_ROOT}/s56_A2v1_tglc_raw_sources.h5" \
   --compact-adp-h5 "${DATA_ROOT}/s56_A2v1_adp_pair_rebuilt.h5" \
+  --cadence-reference-table "${CADENCE_REFERENCE_TABLE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
   --out-h5 "${OUT_ROOT}/real_native/shards/native_${SHARD_INDEX}.h5" \
   --repo-root "${REPO}" \
   --n-periods 4096 \

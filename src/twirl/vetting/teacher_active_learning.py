@@ -21,7 +21,7 @@ from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 from twirl.vetting.label_schema import LABEL_OPTIONS
 
 
-A2V1_TEACHER_INPUT_CONTRACT = "s56_A2v1_adp_raw_pair_v1"
+A2V1_TEACHER_INPUT_CONTRACT = "s56_A2v1_adp_raw_pair_v2"
 LEGACY_CANONICAL_REVIEW_CONTRACT = "s56_legacy_canonical_review_v1"
 ACTIVE_LEARNING_POLICY_VERSION = "s56_teacher_v1_active_learning_v1"
 

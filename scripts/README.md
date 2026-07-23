@@ -54,17 +54,35 @@ in [the A2v1 protocol](../doc/a2v1_production_protocol.md):
 4. [audit_a2v1_photometric_qa.py](stage1_lightcurves/audit_a2v1_photometric_qa.py)
    performs the current Tier-0 integrity/benchmark QA. Tier-1 science QA is a
    separate gate and must not be inferred from this script's pass state.
-5. [audit_a2v1_tier1_qa.py](stage1_lightcurves/audit_a2v1_tier1_qa.py)
-   runs the fail-closed Tier-1 evidence contract. Its initial
-   `active_search_pair` configuration can qualify the two ADP channels for
-   bounded enrichment, but cannot certify the complete six-channel product or
-   set `science_ready=true`.
-6. [build_a2v1_cadence_reference.py](stage1_lightcurves/build_a2v1_cadence_reference.py)
-   builds the detector/orbit cadence authority from all S56 QLP quaternion
-   inputs and hash-bound original SPOC-quality files.
-7. [build_a2v1_independent_extraction.py](stage1_lightcurves/build_a2v1_independent_extraction.py)
+
+Those four steps are the generic A2v1 production path. The current bounded
+Tier-1 path below is S56-specific and remains fail-closed on deliberate
+evidence-hash placeholders; no accepted production Tier-1 pass is recorded.
+
+### S56 bounded Tier-1 evidence order
+
+1. [build_s56_spoc_quality_table.py](stage1_lightcurves/build_s56_spoc_quality_table.py)
+   derives the hash-bound S56 detector-quality CSV/provenance pair from the
+   eight explicit QLP quaternion files and all 16 original SPOC flag files.
+2. [build_a2v1_cadence_reference.py](stage1_lightcurves/build_a2v1_cadence_reference.py)
+   validates that quality pair against the same quaternion authorities plus
+   all 32 orbit/detector QLP qflag files, then writes the final detector/orbit
+   reference with separate `spoc_quality`, `qlp_quality`, and composed
+   `external_quality` columns.
+3. Build one genuinely independent WD 1856 route.
+   [build_a2v1_independent_extraction.py](stage1_lightcurves/build_a2v1_independent_extraction.py)
    turns a target- and sector-identified external WD 1856 extraction into the
-   hash-bound independent metrics/manifest required by Tier 1.
+   hash-bound independent metrics/manifest required by Tier 1. It requires the
+   final cadence-reference table/manifest and applies native-internal OR
+   authoritative-external quality before common-cadence and BLS metrics. Or
+   [build_wd1856_tesscut_independent_extraction.py](stage1_lightcurves/build_wd1856_tesscut_independent_extraction.py)
+   builds the reference directly from an official odd-square MAST TESSCut
+   pixel cube without reading A2v1 flux.
+4. [audit_a2v1_tier1_qa.py](stage1_lightcurves/audit_a2v1_tier1_qa.py)
+   consumes the completed authority, injection, independent-extraction, and
+   pinned Tier-0 evidence. Its `active_search_pair` scope may set
+   `enrichment_ready=true`, but cannot certify the complete six-channel
+   product or set `science_ready=true`.
 
 HDF5 completion alone is not an accepted sector product. Older generic GPU,
 QLP HLSP, canonical-flux, and TWIRL-FS comparison launchers remain available
@@ -73,13 +91,15 @@ A2v1 contract.
 
 ## Current Canonical Stage 2 Baseline
 
-The transparent periodic baseline is launched by
+The transparent periodic algorithmic baseline is launched by
 [stage2_bls_worker.sh](stage2_search/stage2_bls_worker.sh) through
 `python -m twirl.search.sector_run`. Supply the validated A2v1 FITS root
 explicitly with `--hlsp-root` and load the versioned settings from
 [`bls_default.yaml`](../configs/detection/bls_default.yaml). The command must
 not fall back to a legacy product root, and its output must record the selected
-apertures and BLS/cadence-cleaning configuration. The dip branch,
+apertures and BLS/cadence-cleaning configuration. This generic path currently
+uses the product's stored quality field; it is not the S56 Tier-1-approved
+external-quality-bound enrichment builder. The dip branch,
 multi-sector aggregation, and false-alarm calibration remain the next Stage 2
 production interfaces to add.
 

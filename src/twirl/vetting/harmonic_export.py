@@ -16,6 +16,16 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
+from twirl.lightcurves.a2v1_cadence_reference import (
+    S56_EXPECTED_DETECTORS,
+    S56_EXPECTED_ORBITS,
+)
+from twirl.lightcurves.external_quality import (
+    EFFECTIVE_QUALITY_POLICY,
+    EXTERNAL_QUALITY_POLICY_CONTRACT,
+    ExternalQualityReference,
+    load_external_quality_reference,
+)
 from twirl.lightcurves.tglc_h5_reader import read_tglc_h5
 from twirl.search.candidates import compute_sde
 from twirl.vetting.harmonic_inputs import (
@@ -26,6 +36,10 @@ from twirl.vetting.harmonic_inputs import (
     PERIODOGRAM_DATASETS,
     PERIODOGRAM_CHANNELS,
     RAW_PAIR_CONTRACT_VERSION,
+    RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS,
+    RAW_PAIR_EXTERNAL_QUALITY_ATTRS,
+    RAW_PAIR_QUALITY_COUNT_NAMES,
+    candidate_provenance_from_summary,
     injected_raw_uncertainty,
     native_group_path,
 )
@@ -46,6 +60,14 @@ DEFAULT_BLS_DURATIONS_MIN: tuple[float, ...] = (
     20.0,
     30.0,
 )
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def read_candidate_table(path: Path) -> pd.DataFrame:
@@ -421,14 +443,58 @@ def _native_input_mask(rows: pd.DataFrame) -> pd.Series:
     )
 
 
+def _write_external_quality_attrs(
+    destination: Any, reference: ExternalQualityReference
+) -> None:
+    provenance = reference.provenance
+    destination.attrs["external_quality_policy_contract"] = (
+        EXTERNAL_QUALITY_POLICY_CONTRACT
+    )
+    destination.attrs["effective_quality_policy"] = EFFECTIVE_QUALITY_POLICY
+    for name in RAW_PAIR_EXTERNAL_QUALITY_ATTRS[2:]:
+        destination.attrs[name] = provenance[name]
+
+
+def _quality_detector(group: Any, *, context: str) -> tuple[int, int, int]:
+    missing = [name for name in ("sector", "camera", "ccd") if name not in group.attrs]
+    if missing:
+        raise ValueError(f"{context}: missing detector attributes {missing}")
+    sector = int(group.attrs["sector"])
+    camera = int(group.attrs["camera"])
+    ccd = int(group.attrs["ccd"])
+    if sector <= 0 or camera not in range(1, 5) or ccd not in range(1, 5):
+        raise ValueError(
+            f"{context}: invalid detector mapping sector={sector}, "
+            f"camera={camera}, ccd={ccd}"
+        )
+    return sector, camera, ccd
+
+
+def _add_quality_counts(
+    destination: dict[str, int], counts: Mapping[str, int]
+) -> None:
+    for name in destination:
+        destination[name] += int(counts[name])
+
+
+def _write_quality_counts(destination: Any, counts: Mapping[str, int]) -> None:
+    destination.attrs["quality_policy_contract"] = EXTERNAL_QUALITY_POLICY_CONTRACT
+    for name, value in counts.items():
+        destination.attrs[name] = int(value)
+
+
 def build_raw_pair_export(
     *,
     training_table: Path,
+    training_summary: Path | None = None,
     raw_source_h5: Path,
     compact_adp_h5: Path,
     injection_pair_h5: Path | None,
+    cadence_reference_table: Path,
+    cadence_reference_manifest: Path,
     out_h5: Path,
     repo_root: Path,
+    sector: int = 56,
     n_periods: int = DEFAULT_BLS_PERIODS,
     shard_index: int = 0,
     n_shards: int = 1,
@@ -437,6 +503,44 @@ def build_raw_pair_export(
 
     import h5py
 
+    training_table = Path(training_table).resolve()
+    training_summary = Path(training_summary) if training_summary is not None else None
+    training_summary = (
+        training_summary.resolve() if training_summary is not None else None
+    )
+    raw_source_h5 = Path(raw_source_h5).resolve()
+    compact_adp_h5 = Path(compact_adp_h5).resolve()
+    explicit_injection_pair_h5 = (
+        _resolve_path(injection_pair_h5, repo_root=repo_root).resolve()
+        if injection_pair_h5 is not None
+        else None
+    )
+    training_table_sha256 = _file_sha256(training_table)
+    candidate_provenance = (
+        candidate_provenance_from_summary(
+            candidate_table=training_table,
+            candidate_summary=training_summary,
+        )
+        if training_summary is not None
+        else {"training_table_sha256": training_table_sha256}
+    )
+    if candidate_provenance["training_table_sha256"] != training_table_sha256:
+        raise RuntimeError("training table changed while candidate provenance was read")
+    source_file_sha256 = {
+        str(raw_source_h5): _file_sha256(raw_source_h5),
+        str(compact_adp_h5): _file_sha256(compact_adp_h5),
+    }
+    if explicit_injection_pair_h5 is not None:
+        source_file_sha256[str(explicit_injection_pair_h5)] = _file_sha256(
+            explicit_injection_pair_h5
+        )
+    if training_summary is not None and (
+        source_file_sha256[str(compact_adp_h5)]
+        != candidate_provenance["compact_lc_sha256"]
+    ):
+        raise ValueError(
+            "compact ADP HDF5 SHA256 does not match the candidate summary"
+        )
     rows = read_candidate_table(training_table)
     rows = rows.drop_duplicates("review_id", keep="last") if "review_id" in rows else rows
     active = _native_input_mask(rows)
@@ -454,6 +558,15 @@ def build_raw_pair_export(
     real_rows = rows[~rows["native_group_path"].str.startswith("injections/")].drop_duplicates("tic")
     injection_rows = rows[rows["native_group_path"].str.startswith("injections/")].drop_duplicates("injection_id")
 
+    quality_reference = load_external_quality_reference(
+        table_path=cadence_reference_table,
+        manifest_path=cadence_reference_manifest,
+        sector=int(sector),
+        expected_orbits=S56_EXPECTED_ORBITS if int(sector) == 56 else None,
+        expected_detectors=S56_EXPECTED_DETECTORS,
+    )
+    quality_totals = {name: 0 for name in RAW_PAIR_QUALITY_COUNT_NAMES}
+
     out_h5 = Path(out_h5)
     out_h5.parent.mkdir(parents=True, exist_ok=True)
     temporary = out_h5.with_suffix(out_h5.suffix + ".tmp")
@@ -468,9 +581,26 @@ def build_raw_pair_export(
         output.attrs["contract_version"] = RAW_PAIR_CONTRACT_VERSION
         output.attrs["created_utc"] = datetime.now(timezone.utc).isoformat()
         output.attrs["training_table"] = str(training_table)
+        output.attrs["training_table_sha256"] = training_table_sha256
+        output.attrs["training_summary"] = str(training_summary or "")
+        for name in RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS:
+            if name in candidate_provenance:
+                output.attrs[name] = candidate_provenance[name]
         output.attrs["raw_source_h5"] = str(raw_source_h5)
+        output.attrs["raw_source_h5_sha256"] = source_file_sha256[
+            str(raw_source_h5)
+        ]
         output.attrs["compact_adp_h5"] = str(compact_adp_h5)
-        output.attrs["injection_pair_h5"] = str(injection_pair_h5 or "")
+        output.attrs["compact_adp_h5_sha256"] = source_file_sha256[
+            str(compact_adp_h5)
+        ]
+        output.attrs["injection_pair_h5"] = str(explicit_injection_pair_h5 or "")
+        output.attrs["injection_pair_h5_sha256"] = (
+            source_file_sha256[str(explicit_injection_pair_h5)]
+            if explicit_injection_pair_h5 is not None
+            else ""
+        )
+        _write_external_quality_attrs(output, quality_reference)
         output.attrs["time_system"] = "BJD"
         output.attrs["periodogram_grid"] = "log10_period_d"
         output.attrs["periodogram_n"] = int(n_periods)
@@ -497,8 +627,21 @@ def build_raw_pair_export(
                     cadenceno=np.asarray(adp["cadenceno"]),
                     time=np.asarray(adp["time"]),
                 )
+                sector, camera, ccd = _quality_detector(
+                    adp, context=f"TIC {tic} compact ADP"
+                )
+                quality_overlay = quality_reference.apply(
+                    sector=sector,
+                    camera=camera,
+                    ccd=ccd,
+                    cadenceno=np.asarray(adp["cadenceno"]),
+                    orbitid=np.asarray(adp["orbitid"]),
+                    internal_quality=np.asarray(adp["quality"]),
+                    context=f"TIC {tic}",
+                )
                 group = target_root.create_group(f"{tic:016d}")
                 _copy_attrs(adp, group)
+                _write_quality_counts(group, quality_overlay.counts)
                 group.attrs["raw_source_paths"] = raw_file[raw_path].attrs.get(
                     "source_paths", ""
                 )
@@ -509,7 +652,7 @@ def build_raw_pair_export(
                     "time": _absolute_bjd(np.asarray(adp["time"])),
                     "cadenceno": np.asarray(adp["cadenceno"], dtype=np.int64),
                     "orbitid": np.asarray(adp["orbitid"], dtype=np.int32),
-                    "quality": np.asarray(adp["quality"], dtype=np.int32),
+                    "quality": quality_overlay.quality,
                     "raw_flux_small": aligned["raw_flux_small"],
                     "raw_flux_err_small": aligned["raw_flux_err_small"],
                     "raw_flux_primary": aligned["raw_flux_primary"],
@@ -528,6 +671,7 @@ def build_raw_pair_export(
                 )
                 for name, values in payload.items():
                     _write_dataset(group, name, values)
+                _add_quality_counts(quality_totals, quality_overlay.counts)
             except Exception as exc:
                 failures.append({"kind": "real", "id": tic, "error": str(exc)})
             if count % 100 == 0:
@@ -540,14 +684,17 @@ def build_raw_pair_export(
                 injection_id = str(row["injection_id"])
                 try:
                     pair_path = (
-                        _resolve_path(injection_pair_h5, repo_root=repo_root)
-                        if injection_pair_h5 is not None
+                        explicit_injection_pair_h5
+                        if explicit_injection_pair_h5 is not None
                         else _resolve_path(row["source_h5"], repo_root=repo_root)
-                    )
-                    pair_file = pair_files.setdefault(pair_path, h5py.File(pair_path, "r"))
+                    ).resolve()
+                    if pair_path not in pair_files:
+                        source_file_sha256[str(pair_path)] = _file_sha256(pair_path)
+                        pair_files[pair_path] = h5py.File(pair_path, "r")
+                    pair_file = pair_files[pair_path]
                     pair_group_path = (
                         f"injections/{injection_id}"
-                        if injection_pair_h5 is not None
+                        if explicit_injection_pair_h5 is not None
                         else str(row["h5_group"])
                     )
                     pair = pair_file[pair_group_path]
@@ -555,9 +702,15 @@ def build_raw_pair_export(
                         pair.attrs.get("source_injection_h5", pair_file.attrs["source_injection_h5"]),
                         repo_root=repo_root,
                     )
-                    canonical_file = canonical_files.setdefault(
-                        canonical_path, h5py.File(canonical_path, "r")
-                    )
+                    canonical_path = canonical_path.resolve()
+                    if canonical_path not in canonical_files:
+                        source_file_sha256[str(canonical_path)] = _file_sha256(
+                            canonical_path
+                        )
+                        canonical_files[canonical_path] = h5py.File(
+                            canonical_path, "r"
+                        )
+                    canonical_file = canonical_files[canonical_path]
                     canonical = canonical_file[f"injections/{injection_id}"]
                     tic = int(pair.attrs["tic"])
                     raw = _raw_source_payload(raw_file[f"targets/{tic:016d}"])
@@ -566,10 +719,23 @@ def build_raw_pair_export(
                         cadenceno=np.asarray(pair["cadenceno"]),
                         time=np.asarray(pair["time"]),
                     )
+                    sector, camera, ccd = _quality_detector(
+                        pair, context=f"injection {injection_id}"
+                    )
+                    quality_overlay = quality_reference.apply(
+                        sector=sector,
+                        camera=camera,
+                        ccd=ccd,
+                        cadenceno=np.asarray(pair["cadenceno"]),
+                        orbitid=np.asarray(pair["orbitid"]),
+                        internal_quality=np.asarray(pair["quality"]),
+                        context=f"injection {injection_id}",
+                    )
                     model = np.asarray(pair["transit_model"], dtype=float)
                     cadence_s = float(pair.attrs.get("cadence_s", 200.0))
                     group = injection_root.create_group(injection_id)
                     _copy_attrs(pair, group)
+                    _write_quality_counts(group, quality_overlay.counts)
                     group.attrs["raw_source_paths"] = raw_file[
                         f"targets/{tic:016d}"
                     ].attrs.get("source_paths", "")
@@ -580,7 +746,7 @@ def build_raw_pair_export(
                         "time": _absolute_bjd(np.asarray(pair["time"])),
                         "cadenceno": np.asarray(pair["cadenceno"], dtype=np.int64),
                         "orbitid": np.asarray(pair["orbitid"], dtype=np.int32),
-                        "quality": np.asarray(pair["quality"], dtype=np.int32),
+                        "quality": quality_overlay.quality,
                         "raw_flux_small": np.asarray(canonical["RAW_FLUX_Small_injected"]),
                         "raw_flux_primary": np.asarray(canonical["RAW_FLUX_Primary_injected"]),
                         "det_flux_adp_sml": np.asarray(pair["DET_FLUX_ADP_SML_injected"]),
@@ -616,6 +782,7 @@ def build_raw_pair_export(
                     )
                     for name, values in payload.items():
                         _write_dataset(group, name, values)
+                    _add_quality_counts(quality_totals, quality_overlay.counts)
                 except Exception as exc:
                     failures.append({"kind": "injection", "id": injection_id, "error": str(exc)})
                 if count % 50 == 0:
@@ -623,11 +790,34 @@ def build_raw_pair_export(
         finally:
             for handle in (*pair_files.values(), *canonical_files.values()):
                 handle.close()
+        for name, value in quality_totals.items():
+            output.attrs[f"quality_overlay_{name}"] = int(value)
+        output.attrs["native_source_files_sha256"] = json.dumps(
+            source_file_sha256, sort_keys=True
+        )
 
     if failures:
         pd.DataFrame(failures).to_csv(out_h5.with_suffix(".failures.csv"), index=False)
         temporary.unlink(missing_ok=True)
         raise RuntimeError(f"final raw-pair export failed for {len(failures)} rows")
+    try:
+        quality_reference.assert_unchanged()
+        if _file_sha256(training_table) != training_table_sha256:
+            raise RuntimeError("training table changed during native-input build")
+        if training_summary is not None:
+            if (
+                _file_sha256(training_summary)
+                != candidate_provenance["training_summary_sha256"]
+            ):
+                raise RuntimeError("training summary changed during native-input build")
+        observed_source_sha256 = {
+            path: _file_sha256(Path(path)) for path in source_file_sha256
+        }
+        if observed_source_sha256 != source_file_sha256:
+            raise RuntimeError("one or more native source files changed during export")
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
     temporary.replace(out_h5)
     return {
         "n_real_targets": len(real_rows),
@@ -637,25 +827,59 @@ def build_raw_pair_export(
         "periodogram_datasets": list(PERIODOGRAM_DATASETS),
         "shard_index": int(shard_index),
         "n_shards": int(n_shards),
+        "candidate_provenance": dict(candidate_provenance),
+        "source_file_sha256": dict(source_file_sha256),
+        "external_quality": {
+            **quality_reference.provenance,
+            "counts": dict(quality_totals),
+        },
     }
 
 
-def merge_raw_pair_shards(*, shard_paths: Sequence[Path], out_h5: Path) -> dict[str, Any]:
-    """Merge disjoint native-contract shards and reject duplicate groups."""
+def merge_raw_pair_shards(
+    *,
+    shard_paths: Sequence[Path],
+    out_h5: Path,
+    merged_training_table: Path | None = None,
+) -> dict[str, Any]:
+    """Merge disjoint native shards with shared or explicitly aggregated inputs.
+
+    Normal training shards must share one candidate table and one optional
+    injection-pair source. Recovery shards instead pass ``merged_training_table``;
+    their per-shard candidate/pair provenance is retained as an aggregate map,
+    while the merged root is rebound to the exact combined candidate table.
+    """
 
     import h5py
 
-    paths = [Path(path) for path in shard_paths]
+    paths = [Path(path).resolve() for path in shard_paths]
     if not paths:
         raise ValueError("no raw-pair shards supplied")
+    shard_sha256 = {str(path): _file_sha256(path) for path in paths}
+    merged_training_table = (
+        Path(merged_training_table).resolve()
+        if merged_training_table is not None
+        else None
+    )
+    merged_training_table_sha256 = (
+        _file_sha256(merged_training_table)
+        if merged_training_table is not None
+        else None
+    )
     out_h5 = Path(out_h5)
     out_h5.parent.mkdir(parents=True, exist_ok=True)
     temporary = out_h5.with_suffix(out_h5.suffix + ".tmp")
     counts = {"targets": 0, "injections": 0}
+    quality_totals = {name: 0 for name in RAW_PAIR_QUALITY_COUNT_NAMES}
+    merged_source_sha256: dict[str, str] = {}
+    shard_local_provenance: list[dict[str, str]] = []
     with h5py.File(temporary, "w") as output:
         output.attrs["contract_version"] = RAW_PAIR_CONTRACT_VERSION
         output.attrs["created_utc"] = datetime.now(timezone.utc).isoformat()
         output.attrs["merged_shards"] = json.dumps([str(path) for path in paths])
+        output.attrs["merged_shard_sha256"] = json.dumps(
+            shard_sha256, sort_keys=True
+        )
         output.attrs["time_system"] = "BJD"
         target_root = output.create_group("targets")
         injection_root = output.create_group("injections")
@@ -664,20 +888,127 @@ def merge_raw_pair_shards(*, shard_paths: Sequence[Path], out_h5: Path) -> dict[
             with h5py.File(path, "r") as source:
                 if str(source.attrs.get("contract_version", "")) != RAW_PAIR_CONTRACT_VERSION:
                     raise ValueError(f"wrong contract_version in shard {path}")
-                for name in (
-                    "training_table",
+                missing_quality_attrs = [
+                    name
+                    for name in RAW_PAIR_EXTERNAL_QUALITY_ATTRS
+                    if name not in source.attrs
+                ]
+                if missing_quality_attrs:
+                    raise ValueError(
+                        f"shard {path} lacks external-quality attrs: "
+                        f"{missing_quality_attrs}"
+                    )
+                if "training_table_sha256" not in source.attrs:
+                    raise ValueError(f"shard {path} lacks training_table_sha256")
+                candidate_attrs_present = {
+                    name for name in RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS if name in source.attrs
+                }
+                if candidate_attrs_present and candidate_attrs_present != set(
+                    RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS
+                ):
+                    missing = sorted(
+                        set(RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS)
+                        - candidate_attrs_present
+                    )
+                    raise ValueError(
+                        f"shard {path} has incomplete candidate provenance: {missing}"
+                    )
+                if merged_training_table is not None and candidate_attrs_present:
+                    raise ValueError(
+                        "aggregate-table merge does not accept per-shard candidate "
+                        f"summary provenance: {path}"
+                    )
+                if merged_training_table is not None:
+                    local_record = {
+                        "native_shard": str(path),
+                        "native_shard_sha256": shard_sha256[str(path)],
+                    }
+                    for name in (
+                        "training_table",
+                        "training_table_sha256",
+                        "injection_pair_h5",
+                        "injection_pair_h5_sha256",
+                    ):
+                        local_record[name] = str(source.attrs.get(name, ""))
+                    for name in (
+                        "training_table_sha256",
+                        "injection_pair_h5_sha256",
+                    ):
+                        digest = local_record[name]
+                        if digest and (
+                            len(digest) != 64
+                            or any(value not in "0123456789abcdef" for value in digest)
+                        ):
+                            raise ValueError(
+                                f"shard {path} has invalid shard-local {name}"
+                            )
+                    shard_local_provenance.append(local_record)
+                for name in RAW_PAIR_EXTERNAL_QUALITY_ATTRS:
+                    observed = source.attrs[name]
+                    if name in output.attrs and output.attrs[name] != observed:
+                        raise ValueError(
+                            f"external-quality provenance mismatch for {name} in {path}"
+                        )
+                    output.attrs[name] = observed
+                for name in RAW_PAIR_QUALITY_COUNT_NAMES:
+                    attr = f"quality_overlay_{name}"
+                    if attr not in source.attrs:
+                        raise ValueError(f"shard {path} lacks {attr}")
+                    quality_totals[name] += int(source.attrs[attr])
+                invariant_names = (
+                    "training_summary",
                     "raw_source_h5",
+                    "raw_source_h5_sha256",
                     "compact_adp_h5",
-                    "injection_pair_h5",
+                    "compact_adp_h5_sha256",
                     "periodogram_grid",
                     "periodogram_n",
                     "chronology_small_channels",
                     "chronology_supplemental_channels",
                     "harmonic_view_channels",
                     "periodogram_channels",
-                ):
-                    if name in source.attrs and name not in output.attrs:
-                        output.attrs[name] = source.attrs[name]
+                    *RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS,
+                )
+                if merged_training_table is None:
+                    invariant_names = (
+                        "training_table",
+                        "training_table_sha256",
+                        "injection_pair_h5",
+                        "injection_pair_h5_sha256",
+                        *invariant_names,
+                    )
+                for name in invariant_names:
+                    if name not in source.attrs:
+                        continue
+                    observed = source.attrs[name]
+                    if name in output.attrs and output.attrs[name] != observed:
+                        raise ValueError(
+                            f"native-input provenance mismatch for {name} in {path}"
+                        )
+                    output.attrs[name] = observed
+                raw_source_mapping = json.loads(
+                    str(source.attrs.get("native_source_files_sha256", "{}"))
+                )
+                if not isinstance(raw_source_mapping, dict):
+                    raise ValueError(
+                        f"shard {path} has invalid native_source_files_sha256"
+                    )
+                for source_path, digest in raw_source_mapping.items():
+                    digest = str(digest)
+                    if len(digest) != 64 or any(
+                        value not in "0123456789abcdef" for value in digest
+                    ):
+                        raise ValueError(
+                            f"shard {path} has invalid native source hash for "
+                            f"{source_path}"
+                        )
+                    if source_path in merged_source_sha256 and (
+                        merged_source_sha256[source_path] != digest
+                    ):
+                        raise ValueError(
+                            f"native source hash mismatch for {source_path} in {path}"
+                        )
+                    merged_source_sha256[str(source_path)] = digest
                 for root_name, destination in roots.items():
                     if root_name not in source:
                         continue
@@ -686,8 +1017,41 @@ def merge_raw_pair_shards(*, shard_paths: Sequence[Path], out_h5: Path) -> dict[
                             raise ValueError(f"duplicate /{root_name}/{key} while merging {path}")
                         source.copy(source[f"{root_name}/{key}"], destination, name=key)
                         counts[root_name] += 1
+        for name, value in quality_totals.items():
+            output.attrs[f"quality_overlay_{name}"] = int(value)
+        output.attrs["native_source_files_sha256"] = json.dumps(
+            merged_source_sha256, sort_keys=True
+        )
+        if merged_training_table is not None:
+            output.attrs["training_table"] = str(merged_training_table)
+            output.attrs["training_table_sha256"] = str(
+                merged_training_table_sha256
+            )
+            output.attrs["injection_pair_h5"] = ""
+            output.attrs["injection_pair_h5_sha256"] = ""
+            output.attrs["shard_local_provenance"] = json.dumps(
+                shard_local_provenance, sort_keys=True
+            )
+    observed_shard_sha256 = {str(path): _file_sha256(path) for path in paths}
+    if observed_shard_sha256 != shard_sha256:
+        temporary.unlink(missing_ok=True)
+        raise RuntimeError("one or more native input shards changed during merge")
+    if merged_training_table is not None and (
+        _file_sha256(merged_training_table) != merged_training_table_sha256
+    ):
+        temporary.unlink(missing_ok=True)
+        raise RuntimeError("merged training table changed during native shard merge")
     temporary.replace(out_h5)
-    return {"out_h5": str(out_h5), "n_shards": len(paths), "counts": counts}
+    return {
+        "out_h5": str(out_h5),
+        "n_shards": len(paths),
+        "shard_sha256": shard_sha256,
+        "merged_training_table": str(merged_training_table or ""),
+        "merged_training_table_sha256": merged_training_table_sha256 or "",
+        "shard_local_provenance": shard_local_provenance,
+        "counts": counts,
+        "external_quality_counts": quality_totals,
+    }
 
 
 __all__ = [

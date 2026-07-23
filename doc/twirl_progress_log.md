@@ -43,6 +43,9 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
 - `2026-07-16`: The `r2` queue's S58 HDF5 validator completed, but its `tee` subprocess blocked writing the full JSON report to the detached tmux TTY. No extraction or FITS process was active. The queue driver now sends verbose stage output only to the persistent queue log. After syntax and full-test validation, the deadlocked shell/logger were stopped without changing products, and the same manifest restarted as `twirl-a2v1-s58-s63-queue-r3` at `11:30 EDT`.
 - `2026-07-16`: S58 completed at `12:03 EDT`. Its rebuilt full-product validation reports `46,309` present HDF5 rows, zero non-edge HDF5 omissions, zero zero-byte or unreadable HDF5 files, zero non-edge missing FITS targets, and zero bad checked FITS schemas. The `r3` queue then advanced to S59; orbit `125` ePSF/light-curve production is active.
 - `2026-07-17`: S59 completed at `19:05 EDT` after HDF5 extraction and the required FITS/full-product gates. The `r3` S60 log stopped updating at `00:03 EDT` while `pdogpu6` became unresponsive; the shared tree retained `27,048` orbit-`127` and `15,390` orbit-`128` HDF5 files. After a clean `pdogpu5` GPU/runtime preflight, the unchanged manifest restarted as `twirl-a2v1-s58-s63-queue-r4-pdogpu5` at `11:00 EDT` on GPUs `4,5,6,7`. It revalidates accepted sectors and resumes S60 without deleting partial products.
+- `2026-07-18`: The `r4` queue completed S60 (`15:45 EDT`), S61 (`01:27 EDT`), S62 (`10:59 EDT`), and S63 (`21:35 EDT`) after their HDF5, FITS, and full A2v1 schema gates. The terminal log reports `A2v1 queue complete`; no worker remained active.
+- `2026-07-20`: Confirmed S64-S65's complete prepared source trees (`3,136` pickles per orbit) with no legacy ePSFs. The generic queue now permits either a complete reusable ePSF tree or an absent tree that forces all saturated-mask ePSF refits, while rejecting partial ePSF preparation. At `09:38 EDT`, the clean-clone tmux queue `twirl-a2v1-s64-s69-queue-r1-pdogpu5` started [S64-S69](../configs/a2v1_production_s64_s69.txt) on GPUs `4,5,6,7`; S64 preflight accepted both orbits with `epsf_mode=refit-all` and entered HDF5 extraction.
+- `2026-07-20`: Rendered representative S56-S63 A2v1 pixel-mask diagnostics with the [mask-map renderer](../scripts/stage1_lightcurves/plot_a2v1_pixel_mask_maps.py): first-orbit `cam1/ccd1`, first `20` staged FFIs per sector. The left panel is the TGLC threshold-mask proxy; the right panel reports the corresponding per-cutout masked fraction and outlines local A2v1 ePSF refits, which are the nonempty-static-mask cases under the prefill contract. All eight PNGs opened successfully; the contact sheet is in `reports/stage1_lightcurves/a2v1_pixel_mask_maps/`.
 - `2026-07-16`: Reclassified the existing S56 A2v1 QA as Tier-0
   integrity/benchmark QA. It remains valid evidence for product coverage and
   WD 1856 recovery, but science promotion now requires a separate Tier-1 pass
@@ -55,10 +58,119 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   authoritative cadence plus independent WD 1856 evidence. The production
   configuration remains intentionally non-runnable until the real external
   artifact hashes are reviewed; this scope cannot set `science_ready=true`.
+- `2026-07-22`: Hardened the bounded S56 Tier-1 path around one authoritative
+  cadence policy. The custom A2v1 compact product carries the internal TGLC
+  flag only; the WD 1856 audit found `5.4268%` internally flagged cadences and
+  another `4.2887%` flagged only by the external SPOC/QLP authorities. Tier-1,
+  BLS, candidate-metadata, and real/injected teacher-native builders and
+  validators now require the effective internal-OR-external mask and retain
+  the cadence-table/manifest checksums. Added builders for the 16-detector SPOC
+  intermediate and 32 orbit/detector QLP mappings, exact `(sector, TIC)` target
+  eligibility, pinned Tier-0/BLS prerequisites, and a genuinely independent
+  official TESSCut WD 1856 extraction. The downloaded S56 TESSCut product has
+  `11,775` rows and passed the standalone extraction smoke; production evidence
+  still requires the accepted compact product, authority files, reviewed
+  hashes, and a full CPU run. No Tier-1 pass or science-readiness claim has
+  been made. Because the effective mask changes native channels and BLS
+  periodograms, the S56 native-input contract is now v2; candidate artifacts
+  bind that v2 input while retaining a separately versioned provenance
+  envelope. The old native-v1 checkpoint is intentionally incompatible. Any
+  S56 path-validation retrain uses a distinct native-v2 namespace; the planned
+  seven-sector retrain first requires a new observation-keyed multi-sector
+  native contract and cannot simply reuse the S56-only file.
+- `2026-07-23`: The first full quality-aware BLS attempt failed closed on
+  cadence `699957`, which is present in the frozen S56 compact product for all
+  camera-3 detectors but absent from the authoritative camera-3 quaternion
+  timeline. Cadence-reference builder v3 now publishes the exact four
+  detector/cadence rows in a hash-bound `authority_exclusions` sub-contract.
+  The v2 external overlay assigns only those declared rows reserved bit `62`,
+  masks and counts them, and still rejects every undeclared coverage gap.
+  This provenance propagates through real BLS, injection and independent
+  evidence, native HDF5, shard merging, candidate metadata, and teacher-input
+  validation. The combined suite passed `413` tests with `3` skips, plus the
+  detection sample and documentation checks; an independent review also
+  caught and fixed a shard-merge publish-order failure before deployment.
+- `2026-07-23`: Rebuilt the S56 cadence-reference manifest on PDO while
+  preserving the `188,396`-row table hash. The new manifest binds four exact
+  exclusions (`cam3/ccd1` through `cam3/ccd4`, cadence `699957`) and the
+  official TESSCut WD 1856 evidence was regenerated under the v2 overlay.
+  Both active apertures retain the accepted recovery: the 1x1 reference has
+  period `1.407960330 d` and depth S/N `11.87`; the WCS-defined 2x2 reference
+  has period `1.407896973 d` and depth S/N `11.33`. The legacy v1 four-shard
+  injection canary was independently rehashed after its ORCD cleanup
+  relocation: all `2,000` injection IDs, immutable metadata, compact-source
+  parity, and ordered shard hashes match that frozen contract. The restarted
+  `31,450`-target BLS run and its replacement Tier-0 audit both completed on
+  `pdogpu1`. The table contains all `62,900` expected target/aperture pairs,
+  with five `too_few_cadences` results and no missing pairs; all six Tier-0
+  gates pass. The reviewed Tier-0 report and BLS hashes are now locked before
+  the final ORCD Tier-1 population audit. Exact v1 evaluator commit
+  `4831713f` was pushed and deployed, but CPU job `18641848` failed closed
+  before the population scan: the v1 retention predictor measured
+  normalization transfer rather than normalized depth retention, and one
+  frozen epoch had no effective-good in-transit samples. Correcting for the
+  stored injection baseline and detrending scale gives median retention
+  `0.9908` in both apertures with tenth percentiles near `0.966`; no population
+  products or scientific Tier-1 conclusion were emitted by the failed run.
+- `2026-07-23`: Tier-1 contract v2 and the quality-aware epoch policy were
+  locked in producer commit `f1b8b53c`, pushed, and deployed as a clean
+  detached ORCD worktree. CPU array job `18650874` regenerated shard indices
+  `00`, `13`, `26`, and `39` from the unchanged frozen schedule. Independent
+  audit job `18651439` passed all `2,000` injection IDs and `2,000` unique
+  hosts with a minimum of two effective-good in-transit cadences and zero
+  alignment, copied-flux, raw-equation, uncertainty-equation, stored-quality,
+  or provenance failures. The ordered shard hashes are `fe999651…6525`,
+  `7b166ddf…fa07`, `4d6f8f11…ce9b`, and `9e309d6b…e5a4`; thresholds were not
+  relaxed. The first v2 evaluator preflight, CPU job `18651862`, then failed
+  closed on the legacy metadata digest before population scanning. Exact
+  old/new manifest comparison showed bit-for-bit identity for TIC, TESS
+  magnitude, detector, period, duration, and shard; the effective-quality
+  policy resampled all `2,000` epochs and changed the cadence-sampled
+  `model_depth` for `1,591`. Replacing only that realization field transforms
+  the legacy digest `54996889…1910` into the observed v2 digest
+  `b56a0b84…f0b0`, so the v2 lock was updated without changing the sample or
+  thresholds. A future contract should separate schedule/host and
+  epoch-realization digests explicitly.
+- `2026-07-23`: The exact full-population v2 evaluator at commit `5adae3b6`
+  completed on ORCD as CPU job `18652943` in `4 min 58 s`. Seven of eight
+  gates pass: cadence authority, source parity, Tier-0, population scatter,
+  aperture behavior, fixed injections, and independent WD 1856 extraction.
+  The overall status is `review`, with `passed=false`,
+  `enrichment_ready=false`, and `science_ready=false`, because the
+  detector-stratified cadence gate is review for cam1/ccd1. Its median usable
+  fraction is `0.7434`, below the predeclared `0.80` pass threshold despite
+  zero cadence loss and every cam1/ccd1 target passing its individual cadence
+  check. The locked external mask isolates the cause to orbit 119
+  (`65.5%` quality-zero versus `99.0%` in orbit 120), dominated by one
+  contiguous `1,929`-cadence flagged interval rather than a cadence-join gap.
+  The published target mask contains `30,115` pass, `1,303` review, and `32`
+  fail rows. It is not authorized for enrichment while the overall gate
+  remains review.
+- `2026-07-23`: Reinterpreted Tier-1 as a conservative input-usability gate
+  after the v2 result showed that detector-level flagged fraction could veto
+  thousands of otherwise searchable light curves. Contract v3 made
+  population, cadence-fraction, and aperture reviews nonblocking, retained
+  their metrics for sensitivity calibration, and kept all 16 detector cells.
+  ORCD job `18655927` completed successfully, but independent review found
+  that its target count used finite normalized flux without finite time and
+  could let flagged flux values influence normalization. The v3 mask was
+  therefore not promoted.
+- `2026-07-23`: Contract v4 at commit `2633e8b4` now shares the exact BLS input
+  preparation between search and Tier-1. ORCD job `18657818` completed in
+  `9 min 17 s` with `passed=true`, `enrichment_ready=true`, and
+  `science_ready=false`; the sole warning is the retained cadence-fraction
+  diagnostic. The paired teacher keeps `31,446/31,450` targets, while
+  `31,449/31,450` have at least one searchable aperture. Three exceptions have
+  an entirely nonfinite small aperture but a healthy primary aperture; only
+  one has neither channel. None is a negative label. The complete
+  `628,955`-row BLS binding and all published output hashes validate, and the
+  local suite passes `420` tests with `3` skips plus detection and docs checks.
 
-**Next:** Let S59-S63 production continue while the authoritative S56 cadence
-artifact and independent WD 1856 comparison are completed; then rerun Tier 0
-and publish the bounded Tier-1 target pass mask before enrichment uses S56.
+**Next:** Keep the gated S64-S69 source-only production queue active in
+parallel. Apply the v4 paired-input mask when the S56--S62 label corpus is
+frozen; retain the three primary-only cases for manual or single-aperture
+review and do not spend the current critical path on additional Tier-1
+threshold work.
 
 ### Catalog, archive index, and sample control
 
@@ -110,14 +222,85 @@ sample.
   contains exactly six nonempty labels. Preserve all six as premature
   experimental evidence, pause further S57 holdout consumption, and do not
   treat S57 as a pristine external holdout.
+- `2026-07-17`: The accepted frozen teacher-v1 ensemble produced a blinded
+  Franklin handoff of `3,000` real sector-observation rows: `1,000` each from
+  S57, S58, and S59. Every row uses the ADP-small BLS rank-one ephemeris; the
+  hidden quotas are `1,200` compact-transit, `900` Eclipse/contact, `300`
+  Smooth-variable, `300` disagreement, and `300` controls. The package has
+  `3,000` current `S56-ADP-HV2` PNG sheets, `14` real reference examples,
+  zero PDFs, and no exposed model scores or selection provenance. It is an
+  active-learning review set, not a new teacher test set. The self-contained package passed
+  its browser `--check-only` validation in place on PDO with all `3,000`
+  sheets resolved and a group-writable label CSV for Franklin.
+- `2026-07-21`: Franklin returned all `3,000` labels with complete internal
+  row/key/provenance coverage (SHA-256
+  `2bd4d86870c70091eb7291ced067c63bc908118fd730083bfb2d12d52c5a09bf`).
+  The return has `15` Planet-like labels rather than the reported `14`, plus
+  `121` Eclipse/contact and `106` Broad-isolated-dip labels. Nine of the `15`
+  Planet-like rows carry confidence, EB, wide-event, or faintness caveats, so
+  these are enrichment morphology labels rather than confirmed planets.
+- `2026-07-21`: Cross-sector auditing found `133` repeated TICs against the
+  active real S56 training table and `42` active-label differences, including
+  `23` against explicitly final S56 adjudications. The comprehensive second-
+  read set contains `347` unique rows after including planet/EB/wide labels,
+  cross-taxonomy notes, unresolved/refold cases, nine nonblank `uncertain`
+  rows, and S56 differences. Combined S56 plus S57--S59 has `4,702` labeled
+  sector observations but `4,569` unique TICs; every retraining and evaluation
+  split must therefore be TIC-grouped. The return's standalone-app key is not
+  the repository `label_io.candidate_key`, so it must be joined only to the
+  exact frozen `3,000`-row queue under the app-key contract.
+- `2026-07-21`: The user inspected the `347` special-case vet sheets and
+  accepted Franklin's S57--S59 return at the batch-level morphology layer. The
+  exact public queue (SHA-256 `6431ceef...`), returned labels (`2bd4d868...`),
+  and normalized `3,000`-row morphology table are frozen in the
+  [label-return report](../reports/stage5_validation/franklin_s57_s59_label_return_20260721/README.md).
+  Franklin remains the original
+  labeler; TeHan's acceptance is recorded separately. All `3,000` period
+  factors/statuses remain audit metadata and produce zero harmonic targets.
+  The model will still ingest all seven folds around the unchanged rank-one
+  BLS ephemeris.
+- `2026-07-21`: The next S60--S62 handoff is active on PDO with `3,000` rows
+  (`1,000` per sector), `3,000/3,000` PNG vet sheets, and queue SHA-256
+  `01f1e627...`. ORCD access is healthy and the accepted five-fold teacher-v1
+  checkpoints remain hash-verified, but no retraining job was launched. The
+  estimated merged S56--S59 corpus has about `42` unique real Planet-like TICs,
+  still below the `50`-source student/promotion gate.
+- `2026-07-23`: A schema-aware scan of tracked artifacts and reachable git
+  history found S63 only in Stage-1 production/status QA, with no S63 rows in
+  candidate, vetting, label, training, scoring, or evaluation products. S63
+  can therefore be reserved conditionally for the first prospective teacher
+  evaluation after non-git PDO/ORCD/local exposure is also audited. Freeze the
+  S56--S62 checkpoint, calibration, thresholds, TIC-disjoint cohort, and
+  metrics before blind S63 labeling; report repeated hosts separately and do
+  not tune from the unblinded result.
+- `2026-07-23`: Preflighted one final local Planet-like/EB pass over the
+  accepted labels available through S59. The current queue has `223` candidate
+  observations across `207` TICs (`45` prior Planet-like and `178`
+  Eclipse/contact), preserves `230` source decisions and all `65` verified S56
+  harmonic targets, and resolves all `223/223` PNG sheets locally. Its buttons
+  are prefilled but `0/223` rows are marked reviewed; wait for the accepted
+  S60--S62 return, rebuild once, and then freeze TeHan's explicit row-level
+  pass.
+- `2026-07-23`: Added two bounded pre-training contracts. The split registry
+  deterministically fixes whole TICs into a nearest-feasible `20%` test
+  population plus five nonempty development folds, and training preparation
+  now consumes those assignments without recomputing them. The native registry
+  binds each `(sector, TIC)` observation to an explicit HDF5 file/group,
+  contract version, and SHA-256, preventing repeated hosts from colliding in
+  TIC-only storage. The full fast suite passes `446` tests with `3` skips.
+  Actual seven-sector registry artifacts and trainer/checkpoint binding remain
+  pending the frozen label corpus and regenerated per-sector native inputs.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Apply the Tier-1 target mask, complete and audit the bounded S56
-periodic enrichment, freeze its confident candidate/label set, and retrain the
-teacher-v1 baseline with grouped and calibrated evaluation. Keep S57 labeling
-paused; add dip, multi-sector, and false-alarm branches only after this path is
-robust.
+**Next:** Ingest the accepted S60--S62 return, append its Planet-like/EB rows
+to the prepared local queue, and freeze the user's final pass. Then instantiate
+the implemented `(sector, TIC)` native registry and immutable TIC-grouped split
+registry on the seven-sector corpus, bind those registry hashes into the
+trainer/checkpoints, and regenerate quality-aware inputs before training.
+Retrain teacher v1 once with source-separated, calibrated evaluation and
+bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches only
+after this path is robust.
 
 ### Human labels and harmonic review
 
@@ -131,6 +314,11 @@ robust.
 - Rare harmonic supervision remains inadequate for promoting or iterating the
   exploratory teacher-v2 design: `P/3` has no supervised example and `3P` has
   only three in the current harmonic table.
+- Franklin morphology returns do not supply harmonic truth. The app's default
+  `P/resolved` state and any saved morphology click are insufficient evidence
+  that a factor was reviewed. Returned factors remain raw audit fields and are
+  masked unless an explicit factor-only review or injection truth verifies
+  them; all seven folds remain model inputs regardless of that mask.
 
 **Next:** Use teacher v1 to enrich real labels while preserving blinded score
 provenance and cross-review overlap; require a predeclared rare-factor and
@@ -145,6 +333,11 @@ oracle-factor evaluation before any future model iteration.
 - Pixel/source-pickle injection smokes run through extraction, TWIRL-FS, and
   BLS, but no representative pixel-level calibration set or frozen
   extraction-to-candidate completeness surface exists.
+- `2026-07-22`: Bound the existing A2v1 candidate-retention recovery launcher
+  to the native-v2 selected-checkpoint manifest. Its scorer now rejects
+  mixed-generation candidate/native/checkpoint inputs, stages outputs
+  atomically, and records exact before/after hashes. This was infrastructure
+  hardening only; no new recovery or H200 job was launched.
 
 **Next:** Run candidate-retention recovery against the accepted A2v1 ADP pair
 and frozen Stage 2 contract, then build a pixel-level calibration subset

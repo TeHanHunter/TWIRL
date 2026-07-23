@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -45,6 +46,417 @@ DEFAULT_PROFILES: tuple[str, ...] = (
     "shape_plus_periodogram_bls",
     "full_combined",
 )
+
+TEACHER_NATIVE_V2_CHECKPOINT_NAMESPACE = "s56_harmonic_cnn_v1_native_v2"
+ENCODER_PRETRAINING_CACHE_SCHEMA = "s56_harmonic_encoder_pretraining_cache_v2"
+SELECTED_CHECKPOINT_MANIFEST_SCHEMA = "s56_harmonic_selected_checkpoint_manifest_v2"
+
+_INPUT_PROVENANCE_FIELDS: tuple[str, ...] = (
+    "checkpoint_namespace",
+    "input_contract_version",
+    "native_h5_sha256",
+    "training_table_sha256",
+)
+
+
+def _is_sha256(value: Any) -> bool:
+    text = str(value)
+    return len(text) == 64 and all(character in "0123456789abcdef" for character in text)
+
+
+def validate_native_v2_provenance_shape(
+    payload: Mapping[str, Any],
+    *,
+    artifact: str,
+) -> None:
+    """Require a native-v2 namespace and well-formed immutable input hashes."""
+
+    failures: list[str] = []
+    if payload.get("checkpoint_namespace") != TEACHER_NATIVE_V2_CHECKPOINT_NAMESPACE:
+        failures.append(
+            "checkpoint_namespace="
+            f"{payload.get('checkpoint_namespace')!r}"
+        )
+    if payload.get("input_contract_version") != RAW_PAIR_CONTRACT_VERSION:
+        failures.append(
+            "input_contract_version="
+            f"{payload.get('input_contract_version')!r}"
+        )
+    for name in ("native_h5_sha256", "training_table_sha256"):
+        if not _is_sha256(payload.get(name)):
+            failures.append(f"invalid or missing {name}")
+    if failures:
+        raise RuntimeError(f"invalid {artifact} provenance: " + "; ".join(failures))
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_teacher_input_provenance(
+    *,
+    training_table: Path,
+    native_h5: Path,
+) -> dict[str, str]:
+    """Hash and cross-check the exact table/native pair used for training."""
+
+    import h5py
+
+    training_table = Path(training_table)
+    native_h5 = Path(native_h5)
+    training_table_sha256 = _file_sha256(training_table)
+    native_h5_sha256 = _file_sha256(native_h5)
+    with h5py.File(native_h5, "r") as h5:
+        native_contract = str(h5.attrs.get("contract_version", ""))
+        native_training_table_sha256 = str(
+            h5.attrs.get("training_table_sha256", "")
+        )
+    final_training_table_sha256 = _file_sha256(training_table)
+    final_native_h5_sha256 = _file_sha256(native_h5)
+    if final_training_table_sha256 != training_table_sha256:
+        raise RuntimeError(
+            "training table changed while its teacher provenance was being built"
+        )
+    if final_native_h5_sha256 != native_h5_sha256:
+        raise RuntimeError(
+            "native HDF5 changed while its teacher provenance was being built"
+        )
+    if native_contract != RAW_PAIR_CONTRACT_VERSION:
+        raise RuntimeError(
+            "native training input has contract "
+            f"{native_contract!r}, expected {RAW_PAIR_CONTRACT_VERSION!r}"
+        )
+    if native_training_table_sha256 != training_table_sha256:
+        raise RuntimeError(
+            "native training input was not built from the exact training table: "
+            f"native={native_training_table_sha256!r}, "
+            f"table={training_table_sha256!r}"
+        )
+    return {
+        "checkpoint_namespace": TEACHER_NATIVE_V2_CHECKPOINT_NAMESPACE,
+        "input_contract_version": RAW_PAIR_CONTRACT_VERSION,
+        "native_h5_sha256": native_h5_sha256,
+        "training_table_sha256": training_table_sha256,
+    }
+
+
+def _assert_teacher_inputs_unchanged(
+    *,
+    training_table: Path,
+    native_h5: Path,
+    expected: Mapping[str, str],
+    checkpoint: str,
+) -> None:
+    """Fail if either immutable teacher input changed during a long run."""
+
+    observed = {
+        "training_table_sha256": _file_sha256(training_table),
+        "native_h5_sha256": _file_sha256(native_h5),
+    }
+    failures = [
+        f"{name}={value!r}, expected {expected.get(name)!r}"
+        for name, value in observed.items()
+        if value != expected.get(name)
+    ]
+    if failures:
+        raise RuntimeError(
+            f"teacher input changed {checkpoint}: " + "; ".join(failures)
+        )
+
+
+def validate_teacher_input_provenance(
+    payload: Mapping[str, Any],
+    *,
+    expected: Mapping[str, str],
+    artifact: str,
+) -> None:
+    """Fail closed when a cached artifact is missing or has stale input binding."""
+
+    failures = [
+        f"{name}={payload.get(name)!r}, expected {expected.get(name)!r}"
+        for name in _INPUT_PROVENANCE_FIELDS
+        if not str(payload.get(name, ""))
+        or str(payload.get(name)) != str(expected.get(name, ""))
+    ]
+    if failures:
+        raise RuntimeError(
+            f"stale or unprovenanced {artifact}: " + "; ".join(failures)
+        )
+
+
+def validate_encoder_pretraining_cache(
+    payload: Mapping[str, Any],
+    *,
+    expected_provenance: Mapping[str, str],
+    model_config: Mapping[str, Any],
+    train_config: Mapping[str, Any],
+    seed: int,
+    epochs: int,
+) -> None:
+    """Validate every identity-bearing field before reusing encoder weights."""
+
+    validate_teacher_input_provenance(
+        payload,
+        expected=expected_provenance,
+        artifact="encoder-pretraining cache",
+    )
+    expected = {
+        "pretraining_cache_schema": ENCODER_PRETRAINING_CACHE_SCHEMA,
+        "pretraining_profile": "shape_plus_raw_chronology",
+        "model_config": dict(model_config),
+        "train_config": dict(train_config),
+        "seed": int(seed),
+        "pretraining_epochs": int(epochs),
+    }
+    failures = [
+        f"{name}={payload.get(name)!r}, expected {value!r}"
+        for name, value in expected.items()
+        if payload.get(name) != value
+    ]
+    if "state_dict" not in payload:
+        failures.append("missing state_dict")
+    if failures:
+        raise RuntimeError(
+            "stale or incomplete encoder-pretraining cache: "
+            + "; ".join(failures)
+        )
+
+
+def write_selected_teacher_checkpoint_manifest(
+    *,
+    out_dir: Path,
+    selected_profile: str,
+    input_provenance: Mapping[str, str],
+) -> Path:
+    """Write a portable, hash-bound manifest for the selected five-fold model."""
+
+    import torch
+
+    out_dir = Path(out_dir)
+    validate_native_v2_provenance_shape(
+        input_provenance,
+        artifact="selected teacher input",
+    )
+    records: list[dict[str, Any]] = []
+    for fold in range(5):
+        relative_path = Path(selected_profile) / f"fold_{fold}" / "teacher.pt"
+        checkpoint_path = out_dir / relative_path
+        checkpoint = torch.load(
+            checkpoint_path,
+            map_location="cpu",
+            weights_only=False,
+        )
+        validate_teacher_input_provenance(
+            checkpoint,
+            expected=input_provenance,
+            artifact=f"fold-{fold} final teacher checkpoint",
+        )
+        if checkpoint.get("model_version") != MODEL_VERSION:
+            raise RuntimeError(f"{checkpoint_path} has the wrong model_version")
+        if checkpoint.get("profile") != selected_profile:
+            raise RuntimeError(f"{checkpoint_path} has the wrong profile")
+        if int(checkpoint.get("fold", -1)) != fold:
+            raise RuntimeError(f"{checkpoint_path} has the wrong fold")
+        pretraining_path = (
+            out_dir
+            / "encoder_pretraining"
+            / "native_v2"
+            / f"fold_{fold}.pt"
+        )
+        observed_pretraining_sha256 = _file_sha256(pretraining_path)
+        if checkpoint.get("encoder_pretraining_sha256") != observed_pretraining_sha256:
+            raise RuntimeError(
+                f"{checkpoint_path} is not bound to {pretraining_path}"
+            )
+        records.append(
+            {
+                "fold": fold,
+                "path": relative_path.as_posix(),
+                "sha256": _file_sha256(checkpoint_path),
+                "encoder_pretraining_sha256": observed_pretraining_sha256,
+            }
+        )
+    manifest = {
+        "schema_version": SELECTED_CHECKPOINT_MANIFEST_SCHEMA,
+        "model_version": MODEL_VERSION,
+        **dict(input_provenance),
+        "selected_profile": selected_profile,
+        "checkpoints": records,
+    }
+    path = out_dir / "selected_checkpoint_manifest.json"
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def verify_selected_teacher_checkpoint_manifest(
+    *,
+    manifest_path: Path,
+    training_table: Path,
+    native_h5: Path,
+) -> dict[str, Any]:
+    """Verify a selected model manifest and the checkpoint payloads it names."""
+
+    import torch
+
+    manifest_path = Path(manifest_path)
+    root = manifest_path.parent.resolve()
+    manifest = json.loads(manifest_path.read_text())
+    validate_native_v2_provenance_shape(
+        manifest,
+        artifact="selected-checkpoint manifest",
+    )
+    expected_provenance = build_teacher_input_provenance(
+        training_table=training_table,
+        native_h5=native_h5,
+    )
+    validate_teacher_input_provenance(
+        manifest,
+        expected=expected_provenance,
+        artifact="selected-checkpoint manifest",
+    )
+    if manifest.get("schema_version") != SELECTED_CHECKPOINT_MANIFEST_SCHEMA:
+        raise RuntimeError("selected-checkpoint manifest has the wrong schema_version")
+    if manifest.get("model_version") != MODEL_VERSION:
+        raise RuntimeError("selected-checkpoint manifest has the wrong model_version")
+    selected_profile = str(manifest.get("selected_profile", ""))
+    if not selected_profile:
+        raise RuntimeError("selected-checkpoint manifest has no selected_profile")
+    records = manifest.get("checkpoints")
+    if not isinstance(records, list) or len(records) != 5:
+        raise RuntimeError("selected-checkpoint manifest must contain five checkpoints")
+    observed_folds: list[int] = []
+    for record in records:
+        if not isinstance(record, Mapping):
+            raise RuntimeError("selected-checkpoint manifest has a malformed record")
+        fold = int(record.get("fold", -1))
+        observed_folds.append(fold)
+        checkpoint_path = (root / str(record.get("path", ""))).resolve()
+        if checkpoint_path.parent.parent.parent != root:
+            raise RuntimeError("selected-checkpoint manifest path escapes its model root")
+        if _file_sha256(checkpoint_path) != str(record.get("sha256", "")):
+            raise RuntimeError(f"selected checkpoint SHA256 mismatch: {checkpoint_path}")
+        checkpoint = torch.load(
+            checkpoint_path,
+            map_location="cpu",
+            weights_only=False,
+        )
+        validate_teacher_input_provenance(
+            checkpoint,
+            expected=expected_provenance,
+            artifact=f"fold-{fold} final teacher checkpoint",
+        )
+        if checkpoint.get("model_version") != MODEL_VERSION:
+            raise RuntimeError(f"{checkpoint_path} has the wrong model_version")
+        if checkpoint.get("profile") != selected_profile:
+            raise RuntimeError(f"{checkpoint_path} has the wrong profile")
+        if int(checkpoint.get("fold", -1)) != fold:
+            raise RuntimeError(f"{checkpoint_path} has the wrong fold")
+        if checkpoint.get("encoder_pretraining_cache_schema") != (
+            ENCODER_PRETRAINING_CACHE_SCHEMA
+        ):
+            raise RuntimeError(
+                f"{checkpoint_path} has stale encoder-pretraining provenance"
+            )
+        if checkpoint.get("encoder_pretraining_sha256") != record.get(
+            "encoder_pretraining_sha256"
+        ):
+            raise RuntimeError(
+                f"{checkpoint_path} disagrees with its pretraining hash record"
+            )
+    if sorted(observed_folds) != list(range(5)):
+        raise RuntimeError(
+            f"selected-checkpoint manifest folds must be 0..4; got {observed_folds}"
+        )
+    return manifest
+
+
+def verify_deployed_teacher_checkpoint_manifest(
+    *,
+    manifest_path: Path,
+    checkpoint_root: Path,
+) -> dict[str, Any]:
+    """Verify copied checkpoints using a manifest without the training inputs."""
+
+    import torch
+
+    manifest_path = Path(manifest_path)
+    checkpoint_root = Path(checkpoint_root)
+    manifest = json.loads(manifest_path.read_text())
+    validate_native_v2_provenance_shape(
+        manifest,
+        artifact="deployed selected-checkpoint manifest",
+    )
+    if manifest.get("schema_version") != SELECTED_CHECKPOINT_MANIFEST_SCHEMA:
+        raise RuntimeError("deployed checkpoint manifest has the wrong schema_version")
+    if manifest.get("model_version") != MODEL_VERSION:
+        raise RuntimeError("deployed checkpoint manifest has the wrong model_version")
+    selected_profile = str(manifest.get("selected_profile", ""))
+    if not selected_profile or checkpoint_root.name != selected_profile:
+        raise RuntimeError(
+            "deployed checkpoint directory does not match selected_profile: "
+            f"root={checkpoint_root.name!r}, profile={selected_profile!r}"
+        )
+    records = manifest.get("checkpoints")
+    if not isinstance(records, list) or len(records) != 5:
+        raise RuntimeError("deployed checkpoint manifest must contain five records")
+    expected_provenance = {
+        name: str(manifest[name]) for name in _INPUT_PROVENANCE_FIELDS
+    }
+    observed_folds: list[int] = []
+    for record in records:
+        if not isinstance(record, Mapping):
+            raise RuntimeError("deployed checkpoint manifest has a malformed record")
+        fold = int(record.get("fold", -1))
+        observed_folds.append(fold)
+        expected_relative = f"{selected_profile}/fold_{fold}/teacher.pt"
+        if record.get("path") != expected_relative:
+            raise RuntimeError(
+                f"deployed checkpoint record has unexpected path={record.get('path')!r}"
+            )
+        checkpoint_path = checkpoint_root / f"fold_{fold}" / "teacher.pt"
+        if _file_sha256(checkpoint_path) != str(record.get("sha256", "")):
+            raise RuntimeError(f"deployed checkpoint SHA256 mismatch: {checkpoint_path}")
+        checkpoint = torch.load(
+            checkpoint_path,
+            map_location="cpu",
+            weights_only=False,
+        )
+        validate_teacher_input_provenance(
+            checkpoint,
+            expected=expected_provenance,
+            artifact=f"deployed fold-{fold} final teacher checkpoint",
+        )
+        validate_native_v2_provenance_shape(
+            checkpoint,
+            artifact=f"deployed fold-{fold} final teacher checkpoint",
+        )
+        if checkpoint.get("model_version") != MODEL_VERSION:
+            raise RuntimeError(f"{checkpoint_path} has the wrong model_version")
+        if checkpoint.get("profile") != selected_profile:
+            raise RuntimeError(f"{checkpoint_path} has the wrong profile")
+        if int(checkpoint.get("fold", -1)) != fold:
+            raise RuntimeError(f"{checkpoint_path} has the wrong fold")
+        if checkpoint.get("encoder_pretraining_cache_schema") != (
+            ENCODER_PRETRAINING_CACHE_SCHEMA
+        ):
+            raise RuntimeError(
+                f"{checkpoint_path} has stale encoder-pretraining provenance"
+            )
+        if checkpoint.get("encoder_pretraining_sha256") != record.get(
+            "encoder_pretraining_sha256"
+        ):
+            raise RuntimeError(
+                f"{checkpoint_path} disagrees with its pretraining hash record"
+            )
+    if sorted(observed_folds) != list(range(5)):
+        raise RuntimeError(
+            f"deployed checkpoint folds must be 0..4; got {observed_folds}"
+        )
+    return manifest
 
 
 def classification_metrics(
@@ -541,6 +953,7 @@ def _train_one_fold(
     workers: int,
     pretrain_epochs: int,
     require_cuda: bool,
+    input_provenance: Mapping[str, str],
 ) -> dict[str, Any]:
     import torch
 
@@ -555,11 +968,36 @@ def _train_one_fold(
     fold_rows = attach_fold_training_weights(rows, fit_mask=train_mask.to_numpy())
     metadata, normalization = build_metadata_matrix(rows, fit_mask=train_mask.to_numpy())
     model_config = HarmonicModelConfig(metadata_dim=metadata.shape[1])
-    pretrain_path = Path(out_dir) / "encoder_pretraining" / f"fold_{fold}.pt"
+    pretrain_path = (
+        Path(out_dir)
+        / "encoder_pretraining"
+        / "native_v2"
+        / f"fold_{fold}.pt"
+    )
+    expected_pretraining = {
+        **dict(input_provenance),
+        "pretraining_cache_schema": ENCODER_PRETRAINING_CACHE_SCHEMA,
+        "pretraining_profile": "shape_plus_raw_chronology",
+        "model_config": asdict(model_config),
+        "train_config": asdict(train_config),
+        "seed": int(seed),
+        "pretraining_epochs": int(pretrain_epochs),
+    }
     if pretrain_path.exists():
+        pretraining_sha256 = _file_sha256(pretrain_path)
         pretrain = torch.load(pretrain_path, map_location="cpu", weights_only=False)
-        if pretrain.get("model_config") != asdict(model_config) or int(pretrain.get("seed", -1)) != seed:
-            raise RuntimeError(f"stale encoder pretraining checkpoint: {pretrain_path}")
+        validate_encoder_pretraining_cache(
+            pretrain,
+            expected_provenance=input_provenance,
+            model_config=asdict(model_config),
+            train_config=asdict(train_config),
+            seed=seed,
+            epochs=pretrain_epochs,
+        )
+        if _file_sha256(pretrain_path) != pretraining_sha256:
+            raise RuntimeError(
+                f"encoder-pretraining cache changed while it was loaded: {pretrain_path}"
+            )
     else:
         pretrain = _train_pretraining_encoder(
             rows=fold_rows.loc[train_mask].copy(),
@@ -572,8 +1010,17 @@ def _train_one_fold(
             epochs=pretrain_epochs,
             seed=seed,
         )
+        pretrain.update(expected_pretraining)
         pretrain_path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(pretrain, pretrain_path)
+        pretrain_temporary = pretrain_path.with_suffix(pretrain_path.suffix + ".tmp")
+        pretrain_temporary.unlink(missing_ok=True)
+        try:
+            torch.save(pretrain, pretrain_temporary)
+            pretraining_sha256 = _file_sha256(pretrain_temporary)
+            pretrain_temporary.replace(pretrain_path)
+        except Exception:
+            pretrain_temporary.unlink(missing_ok=True)
+            raise
     dataset = HarmonicNativeDataset(
         fold_rows,
         native_h5=native_h5,
@@ -693,10 +1140,12 @@ def _train_one_fold(
     fold_dir.mkdir(parents=True, exist_ok=True)
     checkpoint = {
         "model_version": MODEL_VERSION,
-        "input_contract_version": RAW_PAIR_CONTRACT_VERSION,
+        **dict(input_provenance),
         "input_channel_contract": {
             name: list(channels) for name, channels in CHANNEL_CONTRACT.items()
         },
+        "encoder_pretraining_cache_schema": ENCODER_PRETRAINING_CACHE_SCHEMA,
+        "encoder_pretraining_sha256": pretraining_sha256,
         "profile": profile,
         "fold": fold,
         "model_config": asdict(model_config),
@@ -706,6 +1155,11 @@ def _train_one_fold(
         "best_epoch": best_epoch,
         "model_state_dict": best_state,
     }
+    validate_teacher_input_provenance(
+        checkpoint,
+        expected=input_provenance,
+        artifact="final teacher checkpoint",
+    )
     torch.save(checkpoint, fold_dir / "teacher.pt")
     (fold_dir / "metrics.json").write_text(
         json.dumps(validation_metrics, indent=2, sort_keys=True, allow_nan=True) + "\n"
@@ -800,7 +1254,17 @@ def run_harmonic_teacher_training(
         raise ValueError(f"unknown profiles: {unknown}")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    input_provenance = build_teacher_input_provenance(
+        training_table=training_table,
+        native_h5=native_h5,
+    )
     source = pd.read_csv(training_table, low_memory=False)
+    _assert_teacher_inputs_unchanged(
+        training_table=training_table,
+        native_h5=native_h5,
+        expected=input_provenance,
+        checkpoint="while reading the training table",
+    )
     injection_audit = injection_truth_human_audit(
         source,
         out_dir=out_dir / "injection_truth_human_audit",
@@ -812,6 +1276,12 @@ def run_harmonic_teacher_training(
     )
     if not verification["passed"]:
         raise RuntimeError(f"native input contract failed: {verification['failures'][:10]}")
+    _assert_teacher_inputs_unchanged(
+        training_table=training_table,
+        native_h5=native_h5,
+        expected=input_provenance,
+        checkpoint="while validating the native contract",
+    )
     rows = prepare_harmonic_training_rows(source, seed=train_config.seed)
     rows.to_csv(out_dir / "training_rows_with_fixed_splits.csv", index=False)
     fold_results: list[dict[str, Any]] = []
@@ -828,6 +1298,7 @@ def run_harmonic_teacher_training(
                     workers=workers,
                     pretrain_epochs=pretrain_epochs,
                     require_cuda=require_cuda,
+                    input_provenance=input_provenance,
                 )
             )
     ranking_rows: list[dict[str, Any]] = []
@@ -908,6 +1379,11 @@ def run_harmonic_teacher_training(
     for fold in range(5):
         checkpoint_path = out_dir / selected_profile / f"fold_{fold}" / "teacher.pt"
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        validate_teacher_input_provenance(
+            checkpoint,
+            expected=input_provenance,
+            artifact=f"fold-{fold} final teacher checkpoint",
+        )
         norm_dict = checkpoint["metadata_normalization"]
         normalization = MetadataNormalization(
             columns=tuple(norm_dict["columns"]),
@@ -1042,6 +1518,7 @@ def run_harmonic_teacher_training(
     }
     summary = {
         "model_version": MODEL_VERSION,
+        **input_provenance,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "selected_profile": selected_profile,
         "profiles": list(profiles),
@@ -1063,6 +1540,21 @@ def run_harmonic_teacher_training(
         "student_training_blocked": True,
         "student_block_reason": "requires at least 50 unique real Planet-like examples",
     }
+    _assert_teacher_inputs_unchanged(
+        training_table=training_table,
+        native_h5=native_h5,
+        expected=input_provenance,
+        checkpoint="during teacher training",
+    )
+    selected_checkpoint_manifest = write_selected_teacher_checkpoint_manifest(
+        out_dir=out_dir,
+        selected_profile=selected_profile,
+        input_provenance=input_provenance,
+    )
+    summary["selected_checkpoint_manifest"] = str(selected_checkpoint_manifest)
+    summary["selected_checkpoint_manifest_sha256"] = _file_sha256(
+        selected_checkpoint_manifest
+    )
     (out_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True, allow_nan=True) + "\n"
     )
@@ -1071,9 +1563,19 @@ def run_harmonic_teacher_training(
 
 __all__ = [
     "DEFAULT_PROFILES",
+    "ENCODER_PRETRAINING_CACHE_SCHEMA",
+    "SELECTED_CHECKPOINT_MANIFEST_SCHEMA",
+    "TEACHER_NATIVE_V2_CHECKPOINT_NAMESPACE",
+    "build_teacher_input_provenance",
     "classification_metrics",
     "expected_calibration_error",
     "fit_temperature",
     "injection_truth_human_audit",
     "run_harmonic_teacher_training",
+    "validate_encoder_pretraining_cache",
+    "validate_native_v2_provenance_shape",
+    "validate_teacher_input_provenance",
+    "verify_deployed_teacher_checkpoint_manifest",
+    "verify_selected_teacher_checkpoint_manifest",
+    "write_selected_teacher_checkpoint_manifest",
 ]
