@@ -13,7 +13,7 @@ from twirl.vetting.multisector_signal_review import (
     normalize_accepted_franklin_signals,
     normalize_browser_signal_rows,
     normalize_s56_adjudicated_signals,
-    standalone_app_candidate_key,
+    tehan_app_candidate_key,
 )
 
 
@@ -170,6 +170,12 @@ def test_queue_collapses_exact_duplicate_but_keeps_sector_observations() -> None
     s57 = queue.loc[queue["sector"] == 57].iloc[0]
     assert s57["initial_period_factor"] == "2"
     assert not bool(s57["original_harmonic_supervision_verified"])
+    label_order = queue["prior_label"].tolist()
+    assert label_order == [
+        "planet_like",
+        "eclipsing_binary_or_pceb",
+        "eclipsing_binary_or_pceb",
+    ]
 
 
 def test_app_prefills_without_marking_reviewed_and_searches_multiple_roots(
@@ -261,7 +267,7 @@ def test_final_review_preserves_only_previously_verified_harmonics() -> None:
         labels.append(
             {
                 "row_id": row["row_id"],
-                "candidate_key": standalone_app_candidate_key(row),
+                "candidate_key": tehan_app_candidate_key(row),
                 "tic": row["tic"],
                 "sector": row["sector"],
                 "label": row["initial_label"],
@@ -305,7 +311,7 @@ def test_disk_finalizer_binds_exact_selected_source_provenance(
         [
             {
                 "row_id": row["row_id"],
-                "candidate_key": standalone_app_candidate_key(row),
+                "candidate_key": tehan_app_candidate_key(row),
                 "tic": row["tic"],
                 "sector": row["sector"],
                 "label": row["initial_label"],

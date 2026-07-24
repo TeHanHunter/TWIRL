@@ -309,6 +309,16 @@ sample.
   explicitly reviewed rows. Sixteen TICs repeat, two have cross-sector class
   disagreements, and one TIC has two distinct S56 ephemerides; these remain
   separate observations for the final pass.
+- `2026-07-24`: Replaced the mixed handoff-era review images with one uniform,
+  versioned `s56_s62_a2v1_current_adp_v1` set. PDO re-rendered all `509` rows
+  from `DET_FLUX_ADP_SML + DET_FLUX_ADP`, each row's frozen ephemeris, and the
+  current `S56-ADP-HV2` renderer with `20,000` trial periods and `10` retained
+  peaks. All seven sector summaries report only `ok`, and the local
+  identity/provenance gate verifies the input-export identity and full
+  decodability of all `509/509` PNGs. The final launcher now uses TeHan's
+  standard repository vetter with exact-name sheet binding, suggestions that
+  remain unreviewed until explicitly saved, `P/3` and `3P` controls, and a
+  global Planet-like-first then EB order.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 

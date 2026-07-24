@@ -192,11 +192,13 @@ The complete S60--S62 return has been frozen against the exact `3,000`-row
 handoff. It contains `27` Planet-like and `259` Eclipse/contact labels; these
 remain provisional morphology decisions until TeHan's final row-level pass.
 The rebuilt S56--S62 Planet-like/EB queue has `509` candidate observations
-across `493` unique TICs, with all `509` exact vet sheets available locally.
-Its provisional support is `69` unique Planet-like TICs and `426` unique EB
-TICs, so the `50`-source Planet-like gate is met with a `19`-TIC margin before
-final review. All previously verified S56 harmonic targets are preserved,
-whereas Franklin's factors remain audit-only.
+across `493` unique TICs. Its uniform current-ADP sheet set is verified
+`509/509` against the frozen row ephemerides and is served by the standard
+repository vetter, with all `72` Planet-like suggestions before the `437` EB
+suggestions. Its provisional support is `69` unique Planet-like TICs and `426`
+unique EB TICs, so the `50`-source Planet-like gate is met with a `19`-TIC
+margin before final review. All previously verified S56 harmonic targets are
+preserved, whereas Franklin's factors remain audit-only.
 
 The immediate work is to freeze the S56--S62 label set and its training inputs,
 not to add search branches or retune Tier-1. Apply the accepted v4 paired-input

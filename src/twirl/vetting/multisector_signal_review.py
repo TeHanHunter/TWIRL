@@ -28,6 +28,10 @@ SIGNAL_PRECEDENCE_POLICY_VERSION = "exact_candidate_later_review_wins_v1"
 SIGNAL_REREVIEW_LABELS: frozenset[str] = frozenset(
     {"planet_like", "eclipsing_binary_or_pceb"}
 )
+SIGNAL_REREVIEW_LABEL_RANK: dict[str, int] = {
+    "planet_like": 0,
+    "eclipsing_binary_or_pceb": 1,
+}
 FINAL_LABELS: frozenset[str] = frozenset(
     {
         "planet_like",
@@ -462,9 +466,18 @@ def build_signal_rereview_queue(
         selected["candidate_key"] = selected["observation_candidate_key"]
         selected_rows.append(selected)
 
-    queue = pd.DataFrame(selected_rows).sort_values(
-        ["sector", "prior_label", "tic", "period_d"], kind="stable"
-    ).reset_index(drop=True)
+    queue = pd.DataFrame(selected_rows)
+    queue["_label_rank"] = (
+        queue["prior_label"].map(SIGNAL_REREVIEW_LABEL_RANK).fillna(99).astype(int)
+    )
+    queue = (
+        queue.sort_values(
+            ["_label_rank", "sector", "tic", "period_d"],
+            kind="stable",
+        )
+        .drop(columns="_label_rank")
+        .reset_index(drop=True)
+    )
     queue.insert(0, "row_id", np.arange(len(queue), dtype=int))
     same_sector_count = queue.groupby(["sector", "tic"])["tic"].transform("size")
     queue["same_sector_tic_count"] = same_sector_count.astype(int)
@@ -528,9 +541,13 @@ def build_signal_rereview_queue(
         :,
         [
             "row_id",
+            "review_id",
             "sector",
             "tic",
             "source_batch_id",
+            "period_d",
+            "t0_bjd",
+            "duration_min",
             "twirl_vet_sheet_name",
         ],
     ].copy()
@@ -569,6 +586,12 @@ def standalone_app_candidate_key(row: Mapping[str, Any]) -> str:
         _text(row.get(column, ""))
         for column in ("review_id", "tic", "sector", "period_d", "t0_bjd")
     )
+
+
+def tehan_app_candidate_key(row: Mapping[str, Any]) -> str:
+    """Reproduce the canonical identity used by the standard TeHan vetter."""
+
+    return candidate_key(pd.Series(dict(row)))
 
 
 def finalize_signal_rereview(
@@ -622,10 +645,14 @@ def finalize_signal_rereview(
             raise ValueError(f"{name} has blank or duplicate row_id values")
     if set(public["row_id"]) != set(returned["row_id"]):
         raise ValueError("final signal review is incomplete or contains extra rows")
-    expected = public.apply(standalone_app_candidate_key, axis=1)
+    expected = public.apply(tehan_app_candidate_key, axis=1)
     expected_by_id = dict(zip(public["row_id"], expected))
     observed = returned["row_id"].map(expected_by_id)
-    if returned["candidate_key"].map(_text).ne(observed.map(_text)).any():
+    returned_key = (
+        returned["candidate_key"].map(_text).map(canonicalize_candidate_key)
+    )
+    expected_key = observed.map(_text).map(canonicalize_candidate_key)
+    if returned_key.ne(expected_key).any():
         raise ValueError("final signal labels do not match the exact frozen queue")
     if returned["tic"].map(_text).ne(
         returned["row_id"].map(public.set_index("row_id")["tic"]).map(_text)
@@ -703,6 +730,7 @@ __all__ = [
     "FINAL_LABELS",
     "SIGNAL_PRECEDENCE_POLICY_VERSION",
     "SIGNAL_REREVIEW_LABELS",
+    "SIGNAL_REREVIEW_LABEL_RANK",
     "SIGNAL_REREVIEW_POLICY_VERSION",
     "build_signal_rereview_queue",
     "finalize_signal_rereview",
@@ -710,4 +738,5 @@ __all__ = [
     "normalize_browser_signal_rows",
     "normalize_s56_adjudicated_signals",
     "standalone_app_candidate_key",
+    "tehan_app_candidate_key",
 ]

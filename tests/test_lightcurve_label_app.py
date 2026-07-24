@@ -1,18 +1,35 @@
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 from twirl.vetting.lightcurve_label_app import (
     CandidateStore,
     LightCurveVettingApp,
+    PERIOD_FACTOR_OPTIONS,
     _index_html,
+    _normalize_period_factor,
     find_leo_report,
     find_leo_report_for_row,
     find_hlsp_path,
+    find_twirl_vet_sheet_for_row,
     leo_class_from_report,
     tic_shard_path,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_app_runner():
+    path = ROOT / "scripts/stage5_validation/run_lightcurve_vetting_app.py"
+    spec = importlib.util.spec_from_file_location("run_lightcurve_vetting_app_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_tic_shard_path_and_find_hlsp_path(tmp_path) -> None:
@@ -63,6 +80,88 @@ def test_candidate_store_saves_and_reloads_labels(tmp_path) -> None:
     assert row["notes"] == "clear transit"
     assert row["period_factor"] == "0.5"
     assert row["period_status"] == "refolded"
+    assert bool(row["reviewed"])
+
+
+def test_candidate_store_prefills_without_marking_reviewed(tmp_path) -> None:
+    candidates = tmp_path / "candidates.csv"
+    labels = tmp_path / "labels.csv"
+    pd.DataFrame(
+        [
+            {
+                "tic": 267574918,
+                "sector": 56,
+                "period_d": 1.4079,
+                "t0_bjd": 2459825.47,
+                "initial_label": "planet_like",
+                "initial_notes": "prior morphology",
+                "initial_period_factor": "3",
+                "initial_period_status": "refolded",
+            }
+        ]
+    ).to_csv(candidates, index=False)
+
+    store = CandidateStore(candidates_path=candidates, labels_out=labels)
+    row = store.row(0)
+
+    assert row["label"] == "planet_like"
+    assert row["notes"] == "prior morphology"
+    assert row["period_factor"] == "3"
+    assert row["period_status"] == "refolded"
+    assert not bool(row["reviewed"])
+    assert store.summary()["reviewed"] == 0
+    assert store.summary()["pending_review"] == 1
+    assert store.summary()["labeled"] == 0
+    assert store.summary()["unlabeled"] == 1
+    assert store.summary()["label_counts"] == {}
+
+    store.save_label(
+        row_id=0,
+        label="planet_like",
+        labeler="tehan",
+        notes="confirmed",
+        period_factor="3",
+    )
+
+    assert store.summary()["reviewed"] == 1
+    assert store.summary()["pending_review"] == 0
+    assert store.summary()["labeled"] == 1
+    assert store.summary()["unlabeled"] == 0
+    assert store.summary()["label_counts"] == {"planet_like": 1}
+    reloaded = CandidateStore(candidates_path=candidates, labels_out=labels)
+    assert bool(reloaded.row(0)["reviewed"])
+    assert reloaded.row(0)["notes"] == "confirmed"
+
+
+def test_blank_note_save_remains_pending_review(tmp_path) -> None:
+    candidates = tmp_path / "candidates.csv"
+    labels = tmp_path / "labels.csv"
+    pd.DataFrame(
+        [
+            {
+                "tic": 267574918,
+                "sector": 56,
+                "period_d": 1.4079,
+                "t0_bjd": 2459825.47,
+                "initial_label": "planet_like",
+            }
+        ]
+    ).to_csv(candidates, index=False)
+    store = CandidateStore(candidates_path=candidates, labels_out=labels)
+
+    store.save_label(
+        row_id=0,
+        label="",
+        labeler="tehan",
+        notes="note only",
+    )
+
+    assert not bool(store.row(0)["reviewed"])
+    assert store.summary()["reviewed"] == 0
+    assert store.summary()["pending_review"] == 1
+    reloaded = CandidateStore(candidates_path=candidates, labels_out=labels)
+    assert not bool(reloaded.row(0)["reviewed"])
+    assert reloaded.row(0)["notes"] == "note only"
 
 
 def test_candidate_store_hard_fails_candidate_key_mismatch(tmp_path) -> None:
@@ -148,6 +247,49 @@ def test_candidate_store_shuffles_review_order_without_changing_row_ids(tmp_path
     reloaded = CandidateStore(candidates_path=candidates, labels_out=labels)
     labeled = reloaded.frame.set_index("row_id").loc[int(first["row_id"])]
     assert labeled["label"] == "uncertain"
+
+
+def test_candidate_store_prioritizes_unreviewed_prefilled_rows(tmp_path) -> None:
+    candidates = tmp_path / "candidates.csv"
+    labels = tmp_path / "labels.csv"
+    rows = [
+        {
+            "tic": tic,
+            "sector": 56,
+            "period_d": float(tic),
+            "t0_bjd": float(tic),
+            "initial_label": "planet_like",
+        }
+        for tic in (1, 2, 3)
+    ]
+    pd.DataFrame(rows).to_csv(candidates, index=False)
+    pd.DataFrame(
+        [
+            {
+                "row_id": 0,
+                "candidate_key": "1|56|1|1|",
+                "label": "planet_like",
+                "label_source": "human",
+                "labeler": "tester",
+                "notes": "",
+                "updated_utc": "2026-07-24T00:00:00+00:00",
+                "period_factor": "1",
+                "period_status": "review_period",
+            }
+        ]
+    ).to_csv(labels, index=False)
+
+    store = CandidateStore(
+        candidates_path=candidates,
+        labels_out=labels,
+        shuffle_order=True,
+        random_seed=4,
+        unlabeled_first=True,
+    )
+
+    assert not bool(store.row(0)["reviewed"])
+    assert int(store.row(0)["row_id"]) != 0
+    assert bool(store.row(store.count - 1)["reviewed"])
 
 
 def test_candidate_payload_hides_source_until_labeled(tmp_path) -> None:
@@ -306,6 +448,67 @@ def test_candidate_payload_marks_fallback_leo_report(tmp_path) -> None:
 
     assert payload["leo_report_kind"] == "fallback_plot"
     assert payload["leo_plot_error"].startswith("ValueError:")
+
+
+def test_period_factor_controls_include_thirds() -> None:
+    assert ("0.3333333333333333", "P/3") in PERIOD_FACTOR_OPTIONS
+    assert ("3", "3P") in PERIOD_FACTOR_OPTIONS
+    assert _normalize_period_factor("0.333333")[0] == "0.3333333333333333"
+    assert _normalize_period_factor("3.0") == ("3", "refolded")
+
+
+def test_exact_twirl_vet_sheet_mode_disables_all_fallbacks(tmp_path) -> None:
+    candidates = tmp_path / "candidates.csv"
+    labels = tmp_path / "labels.csv"
+    hlsp_root = tmp_path / "hlsp"
+    vet_root = tmp_path / "vet_sheets"
+    hlsp_root.mkdir()
+    vet_root.mkdir()
+    fallback = vet_root / "real_42_twirl_twoap_twirl_fs_v2_adp015q.png"
+    fallback.write_bytes(b"\x89PNG\r\n\x1a\nfallback")
+    pd.DataFrame(
+        [
+            {
+                "review_id": "real:42",
+                "tic": 42,
+                "sector": 56,
+                "period_d": 1.0,
+                "t0_bjd": 2.0,
+                "twirl_vet_sheet_name": "exact_current.png",
+            }
+        ]
+    ).to_csv(candidates, index=False)
+    row = pd.read_csv(candidates).iloc[0]
+
+    assert find_twirl_vet_sheet_for_row((vet_root,), row) == fallback
+    assert (
+        find_twirl_vet_sheet_for_row(
+            (vet_root,),
+            row,
+            exact_name_only=True,
+        )
+        is None
+    )
+
+    app = LightCurveVettingApp(
+        candidates_path=candidates,
+        labels_out=labels,
+        hlsp_root=hlsp_root,
+        twirl_vet_roots=(vet_root,),
+        labeler="tehan",
+        exact_twirl_vet_sheets=True,
+    )
+    assert app.candidate_payload(0)["twirl_vet_sheet_path"] is None
+
+    exact = vet_root / "exact_current.png"
+    exact.write_bytes(b"\x89PNG\r\n\x1a\nexact")
+    payload = app.candidate_payload(0)
+    assert payload["twirl_vet_sheet_path"] == str(exact)
+    assert payload["twirl_vet_sheet_name"] == exact.name
+
+    runner = _load_app_runner()
+    args = runner._build_arg_parser().parse_args(["--exact-twirl-vet-sheets"])
+    assert args.exact_twirl_vet_sheets
 
 
 def test_vetting_app_has_quick_label_autosave_controls() -> None:
