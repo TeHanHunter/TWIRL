@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-23`.
+Last reconciled: `2026-07-24`.
 
 ## Current status
 
@@ -188,14 +188,15 @@ factor/status together with each morphology click, so those fields are retained
 only as audit metadata. All S57--S59 harmonic targets are explicitly masked
 unless a later factor-only review verifies them; injection truth and the
 existing explicitly verified S56 period decisions remain valid supervision.
-The next `3,000`-row S60--S62 handoff is complete on PDO and under active human
-review. Retrain teacher v1 once after that return is frozen rather than fitting
-an interim four-sector model. The final Planet-like/EB consolidation path is
-preflighted through S59: it currently resolves to `223` candidate observations
-(`207` unique TICs), with all `223` local vet sheets present and all `65`
-previously verified S56 harmonic targets preserved. Do not begin this final
-pass until the accepted S60--S62 return has been appended, because the queue is
-frozen only after the user's row-level review.
+The complete S60--S62 return has been frozen against the exact `3,000`-row
+handoff. It contains `27` Planet-like and `259` Eclipse/contact labels; these
+remain provisional morphology decisions until TeHan's final row-level pass.
+The rebuilt S56--S62 Planet-like/EB queue has `509` candidate observations
+across `493` unique TICs, with all `509` exact vet sheets available locally.
+Its provisional support is `69` unique Planet-like TICs and `426` unique EB
+TICs, so the `50`-source Planet-like gate is met with a `19`-TIC margin before
+final review. All previously verified S56 harmonic targets are preserved,
+whereas Franklin's factors remain audit-only.
 
 The immediate work is to freeze the S56--S62 label set and its training inputs,
 not to add search branches or retune Tier-1. Apply the accepted v4 paired-input
@@ -356,14 +357,14 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Ingest Franklin's final S60--S62 labels, then re-review every Planet-like
-   and EB example across S56--S62 in one local queue. Preserve original label
-   provenance, harmonic annotations, and missing-channel cases; freeze only
-   after the user's final pass.
-2. Complete the bounded S56 review and Franklin's active S60--S62 review, then
-   freeze the seven-sector S56--S62 observation-level morphology corpus.
-   Preserve raw label provenance and cross-sector differences, and resolve
-   same-sector duplicates only through an explicit versioned precedence rule.
+1. Complete TeHan's final local pass over the `509` Planet-like/EB
+   observations across S56--S62. Preserve original label provenance, harmonic
+   annotations, missing-channel cases, and cross-sector disagreements; freeze
+   only after all rows are explicitly saved.
+2. Freeze the current seven-sector S56--S62 observation-level morphology
+   corpus. Preserve raw label provenance and cross-sector differences, and
+   resolve same-sector duplicates only through the explicit versioned
+   precedence rule.
 3. Build and validate the S56--S62 observation-keyed training-input contract:
    per-sector cadence/quality references, exact target eligibility,
    quality-aware BLS/native inputs, `(sector, TIC)` storage identity, and an

@@ -290,17 +290,35 @@ sample.
   TIC-only storage. The full fast suite passes `446` tests with `3` skips.
   Actual seven-sector registry artifacts and trainer/checkpoint binding remain
   pending the frozen label corpus and regenerated per-sector native inputs.
+- `2026-07-24`: Franklin returned the complete S60--S62 handoff. A strict
+  exact-key join against the frozen `3,000`-row queue passed with `1,000` rows
+  per sector, no missing or duplicate decisions, and returned-label SHA-256
+  `852a3135...`. The return contains `27` Planet-like, `259` Eclipse/contact,
+  `215` Broad-isolated-dip, `1,449` uncertain, `602` stellar-variability,
+  `442` instrumental/systematic, and `6` skip labels. The exact queue, return,
+  normalized labels, and handoff manifest are frozen in the
+  [label-return report](../reports/stage5_validation/franklin_s60_s62_label_return_20260724/README.md).
+  Acceptance is batch-level staging only; all returned factor choices remain
+  audit metadata with zero new harmonic targets.
+- `2026-07-24`: Rebuilt the final S56--S62 Planet-like/EB review set from all
+  accepted inputs. It has `509` sector observations across `493` unique TICs:
+  `72` prior Planet-like and `437` prior EB labels, corresponding to `69` and
+  `426` class-specific unique TICs. The provisional Planet-like support is
+  therefore `19` TICs above the `50`-source training gate. All `509/509` exact
+  PNG sheets are present locally and the app preflight passes with `0`
+  explicitly reviewed rows. Sixteen TICs repeat, two have cross-sector class
+  disagreements, and one TIC has two distinct S56 ephemerides; these remain
+  separate observations for the final pass.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Ingest the accepted S60--S62 return, append its Planet-like/EB rows
-to the prepared local queue, and freeze the user's final pass. Then instantiate
-the implemented `(sector, TIC)` native registry and immutable TIC-grouped split
-registry on the seven-sector corpus, bind those registry hashes into the
-trainer/checkpoints, and regenerate quality-aware inputs before training.
-Retrain teacher v1 once with source-separated, calibrated evaluation and
-bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches only
-after this path is robust.
+**Next:** Complete and freeze TeHan's explicit `509`-row final pass. Then
+instantiate the implemented `(sector, TIC)` native registry and immutable
+TIC-grouped split registry on the seven-sector corpus, bind those registry
+hashes into the trainer/checkpoints, and regenerate quality-aware inputs before
+training. Retrain teacher v1 once with source-separated, calibrated evaluation
+and bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches
+only after this path is robust.
 
 ### Human labels and harmonic review
 
