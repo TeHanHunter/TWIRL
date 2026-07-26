@@ -33,13 +33,14 @@ Last reconciled: `2026-07-24`.
   enrichment: `31,446/31,450` targets are paired-teacher eligible,
   `31,449/31,450` retain at least one searchable aperture, and no target is
   excluded from flagged fraction alone. It remains `science_ready=false`.
-  The `s56_harmonic_cnn_v1` architecture and evaluation profile remain the
-  active-learning baseline. Its old native-v1 checkpoint is not reused with
-  the external-quality-aware S56 native-v2 tensors. Any S56 path-validation
-  retrain uses a distinct native-v2 cache/checkpoint namespace. The planned
-  seven-sector retrain first needs a new observation-keyed multi-sector input
-  contract rather than reusing that S56-only file. Teacher v2 was completed as
-  an exploratory comparison but missed
+  The `s56_harmonic_cnn_v1` architecture remains the active-learning model
+  family. `teacher_v3` is the operational name for its frozen S56--S62
+  dataset/training release, not a new architecture and not a promotion of
+  exploratory teacher v2. The seven-sector morphology corpus and TIC-grouped
+  split are frozen; the full shape-model run remains gated on the
+  observation-keyed multi-sector native-input contract. The old native-v1
+  checkpoint is never reused with native-v2 inputs. Teacher v2 was completed
+  as an exploratory comparison but missed
   its promotion gates, so it is not a production ranker or student-label
   generator. See [Stage 2 history](twirl_progress_log.md#stage-2).
 - LC-level injection/recovery, two-aperture vetting, and pixel-injection smokes
@@ -188,29 +189,36 @@ factor/status together with each morphology click, so those fields are retained
 only as audit metadata. All S57--S59 harmonic targets are explicitly masked
 unless a later factor-only review verifies them; injection truth and the
 existing explicitly verified S56 period decisions remain valid supervision.
-The complete S60--S62 return has been frozen against the exact `3,000`-row
-handoff. It contains `27` Planet-like and `259` Eclipse/contact labels; these
-remain provisional morphology decisions until TeHan's final row-level pass.
-The rebuilt S56--S62 Planet-like/EB queue has `509` candidate observations
-across `493` unique TICs. Its uniform current-ADP sheet set is verified
-`509/509` against the frozen row ephemerides and is served by the standard
-repository vetter, with all `72` Planet-like suggestions before the `437` EB
-suggestions. Its provisional support is `69` unique Planet-like TICs and `426`
-unique EB TICs, so the `50`-source Planet-like gate is met with a `19`-TIC
-margin before final review. All previously verified S56 harmonic targets are
-preserved, whereas Franklin's factors remain audit-only.
+The complete S60--S62 return is frozen against the exact `3,000`-row handoff.
+TeHan then completed the uniform current-ADP Planet-like/EB pass over all `509`
+selected observations. The immutable decision snapshot contains `22` explicit
+changes and `487` suggestions accepted unchanged after the declared full pass,
+yielding `70` Planet-like, `419` Eclipse/contact, `10` Broad-isolated-dip, `7`
+stellar-variability, `2` uncertain, and `1` instrumental/systematic decisions.
+It preserves `64` explicitly verified S56 harmonic targets; all Franklin
+factor choices remain audit-only.
 
-The immediate work is to freeze the S56--S62 label set and its training inputs,
-not to add search branches or retune Tier-1. Apply the accepted v4 paired-input
-mask for teacher construction while retaining single-aperture-searchable cases
-for separate review. Keep the small ADP aperture as the search channel and the
-primary ADP aperture as contamination evidence unless later injection and
-real-data tests justify a change. Defer the non-periodic dip detector,
-multi-sector aggregation, and false-alarm/background calibration until this
-path is robust. Those capabilities remain mandatory before the full survey
-search or a science-ready candidate catalog.
+The frozen `teacher_v3` corpus contains `8,181` observation rows (`7,724` real
+and `457` injections), of which `8,163` are active training rows. It includes
+all accepted labels from S56--S62, not only the final Planet-like/EB queue. The
+fixed split registry assigns all `7,903` TIC groups once to a `20%` test
+population or one of five development folds with zero TIC leakage. S63 remains
+reserved as a prospective external evaluation rather than being consumed for
+this training release.
 
-When the S56 and S60--S62 reviews are frozen, publish two sibling products:
+The immediate work is to validate the split-bound per-sector input mappings,
+build the missing quality-aware native files, and run `teacher_v3`; do not add
+search branches or retune Tier-1 on this critical path. Apply the accepted v4
+paired-input mask for teacher construction while retaining
+single-aperture-searchable cases for separate review. Keep the small ADP
+aperture as the search channel and the primary ADP aperture as contamination
+evidence unless later injection and real-data tests justify a change. Defer
+the non-periodic dip detector, multi-sector aggregation, and
+false-alarm/background calibration until this path is robust. Those
+capabilities remain mandatory before the full survey search or a science-ready
+candidate catalog.
+
+The frozen review now supports two sibling products:
 an immutable observation-level `(sector, TIC, candidate_key)` morphology
 corpus and a browsable enrichment-candidate table with a separate TIC roll-up.
 The roll-up may summarize repeated hosts but must not merge detection
@@ -220,14 +228,15 @@ source, and exact input provenance.
 
 ### Model gate
 
-- Use the `s56_harmonic_cnn_v1` architecture/evaluation profile as the
-  active-learning baseline only. Do not apply its native-v1 checkpoint to the
-  quality-aware S56 native-v2 inputs. Any immediate S56 retrain must use the
-  distinct native-v2 cache/checkpoint/sync namespace.
-- Before seven-sector training, implement per-sector quality references and an
-  observation-keyed `(sector, TIC)` native-input registry/contract. Repeated
-  TICs may contribute sector observations but may never collide in storage or
-  cross a TIC-grouped train/validation/test boundary.
+- Use `teacher_v3` for the frozen S56--S62 training release of the
+  `s56_harmonic_cnn_v1` architecture. Do not apply its native-v1 checkpoint to
+  quality-aware native-v2 inputs and do not interpret the release name as an
+  automatic production promotion.
+- The observation-keyed preparation table and immutable TIC split are frozen.
+  Complete and validate the per-sector quality references and `(sector, TIC)`
+  native-input registry before the primary shape-model run. Repeated TICs may
+  contribute sector observations but may never collide in storage or cross a
+  train/validation/test boundary.
 - Apply a bounded training-input gate to S57--S62: validate each A2v1 source,
   regenerate quality-aware BLS/native inputs, and compare the reviewed
   ephemeris with the current search result. Preserve a label automatically
@@ -359,32 +368,30 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Complete TeHan's final local pass over the `509` Planet-like/EB
-   observations across S56--S62. Preserve original label provenance, harmonic
-   annotations, missing-channel cases, and cross-sector disagreements; freeze
-   only after all rows are explicitly saved.
-2. Freeze the current seven-sector S56--S62 observation-level morphology
-   corpus. Preserve raw label provenance and cross-sector differences, and
-   resolve same-sector duplicates only through the explicit versioned
-   precedence rule.
-3. Build and validate the S56--S62 observation-keyed training-input contract:
+1. Build and validate the remaining S56--S62 observation-keyed training
+   inputs for frozen `teacher_v3`:
    per-sector cadence/quality references, exact target eligibility,
    quality-aware BLS/native inputs, `(sector, TIC)` storage identity, and an
    ephemeris-compatibility re-review gate.
-4. Freeze one TIC-grouped split registry, then publish both the hash-bound
-   morphology corpus and the enrichment-only candidate table/TIC index.
-5. Retrain and evaluate teacher v1 once on that frozen set with TIC-grouped,
-   source-separated, calibrated metrics and uncertainty intervals. Do not put
-   teacher v2, student pseudo-labels, or another model family on this path.
-6. Audit non-git exposure and, if still clean, reserve S63 as a sealed
+2. Run the fixed metadata-only baseline and primary
+   `shape_plus_periodogram_bls` profile under the `teacher_v3` release
+   contract. Fit one temperature from pooled development out-of-fold logits;
+   report real and injected metrics separately, TIC-clustered bootstrap
+   intervals, and uncertain-as-other versus uncertain-masked sensitivity.
+3. Open the fixed test population only after the model/calibration contract is
+   frozen. Do not promote the model, start student pseudo-labeling, or change
+   architecture from this result automatically.
+4. Publish the hash-bound morphology corpus plus the enrichment-only candidate
+   table/TIC index, preserving the raw edit log and all source provenance.
+5. Audit non-git exposure and, if still clean, reserve S63 as a sealed
    prospective test: freeze the model, thresholds, cohort, and metrics before
    blind labeling; report TIC-disjoint hosts as the primary evaluation and
    repeated hosts separately; unblind once and do not tune from the result.
-7. After the periodic/enrichment path is robust, add the dip branch,
+6. After the periodic/enrichment path is robust, add the dip branch,
    multi-sector merging, and branch-aware false-alarm calibration; then rerun
    frozen-chain candidate-retention and representative pixel-level recovery
    before survey-wide enrichment or science claims.
-8. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
+7. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
    sample criteria; characterize the `764` no-TIC-bridge WDs and the S94+ QLP
    boundary before the survey release is locked.
 

@@ -855,7 +855,7 @@ def _evaluate_loader(model: Any, loader: Any, *, device: Any) -> dict[str, Any]:
 def _train_pretraining_encoder(
     *,
     rows: pd.DataFrame,
-    native_h5: Path,
+    native_h5: Path | None,
     metadata: np.ndarray,
     model_config: HarmonicModelConfig,
     train_config: HarmonicTrainConfig,
@@ -945,7 +945,7 @@ def _train_pretraining_encoder(
 def _train_one_fold(
     *,
     rows: pd.DataFrame,
-    native_h5: Path,
+    native_h5: Path | None,
     out_dir: Path,
     profile: str,
     fold: int,
@@ -954,6 +954,9 @@ def _train_one_fold(
     pretrain_epochs: int,
     require_cuda: bool,
     input_provenance: Mapping[str, str],
+    defer_temperature_calibration: bool = False,
+    pretraining_cache_namespace: str = "native_v2",
+    skip_encoder_pretraining: bool = False,
 ) -> dict[str, Any]:
     import torch
 
@@ -968,59 +971,78 @@ def _train_one_fold(
     fold_rows = attach_fold_training_weights(rows, fit_mask=train_mask.to_numpy())
     metadata, normalization = build_metadata_matrix(rows, fit_mask=train_mask.to_numpy())
     model_config = HarmonicModelConfig(metadata_dim=metadata.shape[1])
-    pretrain_path = (
-        Path(out_dir)
-        / "encoder_pretraining"
-        / "native_v2"
-        / f"fold_{fold}.pt"
-    )
-    expected_pretraining = {
-        **dict(input_provenance),
-        "pretraining_cache_schema": ENCODER_PRETRAINING_CACHE_SCHEMA,
-        "pretraining_profile": "shape_plus_raw_chronology",
-        "model_config": asdict(model_config),
-        "train_config": asdict(train_config),
-        "seed": int(seed),
-        "pretraining_epochs": int(pretrain_epochs),
-    }
-    if pretrain_path.exists():
-        pretraining_sha256 = _file_sha256(pretrain_path)
-        pretrain = torch.load(pretrain_path, map_location="cpu", weights_only=False)
-        validate_encoder_pretraining_cache(
-            pretrain,
-            expected_provenance=input_provenance,
-            model_config=asdict(model_config),
-            train_config=asdict(train_config),
-            seed=seed,
-            epochs=pretrain_epochs,
-        )
-        if _file_sha256(pretrain_path) != pretraining_sha256:
-            raise RuntimeError(
-                f"encoder-pretraining cache changed while it was loaded: {pretrain_path}"
+    if skip_encoder_pretraining:
+        if profile != "metadata_only":
+            raise ValueError(
+                "encoder pretraining may be skipped only for metadata_only"
             )
+        pretrain_path = None
+        pretraining_sha256 = ""
+        pretrain = {
+            "history": [],
+            "n_rows": 0,
+        }
     else:
-        pretrain = _train_pretraining_encoder(
-            rows=fold_rows.loc[train_mask].copy(),
-            native_h5=native_h5,
-            metadata=metadata[train_mask],
-            model_config=model_config,
-            train_config=train_config,
-            device=device,
-            workers=workers,
-            epochs=pretrain_epochs,
-            seed=seed,
+        pretrain_path = (
+            Path(out_dir)
+            / "encoder_pretraining"
+            / str(pretraining_cache_namespace)
+            / f"fold_{fold}.pt"
         )
-        pretrain.update(expected_pretraining)
-        pretrain_path.parent.mkdir(parents=True, exist_ok=True)
-        pretrain_temporary = pretrain_path.with_suffix(pretrain_path.suffix + ".tmp")
-        pretrain_temporary.unlink(missing_ok=True)
-        try:
-            torch.save(pretrain, pretrain_temporary)
-            pretraining_sha256 = _file_sha256(pretrain_temporary)
-            pretrain_temporary.replace(pretrain_path)
-        except Exception:
+        expected_pretraining = {
+            **dict(input_provenance),
+            "pretraining_cache_schema": ENCODER_PRETRAINING_CACHE_SCHEMA,
+            "pretraining_profile": "shape_plus_raw_chronology",
+            "model_config": asdict(model_config),
+            "train_config": asdict(train_config),
+            "seed": int(seed),
+            "pretraining_epochs": int(pretrain_epochs),
+        }
+        if pretrain_path.exists():
+            pretraining_sha256 = _file_sha256(pretrain_path)
+            pretrain = torch.load(
+                pretrain_path,
+                map_location="cpu",
+                weights_only=False,
+            )
+            validate_encoder_pretraining_cache(
+                pretrain,
+                expected_provenance=input_provenance,
+                model_config=asdict(model_config),
+                train_config=asdict(train_config),
+                seed=seed,
+                epochs=pretrain_epochs,
+            )
+            if _file_sha256(pretrain_path) != pretraining_sha256:
+                raise RuntimeError(
+                    "encoder-pretraining cache changed while it was "
+                    f"loaded: {pretrain_path}"
+                )
+        else:
+            pretrain = _train_pretraining_encoder(
+                rows=fold_rows.loc[train_mask].copy(),
+                native_h5=native_h5,
+                metadata=metadata[train_mask],
+                model_config=model_config,
+                train_config=train_config,
+                device=device,
+                workers=workers,
+                epochs=pretrain_epochs,
+                seed=seed,
+            )
+            pretrain.update(expected_pretraining)
+            pretrain_path.parent.mkdir(parents=True, exist_ok=True)
+            pretrain_temporary = pretrain_path.with_suffix(
+                pretrain_path.suffix + ".tmp"
+            )
             pretrain_temporary.unlink(missing_ok=True)
-            raise
+            try:
+                torch.save(pretrain, pretrain_temporary)
+                pretraining_sha256 = _file_sha256(pretrain_temporary)
+                pretrain_temporary.replace(pretrain_path)
+            except Exception:
+                pretrain_temporary.unlink(missing_ok=True)
+                raise
     dataset = HarmonicNativeDataset(
         fold_rows,
         native_h5=native_h5,
@@ -1044,7 +1066,8 @@ def _train_one_fold(
         seed=seed,
     )
     model = build_harmonic_cnn(model_config, profile=profile).to(device)
-    model.load_state_dict(pretrain["state_dict"], strict=True)
+    if not skip_encoder_pretraining:
+        model.load_state_dict(pretrain["state_dict"], strict=True)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=train_config.learning_rate,
@@ -1109,8 +1132,17 @@ def _train_one_fold(
         raise RuntimeError(f"{profile} fold {fold} never produced finite validation metrics")
     model.load_state_dict(best_state)
     validation = _evaluate_loader(model, validation_loader, device=device)
-    temperature = fit_temperature(
-        validation["morphology_logits"], validation["morphology_target"]
+    temperature = (
+        1.0
+        if defer_temperature_calibration
+        else fit_temperature(
+            validation["morphology_logits"], validation["morphology_target"]
+        )
+    )
+    temperature_calibration_scope = (
+        "pending_pooled_oof_development"
+        if defer_temperature_calibration
+        else "fold_validation"
     )
     morphology_probability = _softmax(
         validation["morphology_logits"], temperature=temperature
@@ -1144,14 +1176,20 @@ def _train_one_fold(
         "input_channel_contract": {
             name: list(channels) for name, channels in CHANNEL_CONTRACT.items()
         },
-        "encoder_pretraining_cache_schema": ENCODER_PRETRAINING_CACHE_SCHEMA,
+        "encoder_pretraining_cache_schema": (
+            "not_applicable_metadata_only"
+            if skip_encoder_pretraining
+            else ENCODER_PRETRAINING_CACHE_SCHEMA
+        ),
         "encoder_pretraining_sha256": pretraining_sha256,
+        "encoder_pretraining_skipped": bool(skip_encoder_pretraining),
         "profile": profile,
         "fold": fold,
         "model_config": asdict(model_config),
         "train_config": asdict(train_config),
         "metadata_normalization": asdict(normalization),
         "temperature": temperature,
+        "temperature_calibration_scope": temperature_calibration_scope,
         "best_epoch": best_epoch,
         "model_state_dict": best_state,
     }
@@ -1172,6 +1210,10 @@ def _train_one_fold(
             "morphology_target": validation["morphology_target"],
             "morphology_prediction": morphology_probability.argmax(axis=1),
             **{
+                f"logit_{label}": validation["morphology_logits"][:, index]
+                for index, label in enumerate(MORPHOLOGY_CLASSES)
+            },
+            **{
                 f"p_{label}": morphology_probability[:, index]
                 for index, label in enumerate(MORPHOLOGY_CLASSES)
             },
@@ -1183,6 +1225,7 @@ def _train_one_fold(
         "fold": fold,
         "best_epoch": best_epoch,
         "temperature": temperature,
+        "temperature_calibration_scope": temperature_calibration_scope,
         "metrics": validation_metrics,
         "checkpoint": str(fold_dir / "teacher.pt"),
         "pretraining_n": pretrain["n_rows"],

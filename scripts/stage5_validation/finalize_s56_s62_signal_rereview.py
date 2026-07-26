@@ -10,7 +10,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from twirl.vetting.multisector_signal_review import finalize_signal_rereview
+from twirl.vetting.multisector_signal_review import (
+    EXPLICIT_OVERRIDE_REVIEW_STATUS,
+    finalize_signal_rereview,
+    materialize_signal_rereview_acceptance,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -29,9 +33,11 @@ def finalize(
     out_dir: Path,
     adjudicator: str,
     accepted_utc: str,
+    accept_unchanged_priors: bool = False,
+    acceptance_declaration: str = "",
 ) -> dict[str, object]:
     queue = pd.read_csv(queue_path, dtype=str, keep_default_na=False)
-    labels = pd.read_csv(labels_path, dtype=str, keep_default_na=False)
+    raw_labels = pd.read_csv(labels_path, dtype=str, keep_default_na=False)
     provenance = pd.read_csv(
         provenance_path, dtype=str, keep_default_na=False
     )
@@ -104,6 +110,24 @@ def finalize(
             "source provenance does not match the exact queue row, candidate, "
             "and selected source identity"
         )
+    if accept_unchanged_priors:
+        if not acceptance_declaration.strip():
+            raise ValueError(
+                "an acceptance declaration is required when accepting "
+                "unchanged priors"
+            )
+        labels = materialize_signal_rereview_acceptance(
+            queue,
+            raw_labels,
+            adjudicator=adjudicator,
+            accepted_utc=accepted_utc,
+        )
+    else:
+        labels = raw_labels.copy()
+        if "review_acceptance_mode" not in labels:
+            labels["review_acceptance_mode"] = (
+                EXPLICIT_OVERRIDE_REVIEW_STATUS
+            )
     final = finalize_signal_rereview(
         queue,
         labels,
@@ -115,9 +139,27 @@ def finalize(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     final_path = out_dir / "accepted_signal_rereview.csv"
-    if final_path.exists():
-        raise FileExistsError(f"refusing to overwrite frozen review: {final_path}")
+    decisions_path = out_dir / "accepted_label_decisions.csv"
+    summary_path = out_dir / "summary.json"
+    existing_outputs = [
+        path
+        for path in (final_path, decisions_path, summary_path)
+        if path.exists()
+    ]
+    if existing_outputs:
+        raise FileExistsError(
+            "refusing to overwrite frozen review outputs: "
+            f"{[str(path) for path in existing_outputs]}"
+        )
+    labels.to_csv(decisions_path, index=False, float_format="%.15g")
     final.to_csv(final_path, index=False, float_format="%.15g")
+    review_status_counts = {
+        str(key): int(value)
+        for key, value in final["morphology_review_status"]
+        .value_counts()
+        .sort_index()
+        .items()
+    }
     summary: dict[str, object] = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "adjudicator": adjudicator,
@@ -142,6 +184,11 @@ def finalize(
         "n_preserved_verified_harmonics": int(
             final["harmonic_include_v1"].astype(bool).sum()
         ),
+        "acceptance": {
+            "accept_unchanged_priors": bool(accept_unchanged_priors),
+            "declaration": acceptance_declaration.strip(),
+            "review_status_counts": review_status_counts,
+        },
         "inputs": {
             "review_queue": {
                 "path": str(queue_path),
@@ -150,6 +197,7 @@ def finalize(
             "human_labels_final": {
                 "path": str(labels_path),
                 "sha256": _sha256(labels_path),
+                "n_saved_rows": int(len(raw_labels)),
             },
             "source_label_provenance": {
                 "path": str(provenance_path),
@@ -157,13 +205,16 @@ def finalize(
             },
         },
         "outputs": {
+            "accepted_label_decisions": {
+                "path": str(decisions_path),
+                "sha256": _sha256(decisions_path),
+            },
             "accepted_signal_rereview": {
                 "path": str(final_path),
                 "sha256": _sha256(final_path),
             }
         },
     }
-    summary_path = out_dir / "summary.json"
     summary["outputs"]["summary"] = {"path": str(summary_path)}  # type: ignore[index]
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     return summary
@@ -186,6 +237,22 @@ def main() -> None:
         default=None,
         help="Explicit UTC acceptance timestamp; defaults to the current time.",
     )
+    parser.add_argument(
+        "--accept-unchanged-priors",
+        action="store_true",
+        help=(
+            "Materialize missing rows from the queue's immutable initial "
+            "decisions after a declared full review pass."
+        ),
+    )
+    parser.add_argument(
+        "--acceptance-declaration",
+        default="",
+        help=(
+            "Human declaration authorizing unchanged priors; required with "
+            "--accept-unchanged-priors."
+        ),
+    )
     args = parser.parse_args()
     accepted_utc = args.accepted_utc or datetime.now(timezone.utc).isoformat()
     provenance_path = (
@@ -199,6 +266,8 @@ def main() -> None:
         out_dir=args.out_dir,
         adjudicator=args.adjudicator,
         accepted_utc=accepted_utc,
+        accept_unchanged_priors=args.accept_unchanged_priors,
+        acceptance_declaration=args.acceptance_declaration,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
 

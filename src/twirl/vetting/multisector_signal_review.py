@@ -43,6 +43,16 @@ FINAL_LABELS: frozenset[str] = frozenset(
         "skip",
     }
 )
+EXPLICIT_OVERRIDE_REVIEW_STATUS = "explicit_override"
+ACCEPTED_UNCHANGED_REVIEW_STATUS = (
+    "accepted_unchanged_after_declared_full_pass"
+)
+MORPHOLOGY_REVIEW_STATUSES: frozenset[str] = frozenset(
+    {
+        EXPLICIT_OVERRIDE_REVIEW_STATUS,
+        ACCEPTED_UNCHANGED_REVIEW_STATUS,
+    }
+)
 
 _COMMON_REQUIRED: frozenset[str] = frozenset(
     {"review_id", "tic", "sector", "period_d", "t0_bjd", "duration_min"}
@@ -594,6 +604,161 @@ def tehan_app_candidate_key(row: Mapping[str, Any]) -> str:
     return candidate_key(pd.Series(dict(row)))
 
 
+def materialize_signal_rereview_acceptance(
+    queue: pd.DataFrame,
+    saved_labels: pd.DataFrame,
+    *,
+    adjudicator: str,
+    accepted_utc: str,
+) -> pd.DataFrame:
+    """Materialize a declared full pass while preserving sparse saved changes.
+
+    This is intentionally opt-in. Rows present in ``saved_labels`` remain
+    explicit overrides with their original timestamps. Missing rows inherit the
+    immutable queue's initial decision and are marked as accepted unchanged at
+    ``accepted_utc``. The raw sparse click log is never modified.
+    """
+
+    _require(
+        queue,
+        {
+            "row_id",
+            "review_id",
+            "tic",
+            "sector",
+            "period_d",
+            "t0_bjd",
+            "prior_label",
+            "initial_label",
+            "initial_notes",
+            "initial_period_factor",
+            "initial_period_status",
+        },
+        name="signal re-review queue",
+    )
+    _require(
+        saved_labels,
+        {
+            "row_id",
+            "candidate_key",
+            "tic",
+            "sector",
+            "label",
+            "labeler",
+            "notes",
+            "period_factor",
+            "period_status",
+            "updated_utc",
+        },
+        name="saved signal re-review labels",
+    )
+    if not _text(adjudicator) or not _text(accepted_utc):
+        raise ValueError("adjudicator and accepted_utc must be nonblank")
+
+    public = queue.copy()
+    saved = saved_labels.copy()
+    for name, table in (("queue", public), ("saved labels", saved)):
+        table["row_id"] = table["row_id"].map(_text)
+        if table["row_id"].eq("").any() or table["row_id"].duplicated().any():
+            raise ValueError(f"{name} has blank or duplicate row_id values")
+
+    public_ids = set(public["row_id"])
+    saved_ids = set(saved["row_id"])
+    extra_ids = sorted(saved_ids - public_ids)
+    if extra_ids:
+        raise ValueError(
+            "saved signal labels contain rows absent from the frozen queue: "
+            f"{extra_ids[:5]}"
+        )
+
+    expected_by_id = {
+        _text(row["row_id"]): tehan_app_candidate_key(row)
+        for row in public.to_dict("records")
+    }
+    public_by_id = public.set_index("row_id")
+    if not saved.empty:
+        expected_keys = saved["row_id"].map(expected_by_id)
+        observed_keys = (
+            saved["candidate_key"].map(_text).map(canonicalize_candidate_key)
+        )
+        if observed_keys.ne(
+            expected_keys.map(_text).map(canonicalize_candidate_key)
+        ).any():
+            raise ValueError(
+                "saved signal labels do not match the exact frozen queue"
+            )
+        if saved["tic"].map(_text).ne(
+            saved["row_id"].map(public_by_id["tic"]).map(_text)
+        ).any():
+            raise ValueError("saved signal labels contain a TIC mismatch")
+        if saved["sector"].map(_text).ne(
+            saved["row_id"].map(public_by_id["sector"]).map(_text)
+        ).any():
+            raise ValueError("saved signal labels contain a sector mismatch")
+        saved_label_values = saved["label"].map(_text)
+        invalid = sorted(set(saved_label_values) - FINAL_LABELS)
+        if invalid or saved_label_values.eq("").any():
+            raise ValueError(
+                f"saved signal review contains invalid labels: {invalid}"
+            )
+        observed_labelers = set(saved["labeler"].map(_text))
+        if observed_labelers != {adjudicator}:
+            raise ValueError(
+                "saved signal review labeler differs from the declared "
+                f"adjudicator: {sorted(observed_labelers)}"
+            )
+
+    saved_by_id = {
+        _text(row["row_id"]): row for row in saved.to_dict("records")
+    }
+    materialized: list[dict[str, Any]] = []
+    for row in public.to_dict("records"):
+        row_id = _text(row["row_id"])
+        if row_id in saved_by_id:
+            decision = dict(saved_by_id[row_id])
+            decision["review_acceptance_mode"] = (
+                EXPLICIT_OVERRIDE_REVIEW_STATUS
+            )
+            materialized.append(decision)
+            continue
+
+        label = _text(row.get("initial_label")) or _text(
+            row.get("prior_label")
+        )
+        if label not in FINAL_LABELS:
+            raise ValueError(
+                f"queue row {row_id} has no valid unchanged label to accept"
+            )
+        period_factor = _factor_text(row.get("initial_period_factor"))
+        period_status = _text(row.get("initial_period_status"))
+        if not period_status:
+            period_status = (
+                "unresolved"
+                if period_factor == "unresolved"
+                else ("review_period" if period_factor == "1" else "refolded")
+            )
+        materialized.append(
+            {
+                "row_id": row_id,
+                "candidate_key": expected_by_id[row_id],
+                "tic": row.get("tic", ""),
+                "sector": row.get("sector", ""),
+                "label": label,
+                "label_source": "accepted_unchanged_prior",
+                "labeler": adjudicator,
+                "notes": _text(row.get("initial_notes")),
+                "updated_utc": accepted_utc,
+                "period_factor": period_factor,
+                "period_status": period_status,
+                "review_acceptance_mode": (
+                    ACCEPTED_UNCHANGED_REVIEW_STATUS
+                ),
+            }
+        )
+
+    return pd.DataFrame(materialized)
+
+
 def finalize_signal_rereview(
     queue: pd.DataFrame,
     labels: pd.DataFrame,
@@ -672,6 +837,24 @@ def finalize_signal_rereview(
             "final signal review labeler differs from the declared adjudicator: "
             f"{sorted(observed_labelers)}"
         )
+    if "review_acceptance_mode" not in returned:
+        returned["review_acceptance_mode"] = EXPLICIT_OVERRIDE_REVIEW_STATUS
+    returned["review_acceptance_mode"] = returned[
+        "review_acceptance_mode"
+    ].map(_text)
+    returned.loc[
+        returned["review_acceptance_mode"].eq(""),
+        "review_acceptance_mode",
+    ] = EXPLICIT_OVERRIDE_REVIEW_STATUS
+    invalid_review_statuses = sorted(
+        set(returned["review_acceptance_mode"])
+        - MORPHOLOGY_REVIEW_STATUSES
+    )
+    if invalid_review_statuses:
+        raise ValueError(
+            "final signal review contains invalid acceptance modes: "
+            f"{invalid_review_statuses}"
+        )
 
     returned = returned.rename(
         columns={
@@ -684,14 +867,21 @@ def finalize_signal_rereview(
             "updated_utc": "final_updated_utc",
             "tic": "returned_tic",
             "sector": "returned_sector",
+            "label_source": "final_app_label_source",
+            "review_acceptance_mode": "morphology_review_status",
         }
     )
     joined = public.merge(returned, on="row_id", how="left", validate="one_to_one")
     joined["morphology_adjudicator"] = adjudicator
     joined["morphology_accepted_utc"] = accepted_utc
-    joined["morphology_review_status"] = "explicit_row_review"
     joined["human_label"] = joined["final_human_label"]
-    joined["human_label_source"] = "human_adjudication"
+    joined["human_label_source"] = np.where(
+        joined["morphology_review_status"].eq(
+            ACCEPTED_UNCHANGED_REVIEW_STATUS
+        ),
+        "human_acceptance_of_prior_review",
+        "human_adjudication",
+    )
     joined["human_labeler"] = joined["final_labeler"]
     joined["human_notes"] = joined["final_notes"]
     joined["human_updated_utc"] = joined["final_updated_utc"]
@@ -727,13 +917,17 @@ def finalize_signal_rereview(
 
 
 __all__ = [
+    "ACCEPTED_UNCHANGED_REVIEW_STATUS",
+    "EXPLICIT_OVERRIDE_REVIEW_STATUS",
     "FINAL_LABELS",
+    "MORPHOLOGY_REVIEW_STATUSES",
     "SIGNAL_PRECEDENCE_POLICY_VERSION",
     "SIGNAL_REREVIEW_LABELS",
     "SIGNAL_REREVIEW_LABEL_RANK",
     "SIGNAL_REREVIEW_POLICY_VERSION",
     "build_signal_rereview_queue",
     "finalize_signal_rereview",
+    "materialize_signal_rereview_acceptance",
     "normalize_accepted_franklin_signals",
     "normalize_browser_signal_rows",
     "normalize_s56_adjudicated_signals",

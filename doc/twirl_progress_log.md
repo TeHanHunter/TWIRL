@@ -319,16 +319,38 @@ sample.
   standard repository vetter with exact-name sheet binding, suggestions that
   remain unreviewed until explicitly saved, `P/3` and `3P` controls, and a
   global Planet-like-first then EB order.
+- `2026-07-24`: TeHan completed the uniform `509`-row Planet-like/EB pass and
+  declared the untouched suggestions accepted after inspecting the full
+  queue. The immutable
+  [decision snapshot](../reports/stage5_validation/s56_s62_morphology_corpus_teacher_v3_v1/)
+  keeps the raw `22`-row click log separate from the materialized acceptance:
+  `22` explicit overrides plus `487` accepted-unchanged decisions. The
+  accepted table SHA-256 is
+  `47ffb23909dd2aceb3055d33969a903a356d6a79617b287ff172a6f156694278`;
+  final labels are `70` Planet-like, `419` Eclipse/contact, `10`
+  Broad-isolated-dip, `7` stellar variability, `2` uncertain, and `1`
+  instrumental/systematic. Exactly `64` S56 harmonic decisions remain
+  explicitly verified.
+- `2026-07-24`: Froze the seven-sector `teacher_v3` data release while keeping
+  the architecture identifier `s56_harmonic_cnn_v1`. The
+  [corpus and split](../reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/)
+  contain `8,181` rows (`7,724` real plus `457` injections), `8,163` active
+  training rows, and `7,903` TIC groups. The corpus SHA-256 is
+  `7f05bd9e8b7c7b04c7cf6ec0b45df6300fb0cb08623acbfbec65fb85cd66ebd7`;
+  the immutable `20%` test/five-development-fold registry SHA-256 is
+  `551747a18175ecc3c4dbcc9d464e2f521f0550cb9e045c28c6a7580455922f7c`
+  and has zero TIC leakage. All seven sectors and all accepted label sources
+  contribute; Franklin's period factors remain audit-only. S63 remains
+  reserved for a later prospective evaluation.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Complete and freeze TeHan's explicit `509`-row final pass. Then
-instantiate the implemented `(sector, TIC)` native registry and immutable
-TIC-grouped split registry on the seven-sector corpus, bind those registry
-hashes into the trainer/checkpoints, and regenerate quality-aware inputs before
-training. Retrain teacher v1 once with source-separated, calibrated evaluation
-and bootstrap uncertainty. Add dip, multi-sector, and false-alarm branches
-only after this path is robust.
+**Next:** Complete and validate the split-bound, quality-aware per-sector
+native inputs, instantiate the `(sector, TIC)` registry, and run the fixed
+metadata baseline plus primary shape/BLS profile as the `teacher_v3` release.
+Use pooled development-OOF calibration, TIC-clustered uncertainty, and the
+uncertain-label sensitivity analysis. Add dip, multi-sector, and false-alarm
+branches only after this path is robust.
 
 ### Human labels and harmonic review
 

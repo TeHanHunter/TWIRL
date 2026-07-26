@@ -1,0 +1,115 @@
+{
+  "corpus_summary_contract": "teacher_v3_s56_s62_morphology_corpus_v1",
+  "fixed_split_counts": {
+    "development": 6549,
+    "test": 1632
+  },
+  "group_leakage_count": 0,
+  "inputs": {
+    "corpus": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/frozen/observation_morphology_corpus.csv",
+      "sha256": "7f05bd9e8b7c7b04c7cf6ec0b45df6300fb0cb08623acbfbec65fb85cd66ebd7"
+    },
+    "corpus_summary": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/frozen/observation_morphology_corpus.summary.json",
+      "sha256": "43bc76d52001505485f5c83f81d0d8adeab78b3e8b57ab4913cbf5f41590398d"
+    },
+    "split_registry": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/frozen/tic_split_registry.csv",
+      "sha256": "551747a18175ecc3c4dbcc9d464e2f521f0550cb9e045c28c6a7580455922f7c"
+    },
+    "split_summary": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/frozen/tic_split_registry.summary.json",
+      "sha256": "d39143eb792b62e9764b38f5687009577b9379ac4673df17ef2fbc51ad247215"
+    }
+  },
+  "n_active_injected_rows": 456,
+  "n_active_real_rows": 7707,
+  "n_active_rows": 8163,
+  "n_real_registry_observations": 7705,
+  "n_rows": 8181,
+  "native_contract_version_expected": "s56_adp_raw_pair_v2",
+  "native_root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native",
+  "outputs": {
+    "injection_native_mapping": {
+      "n_rows": 456,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/injection_native_mapping.csv",
+      "sha256": "f6df4beed7c5a6a0fe1a88eb6c6616c1cc699d2f96e6c94823e8351dd435c4da"
+    },
+    "real_native_registry_source": {
+      "n_rows": 7705,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/real_native_registry_source.csv",
+      "sha256": "2b7af5ad414022bdc52576e40d9d41571572ba9fc6c101b71fb96628cce7e6f9"
+    },
+    "s56_native_export_table": {
+      "n_rows": 2181,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/s56_native_export_table.csv",
+      "sha256": "ba31963a568ba5e381a19f123d238b45413dbe33ec47a84538f483dc4ce9c762"
+    },
+    "s57_native_export_table": {
+      "n_rows": 1000,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/s57_native_export_table.csv",
+      "sha256": "42ed55536ba1004202d378af9fd9512a645b89e5c9def3a6ac216e6bb2fded6c"
+    },
+    "s58_native_export_table": {
+      "n_rows": 1000,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/s58_native_export_table.csv",
+      "sha256": "17b647db0d5cff0452bc37d6692d0a87c77cb1b9ee67298c0fc85b290f79fb9d"
+    },
+    "s59_native_export_table": {
+      "n_rows": 1000,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/s59_native_export_table.csv",
+      "sha256": "7c0f88b5eca00f32016eed8c2c1de6168ccf107c969f6c62c69de0bc91630ba9"
+    },
+    "s60_native_export_table": {
+      "n_rows": 1000,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/s60_native_export_table.csv",
+      "sha256": "adfbd513848b9d903b3b6a4c53b0af5168dcea098798977cf87043116fb85847"
+    },
+    "s61_native_export_table": {
+      "n_rows": 1000,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/s61_native_export_table.csv",
+      "sha256": "1f67e5844a1d3af6c0b709c6a5e53da15fec6861f0dbb5dade470011c32d53ba"
+    },
+    "s62_native_export_table": {
+      "n_rows": 1000,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/s62_native_export_table.csv",
+      "sha256": "47497f068adec26c8a209f47ab17d9601c06411fc83bd32a7fb6fdbbdb9b5422"
+    },
+    "training_table_with_splits": {
+      "n_rows": 8181,
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/training_table_with_splits.csv",
+      "sha256": "04a565a6e27d76b696f80f80146761034c9f60c1d3a90388c8c9906a3cfba639"
+    }
+  },
+  "preparation_contract_version": "teacher_v3_s56_s62_native_preparation_v1",
+  "sector_active_counts": {
+    "56": 2174,
+    "57": 998,
+    "58": 998,
+    "59": 999,
+    "60": 999,
+    "61": 998,
+    "62": 997
+  },
+  "sector_native_h5_paths": {
+    "56": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/s56_teacher_v3_native_v2.h5",
+    "57": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/s57_teacher_v3_native_v2.h5",
+    "58": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/s58_teacher_v3_native_v2.h5",
+    "59": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/s59_teacher_v3_native_v2.h5",
+    "60": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/s60_teacher_v3_native_v2.h5",
+    "61": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/s61_teacher_v3_native_v2.h5",
+    "62": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/s62_teacher_v3_native_v2.h5"
+  },
+  "sector_row_counts": {
+    "56": 2181,
+    "57": 1000,
+    "58": 1000,
+    "59": 1000,
+    "60": 1000,
+    "61": 1000,
+    "62": 1000
+  },
+  "split_policy_version": "tic_grouped_stratified_test20_dev5_v1",
+  "teacher_run_name": "teacher_v3"
+}

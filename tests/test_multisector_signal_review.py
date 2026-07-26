@@ -8,8 +8,11 @@ import pytest
 
 from twirl.vetting.label_io import candidate_key
 from twirl.vetting.multisector_signal_review import (
+    ACCEPTED_UNCHANGED_REVIEW_STATUS,
+    EXPLICIT_OVERRIDE_REVIEW_STATUS,
     build_signal_rereview_queue,
     finalize_signal_rereview,
+    materialize_signal_rereview_acceptance,
     normalize_accepted_franklin_signals,
     normalize_browser_signal_rows,
     normalize_s56_adjudicated_signals,
@@ -302,6 +305,91 @@ def test_final_review_preserves_only_previously_verified_harmonics() -> None:
         )
 
 
+def test_declared_full_pass_materializes_only_unchanged_rows() -> None:
+    queue, _, _ = _current_queue()
+    string_queue = queue.astype(object).where(pd.notna(queue), "")
+    changed_row = string_queue.iloc[0]
+    saved = pd.DataFrame(
+        [
+            {
+                "row_id": changed_row["row_id"],
+                "candidate_key": tehan_app_candidate_key(changed_row),
+                "tic": changed_row["tic"],
+                "sector": changed_row["sector"],
+                "label": "wide_transit_like",
+                "label_source": "human",
+                "labeler": "tehan",
+                "notes": "explicit change",
+                "period_factor": "2",
+                "period_status": "refolded",
+                "updated_utc": "2026-07-24T19:00:00+00:00",
+            }
+        ]
+    )
+    accepted_utc = "2026-07-24T20:10:00+00:00"
+    materialized = materialize_signal_rereview_acceptance(
+        string_queue,
+        saved,
+        adjudicator="tehan",
+        accepted_utc=accepted_utc,
+    )
+
+    assert len(materialized) == len(string_queue)
+    assert materialized["row_id"].tolist() == string_queue["row_id"].map(str).tolist()
+    assert materialized["review_acceptance_mode"].value_counts().to_dict() == {
+        ACCEPTED_UNCHANGED_REVIEW_STATUS: len(string_queue) - 1,
+        EXPLICIT_OVERRIDE_REVIEW_STATUS: 1,
+    }
+    explicit = materialized.loc[
+        materialized["review_acceptance_mode"].eq(
+            EXPLICIT_OVERRIDE_REVIEW_STATUS
+        )
+    ].iloc[0]
+    assert explicit["label"] == "wide_transit_like"
+    assert explicit["notes"] == "explicit change"
+    assert explicit["updated_utc"] == "2026-07-24T19:00:00+00:00"
+    unchanged = materialized.loc[
+        materialized["review_acceptance_mode"].eq(
+            ACCEPTED_UNCHANGED_REVIEW_STATUS
+        )
+    ]
+    expected = string_queue.set_index(string_queue["row_id"].map(str))
+    assert unchanged["label"].tolist() == [
+        expected.loc[row_id, "initial_label"]
+        for row_id in unchanged["row_id"]
+    ]
+    assert unchanged["updated_utc"].eq(accepted_utc).all()
+
+    final = finalize_signal_rereview(
+        string_queue,
+        materialized,
+        adjudicator="tehan",
+        accepted_utc=accepted_utc,
+    )
+    assert final["morphology_review_status"].value_counts().to_dict() == {
+        ACCEPTED_UNCHANGED_REVIEW_STATUS: len(string_queue) - 1,
+        EXPLICIT_OVERRIDE_REVIEW_STATUS: 1,
+    }
+    assert set(
+        final.loc[
+            final["morphology_review_status"].eq(
+                ACCEPTED_UNCHANGED_REVIEW_STATUS
+            ),
+            "human_label_source",
+        ]
+    ) == {"human_acceptance_of_prior_review"}
+
+    tampered = saved.copy()
+    tampered.loc[0, "candidate_key"] = "wrong"
+    with pytest.raises(ValueError, match="exact frozen queue"):
+        materialize_signal_rereview_acceptance(
+            string_queue,
+            tampered,
+            adjudicator="tehan",
+            accepted_utc=accepted_utc,
+        )
+
+
 def test_disk_finalizer_binds_exact_selected_source_provenance(
     tmp_path: Path,
 ) -> None:
@@ -342,6 +430,12 @@ def test_disk_finalizer_binds_exact_selected_source_provenance(
         accepted_utc="2026-07-24T00:01:00+00:00",
     )
     assert summary["n_rows"] == len(queue)
+    assert summary["acceptance"]["review_status_counts"] == {
+        EXPLICIT_OVERRIDE_REVIEW_STATUS: len(queue)
+    }
+    assert (
+        tmp_path / "accepted" / "accepted_label_decisions.csv"
+    ).is_file()
 
     tampered = provenance.copy()
     selected = tampered["selected_for_queue"].astype(bool)
@@ -366,3 +460,61 @@ def test_disk_finalizer_binds_exact_selected_source_provenance(
             adjudicator="tehan",
             accepted_utc="2026-07-24T00:01:00+00:00",
         )
+
+
+def test_disk_finalizer_requires_declaration_for_unchanged_priors(
+    tmp_path: Path,
+) -> None:
+    queue, provenance, _ = _current_queue()
+    string_queue = queue.astype(object).where(pd.notna(queue), "")
+    row = string_queue.iloc[0]
+    saved = pd.DataFrame(
+        [
+            {
+                "row_id": row["row_id"],
+                "candidate_key": tehan_app_candidate_key(row),
+                "tic": row["tic"],
+                "sector": row["sector"],
+                "label": "wide_transit_like",
+                "label_source": "human",
+                "labeler": "tehan",
+                "notes": "",
+                "period_factor": "1",
+                "period_status": "review_period",
+                "updated_utc": "2026-07-24T19:00:00+00:00",
+            }
+        ]
+    )
+    queue_path = tmp_path / "queue.csv"
+    labels_path = tmp_path / "labels.csv"
+    provenance_path = tmp_path / "provenance.csv"
+    string_queue.to_csv(queue_path, index=False)
+    saved.to_csv(labels_path, index=False)
+    provenance.to_csv(provenance_path, index=False)
+    finalizer = _load_finalizer()
+
+    with pytest.raises(ValueError, match="acceptance declaration"):
+        finalizer.finalize(
+            queue_path=queue_path,
+            labels_path=labels_path,
+            provenance_path=provenance_path,
+            out_dir=tmp_path / "missing_declaration",
+            adjudicator="tehan",
+            accepted_utc="2026-07-24T20:10:00+00:00",
+            accept_unchanged_priors=True,
+        )
+
+    summary = finalizer.finalize(
+        queue_path=queue_path,
+        labels_path=labels_path,
+        provenance_path=provenance_path,
+        out_dir=tmp_path / "accepted_declared_pass",
+        adjudicator="tehan",
+        accepted_utc="2026-07-24T20:10:00+00:00",
+        accept_unchanged_priors=True,
+        acceptance_declaration="Reviewed all rows; unchanged priors accepted.",
+    )
+    assert summary["acceptance"]["review_status_counts"] == {
+        ACCEPTED_UNCHANGED_REVIEW_STATUS: len(queue) - 1,
+        EXPLICIT_OVERRIDE_REVIEW_STATUS: 1,
+    }

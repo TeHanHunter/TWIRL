@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build one hash-bound A2v1 cadence/quality reference."""
+"""Build a hash-bound A2v1 SPOC-quality table for one TESS sector."""
 from __future__ import annotations
 
 import argparse
@@ -16,20 +16,15 @@ if str(SRC_ROOT) not in sys.path:
 from twirl.lightcurves.a2v1_cadence_reference import (  # noqa: E402
     S56_EXPECTED_DETECTORS,
     S56_EXPECTED_ORBITS,
-    parse_qlp_qflag_spec,
     parse_quat_spec,
-    write_cadence_reference,
+    parse_spoc_flag_spec,
+    write_spoc_quality_table,
 )
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--sector",
-        type=int,
-        default=56,
-        help="TESS sector (default: the locked S56 case).",
-    )
+    parser.add_argument("--sector", type=int, default=56)
     parser.add_argument(
         "--expected-orbit",
         action="append",
@@ -47,44 +42,26 @@ def build_arg_parser() -> argparse.ArgumentParser:
         required=True,
         metavar="ORBIT,CAMERA,PATH",
         help=(
-            "QLP camC_quat.txt with explicit orbit and camera; repeat for all "
-            "expected orbit/camera combinations."
+            "Explicit QLP camC_quat.txt authority; repeat for every expected "
+            "orbit/camera combination."
         ),
     )
     parser.add_argument(
-        "--qlp-qflag",
+        "--spoc-flag",
         action="append",
         required=True,
-        metavar="ORBIT,CAMERA,CCD,PATH",
+        metavar="CAMERA,CCD,PATH",
         help=(
-            "Headerless QLP cadence/qflag authority with explicit orbit and "
-            "detector; repeat for every expected orbit/camera/CCD combination."
-        ),
-    )
-    parser.add_argument(
-        "--spoc-quality-table",
-        type=Path,
-        required=True,
-        help=(
-            "Precomputed CSV/Parquet with sector,camera,ccd,cadenceno,quality "
-            "and optional orbitid."
-        ),
-    )
-    parser.add_argument(
-        "--spoc-quality-provenance",
-        type=Path,
-        required=True,
-        help=(
-            "Mandatory JSON sidecar binding the table to the derivation contract "
-            "and all 16 original detector-level SPOC flag files."
+            "Original detector spocffiflag_sN_camC_ccdD.txt; repeat for all "
+            "16 detectors."
         ),
     )
     parser.add_argument("--output-table", type=Path, required=True)
-    parser.add_argument("--output-manifest", type=Path, required=True)
+    parser.add_argument("--output-provenance", type=Path, required=True)
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Atomically replace existing table/manifest outputs.",
+        help="Atomically replace an existing output table/provenance pair.",
     )
     return parser
 
@@ -117,19 +94,17 @@ def main(argv: list[str] | None = None) -> int:
             supplied=args.expected_orbits,
         )
         quat_sources = tuple(parse_quat_spec(value) for value in args.quat)
-        qlp_qflag_sources = tuple(
-            parse_qlp_qflag_spec(value) for value in args.qlp_qflag
+        spoc_sources = tuple(
+            parse_spoc_flag_spec(value) for value in args.spoc_flag
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
-    manifest = write_cadence_reference(
+    manifest = write_spoc_quality_table(
         sector=args.sector,
         quat_sources=quat_sources,
-        qlp_qflag_sources=qlp_qflag_sources,
-        spoc_quality_table=args.spoc_quality_table,
-        spoc_quality_provenance=args.spoc_quality_provenance,
+        spoc_flag_sources=spoc_sources,
         output_table=args.output_table,
-        output_manifest=args.output_manifest,
+        output_provenance=args.output_provenance,
         expected_orbits=expected_orbits,
         expected_detectors=S56_EXPECTED_DETECTORS,
         overwrite=args.overwrite,
