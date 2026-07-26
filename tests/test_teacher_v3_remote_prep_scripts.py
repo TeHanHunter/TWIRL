@@ -226,6 +226,10 @@ def test_teacher_v3_shell_wrappers_have_valid_bash_syntax() -> None:
     ).read_text(encoding="utf-8")
     assert "#SBATCH -c 1" in native_wrapper
     assert 'TWIRL_TEACHER_V3_NATIVE_SHARDS:-1' in native_wrapper
+    assert 'TWIRL_TEACHER_V3_ORBITID_POLICY:-strict' in native_wrapper
+    assert "reference_by_cadence" in native_wrapper
+    assert '--orbitid-policy "${ORBITID_POLICY}"' in native_wrapper
+    assert "bounded to S62" in native_wrapper
     assert "srun --exclusive --exact -N1 -n1 -c1" in native_wrapper
     assert "TWIRL_OVERWRITE_TEACHER_V3_NATIVE" not in native_wrapper
     assert "is real-only; unset TWIRL_TEACHER_V3_INJECTION_PAIR_H5" in (

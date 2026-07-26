@@ -19,6 +19,7 @@ from twirl.lightcurves.a2v1_cadence_reference import (
 from twirl.lightcurves.external_quality import (
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
+    ORBITID_POLICY_REFERENCE,
     load_external_quality_reference,
 )
 
@@ -184,6 +185,31 @@ def test_reference_fails_closed_on_missing_cadence_or_orbit_mismatch(
             internal_quality=[0],
         )
 
+    input_orbitid = np.asarray([120], dtype=np.int64)
+    resolved = reference.apply(
+        sector=56,
+        camera=1,
+        ccd=1,
+        cadenceno=[100],
+        orbitid=input_orbitid,
+        internal_quality=[0],
+        orbitid_policy=ORBITID_POLICY_REFERENCE,
+    )
+    assert input_orbitid.tolist() == [120]
+    assert resolved.resolved_orbitid.tolist() == [119]
+    assert resolved.orbitid_reference_correction_mask.tolist() == [True]
+
+    with pytest.raises(ValueError, match="unknown orbitid_policy"):
+        reference.apply(
+            sector=56,
+            camera=1,
+            ccd=1,
+            cadenceno=[100],
+            orbitid=[119],
+            internal_quality=[0],
+            orbitid_policy="guess",
+        )
+
 
 def test_reference_masks_only_exact_declared_authority_exclusion(
     tmp_path: Path,
@@ -210,6 +236,8 @@ def test_reference_masks_only_exact_declared_authority_exclusion(
         1 << AUTHORITY_EXCLUSION_EXTERNAL_BIT,
         8,
     ]
+    assert result.resolved_orbitid.tolist() == [119, 120, 120]
+    assert not result.orbitid_reference_correction_mask.any()
     assert result.counts == {
         "n_cad_total": 3,
         "n_cad_internal_bad": 0,

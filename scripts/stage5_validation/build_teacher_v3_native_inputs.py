@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from twirl.vetting.harmonic_export import build_raw_pair_export  # noqa: E402
+from twirl.lightcurves.external_quality import ORBITID_POLICIES  # noqa: E402
 from twirl.vetting.harmonic_inputs import verify_raw_pair_contract  # noqa: E402
 
 
@@ -29,6 +30,11 @@ def main() -> None:
     parser.add_argument("--n-periods", type=int, default=4096)
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--n-shards", type=int, default=1)
+    parser.add_argument(
+        "--orbitid-policy",
+        choices=ORBITID_POLICIES,
+        default="strict",
+    )
     args = parser.parse_args()
     if args.sector < 56 or args.sector > 62:
         raise SystemExit("Teacher-v3 native input is bounded to sectors 56-62")
@@ -45,6 +51,7 @@ def main() -> None:
         n_periods=args.n_periods,
         shard_index=args.shard_index,
         n_shards=args.n_shards,
+        orbitid_policy=args.orbitid_policy,
     )
     verification = verify_raw_pair_contract(
         args.out_h5,

@@ -45,6 +45,15 @@ EXPECTED_QUALITY_COMPOSITION = {
     "qlp_quality_raw_values": [0, 1],
     "qlp_quality_external_bit": QLP_QUALITY_EXTERNAL_BIT,
 }
+ORBITID_POLICY_STRICT = "strict"
+ORBITID_POLICY_REFERENCE = "reference_by_cadence"
+ORBITID_POLICIES = (
+    ORBITID_POLICY_STRICT,
+    ORBITID_POLICY_REFERENCE,
+)
+ORBITID_RECONCILIATION_CONTRACT_VERSION = (
+    "a2v1_native_orbitid_reconciliation_v1"
+)
 
 
 def _read_table(path: Path) -> pd.DataFrame:
@@ -309,6 +318,8 @@ class QualityOverlayResult:
     quality: np.ndarray
     external_quality: np.ndarray
     counts: Mapping[str, int]
+    resolved_orbitid: np.ndarray
+    orbitid_reference_correction_mask: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -374,9 +385,15 @@ class ExternalQualityReference:
         orbitid: Any,
         internal_quality: Any,
         context: str = "light curve",
+        orbitid_policy: str = ORBITID_POLICY_STRICT,
     ) -> QualityOverlayResult:
         """Apply the exact detector/cadence/orbit overlay to one light curve."""
 
+        if orbitid_policy not in ORBITID_POLICIES:
+            raise ValueError(
+                f"{context}: unknown orbitid_policy {orbitid_policy!r}; "
+                f"expected one of {ORBITID_POLICIES}"
+            )
         sector = int(sector)
         camera = int(camera)
         ccd = int(ccd)
@@ -436,7 +453,7 @@ class ExternalQualityReference:
         mapped_orbits = np.zeros(len(cadences), dtype=np.int64)
         mapped_orbits[matched] = reference_orbit[positions[matched]]
         mismatch = matched & (mapped_orbits != orbits)
-        if mismatch.any():
+        if mismatch.any() and orbitid_policy == ORBITID_POLICY_STRICT:
             examples = [
                 {
                     "cadenceno": int(cadences[index]),
@@ -448,6 +465,9 @@ class ExternalQualityReference:
             raise ValueError(
                 f"{context}: external-quality orbit mapping mismatch: {examples}"
             )
+        resolved_orbits = orbits.copy()
+        if orbitid_policy == ORBITID_POLICY_REFERENCE:
+            resolved_orbits[matched] = mapped_orbits[matched]
 
         external = np.zeros(len(cadences), dtype=np.int64)
         external[matched] = reference_quality[positions[matched]]
@@ -473,6 +493,8 @@ class ExternalQualityReference:
             quality=effective_bad.astype(np.int32),
             external_quality=external.astype(np.int64, copy=False),
             counts=counts,
+            resolved_orbitid=resolved_orbits.astype(np.int64, copy=False),
+            orbitid_reference_correction_mask=mismatch.astype(bool, copy=False),
         )
 
 
@@ -708,6 +730,10 @@ __all__ = [
     "EXPECTED_QUALITY_AUTHORITY",
     "EXTERNAL_QUALITY_POLICY_CONTRACT",
     "ExternalQualityReference",
+    "ORBITID_POLICIES",
+    "ORBITID_POLICY_REFERENCE",
+    "ORBITID_POLICY_STRICT",
+    "ORBITID_RECONCILIATION_CONTRACT_VERSION",
     "QualityOverlayResult",
     "load_external_quality_reference",
 ]

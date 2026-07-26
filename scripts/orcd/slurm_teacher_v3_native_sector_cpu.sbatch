@@ -30,10 +30,23 @@ CADENCE_REFERENCE_MANIFEST="${TWIRL_TEACHER_V3_CADENCE_REFERENCE_MANIFEST:?set t
 INJECTION_PAIR="${TWIRL_TEACHER_V3_INJECTION_PAIR_H5:-}"
 FINAL="${TWIRL_TEACHER_V3_NATIVE_H5:-${TWIRL_ROOT}/${RUN_REL}/native/s${SECTOR}_teacher_v3_native_v2.h5}"
 N_SHARDS="${TWIRL_TEACHER_V3_NATIVE_SHARDS:-1}"
+ORBITID_POLICY="${TWIRL_TEACHER_V3_ORBITID_POLICY:-strict}"
 RUN_DIR="${TWIRL_ROOT}/runtime/teacher_v3/native_s${SECTOR}_${SLURM_JOB_ID}"
 
 if (( N_SHARDS < 1 || N_SHARDS > SLURM_CPUS_PER_TASK )); then
   echo "TWIRL_TEACHER_V3_NATIVE_SHARDS must be in 1..${SLURM_CPUS_PER_TASK}." >&2
+  exit 2
+fi
+if [[ "${ORBITID_POLICY}" != "strict" && "${ORBITID_POLICY}" != "reference_by_cadence" ]]; then
+  echo "TWIRL_TEACHER_V3_ORBITID_POLICY must be strict or reference_by_cadence." >&2
+  exit 2
+fi
+if [[ "${ORBITID_POLICY}" == "reference_by_cadence" && "${SECTOR}" != "62" ]]; then
+  echo "reference_by_cadence orbit-ID reconciliation is bounded to S62." >&2
+  exit 2
+fi
+if [[ "${ORBITID_POLICY}" == "reference_by_cadence" && "${N_SHARDS}" != "1" ]]; then
+  echo "S62 orbit-ID reconciliation requires exactly one native shard." >&2
   exit 2
 fi
 if [[ "${SECTOR}" == "56" && ! -s "${INJECTION_PAIR}" ]]; then
@@ -81,12 +94,13 @@ common_args=(
   --repo-root "${REPO}"
   --n-periods 4096
   --n-shards "${N_SHARDS}"
+  --orbitid-policy "${ORBITID_POLICY}"
 )
 if [[ -n "${INJECTION_PAIR}" ]]; then
   common_args+=(--injection-pair-h5 "${INJECTION_PAIR}")
 fi
 
-echo "[teacher-v3-native] sector=${SECTOR} shards=${N_SHARDS} start=$(date -Is)"
+echo "[teacher-v3-native] sector=${SECTOR} shards=${N_SHARDS} orbitid_policy=${ORBITID_POLICY} start=$(date -Is)"
 pids=()
 for ((shard=0; shard<N_SHARDS; shard++)); do
   shard_path="${RUN_DIR}/native_${shard}.h5"

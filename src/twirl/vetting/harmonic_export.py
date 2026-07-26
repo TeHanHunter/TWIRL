@@ -24,6 +24,10 @@ from twirl.lightcurves.external_quality import (
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
     ExternalQualityReference,
+    ORBITID_POLICIES,
+    ORBITID_POLICY_REFERENCE,
+    ORBITID_POLICY_STRICT,
+    ORBITID_RECONCILIATION_CONTRACT_VERSION,
     load_external_quality_reference,
 )
 from twirl.lightcurves.tglc_h5_reader import read_tglc_h5
@@ -33,15 +37,21 @@ from twirl.vetting.harmonic_inputs import (
     CHRONOLOGY_SUPPLEMENTAL_CHANNELS,
     HARMONIC_VIEW_CHANNELS,
     NATIVE_DATASETS,
+    ORBITID_RECONCILIATION_MASK_DATASET,
     PERIODOGRAM_DATASETS,
     PERIODOGRAM_CHANNELS,
     RAW_PAIR_CONTRACT_VERSION,
     RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS,
     RAW_PAIR_EXTERNAL_QUALITY_ATTRS,
+    RAW_PAIR_ORBITID_RECONCILIATION_ATTRS,
     RAW_PAIR_QUALITY_COUNT_NAMES,
     candidate_provenance_from_summary,
     injected_raw_uncertainty,
     native_group_path,
+)
+from twirl.vetting.orbitid_reconciliation import (
+    S62_TEACHER_V3_ORBITID_RECONCILIATION_BINDING,
+    S62_TEACHER_V3_ORBITID_RECONCILIATION_RELEASE,
 )
 
 
@@ -60,8 +70,6 @@ DEFAULT_BLS_DURATIONS_MIN: tuple[float, ...] = (
     20.0,
     30.0,
 )
-
-
 def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -483,6 +491,266 @@ def _write_quality_counts(destination: Any, counts: Mapping[str, int]) -> None:
         destination.attrs[name] = int(value)
 
 
+def _new_orbitid_reconciliation_stats() -> dict[str, Any]:
+    return {
+        "n_groups_examined": 0,
+        "n_groups_corrected": 0,
+        "n_groups_unmodified": 0,
+        "n_cad_corrected": 0,
+        "min_cadenceno_corrected": None,
+        "max_cadenceno_corrected": None,
+        "input_orbitids": set(),
+        "reference_orbitids": set(),
+        "n_cad_corrected_by_camera": {},
+        "n_groups_corrected_by_camera": {},
+        "n_cad_corrected_by_detector": {},
+    }
+
+
+def _record_orbitid_reconciliation(
+    stats: dict[str, Any],
+    *,
+    camera: int,
+    ccd: int,
+    cadenceno: np.ndarray,
+    input_orbitid: np.ndarray,
+    resolved_orbitid: np.ndarray,
+    correction_mask: np.ndarray,
+) -> int:
+    """Accumulate one native group's deterministic orbit-ID audit."""
+
+    cadences = np.asarray(cadenceno, dtype=np.int64)
+    input_orbits = np.asarray(input_orbitid, dtype=np.int64)
+    resolved_orbits = np.asarray(resolved_orbitid, dtype=np.int64)
+    corrected = np.asarray(correction_mask, dtype=bool)
+    lengths = {
+        len(cadences),
+        len(input_orbits),
+        len(resolved_orbits),
+        len(corrected),
+    }
+    if len(lengths) != 1:
+        raise ValueError("orbitid reconciliation arrays have inconsistent lengths")
+    n_corrected = int(np.count_nonzero(corrected))
+    stats["n_groups_examined"] += 1
+    if not n_corrected:
+        stats["n_groups_unmodified"] += 1
+        return 0
+
+    stats["n_groups_corrected"] += 1
+    stats["n_cad_corrected"] += n_corrected
+    corrected_cadences = cadences[corrected]
+    corrected_input = input_orbits[corrected]
+    corrected_resolved = resolved_orbits[corrected]
+    low = int(np.min(corrected_cadences))
+    high = int(np.max(corrected_cadences))
+    stats["min_cadenceno_corrected"] = (
+        low
+        if stats["min_cadenceno_corrected"] is None
+        else min(int(stats["min_cadenceno_corrected"]), low)
+    )
+    stats["max_cadenceno_corrected"] = (
+        high
+        if stats["max_cadenceno_corrected"] is None
+        else max(int(stats["max_cadenceno_corrected"]), high)
+    )
+    stats["input_orbitids"].update(int(value) for value in corrected_input)
+    stats["reference_orbitids"].update(
+        int(value) for value in corrected_resolved
+    )
+    camera_key = f"cam{int(camera)}"
+    detector_key = f"{camera_key}_ccd{int(ccd)}"
+    stats["n_cad_corrected_by_camera"][camera_key] = (
+        int(stats["n_cad_corrected_by_camera"].get(camera_key, 0))
+        + n_corrected
+    )
+    stats["n_groups_corrected_by_camera"][camera_key] = (
+        int(stats["n_groups_corrected_by_camera"].get(camera_key, 0)) + 1
+    )
+    stats["n_cad_corrected_by_detector"][detector_key] = (
+        int(stats["n_cad_corrected_by_detector"].get(detector_key, 0))
+        + n_corrected
+    )
+    return n_corrected
+
+
+def _orbitid_reconciliation_summary(
+    *,
+    policy: str,
+    stats: Mapping[str, Any],
+) -> dict[str, Any]:
+    reference_policy = policy == ORBITID_POLICY_REFERENCE
+    input_values = sorted(int(value) for value in stats["input_orbitids"])
+    reference_values = sorted(
+        int(value) for value in stats["reference_orbitids"]
+    )
+    return {
+        "contract_version": ORBITID_RECONCILIATION_CONTRACT_VERSION,
+        "policy": policy,
+        "authority": "qlp_cam_quat",
+        "scope": (
+            "teacher_v3_native_export_s62_real_only"
+            if reference_policy
+            else "strict_input_match"
+        ),
+        "bounded_sector": 62 if reference_policy else -1,
+        "source_agreement_required": bool(reference_policy),
+        "release_binding": (
+            S62_TEACHER_V3_ORBITID_RECONCILIATION_RELEASE
+            if reference_policy
+            else ""
+        ),
+        "n_groups_examined": int(stats["n_groups_examined"]),
+        "n_groups_corrected": int(stats["n_groups_corrected"]),
+        "n_groups_unmodified": int(stats["n_groups_unmodified"]),
+        "n_cad_corrected": int(stats["n_cad_corrected"]),
+        "min_cadenceno_corrected": (
+            int(stats["min_cadenceno_corrected"])
+            if stats["min_cadenceno_corrected"] is not None
+            else -1
+        ),
+        "max_cadenceno_corrected": (
+            int(stats["max_cadenceno_corrected"])
+            if stats["max_cadenceno_corrected"] is not None
+            else -1
+        ),
+        "input_orbitid": input_values[0] if len(input_values) == 1 else -1,
+        "reference_orbitid": (
+            reference_values[0] if len(reference_values) == 1 else -1
+        ),
+        "n_cad_corrected_by_camera": dict(
+            sorted(stats["n_cad_corrected_by_camera"].items())
+        ),
+        "n_groups_corrected_by_camera": dict(
+            sorted(stats["n_groups_corrected_by_camera"].items())
+        ),
+        "n_cad_corrected_by_detector": dict(
+            sorted(stats["n_cad_corrected_by_detector"].items())
+        ),
+    }
+
+
+def _write_orbitid_reconciliation_attrs(
+    destination: Any,
+    summary: Mapping[str, Any],
+) -> None:
+    destination.attrs["orbitid_reconciliation_contract_version"] = summary[
+        "contract_version"
+    ]
+    for name in (
+        "policy",
+        "authority",
+        "scope",
+        "release_binding",
+    ):
+        destination.attrs[f"orbitid_reconciliation_{name}"] = str(
+            summary[name]
+        )
+    destination.attrs["orbitid_reconciliation_bounded_sector"] = int(
+        summary["bounded_sector"]
+    )
+    destination.attrs[
+        "orbitid_reconciliation_source_agreement_required"
+    ] = int(bool(summary["source_agreement_required"]))
+    for name in (
+        "n_groups_examined",
+        "n_groups_corrected",
+        "n_groups_unmodified",
+        "n_cad_corrected",
+        "min_cadenceno_corrected",
+        "max_cadenceno_corrected",
+        "input_orbitid",
+        "reference_orbitid",
+    ):
+        destination.attrs[f"orbitid_reconciliation_{name}"] = int(
+            summary[name]
+        )
+    for name in (
+        "n_cad_corrected_by_camera",
+        "n_groups_corrected_by_camera",
+        "n_cad_corrected_by_detector",
+    ):
+        destination.attrs[f"orbitid_reconciliation_{name}"] = json.dumps(
+            summary[name], sort_keys=True
+        )
+
+
+def _validate_s62_orbitid_reconciliation_binding(
+    *,
+    training_table_sha256: str,
+    raw_source_h5_sha256: str,
+    compact_adp_h5_sha256: str,
+    quality_reference: ExternalQualityReference,
+    n_real_targets: int,
+    n_injections: int,
+    shard_index: int,
+    n_shards: int,
+) -> None:
+    """Fail unless the opt-in correction targets the audited frozen S62 release."""
+
+    expected = S62_TEACHER_V3_ORBITID_RECONCILIATION_BINDING
+    observed = {
+        "training_table_sha256": training_table_sha256,
+        "raw_source_h5_sha256": raw_source_h5_sha256,
+        "compact_adp_h5_sha256": compact_adp_h5_sha256,
+        "cadence_reference_table_sha256": quality_reference.table_sha256,
+        "cadence_reference_manifest_sha256": quality_reference.manifest_sha256,
+        "cadence_reference_source_declaration_sha256": (
+            quality_reference.source_declaration_sha256
+        ),
+        "n_real_targets": int(n_real_targets),
+    }
+    mismatches = {
+        name: {"expected": expected[name], "observed": value}
+        for name, value in observed.items()
+        if value != expected[name]
+    }
+    if mismatches:
+        raise ValueError(
+            "S62 orbitid reconciliation input binding mismatch: "
+            + json.dumps(mismatches, sort_keys=True)
+        )
+    if n_injections:
+        raise ValueError("S62 orbitid reconciliation is real-target only")
+    if int(n_shards) != 1 or int(shard_index) != 0:
+        raise ValueError(
+            "S62 orbitid reconciliation requires one complete unsharded export"
+        )
+
+
+def _validate_s62_orbitid_reconciliation_totals(
+    summary: Mapping[str, Any],
+) -> None:
+    expected = S62_TEACHER_V3_ORBITID_RECONCILIATION_BINDING
+    names = (
+        "n_groups_corrected",
+        "n_groups_unmodified",
+        "n_cad_corrected",
+        "min_cadenceno_corrected",
+        "max_cadenceno_corrected",
+        "input_orbitid",
+        "reference_orbitid",
+        "n_cad_corrected_by_camera",
+        "n_groups_corrected_by_camera",
+        "n_cad_corrected_by_detector",
+    )
+    mismatches = {
+        name: {"expected": expected[name], "observed": summary[name]}
+        for name in names
+        if summary[name] != expected[name]
+    }
+    if int(summary["n_groups_examined"]) != int(expected["n_real_targets"]):
+        mismatches["n_groups_examined"] = {
+            "expected": expected["n_real_targets"],
+            "observed": summary["n_groups_examined"],
+        }
+    if mismatches:
+        raise ValueError(
+            "S62 orbitid reconciliation signature mismatch: "
+            + json.dumps(mismatches, sort_keys=True)
+        )
+
+
 def build_raw_pair_export(
     *,
     training_table: Path,
@@ -498,11 +766,21 @@ def build_raw_pair_export(
     n_periods: int = DEFAULT_BLS_PERIODS,
     shard_index: int = 0,
     n_shards: int = 1,
+    orbitid_policy: str = ORBITID_POLICY_STRICT,
 ) -> dict[str, Any]:
     """Assemble the final native contract from compact products on ORCD."""
 
     import h5py
 
+    if orbitid_policy not in ORBITID_POLICIES:
+        raise ValueError(
+            f"unknown orbitid_policy {orbitid_policy!r}; "
+            f"expected one of {ORBITID_POLICIES}"
+        )
+    if orbitid_policy == ORBITID_POLICY_REFERENCE and int(sector) != 62:
+        raise ValueError(
+            "reference-by-cadence orbitid reconciliation is bounded to sector 62"
+        )
     training_table = Path(training_table).resolve()
     training_summary = Path(training_summary) if training_summary is not None else None
     training_summary = (
@@ -565,7 +843,21 @@ def build_raw_pair_export(
         expected_orbits=S56_EXPECTED_ORBITS if int(sector) == 56 else None,
         expected_detectors=S56_EXPECTED_DETECTORS,
     )
+    if orbitid_policy == ORBITID_POLICY_REFERENCE:
+        _validate_s62_orbitid_reconciliation_binding(
+            training_table_sha256=training_table_sha256,
+            raw_source_h5_sha256=source_file_sha256[str(raw_source_h5)],
+            compact_adp_h5_sha256=source_file_sha256[str(compact_adp_h5)],
+            quality_reference=quality_reference,
+            n_real_targets=len(real_rows),
+            n_injections=len(injection_rows),
+            shard_index=shard_index,
+            n_shards=n_shards,
+        )
     quality_totals = {name: 0 for name in RAW_PAIR_QUALITY_COUNT_NAMES}
+    orbitid_stats = _new_orbitid_reconciliation_stats()
+    orbitid_reconciliation_failure: Exception | None = None
+    orbitid_summary: dict[str, Any] = {}
 
     out_h5 = Path(out_h5)
     out_h5.parent.mkdir(parents=True, exist_ok=True)
@@ -638,10 +930,66 @@ def build_raw_pair_export(
                     orbitid=np.asarray(adp["orbitid"]),
                     internal_quality=np.asarray(adp["quality"]),
                     context=f"TIC {tic}",
+                    orbitid_policy=orbitid_policy,
+                )
+                compact_orbitid = np.asarray(adp["orbitid"], dtype=np.int64)
+                raw_orbitid = np.asarray(aligned["orbitid"], dtype=np.int64)
+                source_agreement = bool(
+                    np.array_equal(raw_orbitid, compact_orbitid)
+                )
+                if (
+                    orbitid_policy == ORBITID_POLICY_REFERENCE
+                    and not source_agreement
+                ):
+                    raise ValueError(
+                        f"TIC {tic}: raw-source and compact orbitid arrays "
+                        "disagree before bounded reconciliation"
+                    )
+                correction_mask = (
+                    quality_overlay.orbitid_reference_correction_mask
+                )
+                if (
+                    orbitid_policy == ORBITID_POLICY_REFERENCE
+                    and np.any(correction_mask)
+                ):
+                    corrected_cadences = np.asarray(
+                        adp["cadenceno"], dtype=np.int64
+                    )[correction_mask]
+                    corrected_input = compact_orbitid[correction_mask]
+                    corrected_reference = np.asarray(
+                        quality_overlay.resolved_orbitid, dtype=np.int64
+                    )[correction_mask]
+                    if (
+                        not np.all(corrected_input == 132)
+                        or not np.all(corrected_reference == 131)
+                        or int(np.min(corrected_cadences)) < 766_048
+                        or int(np.max(corrected_cadences)) > 766_136
+                    ):
+                        raise ValueError(
+                            f"TIC {tic}: orbitid reconciliation exceeded the "
+                            "audited 132->131, cadence 766048..766136 bound"
+                        )
+                corrected = _record_orbitid_reconciliation(
+                    orbitid_stats,
+                    camera=camera,
+                    ccd=ccd,
+                    cadenceno=np.asarray(adp["cadenceno"]),
+                    input_orbitid=compact_orbitid,
+                    resolved_orbitid=quality_overlay.resolved_orbitid,
+                    correction_mask=correction_mask,
                 )
                 group = target_root.create_group(f"{tic:016d}")
                 _copy_attrs(adp, group)
                 _write_quality_counts(group, quality_overlay.counts)
+                group.attrs["orbitid_reconciliation_policy"] = orbitid_policy
+                group.attrs["n_cad_orbitid_reference_corrected"] = int(
+                    corrected
+                )
+                group.attrs["orbitid_reconciliation_source_agreement"] = int(
+                    source_agreement
+                    if orbitid_policy == ORBITID_POLICY_REFERENCE
+                    else True
+                )
                 group.attrs["raw_source_paths"] = raw_file[raw_path].attrs.get(
                     "source_paths", ""
                 )
@@ -651,7 +999,12 @@ def build_raw_pair_export(
                 payload = {
                     "time": _absolute_bjd(np.asarray(adp["time"])),
                     "cadenceno": np.asarray(adp["cadenceno"], dtype=np.int64),
-                    "orbitid": np.asarray(adp["orbitid"], dtype=np.int32),
+                    "orbitid": np.asarray(
+                        quality_overlay.resolved_orbitid, dtype=np.int32
+                    ),
+                    ORBITID_RECONCILIATION_MASK_DATASET: np.asarray(
+                        correction_mask, dtype=np.uint8
+                    ),
                     "quality": quality_overlay.quality,
                     "raw_flux_small": aligned["raw_flux_small"],
                     "raw_flux_err_small": aligned["raw_flux_err_small"],
@@ -733,12 +1086,34 @@ def build_raw_pair_export(
                         orbitid=np.asarray(pair["orbitid"]),
                         internal_quality=np.asarray(pair["quality"]),
                         context=f"injection {injection_id}",
+                        orbitid_policy=orbitid_policy,
+                    )
+                    pair_orbitid = np.asarray(pair["orbitid"], dtype=np.int64)
+                    corrected = _record_orbitid_reconciliation(
+                        orbitid_stats,
+                        camera=camera,
+                        ccd=ccd,
+                        cadenceno=np.asarray(pair["cadenceno"]),
+                        input_orbitid=pair_orbitid,
+                        resolved_orbitid=quality_overlay.resolved_orbitid,
+                        correction_mask=(
+                            quality_overlay.orbitid_reference_correction_mask
+                        ),
                     )
                     model = np.asarray(pair["transit_model"], dtype=float)
                     cadence_s = float(pair.attrs.get("cadence_s", 200.0))
                     group = injection_root.create_group(injection_id)
                     _copy_attrs(pair, group)
                     _write_quality_counts(group, quality_overlay.counts)
+                    group.attrs[
+                        "orbitid_reconciliation_policy"
+                    ] = orbitid_policy
+                    group.attrs[
+                        "n_cad_orbitid_reference_corrected"
+                    ] = int(corrected)
+                    group.attrs[
+                        "orbitid_reconciliation_source_agreement"
+                    ] = 1
                     group.attrs["raw_source_paths"] = raw_file[
                         f"targets/{tic:016d}"
                     ].attrs.get("source_paths", "")
@@ -748,7 +1123,13 @@ def build_raw_pair_export(
                     payload = {
                         "time": _absolute_bjd(np.asarray(pair["time"])),
                         "cadenceno": np.asarray(pair["cadenceno"], dtype=np.int64),
-                        "orbitid": np.asarray(pair["orbitid"], dtype=np.int32),
+                        "orbitid": np.asarray(
+                            quality_overlay.resolved_orbitid, dtype=np.int32
+                        ),
+                        ORBITID_RECONCILIATION_MASK_DATASET: np.asarray(
+                            quality_overlay.orbitid_reference_correction_mask,
+                            dtype=np.uint8,
+                        ),
                         "quality": quality_overlay.quality,
                         "raw_flux_small": np.asarray(canonical["RAW_FLUX_Small_injected"]),
                         "raw_flux_primary": np.asarray(canonical["RAW_FLUX_Primary_injected"]),
@@ -798,11 +1179,26 @@ def build_raw_pair_export(
         output.attrs["native_source_files_sha256"] = json.dumps(
             source_file_sha256, sort_keys=True
         )
+        orbitid_summary = _orbitid_reconciliation_summary(
+            policy=orbitid_policy,
+            stats=orbitid_stats,
+        )
+        if orbitid_policy == ORBITID_POLICY_REFERENCE and not failures:
+            try:
+                _validate_s62_orbitid_reconciliation_totals(
+                    orbitid_summary
+                )
+            except ValueError as exc:
+                orbitid_reconciliation_failure = exc
+        _write_orbitid_reconciliation_attrs(output, orbitid_summary)
 
     if failures:
         pd.DataFrame(failures).to_csv(out_h5.with_suffix(".failures.csv"), index=False)
         temporary.unlink(missing_ok=True)
         raise RuntimeError(f"final raw-pair export failed for {len(failures)} rows")
+    if orbitid_reconciliation_failure is not None:
+        temporary.unlink(missing_ok=True)
+        raise orbitid_reconciliation_failure
     try:
         quality_reference.assert_unchanged()
         if _file_sha256(training_table) != training_table_sha256:
@@ -836,6 +1232,7 @@ def build_raw_pair_export(
             **quality_reference.provenance,
             "counts": dict(quality_totals),
         },
+        "orbitid_reconciliation": dict(orbitid_summary),
     }
 
 
@@ -876,6 +1273,21 @@ def merge_raw_pair_shards(
     quality_totals = {name: 0 for name in RAW_PAIR_QUALITY_COUNT_NAMES}
     merged_source_sha256: dict[str, str] = {}
     shard_local_provenance: list[dict[str, str]] = []
+    orbitid_enveloped: bool | None = None
+    orbitid_invariants: dict[str, Any] = {}
+    orbitid_counts = {
+        "orbitid_reconciliation_n_groups_examined": 0,
+        "orbitid_reconciliation_n_groups_corrected": 0,
+        "orbitid_reconciliation_n_groups_unmodified": 0,
+        "orbitid_reconciliation_n_cad_corrected": 0,
+    }
+    orbitid_minimum: int | None = None
+    orbitid_maximum: int | None = None
+    orbitid_mappings = {
+        "orbitid_reconciliation_n_cad_corrected_by_camera": {},
+        "orbitid_reconciliation_n_groups_corrected_by_camera": {},
+        "orbitid_reconciliation_n_cad_corrected_by_detector": {},
+    }
     with h5py.File(temporary, "w") as output:
         output.attrs["contract_version"] = RAW_PAIR_CONTRACT_VERSION
         output.attrs["created_utc"] = datetime.now(timezone.utc).isoformat()
@@ -953,6 +1365,104 @@ def merge_raw_pair_shards(
                             f"external-quality provenance mismatch for {name} in {path}"
                         )
                     output.attrs[name] = observed
+                reconciliation_present = {
+                    name
+                    for name in RAW_PAIR_ORBITID_RECONCILIATION_ATTRS
+                    if name in source.attrs
+                }
+                if reconciliation_present and reconciliation_present != set(
+                    RAW_PAIR_ORBITID_RECONCILIATION_ATTRS
+                ):
+                    missing = sorted(
+                        set(RAW_PAIR_ORBITID_RECONCILIATION_ATTRS)
+                        - reconciliation_present
+                    )
+                    raise ValueError(
+                        f"shard {path} has incomplete orbitid reconciliation "
+                        f"attrs: {missing}"
+                    )
+                source_enveloped = bool(reconciliation_present)
+                if orbitid_enveloped is None:
+                    orbitid_enveloped = source_enveloped
+                elif orbitid_enveloped != source_enveloped:
+                    raise ValueError(
+                        "cannot mix orbitid-reconciliation and legacy native shards"
+                    )
+                if source_enveloped:
+                    invariant_names = (
+                        "orbitid_reconciliation_contract_version",
+                        "orbitid_reconciliation_policy",
+                        "orbitid_reconciliation_authority",
+                        "orbitid_reconciliation_scope",
+                        "orbitid_reconciliation_bounded_sector",
+                        "orbitid_reconciliation_source_agreement_required",
+                        "orbitid_reconciliation_release_binding",
+                        "orbitid_reconciliation_input_orbitid",
+                        "orbitid_reconciliation_reference_orbitid",
+                    )
+                    for name in invariant_names:
+                        observed = source.attrs[name]
+                        if name in orbitid_invariants and (
+                            orbitid_invariants[name] != observed
+                        ):
+                            raise ValueError(
+                                "orbitid reconciliation provenance mismatch "
+                                f"for {name} in {path}"
+                            )
+                        orbitid_invariants[name] = observed
+                    for name in orbitid_counts:
+                        value = int(source.attrs[name])
+                        if value < 0:
+                            raise ValueError(
+                                f"shard {path} has negative {name}"
+                            )
+                        orbitid_counts[name] += value
+                    observed_minimum = int(
+                        source.attrs[
+                            "orbitid_reconciliation_min_cadenceno_corrected"
+                        ]
+                    )
+                    observed_maximum = int(
+                        source.attrs[
+                            "orbitid_reconciliation_max_cadenceno_corrected"
+                        ]
+                    )
+                    if observed_minimum >= 0:
+                        orbitid_minimum = (
+                            observed_minimum
+                            if orbitid_minimum is None
+                            else min(orbitid_minimum, observed_minimum)
+                        )
+                    if observed_maximum >= 0:
+                        orbitid_maximum = (
+                            observed_maximum
+                            if orbitid_maximum is None
+                            else max(orbitid_maximum, observed_maximum)
+                        )
+                    for name, aggregate in orbitid_mappings.items():
+                        try:
+                            mapping = json.loads(str(source.attrs[name]))
+                        except (
+                            TypeError,
+                            ValueError,
+                            json.JSONDecodeError,
+                        ) as exc:
+                            raise ValueError(
+                                f"shard {path} has invalid {name}"
+                            ) from exc
+                        if not isinstance(mapping, dict):
+                            raise ValueError(
+                                f"shard {path} has non-object {name}"
+                            )
+                        for key, value in mapping.items():
+                            numeric = int(value)
+                            if numeric < 0:
+                                raise ValueError(
+                                    f"shard {path} has negative {name}[{key}]"
+                                )
+                            aggregate[str(key)] = (
+                                int(aggregate.get(str(key), 0)) + numeric
+                            )
                 for name in RAW_PAIR_QUALITY_COUNT_NAMES:
                     attr = f"quality_overlay_{name}"
                     if attr not in source.attrs:
@@ -1025,6 +1535,19 @@ def merge_raw_pair_shards(
         output.attrs["native_source_files_sha256"] = json.dumps(
             merged_source_sha256, sort_keys=True
         )
+        if orbitid_enveloped:
+            for name, value in orbitid_invariants.items():
+                output.attrs[name] = value
+            for name, value in orbitid_counts.items():
+                output.attrs[name] = int(value)
+            output.attrs[
+                "orbitid_reconciliation_min_cadenceno_corrected"
+            ] = int(orbitid_minimum if orbitid_minimum is not None else -1)
+            output.attrs[
+                "orbitid_reconciliation_max_cadenceno_corrected"
+            ] = int(orbitid_maximum if orbitid_maximum is not None else -1)
+            for name, mapping in orbitid_mappings.items():
+                output.attrs[name] = json.dumps(mapping, sort_keys=True)
         if merged_training_table is not None:
             output.attrs["training_table"] = str(merged_training_table)
             output.attrs["training_table_sha256"] = str(
@@ -1054,6 +1577,21 @@ def merge_raw_pair_shards(
         "shard_local_provenance": shard_local_provenance,
         "counts": counts,
         "external_quality_counts": quality_totals,
+        "orbitid_reconciliation": (
+            {
+                **{name: str(value) for name, value in orbitid_invariants.items()},
+                **orbitid_counts,
+                "orbitid_reconciliation_min_cadenceno_corrected": (
+                    orbitid_minimum if orbitid_minimum is not None else -1
+                ),
+                "orbitid_reconciliation_max_cadenceno_corrected": (
+                    orbitid_maximum if orbitid_maximum is not None else -1
+                ),
+                **orbitid_mappings,
+            }
+            if orbitid_enveloped
+            else {}
+        ),
     }
 
 

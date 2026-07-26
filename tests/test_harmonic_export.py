@@ -19,6 +19,8 @@ from twirl.lightcurves.a2v1_cadence_reference import (
 from twirl.lightcurves.external_quality import (
     EFFECTIVE_QUALITY_POLICY,
     EXTERNAL_QUALITY_POLICY_CONTRACT,
+    ORBITID_POLICY_REFERENCE,
+    load_external_quality_reference,
 )
 from twirl.vetting import harmonic_export
 from twirl.vetting.harmonic_export import (
@@ -37,6 +39,7 @@ from twirl.vetting.harmonic_inputs import (
     CHANNEL_CONTRACT,
     verify_raw_pair_contract,
 )
+from twirl.vetting import harmonic_inputs
 
 
 def _write_table(frame: pd.DataFrame, path: Path) -> None:
@@ -51,13 +54,15 @@ def _write_s56_reference(
     *,
     camera1_orbit119_cadences: np.ndarray,
     external_bad_cadences: set[int] | None = None,
+    sector: int = 56,
+    orbits: tuple[int, int] = (119, 120),
 ) -> tuple[Path, Path]:
     external_bad_cadences = external_bad_cadences or set()
     rows: list[dict[str, int]] = []
     camera_orbit_cadences: dict[tuple[int, int], list[int]] = {}
     for camera in range(1, 5):
-        for orbit in (119, 120):
-            if camera == 1 and orbit == 119:
+        for orbit in orbits:
+            if camera == 1 and orbit == orbits[0]:
                 cadences = [int(value) for value in camera1_orbit119_cadences]
             else:
                 cadences = [9_000_000 + orbit * 100 + camera]
@@ -73,7 +78,7 @@ def _write_s56_reference(
                     )
                     rows.append(
                         {
-                            "sector": 56,
+                            "sector": sector,
                             "orbitid": orbit,
                             "camera": camera,
                             "ccd": ccd,
@@ -101,7 +106,7 @@ def _write_s56_reference(
         )
         source_index += 1
 
-    for orbit in (119, 120):
+    for orbit in orbits:
         for camera in range(1, 5):
             add_source("qlp_cam_quat", orbitid=orbit, camera=camera)
             for ccd in range(1, 5):
@@ -133,9 +138,9 @@ def _write_s56_reference(
         },
     }
     manifest = {
-        "contract_version": "s56_a2v1_cadence_reference_v1",
+        "contract_version": f"s{sector}_a2v1_cadence_reference_v1",
         "builder_version": "a2v1_cadence_reference_builder_v3",
-        "sector": 56,
+        "sector": sector,
         "cadence_authority": "qlp_cam_quat",
         "quality_authority": "spoc_and_qlp_quality_flags",
         "quality_composition": {
@@ -147,7 +152,7 @@ def _write_s56_reference(
         "table_columns": list(CADENCE_REFERENCE_COLUMNS),
         "n_rows": len(frame),
         "detectors": detector_names,
-        "orbits": [119, 120],
+        "orbits": list(orbits),
         "n_rows_by_detector": {
             f"cam{int(camera)}_ccd{int(ccd)}": int(len(group))
             for (camera, ccd), group in frame.groupby(["camera", "ccd"])
@@ -514,6 +519,197 @@ def test_raw_pair_export_rejects_compact_not_bound_by_candidate_summary(
             out_h5=tmp_path / "native.h5",
             repo_root=tmp_path,
         )
+
+
+def test_s62_native_orbitid_reconciliation_is_explicit_and_release_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tic = 620001
+    n = 220
+    cadence = np.arange(765917, 765917 + n, dtype=np.int64)
+    time = 2460000.0 + np.arange(n) * 200.0 / 86400.0
+    input_orbitid = np.full(n, 131, dtype=np.int32)
+    corrected_index = 160
+    input_orbitid[corrected_index] = 132
+
+    raw_source = tmp_path / "s62_raw.h5"
+    with h5py.File(raw_source, "w") as h5:
+        h5.attrs["contract_version"] = RAW_SOURCE_CONTRACT_VERSION
+        group = h5.create_group(f"targets/{tic:016d}")
+        for name, values in {
+            "time": time,
+            "cadenceno": cadence,
+            "orbitid": input_orbitid,
+            "quality": np.zeros(n, dtype=np.int32),
+            "raw_flux_small": np.linspace(10.0, 11.0, n),
+            "raw_flux_err_small": np.ones(n),
+            "raw_flux_primary": np.linspace(20.0, 21.0, n),
+            "raw_flux_err_primary": np.ones(n),
+        }.items():
+            group.create_dataset(name, data=values)
+
+    compact = tmp_path / "s62_compact.h5"
+    with h5py.File(compact, "w") as h5:
+        group = h5.create_group(f"targets/{tic:016d}")
+        group.attrs["tic"] = tic
+        group.attrs["sector"] = 62
+        group.attrs["camera"] = 1
+        group.attrs["ccd"] = 1
+        for name, values in {
+            "time": time,
+            "cadenceno": cadence,
+            "orbitid": input_orbitid,
+            "quality": np.zeros(n, dtype=np.int32),
+            "DET_FLUX_ADP_SML": np.ones(n),
+            "DET_FLUX_ADP": np.ones(n),
+        }.items():
+            group.create_dataset(name, data=values)
+
+    training = tmp_path / "s62_training.csv"
+    pd.DataFrame(
+        {
+            "review_id": [f"real:{tic}"],
+            "tic": [tic],
+            "sector": [62],
+            "source_kind": ["real_candidate"],
+            "native_input_include": [True],
+        }
+    ).to_csv(training, index=False)
+    cadence_table, cadence_manifest = _write_s56_reference(
+        tmp_path,
+        camera1_orbit119_cadences=cadence,
+        sector=62,
+        orbits=(131, 132),
+    )
+    reference = load_external_quality_reference(
+        table_path=cadence_table,
+        manifest_path=cadence_manifest,
+        sector=62,
+    )
+    expected_binding = {
+        "training_table_sha256": file_sha256(training),
+        "raw_source_h5_sha256": file_sha256(raw_source),
+        "compact_adp_h5_sha256": file_sha256(compact),
+        "cadence_reference_table_sha256": file_sha256(cadence_table),
+        "cadence_reference_manifest_sha256": file_sha256(cadence_manifest),
+        "cadence_reference_source_declaration_sha256": (
+            reference.source_declaration_sha256
+        ),
+        "n_real_targets": 1,
+        "n_groups_corrected": 1,
+        "n_groups_unmodified": 0,
+        "n_cad_corrected": 1,
+        "min_cadenceno_corrected": int(cadence[corrected_index]),
+        "max_cadenceno_corrected": int(cadence[corrected_index]),
+        "input_orbitid": 132,
+        "reference_orbitid": 131,
+        "n_cad_corrected_by_camera": {"cam1": 1},
+        "n_groups_corrected_by_camera": {"cam1": 1},
+        "n_cad_corrected_by_detector": {"cam1_ccd1": 1},
+    }
+    monkeypatch.setattr(
+        harmonic_export,
+        "S62_TEACHER_V3_ORBITID_RECONCILIATION_BINDING",
+        expected_binding,
+    )
+    monkeypatch.setattr(
+        harmonic_inputs,
+        "S62_TEACHER_V3_ORBITID_RECONCILIATION_BINDING",
+        expected_binding,
+    )
+
+    strict_output = tmp_path / "s62_strict.h5"
+    with pytest.raises(RuntimeError, match="failed for 1 rows"):
+        build_raw_pair_export(
+            training_table=training,
+            raw_source_h5=raw_source,
+            compact_adp_h5=compact,
+            injection_pair_h5=None,
+            cadence_reference_table=cadence_table,
+            cadence_reference_manifest=cadence_manifest,
+            out_h5=strict_output,
+            repo_root=tmp_path,
+            sector=62,
+            n_periods=32,
+        )
+    assert not strict_output.exists()
+
+    output = tmp_path / "s62_reconciled.h5"
+    summary = build_raw_pair_export(
+        training_table=training,
+        raw_source_h5=raw_source,
+        compact_adp_h5=compact,
+        injection_pair_h5=None,
+        cadence_reference_table=cadence_table,
+        cadence_reference_manifest=cadence_manifest,
+        out_h5=output,
+        repo_root=tmp_path,
+        sector=62,
+        n_periods=32,
+        orbitid_policy=ORBITID_POLICY_REFERENCE,
+    )
+    assert summary["orbitid_reconciliation"]["n_cad_corrected"] == 1
+    with h5py.File(output, "r") as h5:
+        group = h5[f"targets/{tic:016d}"]
+        assert group["orbitid"][corrected_index] == 131
+        assert input_orbitid[corrected_index] == 132
+        assert group.attrs["n_cad_orbitid_reference_corrected"] == 1
+        assert h5.attrs["orbitid_reconciliation_n_groups_corrected"] == 1
+    verification = verify_raw_pair_contract(
+        output,
+        require_errors=True,
+        require_periodograms=True,
+    )
+    assert verification["passed"], verification["failures"]
+
+    merged_output = tmp_path / "s62_reconciled_merged.h5"
+    merge = merge_raw_pair_shards(
+        shard_paths=[output],
+        out_h5=merged_output,
+    )
+    assert (
+        merge["orbitid_reconciliation"][
+            "orbitid_reconciliation_n_cad_corrected"
+        ]
+        == 1
+    )
+    merged_verification = verify_raw_pair_contract(
+        merged_output,
+        require_errors=True,
+        require_periodograms=True,
+    )
+    assert merged_verification["passed"], merged_verification["failures"]
+
+    with h5py.File(merged_output, "r+") as h5:
+        orbitid = h5[f"targets/{tic:016d}/orbitid"]
+        orbitid[corrected_index] = 132
+    data_tampered = verify_raw_pair_contract(
+        merged_output,
+        require_errors=True,
+        require_periodograms=True,
+    )
+    assert not data_tampered["passed"]
+    assert any(
+        "stored orbitid disagrees with S62 cadence authority" in failure
+        for failure in data_tampered["failures"]
+    )
+    with h5py.File(merged_output, "r+") as h5:
+        h5[f"targets/{tic:016d}/orbitid"][corrected_index] = 131
+
+    with h5py.File(merged_output, "r+") as h5:
+        h5.attrs["orbitid_reconciliation_n_cad_corrected"] = 2
+    tampered = verify_raw_pair_contract(
+        merged_output,
+        require_errors=True,
+        require_periodograms=True,
+    )
+    assert not tampered["passed"]
+    assert any(
+        "frozen S62 release signature" in failure
+        or "disagrees with group total" in failure
+        for failure in tampered["failures"]
+    )
 
 
 def test_raw_pair_export_accepts_parquet_training_table(tmp_path: Path) -> None:

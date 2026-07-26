@@ -18,6 +18,14 @@ from twirl.lightcurves.external_quality import (
     EXTERNAL_QUALITY_POLICY_CONTRACT,
     EXPECTED_CADENCE_AUTHORITY,
     EXPECTED_QUALITY_AUTHORITY,
+    ORBITID_POLICIES,
+    ORBITID_POLICY_REFERENCE,
+    ORBITID_POLICY_STRICT,
+    ORBITID_RECONCILIATION_CONTRACT_VERSION,
+)
+from twirl.vetting.orbitid_reconciliation import (
+    S62_TEACHER_V3_ORBITID_RECONCILIATION_BINDING,
+    S62_TEACHER_V3_ORBITID_RECONCILIATION_RELEASE,
 )
 
 RAW_PAIR_CONTRACT_VERSION = "s56_adp_raw_pair_v2"
@@ -118,6 +126,34 @@ RAW_PAIR_QUALITY_COUNT_NAMES: tuple[str, ...] = (
     "n_cad_external_only_bad",
     "n_cad_authority_excluded",
     "n_cad_effective_bad",
+)
+RAW_PAIR_ORBITID_RECONCILIATION_ATTRS: tuple[str, ...] = (
+    "orbitid_reconciliation_contract_version",
+    "orbitid_reconciliation_policy",
+    "orbitid_reconciliation_authority",
+    "orbitid_reconciliation_scope",
+    "orbitid_reconciliation_bounded_sector",
+    "orbitid_reconciliation_source_agreement_required",
+    "orbitid_reconciliation_release_binding",
+    "orbitid_reconciliation_n_groups_examined",
+    "orbitid_reconciliation_n_groups_corrected",
+    "orbitid_reconciliation_n_groups_unmodified",
+    "orbitid_reconciliation_n_cad_corrected",
+    "orbitid_reconciliation_min_cadenceno_corrected",
+    "orbitid_reconciliation_max_cadenceno_corrected",
+    "orbitid_reconciliation_input_orbitid",
+    "orbitid_reconciliation_reference_orbitid",
+    "orbitid_reconciliation_n_cad_corrected_by_camera",
+    "orbitid_reconciliation_n_groups_corrected_by_camera",
+    "orbitid_reconciliation_n_cad_corrected_by_detector",
+)
+RAW_PAIR_GROUP_ORBITID_RECONCILIATION_ATTRS: tuple[str, ...] = (
+    "orbitid_reconciliation_policy",
+    "n_cad_orbitid_reference_corrected",
+    "orbitid_reconciliation_source_agreement",
+)
+ORBITID_RECONCILIATION_MASK_DATASET = (
+    "orbitid_reference_correction_mask"
 )
 RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS: tuple[str, ...] = (
     "candidate_provenance_contract_version",
@@ -794,6 +830,374 @@ def _external_quality_root_failures(attrs: Mapping[str, Any]) -> list[str]:
     return failures
 
 
+def _orbitid_reconciliation_root_failures(
+    attrs: Mapping[str, Any],
+) -> tuple[list[str], str | None]:
+    """Validate the optional additive orbit-ID reconciliation envelope."""
+
+    failures: list[str] = []
+    present = {
+        name for name in RAW_PAIR_ORBITID_RECONCILIATION_ATTRS if name in attrs
+    }
+    if not present:
+        return failures, None
+    missing = sorted(set(RAW_PAIR_ORBITID_RECONCILIATION_ATTRS) - present)
+    if missing:
+        return [f"incomplete orbitid reconciliation attrs: {','.join(missing)}"], None
+
+    contract = str(attrs["orbitid_reconciliation_contract_version"])
+    if contract != ORBITID_RECONCILIATION_CONTRACT_VERSION:
+        failures.append("orbitid_reconciliation_contract_version mismatch")
+    policy = str(attrs["orbitid_reconciliation_policy"])
+    if policy not in ORBITID_POLICIES:
+        failures.append("orbitid_reconciliation_policy is invalid")
+    if str(attrs["orbitid_reconciliation_authority"]) != EXPECTED_CADENCE_AUTHORITY:
+        failures.append("orbitid_reconciliation_authority mismatch")
+
+    integers: dict[str, int] = {}
+    for name in (
+        "orbitid_reconciliation_bounded_sector",
+        "orbitid_reconciliation_source_agreement_required",
+        "orbitid_reconciliation_n_groups_examined",
+        "orbitid_reconciliation_n_groups_corrected",
+        "orbitid_reconciliation_n_groups_unmodified",
+        "orbitid_reconciliation_n_cad_corrected",
+        "orbitid_reconciliation_min_cadenceno_corrected",
+        "orbitid_reconciliation_max_cadenceno_corrected",
+        "orbitid_reconciliation_input_orbitid",
+        "orbitid_reconciliation_reference_orbitid",
+    ):
+        try:
+            integers[name] = int(attrs[name])
+        except (TypeError, ValueError):
+            failures.append(f"{name} is not an integer")
+    if len(integers) == 10:
+        n_examined = integers["orbitid_reconciliation_n_groups_examined"]
+        n_corrected_groups = integers[
+            "orbitid_reconciliation_n_groups_corrected"
+        ]
+        n_unmodified = integers[
+            "orbitid_reconciliation_n_groups_unmodified"
+        ]
+        n_corrected_cadences = integers[
+            "orbitid_reconciliation_n_cad_corrected"
+        ]
+        if min(n_examined, n_corrected_groups, n_unmodified, n_corrected_cadences) < 0:
+            failures.append("orbitid reconciliation counts must be nonnegative")
+        if n_corrected_groups + n_unmodified != n_examined:
+            failures.append("orbitid reconciliation group arithmetic is inconsistent")
+        if integers["orbitid_reconciliation_source_agreement_required"] not in (
+            0,
+            1,
+        ):
+            failures.append(
+                "orbitid_reconciliation_source_agreement_required must be 0 or 1"
+            )
+        minimum = integers[
+            "orbitid_reconciliation_min_cadenceno_corrected"
+        ]
+        maximum = integers[
+            "orbitid_reconciliation_max_cadenceno_corrected"
+        ]
+        if n_corrected_cadences > 0 and (
+            minimum < 0 or maximum < minimum
+        ):
+            failures.append("orbitid reconciliation cadence range is invalid")
+
+    parsed_mappings: dict[str, dict[str, int]] = {}
+    for name in (
+        "orbitid_reconciliation_n_cad_corrected_by_camera",
+        "orbitid_reconciliation_n_groups_corrected_by_camera",
+        "orbitid_reconciliation_n_cad_corrected_by_detector",
+    ):
+        try:
+            raw = json.loads(str(attrs[name]))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            failures.append(f"{name} is not valid JSON")
+            continue
+        if not isinstance(raw, dict):
+            failures.append(f"{name} is not a JSON object")
+            continue
+        normalized: dict[str, int] = {}
+        for key, value in raw.items():
+            try:
+                numeric = int(value)
+            except (TypeError, ValueError):
+                failures.append(f"{name} contains a non-integer count")
+                break
+            if numeric < 0:
+                failures.append(f"{name} contains a negative count")
+                break
+            normalized[str(key)] = numeric
+        else:
+            parsed_mappings[name] = normalized
+
+    if policy == ORBITID_POLICY_STRICT and len(integers) == 10:
+        if str(attrs["orbitid_reconciliation_scope"]) != "strict_input_match":
+            failures.append("strict orbitid reconciliation scope mismatch")
+        if str(attrs["orbitid_reconciliation_release_binding"]):
+            failures.append("strict orbitid reconciliation release binding is nonempty")
+        strict_expected = {
+            "orbitid_reconciliation_bounded_sector": -1,
+            "orbitid_reconciliation_source_agreement_required": 0,
+            "orbitid_reconciliation_n_groups_corrected": 0,
+            "orbitid_reconciliation_n_cad_corrected": 0,
+            "orbitid_reconciliation_min_cadenceno_corrected": -1,
+            "orbitid_reconciliation_max_cadenceno_corrected": -1,
+            "orbitid_reconciliation_input_orbitid": -1,
+            "orbitid_reconciliation_reference_orbitid": -1,
+        }
+        for name, expected in strict_expected.items():
+            if integers[name] != expected:
+                failures.append(f"{name} must be {expected} for strict policy")
+        if any(any(mapping.values()) for mapping in parsed_mappings.values()):
+            failures.append("strict orbitid reconciliation mappings must be empty")
+    elif policy == ORBITID_POLICY_REFERENCE and len(integers) == 10:
+        if (
+            str(attrs["orbitid_reconciliation_scope"])
+            != "teacher_v3_native_export_s62_real_only"
+        ):
+            failures.append("reference orbitid reconciliation scope mismatch")
+        if (
+            str(attrs["orbitid_reconciliation_release_binding"])
+            != S62_TEACHER_V3_ORBITID_RECONCILIATION_RELEASE
+        ):
+            failures.append("reference orbitid reconciliation release mismatch")
+        reference_expected = {
+            "orbitid_reconciliation_bounded_sector": 62,
+            "orbitid_reconciliation_source_agreement_required": 1,
+            "orbitid_reconciliation_input_orbitid": 132,
+            "orbitid_reconciliation_reference_orbitid": 131,
+        }
+        for name, expected in reference_expected.items():
+            if integers[name] != expected:
+                failures.append(f"{name} must be {expected} for reference policy")
+        if integers["orbitid_reconciliation_n_cad_corrected"] <= 0:
+            failures.append("reference orbitid reconciliation corrected no cadences")
+        if integers["orbitid_reconciliation_n_groups_corrected"] <= 0:
+            failures.append("reference orbitid reconciliation corrected no groups")
+        expected = S62_TEACHER_V3_ORBITID_RECONCILIATION_BINDING
+        exact_integer_expected = {
+            "orbitid_reconciliation_n_groups_examined": expected[
+                "n_real_targets"
+            ],
+            "orbitid_reconciliation_n_groups_corrected": expected[
+                "n_groups_corrected"
+            ],
+            "orbitid_reconciliation_n_groups_unmodified": expected[
+                "n_groups_unmodified"
+            ],
+            "orbitid_reconciliation_n_cad_corrected": expected[
+                "n_cad_corrected"
+            ],
+            "orbitid_reconciliation_min_cadenceno_corrected": expected[
+                "min_cadenceno_corrected"
+            ],
+            "orbitid_reconciliation_max_cadenceno_corrected": expected[
+                "max_cadenceno_corrected"
+            ],
+            "orbitid_reconciliation_input_orbitid": expected[
+                "input_orbitid"
+            ],
+            "orbitid_reconciliation_reference_orbitid": expected[
+                "reference_orbitid"
+            ],
+        }
+        for name, expected_value in exact_integer_expected.items():
+            if integers[name] != expected_value:
+                failures.append(
+                    f"{name} does not match the frozen S62 release signature"
+                )
+        exact_mapping_expected = {
+            "orbitid_reconciliation_n_cad_corrected_by_camera": expected[
+                "n_cad_corrected_by_camera"
+            ],
+            "orbitid_reconciliation_n_groups_corrected_by_camera": expected[
+                "n_groups_corrected_by_camera"
+            ],
+            "orbitid_reconciliation_n_cad_corrected_by_detector": expected[
+                "n_cad_corrected_by_detector"
+            ],
+        }
+        for name, expected_mapping in exact_mapping_expected.items():
+            if (
+                name in parsed_mappings
+                and parsed_mappings[name] != expected_mapping
+            ):
+                failures.append(
+                    f"{name} does not match the frozen S62 release signature"
+                )
+        exact_hash_expected = {
+            "training_table_sha256": expected["training_table_sha256"],
+            "raw_source_h5_sha256": expected["raw_source_h5_sha256"],
+            "compact_adp_h5_sha256": expected["compact_adp_h5_sha256"],
+            "cadence_reference_table_sha256": expected[
+                "cadence_reference_table_sha256"
+            ],
+            "cadence_reference_manifest_sha256": expected[
+                "cadence_reference_manifest_sha256"
+            ],
+            "cadence_reference_source_declaration_sha256": expected[
+                "cadence_reference_source_declaration_sha256"
+            ],
+        }
+        for name, expected_digest in exact_hash_expected.items():
+            if str(attrs.get(name, "")) != expected_digest:
+                failures.append(
+                    f"{name} does not match the frozen S62 release binding"
+                )
+
+    if len(integers) == 10:
+        cadence_total = integers["orbitid_reconciliation_n_cad_corrected"]
+        group_total = integers["orbitid_reconciliation_n_groups_corrected"]
+        for name in (
+            "orbitid_reconciliation_n_cad_corrected_by_camera",
+            "orbitid_reconciliation_n_cad_corrected_by_detector",
+        ):
+            if name in parsed_mappings and sum(parsed_mappings[name].values()) != (
+                cadence_total
+            ):
+                failures.append(f"{name} does not sum to the root cadence count")
+        group_mapping_name = (
+            "orbitid_reconciliation_n_groups_corrected_by_camera"
+        )
+        if (
+            group_mapping_name in parsed_mappings
+            and sum(parsed_mappings[group_mapping_name].values()) != group_total
+        ):
+            failures.append(
+                f"{group_mapping_name} does not sum to the root group count"
+            )
+    return failures, policy if policy in ORBITID_POLICIES else None
+
+
+def _orbitid_reconciliation_group_failures(
+    group: Any,
+    *,
+    context: str,
+    root_policy: str | None,
+) -> tuple[list[str], int]:
+    """Validate one group's optional reconciliation audit record."""
+
+    failures: list[str] = []
+    present = {
+        name
+        for name in RAW_PAIR_GROUP_ORBITID_RECONCILIATION_ATTRS
+        if name in group.attrs
+    }
+    if root_policy is None:
+        if present:
+            failures.append(
+                f"{context}:orbitid reconciliation attrs exist without root envelope"
+            )
+        if ORBITID_RECONCILIATION_MASK_DATASET in group:
+            failures.append(
+                f"{context}:orbitid reconciliation mask exists without root envelope"
+            )
+        return failures, 0
+    missing = sorted(set(RAW_PAIR_GROUP_ORBITID_RECONCILIATION_ATTRS) - present)
+    if missing:
+        return (
+            [
+                f"{context}:missing orbitid reconciliation attrs "
+                f"{','.join(missing)}"
+            ],
+            0,
+        )
+    if str(group.attrs["orbitid_reconciliation_policy"]) != root_policy:
+        failures.append(f"{context}:orbitid reconciliation policy mismatch")
+    try:
+        corrected = int(group.attrs["n_cad_orbitid_reference_corrected"])
+    except (TypeError, ValueError):
+        failures.append(
+            f"{context}:n_cad_orbitid_reference_corrected is not an integer"
+        )
+        corrected = 0
+    n_cad = len(group["orbitid"]) if "orbitid" in group else 0
+    if corrected < 0 or corrected > n_cad:
+        failures.append(
+            f"{context}:n_cad_orbitid_reference_corrected is outside cadence length"
+        )
+    correction_mask: np.ndarray | None = None
+    if ORBITID_RECONCILIATION_MASK_DATASET not in group:
+        failures.append(f"{context}:missing orbitid reconciliation mask")
+    else:
+        raw_mask = np.asarray(group[ORBITID_RECONCILIATION_MASK_DATASET])
+        if raw_mask.ndim != 1 or len(raw_mask) != n_cad:
+            failures.append(
+                f"{context}:orbitid reconciliation mask length mismatch"
+            )
+        elif not np.isin(raw_mask, (0, 1, False, True)).all():
+            failures.append(
+                f"{context}:orbitid reconciliation mask must be binary"
+            )
+        else:
+            correction_mask = raw_mask.astype(bool)
+            if int(np.count_nonzero(correction_mask)) != corrected:
+                failures.append(
+                    f"{context}:orbitid reconciliation mask count mismatch"
+                )
+    try:
+        agreement = int(
+            group.attrs["orbitid_reconciliation_source_agreement"]
+        )
+    except (TypeError, ValueError):
+        failures.append(
+            f"{context}:orbitid_reconciliation_source_agreement is not an integer"
+        )
+    else:
+        if agreement != 1:
+            failures.append(
+                f"{context}:orbitid reconciliation source agreement failed"
+            )
+    if root_policy == ORBITID_POLICY_STRICT and corrected != 0:
+        failures.append(f"{context}:strict orbitid reconciliation corrected cadences")
+    if root_policy == ORBITID_POLICY_REFERENCE:
+        try:
+            sector = int(group.attrs["sector"])
+        except (KeyError, TypeError, ValueError):
+            failures.append(f"{context}:reference reconciliation lacks sector")
+        else:
+            if sector != 62:
+                failures.append(
+                    f"{context}:reference reconciliation is outside sector 62"
+                )
+        if (
+            correction_mask is not None
+            and "cadenceno" in group
+            and "orbitid" in group
+        ):
+            cadenceno = np.asarray(group["cadenceno"], dtype=np.int64)
+            orbitid = np.asarray(group["orbitid"], dtype=np.int64)
+            corrected_cadences = cadenceno[correction_mask]
+            if corrected_cadences.size and (
+                int(np.min(corrected_cadences)) < 766_048
+                or int(np.max(corrected_cadences)) > 766_136
+            ):
+                failures.append(
+                    f"{context}:orbitid reconciliation mask exceeds cadence bound"
+                )
+            if np.any(orbitid[correction_mask] != 131):
+                failures.append(
+                    f"{context}:corrected orbitid samples are not authoritative 131"
+                )
+            authority_gap = (cadenceno >= 766_137) & (cadenceno <= 766_227)
+            reference_131 = (cadenceno >= 760_742) & (cadenceno <= 766_136)
+            reference_132 = (cadenceno >= 766_228) & (cadenceno <= 771_851)
+            outside_reference = ~(reference_131 | reference_132)
+            if np.any(authority_gap | outside_reference):
+                failures.append(
+                    f"{context}:cadenceno lies outside the frozen S62 authority"
+                )
+            if np.any(orbitid[reference_131] != 131) or np.any(
+                orbitid[reference_132] != 132
+            ):
+                failures.append(
+                    f"{context}:stored orbitid disagrees with S62 cadence authority"
+                )
+    return failures, corrected
+
+
 def _external_quality_group_failures(group: Any, *, context: str) -> list[str]:
     failures: list[str] = []
     if str(group.attrs.get("quality_policy_contract", "")) != (
@@ -852,6 +1256,14 @@ def read_native_light_curve_from_h5(
             "native input external-quality contract failed: "
             + "; ".join(quality_failures)
         )
+    orbitid_failures, orbitid_policy = _orbitid_reconciliation_root_failures(
+        h5.attrs
+    )
+    if orbitid_failures:
+        raise ValueError(
+            "native input orbitid reconciliation contract failed: "
+            + "; ".join(orbitid_failures)
+        )
     for name, expected in CHANNEL_CONTRACT.items():
         observed = tuple(json.loads(str(h5.attrs.get(name, "[]"))))
         if observed != expected:
@@ -862,10 +1274,15 @@ def read_native_light_curve_from_h5(
     group_quality_failures = _external_quality_group_failures(
         group, context=f"/{group_path}"
     )
-    if group_quality_failures:
+    group_orbitid_failures, _ = _orbitid_reconciliation_group_failures(
+        group,
+        context=f"/{group_path}",
+        root_policy=orbitid_policy,
+    )
+    if group_quality_failures or group_orbitid_failures:
         raise ValueError(
-            "native group external-quality contract failed: "
-            + "; ".join(group_quality_failures)
+            "native group contract failed: "
+            + "; ".join(group_quality_failures + group_orbitid_failures)
         )
     lc = _read_group(group)
     paired_names = [f"paired_original_{name}" for name in NATIVE_DATASETS[4:]]
@@ -923,6 +1340,13 @@ def verify_raw_pair_contract(
         if str(h5.attrs.get("time_system", "")) != "BJD":
             failures.append("time_system must be BJD")
         failures.extend(_external_quality_root_failures(h5.attrs))
+        orbitid_root_failures, orbitid_policy = (
+            _orbitid_reconciliation_root_failures(h5.attrs)
+        )
+        failures.extend(orbitid_root_failures)
+        orbitid_corrected_cadences = 0
+        orbitid_corrected_groups = 0
+        orbitid_examined_groups = 0
         for name, expected in CHANNEL_CONTRACT.items():
             try:
                 observed = tuple(json.loads(str(h5.attrs.get(name, "[]"))))
@@ -936,9 +1360,27 @@ def verify_raw_pair_contract(
             for key, group in h5[root_name].items():
                 counts[root_name] += 1
                 context = f"/{root_name}/{key}"
+                orbitid_examined_groups += 1
                 failures.extend(
                     _external_quality_group_failures(group, context=context)
                 )
+                group_orbitid_failures, group_orbitid_corrected = (
+                    _orbitid_reconciliation_group_failures(
+                        group,
+                        context=context,
+                        root_policy=orbitid_policy,
+                    )
+                )
+                failures.extend(group_orbitid_failures)
+                orbitid_corrected_cadences += group_orbitid_corrected
+                orbitid_corrected_groups += int(group_orbitid_corrected > 0)
+                if (
+                    orbitid_policy == ORBITID_POLICY_REFERENCE
+                    and root_name == "injections"
+                ):
+                    failures.append(
+                        f"{context}:reference orbitid reconciliation is real-only"
+                    )
                 if all(name in group.attrs for name in RAW_PAIR_QUALITY_COUNT_NAMES):
                     for name in RAW_PAIR_QUALITY_COUNT_NAMES:
                         try:
@@ -994,6 +1436,30 @@ def verify_raw_pair_contract(
                 if declared != observed:
                     failures.append(
                         f"{attr}={declared} disagrees with group total {observed}"
+                    )
+        if orbitid_policy is not None:
+            observed_orbitid_totals = {
+                "orbitid_reconciliation_n_groups_examined": (
+                    orbitid_examined_groups
+                ),
+                "orbitid_reconciliation_n_groups_corrected": (
+                    orbitid_corrected_groups
+                ),
+                "orbitid_reconciliation_n_groups_unmodified": (
+                    orbitid_examined_groups - orbitid_corrected_groups
+                ),
+                "orbitid_reconciliation_n_cad_corrected": (
+                    orbitid_corrected_cadences
+                ),
+            }
+            for name, observed in observed_orbitid_totals.items():
+                try:
+                    declared = int(h5.attrs[name])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if declared != observed:
+                    failures.append(
+                        f"{name}={declared} disagrees with group total {observed}"
                     )
     return {
         "passed": not failures,
@@ -1187,6 +1653,7 @@ __all__ = [
     "HARMONIC_VIEW_CHANNELS",
     "HarmonicViews",
     "NATIVE_DATASETS",
+    "ORBITID_RECONCILIATION_MASK_DATASET",
     "PERIODOGRAM_DATASETS",
     "PERIODOGRAM_CHANNELS",
     "NativeChannels",
@@ -1195,7 +1662,10 @@ __all__ = [
     "RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS",
     "RAW_PAIR_CONTRACT_VERSION",
     "RAW_PAIR_EXTERNAL_QUALITY_ATTRS",
+    "RAW_PAIR_GROUP_ORBITID_RECONCILIATION_ATTRS",
+    "RAW_PAIR_ORBITID_RECONCILIATION_ATTRS",
     "RAW_PAIR_QUALITY_COUNT_NAMES",
+    "S62_TEACHER_V3_ORBITID_RECONCILIATION_RELEASE",
     "build_harmonic_views",
     "build_native_channels",
     "candidate_provenance_from_summary",

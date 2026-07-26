@@ -211,6 +211,10 @@ class _FakeExternalQualityReference:
                 "n_cad_authority_excluded": 0,
                 "n_cad_effective_bad": int(np.count_nonzero(effective_bad)),
             },
+            resolved_orbitid=np.asarray(orbitid, dtype=np.int64).copy(),
+            orbitid_reference_correction_mask=np.zeros(
+                len(orbitid), dtype=bool
+            ),
         )
 
 
