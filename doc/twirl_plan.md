@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-24`.
+Last reconciled: `2026-07-25`.
 
 ## Current status
 
@@ -37,7 +37,9 @@ Last reconciled: `2026-07-24`.
   family. `teacher_v3` is the operational name for its frozen S56--S62
   dataset/training release, not a new architecture and not a promotion of
   exploratory teacher v2. The seven-sector morphology corpus and TIC-grouped
-  split are frozen; the full shape-model run remains gated on the
+  split are frozen. The native-independent, five-fold metadata baseline is
+  running on ORCD as the first `teacher_v3` training checkpoint; it does not
+  open the fixed test set. The full shape-model run remains gated on the
   observation-keyed multi-sector native-input contract. The old native-v1
   checkpoint is never reused with native-v2 inputs. Teacher v2 was completed
   as an exploratory comparison but missed
@@ -368,30 +370,33 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Build and validate the remaining S56--S62 observation-keyed training
+1. Monitor and validate the running five-fold `teacher_v3` metadata baseline;
+   retain the fixed test population sealed and treat this as a pipeline/baseline
+   checkpoint rather than a production-model result.
+2. Build and validate the remaining S56--S62 observation-keyed training
    inputs for frozen `teacher_v3`:
    per-sector cadence/quality references, exact target eligibility,
    quality-aware BLS/native inputs, `(sector, TIC)` storage identity, and an
    ephemeris-compatibility re-review gate.
-2. Run the fixed metadata-only baseline and primary
-   `shape_plus_periodogram_bls` profile under the `teacher_v3` release
-   contract. Fit one temperature from pooled development out-of-fold logits;
-   report real and injected metrics separately, TIC-clustered bootstrap
-   intervals, and uncertain-as-other versus uncertain-masked sensitivity.
-3. Open the fixed test population only after the model/calibration contract is
+3. Run the fixed primary `shape_plus_periodogram_bls` profile under the
+   `teacher_v3` release contract. Fit one temperature from pooled development
+   out-of-fold logits; report real and injected metrics separately,
+   TIC-clustered bootstrap intervals, and a genuinely retrained
+   uncertain-as-other versus uncertain-masked sensitivity.
+4. Open the fixed test population only after the model/calibration contract is
    frozen. Do not promote the model, start student pseudo-labeling, or change
    architecture from this result automatically.
-4. Publish the hash-bound morphology corpus plus the enrichment-only candidate
+5. Publish the hash-bound morphology corpus plus the enrichment-only candidate
    table/TIC index, preserving the raw edit log and all source provenance.
-5. Audit non-git exposure and, if still clean, reserve S63 as a sealed
+6. Audit non-git exposure and, if still clean, reserve S63 as a sealed
    prospective test: freeze the model, thresholds, cohort, and metrics before
    blind labeling; report TIC-disjoint hosts as the primary evaluation and
    repeated hosts separately; unblind once and do not tune from the result.
-6. After the periodic/enrichment path is robust, add the dip branch,
+7. After the periodic/enrichment path is robust, add the dip branch,
    multi-sector merging, and branch-aware false-alarm calibration; then rerun
    frozen-chain candidate-retention and representative pixel-level recovery
    before survey-wide enrichment or science claims.
-7. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
+8. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
    sample criteria; characterize the `764` no-TIC-bridge WDs and the S94+ QLP
    boundary before the survey release is locked.
 

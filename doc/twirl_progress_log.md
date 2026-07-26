@@ -342,15 +342,28 @@ sample.
   and has zero TIC leakage. All seven sectors and all accepted label sources
   contribute; Franklin's period factors remain audit-only. S63 remains
   reserved for a later prospective evaluation.
+- `2026-07-25`: Deployed the exact `teacher_v3` launch checkpoint
+  (`2f4a00a4`) to a clean detached ORCD checkout and restaged the frozen corpus,
+  split, and split-bound table from that Git object. Their ORCD SHA-256 values
+  match the local freeze (`7f05bd9e...`, `551747a1...`, and `04a565a6...`).
+  ORCD job `18882429` (`twirl-tv3-meta`) is the native-independent,
+  metadata-only bootstrap: it entered `RUNNING` on `node4900` in CPU-only mode
+  and emitted the `teacher_v3_start` record for all `8,181` source rows. It
+  uses the immutable TIC grouping (`6,534` active development rows and `1,629`
+  active fixed-test rows), five development folds, fold-local feature
+  normalization, and pooled development-OOF temperature fitting. The fixed
+  test remains sealed in this bootstrap. No H200 was requested or displaced.
+  The full shape/BLS model, clustered-bootstrap intervals, and a genuinely
+  retrained uncertain-masked sensitivity remain pending.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Complete and validate the split-bound, quality-aware per-sector
-native inputs, instantiate the `(sector, TIC)` registry, and run the fixed
-metadata baseline plus primary shape/BLS profile as the `teacher_v3` release.
-Use pooled development-OOF calibration, TIC-clustered uncertainty, and the
-uncertain-label sensitivity analysis. Add dip, multi-sector, and false-alarm
-branches only after this path is robust.
+**Next:** Validate the running metadata-baseline artifacts without opening the
+fixed test, then complete the split-bound, quality-aware per-sector native
+inputs and instantiate the `(sector, TIC)` registry. Run the fixed primary
+shape/BLS profile with pooled development-OOF calibration, TIC-clustered
+uncertainty, and the retrained uncertain-label sensitivity. Add dip,
+multi-sector, and false-alarm branches only after this path is robust.
 
 ### Human labels and harmonic review
 
