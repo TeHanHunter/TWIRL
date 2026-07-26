@@ -355,15 +355,37 @@ sample.
   test remains sealed in this bootstrap. No H200 was requested or displaced.
   The full shape/BLS model, clustered-bootstrap intervals, and a genuinely
   retrained uncertain-masked sensitivity remain pending.
+- `2026-07-25`: ORCD job `18882429` completed the five-fold metadata-only
+  control in `36m41s` with exit `0:0`. Development OOF balanced accuracy is
+  `0.812`, macro F1 is `0.806`, real Planet-like recall is `0.625`, real EB
+  recall is `0.638`, and ECE is `0.0070`. These are development-control
+  diagnostics only: the fixed test remained sealed and the result is not the
+  full Teacher v3 model.
+- `2026-07-26`: Prepared the one-H200 Teacher v3 launch path without opening
+  the fixed test. PDO audits pass for all S56--S62 cadence authorities and
+  exact-host raw subsets; the `1.77 GB` handoff tar is SHA-256 matched on ORCD
+  and extracted into an isolated staging tree. The remaining large-file hashes
+  and compact-path map paused when the user-owned ORCD control socket expired.
+  The [training code](../src/twirl/vetting/teacher_v3_training.py) now requires
+  CUDA for the full run, rejects dirty output directories, verifies native
+  inputs and all frozen checkpoint bytes before and after test evaluation,
+  imports the sealed metadata control by hash, independently retrains the
+  uncertain-masked sensitivity, and produces `2,000`-draw TIC-clustered
+  intervals. The S56 `300 + 156 = 456` injection-pair inputs have an atomic
+  exact-group promotion gate, native preparation defaults to one CPU shard,
+  and plotting is a dependent CPU job. Independent review found no remaining
+  launch blocker; the full suite passes `487` tests with `3` skips. No H200
+  training job has yet been submitted.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Validate the running metadata-baseline artifacts without opening the
-fixed test, then complete the split-bound, quality-aware per-sector native
-inputs and instantiate the `(sector, TIC)` registry. Run the fixed primary
-shape/BLS profile with pooled development-OOF calibration, TIC-clustered
-uncertainty, and the retrained uncertain-label sensitivity. Add dip,
-multi-sector, and false-alarm branches only after this path is robust.
+**Next:** Complete the interrupted ORCD staging hashes and path map, build S57
+as the one-shard native pilot, then exercise the merged S56 injection path.
+After all seven native files and the `(sector, TIC)` registry pass, run the
+fixed primary shape/BLS and uncertain-masked profiles on one H200. Open the
+fixed test once after the checkpoint freeze, then render the dependent CPU
+performance figure. Add dip, multi-sector, and false-alarm branches only after
+this path is robust.
 
 ### Human labels and harmonic review
 

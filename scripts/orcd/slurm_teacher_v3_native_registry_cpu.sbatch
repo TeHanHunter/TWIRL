@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH -p pg_mki_aryeh
+#SBATCH --exclude=node4900
 #SBATCH --job-name=twirl-tv3-registry
 #SBATCH -N 1
 #SBATCH -n 1

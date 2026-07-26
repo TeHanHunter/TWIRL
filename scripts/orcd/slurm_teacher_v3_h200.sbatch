@@ -6,7 +6,7 @@
 #SBATCH -c 16
 #SBATCH --mem=192G
 #SBATCH --gres=gpu:h200:1
-#SBATCH -t 24:00:00
+#SBATCH -t 2-00:00:00
 #SBATCH -o /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.out
 #SBATCH -e /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.err
 
@@ -18,6 +18,13 @@ PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python
 CONFIG="${TWIRL_TEACHER_V3_CONFIG:-${REPO}/configs/models/teacher_v3_s56_s62_a2v1_current_adp.yaml}"
 OUTPUT_ROOT="${TWIRL_TEACHER_V3_OUTPUT_ROOT:-${TWIRL_ROOT}/results/models/teacher_v3_s56_s62_a2v1_current_adp}"
 METADATA_ONLY="${TWIRL_TEACHER_V3_METADATA_ONLY_BOOTSTRAP:-0}"
+RUN_ID="teacher_v3_s56_s62_a2v1_current_adp"
+if [[ "$(basename "${OUTPUT_ROOT}")" == "${RUN_ID}" ]]; then
+  RUN_ROOT="${OUTPUT_ROOT}"
+else
+  RUN_ROOT="${OUTPUT_ROOT}/${RUN_ID}"
+fi
+METADATA_BASELINE_DIR="${TWIRL_TEACHER_V3_METADATA_BASELINE_DIR:-${RUN_ROOT}/metadata_only_bootstrap}"
 
 for input in \
   "${CONFIG}" \
@@ -36,7 +43,9 @@ fi
 if [[ "${METADATA_ONLY}" == "0" ]]; then
   for input in \
     "${TWIRL_ROOT}/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/native_input_registry.csv" \
-    "${TWIRL_ROOT}/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/native_input_registry.summary.json"; do
+    "${TWIRL_ROOT}/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/native_input_registry.summary.json" \
+    "${METADATA_BASELINE_DIR}/summary.json" \
+    "${METADATA_BASELINE_DIR}/metadata_baseline_checkpoint_manifest.json"; do
     if [[ ! -s "${input}" ]]; then
       echo "Missing full Teacher-v3 native input: ${input}" >&2
       echo "Use TWIRL_TEACHER_V3_METADATA_ONLY_BOOTSTRAP=1 only for the declared real-label baseline." >&2
@@ -65,6 +74,8 @@ args=(
 )
 if [[ "${METADATA_ONLY}" == "1" ]]; then
   args+=(--metadata-only-bootstrap)
+else
+  args+=(--metadata-baseline-dir "${METADATA_BASELINE_DIR}")
 fi
 
 echo "[teacher-v3] metadata_only_bootstrap=${METADATA_ONLY} start=$(date -Is)"

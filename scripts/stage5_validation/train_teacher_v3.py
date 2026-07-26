@@ -53,6 +53,32 @@ def _load_config(path: Path) -> dict[str, Any]:
         "one_temperature_from_concatenated_development_oof_logits"
     ):
         failures.append("config does not require pooled development OOF calibration")
+    else:
+        bootstrap = evaluation.get("bootstrap", {})
+        expected_bootstrap = {
+            "unit": "tic",
+            "draws": 2000,
+            "seed": 560063,
+            "confidence_level": 0.95,
+        }
+        if not isinstance(bootstrap, dict):
+            failures.append("evaluation.bootstrap must be a mapping")
+        else:
+            for name, expected_value in expected_bootstrap.items():
+                if bootstrap.get(name) != expected_value:
+                    failures.append(
+                        "config evaluation.bootstrap."
+                        f"{name}={bootstrap.get(name)!r}, "
+                        f"expected {expected_value!r}"
+                    )
+        if set(evaluation.get("sensitivities", [])) != {
+            "uncertain_as_other",
+            "uncertain_masked",
+        }:
+            failures.append(
+                "config must predeclare uncertain_as_other and "
+                "uncertain_masked sensitivities"
+            )
     if failures:
         raise ValueError("invalid Teacher v3 config: " + "; ".join(failures))
     return payload
@@ -92,6 +118,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--training-table", type=Path)
     parser.add_argument("--native-registry", type=Path)
     parser.add_argument("--native-registry-summary", type=Path)
+    parser.add_argument(
+        "--metadata-baseline-dir",
+        type=Path,
+        help=(
+            "Optional completed, test-sealed metadata-only run to verify and "
+            "reuse instead of retraining five baseline folds on the H200."
+        ),
+    )
     output = parser.add_mutually_exclusive_group(required=True)
     output.add_argument(
         "--output-root",
@@ -209,6 +243,11 @@ def main(argv: list[str] | None = None) -> int:
                 "train_config": train_config.__dict__,
                 "workers": int(args.workers),
                 "require_cuda": not args.allow_cpu,
+                "metadata_baseline_dir": (
+                    str(args.metadata_baseline_dir.expanduser().resolve())
+                    if args.metadata_baseline_dir is not None
+                    else ""
+                ),
             },
             sort_keys=True,
         ),
@@ -237,6 +276,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         assert native_registry is not None
         assert native_registry_summary is not None
+        evaluation = config["evaluation"]
+        bootstrap = evaluation["bootstrap"]
         summary = run_teacher_v3_training(
             training_table=training_table,
             native_registry=native_registry,
@@ -251,6 +292,16 @@ def main(argv: list[str] | None = None) -> int:
                 )
             ),
             require_cuda=not args.allow_cpu,
+            metadata_baseline_dir=(
+                args.metadata_baseline_dir.expanduser().resolve()
+                if args.metadata_baseline_dir is not None
+                else None
+            ),
+            bootstrap_draws=int(bootstrap["draws"]),
+            bootstrap_seed=int(bootstrap["seed"]),
+            bootstrap_confidence_level=float(
+                bootstrap["confidence_level"]
+            ),
         )
     print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=True))
     return 0

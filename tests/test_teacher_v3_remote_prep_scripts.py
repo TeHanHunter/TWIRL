@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+import h5py
 import pytest
 
 
@@ -166,8 +167,10 @@ def test_teacher_v3_shell_wrappers_have_valid_bash_syntax() -> None:
         "scripts/stage5_validation/run_teacher_v3_raw_export_pdo.sh",
         "scripts/orcd/slurm_teacher_v3_native_sector_cpu.sbatch",
         "scripts/orcd/slurm_teacher_v3_native_registry_cpu.sbatch",
+        "scripts/orcd/slurm_teacher_v3_injection_merge_cpu.sbatch",
         "scripts/orcd/slurm_teacher_v3_metadata_bootstrap_cpu.sbatch",
         "scripts/orcd/slurm_teacher_v3_h200.sbatch",
+        "scripts/orcd/slurm_teacher_v3_plot_cpu.sbatch",
     )
     for relative in scripts:
         completed = subprocess.run(
@@ -191,3 +194,87 @@ def test_teacher_v3_shell_wrappers_have_valid_bash_syntax() -> None:
         in metadata_wrapper
     )
     assert "a2v1_current_adp/metadata_bootstrap}" not in metadata_wrapper
+    h200_wrapper = (
+        REPO_ROOT / "scripts/orcd/slurm_teacher_v3_h200.sbatch"
+    ).read_text(encoding="utf-8")
+    assert "--gres=gpu:h200:1" in h200_wrapper
+    assert "#SBATCH -t 2-00:00:00" in h200_wrapper
+    assert "--metadata-baseline-dir" in h200_wrapper
+    assert "plot_teacher_v3_performance.py" not in h200_wrapper
+
+    plot_wrapper = (
+        REPO_ROOT / "scripts/orcd/slurm_teacher_v3_plot_cpu.sbatch"
+    ).read_text(encoding="utf-8")
+    assert "#SBATCH --exclude=node4900" in plot_wrapper
+    assert "--gres=" not in plot_wrapper
+    assert "plot_teacher_v3_performance.py" in plot_wrapper
+    assert "--check-only" in plot_wrapper
+    assert "--expected-bootstrap-draws 2000" in plot_wrapper
+    assert "--expected-bootstrap-seed 560063" in plot_wrapper
+    assert 'SUMMARY="${RUN_DIR}/summary.json"' in plot_wrapper
+
+    for relative in (
+        "scripts/orcd/slurm_teacher_v3_native_sector_cpu.sbatch",
+        "scripts/orcd/slurm_teacher_v3_native_registry_cpu.sbatch",
+        "scripts/orcd/slurm_teacher_v3_injection_merge_cpu.sbatch",
+    ):
+        wrapper = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        assert "#SBATCH --exclude=node4900" in wrapper
+
+    native_wrapper = (
+        REPO_ROOT / "scripts/orcd/slurm_teacher_v3_native_sector_cpu.sbatch"
+    ).read_text(encoding="utf-8")
+    assert "#SBATCH -c 1" in native_wrapper
+    assert 'TWIRL_TEACHER_V3_NATIVE_SHARDS:-1' in native_wrapper
+    assert "srun --exclusive --exact -N1 -n1 -c1" in native_wrapper
+    assert "TWIRL_OVERWRITE_TEACHER_V3_NATIVE" not in native_wrapper
+    assert "is real-only; unset TWIRL_TEACHER_V3_INJECTION_PAIR_H5" in (
+        native_wrapper
+    )
+
+
+def test_teacher_v3_native_merge_requires_complete_shard_sequence(
+    tmp_path: Path,
+) -> None:
+    module = _load_script(
+        "scripts/stage5_validation/merge_teacher_v3_native_shards.py",
+        "merge_teacher_v3_native_shards_contract_test",
+    )
+    table_sha256 = "a" * 64
+    shards = [tmp_path / "native_0.h5", tmp_path / "native_1.h5"]
+    for index, path in enumerate(shards):
+        with h5py.File(path, "w") as h5:
+            h5.attrs["shard_index"] = index
+            h5.attrs["n_shards"] = 2
+            h5.attrs["training_table_sha256"] = table_sha256
+
+    audit = module._validate_shard_contract(
+        shards,
+        training_table_sha256=table_sha256,
+    )
+    assert audit["shard_indices"] == [0, 1]
+    with h5py.File(shards[1], "a") as h5:
+        h5.attrs["shard_index"] = 0
+    with pytest.raises(ValueError, match="incomplete or duplicated"):
+        module._validate_shard_contract(
+            shards,
+            training_table_sha256=table_sha256,
+        )
+
+
+def test_teacher_v3_native_merge_reports_exact_group_identity(
+    tmp_path: Path,
+) -> None:
+    module = _load_script(
+        "scripts/stage5_validation/merge_teacher_v3_native_shards.py",
+        "merge_teacher_v3_native_shards_identity_test",
+    )
+    path = tmp_path / "native.h5"
+    with h5py.File(path, "w") as h5:
+        h5.create_group("targets/0000000000000123")
+        h5.create_group("injections/inj-456")
+
+    assert module._native_group_paths(path) == {
+        "targets/0000000000000123",
+        "injections/inj-456",
+    }

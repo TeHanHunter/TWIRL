@@ -689,7 +689,10 @@ def build_raw_pair_export(
                         else _resolve_path(row["source_h5"], repo_root=repo_root)
                     ).resolve()
                     if pair_path not in pair_files:
-                        source_file_sha256[str(pair_path)] = _file_sha256(pair_path)
+                        if str(pair_path) not in source_file_sha256:
+                            source_file_sha256[str(pair_path)] = _file_sha256(
+                                pair_path
+                            )
                         pair_files[pair_path] = h5py.File(pair_path, "r")
                     pair_file = pair_files[pair_path]
                     pair_group_path = (

@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH -p pg_mki_aryeh
+#SBATCH --exclude=node4900
 #SBATCH --job-name=twirl-tv3-native
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH -c 64
-#SBATCH --mem=512G
+#SBATCH -c 1
+#SBATCH --mem=32G
 #SBATCH -t 12:00:00
 #SBATCH -o /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.out
 #SBATCH -e /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.err
@@ -28,15 +29,19 @@ CADENCE_REFERENCE_TABLE="${TWIRL_TEACHER_V3_CADENCE_REFERENCE_TABLE:?set the exa
 CADENCE_REFERENCE_MANIFEST="${TWIRL_TEACHER_V3_CADENCE_REFERENCE_MANIFEST:?set the exact S${SECTOR} cadence-reference manifest}"
 INJECTION_PAIR="${TWIRL_TEACHER_V3_INJECTION_PAIR_H5:-}"
 FINAL="${TWIRL_TEACHER_V3_NATIVE_H5:-${TWIRL_ROOT}/${RUN_REL}/native/s${SECTOR}_teacher_v3_native_v2.h5}"
-N_SHARDS="${TWIRL_TEACHER_V3_NATIVE_SHARDS:-32}"
+N_SHARDS="${TWIRL_TEACHER_V3_NATIVE_SHARDS:-1}"
 RUN_DIR="${TWIRL_ROOT}/runtime/teacher_v3/native_s${SECTOR}_${SLURM_JOB_ID}"
 
-if (( N_SHARDS < 1 || N_SHARDS > SLURM_CPUS_PER_TASK / 2 )); then
-  echo "TWIRL_TEACHER_V3_NATIVE_SHARDS must be in 1..$((SLURM_CPUS_PER_TASK / 2))." >&2
+if (( N_SHARDS < 1 || N_SHARDS > SLURM_CPUS_PER_TASK )); then
+  echo "TWIRL_TEACHER_V3_NATIVE_SHARDS must be in 1..${SLURM_CPUS_PER_TASK}." >&2
   exit 2
 fi
 if [[ "${SECTOR}" == "56" && ! -s "${INJECTION_PAIR}" ]]; then
   echo "S56 contains Teacher-v3 injections; set TWIRL_TEACHER_V3_INJECTION_PAIR_H5." >&2
+  exit 3
+fi
+if [[ "${SECTOR}" != "56" && -n "${INJECTION_PAIR}" ]]; then
+  echo "S${SECTOR} is real-only; unset TWIRL_TEACHER_V3_INJECTION_PAIR_H5." >&2
   exit 3
 fi
 for input in \
@@ -50,8 +55,9 @@ for input in \
     exit 3
   fi
 done
-if [[ -e "${FINAL}" && "${TWIRL_OVERWRITE_TEACHER_V3_NATIVE:-0}" != "1" ]]; then
-  echo "Refusing to overwrite ${FINAL}; set TWIRL_OVERWRITE_TEACHER_V3_NATIVE=1." >&2
+if [[ -e "${FINAL}" || -e "${FINAL%.h5}.summary.json" ]]; then
+  echo "Refusing to overwrite an existing Teacher-v3 native artifact." >&2
+  echo "output=${FINAL} summary=${FINAL%.h5}.summary.json" >&2
   exit 4
 fi
 
@@ -84,7 +90,7 @@ echo "[teacher-v3-native] sector=${SECTOR} shards=${N_SHARDS} start=$(date -Is)"
 pids=()
 for ((shard=0; shard<N_SHARDS; shard++)); do
   shard_path="${RUN_DIR}/native_${shard}.h5"
-  srun --exclusive --exact -N1 -n1 -c2 --mem=12G \
+  srun --exclusive --exact -N1 -n1 -c1 --mem=12G \
     "${PYTHON}" scripts/stage5_validation/build_teacher_v3_native_inputs.py \
     "${common_args[@]}" \
     --out-h5 "${shard_path}" \
