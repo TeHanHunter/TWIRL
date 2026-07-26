@@ -15,7 +15,7 @@ TWIRL_ROOT="${TWIRL_ORCD_ROOT:-/orcd/data/mki_aryeh/001/twirl}"
 REPO="${TWIRL_ORCD_REPO:-${TWIRL_ROOT}/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_TORCH_PYTHON:-${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python}"
 CONFIG="${TWIRL_TEACHER_V3_CONFIG:-${REPO}/configs/models/teacher_v3_s56_s62_a2v1_current_adp.yaml}"
-OUTPUT_ROOT="${TWIRL_TEACHER_V3_OUTPUT_ROOT:-${TWIRL_ROOT}/results/models/teacher_v3_s56_s62_a2v1_current_adp/metadata_bootstrap}"
+OUTPUT_ROOT="${TWIRL_TEACHER_V3_OUTPUT_ROOT:-${TWIRL_ROOT}/results/models/teacher_v3_s56_s62_a2v1_current_adp}"
 
 for input in \
   "${CONFIG}" \

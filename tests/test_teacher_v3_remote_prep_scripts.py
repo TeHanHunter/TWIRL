@@ -186,3 +186,8 @@ def test_teacher_v3_shell_wrappers_have_valid_bash_syntax() -> None:
     assert "--metadata-only-bootstrap" in metadata_wrapper
     assert "--allow-cpu" in metadata_wrapper
     assert "--workers 0" in metadata_wrapper
+    assert (
+        "results/models/teacher_v3_s56_s62_a2v1_current_adp}"
+        in metadata_wrapper
+    )
+    assert "a2v1_current_adp/metadata_bootstrap}" not in metadata_wrapper
