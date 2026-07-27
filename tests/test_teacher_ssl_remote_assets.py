@@ -231,7 +231,7 @@ def test_teacher_ssl_cli_wires_frozen_inputs_and_overrides(
 def test_teacher_ssl_cli_has_valid_python_syntax() -> None:
     completed = subprocess.run(
         [
-            "python",
+            sys.executable,
             "-m",
             "py_compile",
             str(CLI_PATH),
