@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-26`.
+Last reconciled: `2026-07-27`.
 
 ## Current status
 
@@ -39,13 +39,17 @@ Last reconciled: `2026-07-26`.
   exploratory teacher v2. The seven-sector morphology corpus and TIC-grouped
   split are frozen. The native-independent, five-fold metadata baseline
   completed on ORCD with the fixed test still sealed; it is a control, not
-  `teacher_v3` itself. The full release now has a fail-closed one-H200
+  `teacher_v3` itself. The full release completed its fail-closed one-H200
   training/evaluation contract with pooled development-OOF calibration,
   genuinely retrained uncertain-label sensitivity, TIC-clustered intervals,
-  and checkpoint verification around the single fixed-test opening. Its
-  launch remains gated on the observation-keyed S56--S62 native-v2 inputs.
-  The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
-  v2 was completed as an exploratory comparison but missed
+  and checkpoint verification around the single fixed-test opening. On the
+  shared `528`-row real non-uncertain test support, the primary raises
+  balanced accuracy from `0.720` to `0.779` and macro F1 from `0.744` to
+  `0.809` over metadata only; Planet-like recall remains descriptive at
+  `8/14`. Teacher v3 is frozen for enrichment only: automatic promotion is
+  disabled and student training is blocked. The old native-v1 checkpoint is
+  never reused with native-v2 inputs. Teacher v2 was completed as an
+  exploratory comparison but missed
   its promotion gates, so it is not a production ranker or student-label
   generator. See [Stage 2 history](twirl_progress_log.md#stage-2).
 - LC-level injection/recovery, two-aperture vetting, and pixel-injection smokes
@@ -211,15 +215,18 @@ population or one of five development folds with zero TIC leakage. S63 remains
 reserved as a prospective external evaluation rather than being consumed for
 this training release.
 
-The immediate work is to validate the split-bound per-sector input mappings,
-build the missing quality-aware native files, and run `teacher_v3`; do not add
-search branches or retune Tier-1 on this critical path. Apply the accepted v4
-paired-input mask for teacher construction while retaining
-single-aperture-searchable cases for separate review. Keep the small ADP
-aperture as the search channel and the primary ADP aperture as contamination
-evidence unless later injection and real-data tests justify a change. Defer
-the non-periodic dip detector, multi-sector aggregation, and
-false-alarm/background calibration until this path is robust. Those
+The split-bound per-sector mappings, seven observation-keyed native files,
+native registry, H200 training, single fixed-test opening, and dependent
+performance figure are complete. The
+[performance report](../reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/performance/)
+supports Teacher v3 as an enrichment tool, not an automatic classifier. Its
+primary improvement over metadata only is useful but not decisive, and the
+strong uncertain-masked control identifies label policy as the next
+model-development question. Keep the small ADP aperture as the search channel
+and the primary ADP aperture as contamination evidence unless later injection
+and real-data tests justify a change. Defer the non-periodic dip detector,
+multi-sector aggregation, and false-alarm/background calibration until the
+periodic enrichment and prospective S63 evaluation are frozen. Those
 capabilities remain mandatory before the full survey search or a science-ready
 candidate catalog.
 
@@ -237,11 +244,10 @@ source, and exact input provenance.
   `s56_harmonic_cnn_v1` architecture. Do not apply its native-v1 checkpoint to
   quality-aware native-v2 inputs and do not interpret the release name as an
   automatic production promotion.
-- The observation-keyed preparation table and immutable TIC split are frozen.
-  Complete and validate the per-sector quality references and `(sector, TIC)`
-  native-input registry before the primary shape-model run. Repeated TICs may
-  contribute sector observations but may never collide in storage or cross a
-  train/validation/test boundary.
+- The observation-keyed preparation table, immutable TIC split, seven native
+  inputs, and `(sector, TIC)` native registry are frozen and validated.
+  Repeated TICs may contribute sector observations but may never collide in
+  storage or cross a train/validation/test boundary.
 - Apply a bounded training-input gate to S57--S62: validate each A2v1 source,
   regenerate quality-aware BLS/native inputs, and compare the reviewed
   ephemeris with the current search result. Preserve a label automatically
@@ -373,31 +379,23 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Finish and validate the S56--S62 observation-keyed training
-   inputs for frozen `teacher_v3`:
-   per-sector cadence/quality references, exact target eligibility,
-   quality-aware BLS/native inputs, `(sector, TIC)` storage identity, and an
-   ephemeris-compatibility re-review gate.
-2. Run the fixed primary `shape_plus_periodogram_bls` profile on one H200
-   under the
-   `teacher_v3` release contract. Fit one temperature from pooled development
-   out-of-fold logits; report real and injected metrics separately,
-   TIC-clustered bootstrap intervals, and a genuinely retrained
-   uncertain-as-other versus uncertain-masked sensitivity.
-3. Open the fixed test population only after the model/calibration contract is
-   frozen. Do not promote the model, start student pseudo-labeling, or change
-   architecture from this result automatically.
-4. Publish the hash-bound morphology corpus plus the enrichment-only candidate
+1. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
+   the hash-bound morphology corpus plus the enrichment-only candidate
    table/TIC index, preserving the raw edit log and all source provenance.
-5. Audit non-git exposure and, if still clean, reserve S63 as a sealed
-   prospective test: freeze the model, thresholds, cohort, and metrics before
-   blind labeling; report TIC-disjoint hosts as the primary evaluation and
-   repeated hosts separately; unblind once and do not tune from the result.
-6. After the periodic/enrichment path is robust, add the dip branch,
+2. Use S63 as the sealed prospective test: freeze the model, thresholds,
+   cohort, queue-construction rule, and metrics before blind labeling; include
+   a predeclared random/control slice, report TIC-disjoint hosts as the primary
+   evaluation and repeated hosts separately, and unblind once without tuning
+   from the result.
+3. Audit a small targeted set of uncertain rows selected by primary versus
+   uncertain-masked disagreement, high confidence, and boundary proximity.
+   Do not relabel the entire corpus, change architecture, or start student
+   pseudo-labeling from the current fixed-test result.
+4. After the periodic/enrichment path is robust, add the dip branch,
    multi-sector merging, and branch-aware false-alarm calibration; then rerun
    frozen-chain candidate-retention and representative pixel-level recovery
    before survey-wide enrichment or science claims.
-7. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
+5. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
    sample criteria; characterize the `764` no-TIC-bridge WDs and the S94+ QLP
    boundary before the survey release is locked.
 

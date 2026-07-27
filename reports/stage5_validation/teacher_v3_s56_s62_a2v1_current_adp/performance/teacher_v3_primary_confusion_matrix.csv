@@ -1,0 +1,17 @@
+actual_class,predicted_class,count,actual_class_support,row_fraction,evaluation_scope,model_key
+planet_like,planet_like,8,14,0.5714285714285714,fixed_test_real_labels,primary
+planet_like,eclipse_contact,0,14,0,fixed_test_real_labels,primary
+planet_like,smooth_variable,1,14,0.071428571428571425,fixed_test_real_labels,primary
+planet_like,other,5,14,0.35714285714285715,fixed_test_real_labels,primary
+eclipse_contact,planet_like,1,85,0.011764705882352941,fixed_test_real_labels,primary
+eclipse_contact,eclipse_contact,69,85,0.81176470588235294,fixed_test_real_labels,primary
+eclipse_contact,smooth_variable,13,85,0.15294117647058825,fixed_test_real_labels,primary
+eclipse_contact,other,2,85,0.023529411764705882,fixed_test_real_labels,primary
+smooth_variable,planet_like,1,234,0.0042735042735042739,fixed_test_real_labels,primary
+smooth_variable,eclipse_contact,2,234,0.0085470085470085479,fixed_test_real_labels,primary
+smooth_variable,smooth_variable,206,234,0.88034188034188032,fixed_test_real_labels,primary
+smooth_variable,other,25,234,0.10683760683760683,fixed_test_real_labels,primary
+other,planet_like,1,1139,0.00087796312554872696,fixed_test_real_labels,primary
+other,eclipse_contact,3,1139,0.0026338893766461808,fixed_test_real_labels,primary
+other,smooth_variable,37,1139,0.032484635645302899,fixed_test_real_labels,primary
+other,other,1098,1139,0.96400351185250222,fixed_test_real_labels,primary

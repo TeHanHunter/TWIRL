@@ -376,16 +376,44 @@ sample.
   and plotting is a dependent CPU job. Independent review found no remaining
   launch blocker; the full suite passes `487` tests with `3` skips. No H200
   training job has yet been submitted.
+- `2026-07-27`: Completed all seven observation-keyed native-v2 inputs and
+  the merged registry from exact Git object `0823d49a`. Registry job
+  `18918806` passed with `7,705` real observations, `7,571` unique TICs, and
+  `134` multi-sector TICs; its SHA-256 is `81b258590c...`. S62 required one
+  checksum-bound compatibility correction because both raw and compact inputs
+  inherited an orbit-partition defect: `65,478` target-cadence rows (`0.606%`)
+  were remapped from orbit 132 to the authoritative orbit 131 assignment.
+  Times, fluxes, uncertainties, quality values, labels, and splits were
+  unchanged. This is accepted for Teacher v3 only; a science-ready S62 product
+  still requires an upstream rebuild.
+- `2026-07-27`: ORCD job `18918808` completed the fixed primary and
+  independently retrained uncertain-masked profiles on exactly one H200 in
+  `02:17:59` with exit `0:0`; all ten newly trained folds are present. The
+  fixed test opened once after pretest freeze
+  `140ad51dcbbad66cc8fbb10a9fd138f383fdeb0698be47cc1f083a3e48ed2eb3`,
+  and all metadata, primary, and sensitivity checkpoint/calibration hashes are
+  identical before and after evaluation. On the common `528`-row,
+  `519`-TIC real non-uncertain support, primary versus metadata-only balanced
+  accuracy is `0.779` versus `0.720`, macro F1 is `0.809` versus `0.744`, EB
+  recall is `0.812` versus `0.694`, and ECE is `0.025` versus `0.054`. Real
+  Planet-like recall is `8/14 = 0.571` and remains descriptive. The
+  uncertain-masked retraining reaches balanced accuracy `0.817` and macro F1
+  `0.818` on that same support after retaining `3,333/8,163` active rows,
+  making label policy the clearest near-term model-development issue. Student
+  training remains blocked and automatic production promotion is false.
+  Dependent CPU job `18918849` rendered and hash-verified the
+  [PNG, PDF, metrics, and short report](../reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/performance/).
+  Final local validation passes `488` tests with `3` skips plus the
+  documentation checker.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Complete the interrupted ORCD staging hashes and path map, build S57
-as the one-shard native pilot, then exercise the merged S56 injection path.
-After all seven native files and the `(sector, TIC)` registry pass, run the
-fixed primary shape/BLS and uncertain-masked profiles on one H200. Open the
-fixed test once after the checkpoint freeze, then render the dependent CPU
-performance figure. Add dip, multi-sector, and false-alarm branches only after
-this path is robust.
+**Next:** Freeze Teacher v3 as enrichment only, publish the reviewed
+S56--S62 candidate table/TIC roll-up, and define the sealed S63 queue,
+thresholds, random-control slice, and prospective metrics before blind review.
+Use model disagreement to target a small uncertain-label audit; do not relabel
+the whole corpus or start student pseudo-labeling. Add dip, multi-sector, and
+false-alarm branches only after this prospective periodic path is robust.
 
 ### Human labels and harmonic review
 
@@ -405,9 +433,10 @@ this path is robust.
   masked unless an explicit factor-only review or injection truth verifies
   them; all seven folds remain model inputs regardless of that mask.
 
-**Next:** Use teacher v1 to enrich real labels while preserving blinded score
-provenance and cross-review overlap; require a predeclared rare-factor and
-oracle-factor evaluation before any future model iteration.
+**Next:** Use the frozen Teacher v3 release to enrich the sealed S63 review
+while preserving blinded score provenance and a random/control slice. Require
+the prospective result plus a predeclared rare-factor and oracle-factor
+evaluation before any architecture iteration or student pseudo-labeling.
 
 ## Stage 3
 

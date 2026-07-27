@@ -1,0 +1,126 @@
+{
+  "automatic_production_promotion": false,
+  "bootstrap": {
+    "confidence_level": 0.95,
+    "draws": 2000,
+    "interval": "percentile",
+    "seed": 560063,
+    "unit": "tic"
+  },
+  "common_support": {
+    "evaluation_scope": "fixed_test_real_non_uncertain",
+    "n_rows": 528,
+    "n_tics": 519,
+    "review_id_tic_pairs_sha256": "0c2b16f71564dc4107e0b1bd308eed857ae6053822270b9e942102c6cc68ef0e",
+    "review_ids_sha256": "5df15c4ec9f0bbfe5ac43df860625bb6126bc126b224db00159dd572e3895acc",
+    "tics_sha256": "616f2ad827e20f1bca019de701a459dd716cf74d44384600e09bd23ca587785a",
+    "verified_models": [
+      "metadata_baseline",
+      "primary",
+      "uncertain_masked"
+    ]
+  },
+  "figure_question": "How does the fixed Teacher v3 primary compare with metadata-only and genuinely retrained uncertain-masked controls?",
+  "input_artifacts": {
+    "metadata_baseline_bootstrap_summary": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/metadata_only/fixed_test_non_uncertain_bootstrap.summary.json",
+      "sha256": "2b5817722d9a23fe1ae580dcac9d0a1be3f7aa7599e641737d4401ef1cc36bb1"
+    },
+    "metadata_baseline_fixed_metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/metadata_only/fixed_test_metrics.json",
+      "sha256": "6b6feff4e79502980f80e3d11f3145bc95329665638f16e26db3efc1553861e0"
+    },
+    "metadata_baseline_metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/metadata_only/fixed_test_non_uncertain_bootstrap_metrics.csv",
+      "sha256": "4bf2e57bd6a7a9ab7c676c4f1443a704ba6b2b6d082a7742eb83221686d3d21b"
+    },
+    "metadata_baseline_predictions": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/metadata_only/fixed_test_predictions.csv",
+      "sha256": "414842db94f37d6d535406aa7adc22fa9314f8935cea71ee941b2bdc89439169"
+    },
+    "metadata_baseline_reliability": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/metadata_only/fixed_test_non_uncertain_reliability.csv",
+      "sha256": "f32b78efd0462d95e823d1b047e895a03c88a1aa45d42e602b3413f42974de4d"
+    },
+    "primary_bootstrap_summary": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/shape_plus_periodogram_bls/fixed_test_non_uncertain_bootstrap.summary.json",
+      "sha256": "a69dca25971cca5f073ee3cef2ce0009d78eeba5b807cd2285560b7904d500b3"
+    },
+    "primary_fixed_metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/shape_plus_periodogram_bls/fixed_test_metrics.json",
+      "sha256": "2b52312d14855deefc047fd5159ca2a60821645b878ca0bb05206ddd59df0f3b"
+    },
+    "primary_metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/shape_plus_periodogram_bls/fixed_test_non_uncertain_bootstrap_metrics.csv",
+      "sha256": "157630992f0f78a93ee181743314cf708110571347bc06fd727936019b4fcfea"
+    },
+    "primary_predictions": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/shape_plus_periodogram_bls/fixed_test_predictions.csv",
+      "sha256": "f3a9e4a56287a8e60d305a52776361e91473d0b61b42251766b6f99b69d270cb"
+    },
+    "primary_reliability": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/shape_plus_periodogram_bls/fixed_test_non_uncertain_reliability.csv",
+      "sha256": "0d05f54b4625333c743148473e8c4a25c80273846d525827151cf9bc9d9562a3"
+    },
+    "training_summary": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/summary.json",
+      "sha256": "0bdcb064a7e67f2304ba58b1e79c462daa7cc8aad5ad64d2f57a86c4dae46e99"
+    },
+    "uncertain_masked_bootstrap_summary": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/sensitivities/uncertain_masked/shape_plus_periodogram_bls/fixed_test_bootstrap.summary.json",
+      "sha256": "cce3299d1febfbb4f1ae0a4ee6dc1ab7d87b996b239b970946529788606dbf23"
+    },
+    "uncertain_masked_fixed_metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/sensitivities/uncertain_masked/shape_plus_periodogram_bls/fixed_test_metrics.json",
+      "sha256": "b3eaec0e871652e418ef9f12a63979824a566c0293ca36f8cc52e1bf39d08475"
+    },
+    "uncertain_masked_metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/sensitivities/uncertain_masked/shape_plus_periodogram_bls/fixed_test_bootstrap_metrics.csv",
+      "sha256": "fceb4875ed185a2a39871d01c59360b9d0bfba5fbad63c1fce94a85ff245e558"
+    },
+    "uncertain_masked_predictions": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/sensitivities/uncertain_masked/shape_plus_periodogram_bls/fixed_test_predictions.csv",
+      "sha256": "d09c2fe7e68f58f6f1f7bd386b8d3946d655b623ebcfa9b8921ed606bfebea45"
+    },
+    "uncertain_masked_reliability": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/sensitivities/uncertain_masked/shape_plus_periodogram_bls/fixed_test_reliability.csv",
+      "sha256": "e2f83c4c679dac2217570e01eae3ade3e3a28613bc23a03a0cdb2c3f87485405"
+    }
+  },
+  "output_artifacts": {
+    "confusion": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/performance/teacher_v3_primary_confusion_matrix.csv",
+      "sha256": "c564612b922d10a92af0243b861860ed14c36cc5caf00c63bd3d23b4f3c5f1c4"
+    },
+    "metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/performance/teacher_v3_performance_metrics.csv",
+      "sha256": "65c39a774fbd86336610b92971db0f040b1a7147d7bf1173dbba6cacde7e4af9"
+    },
+    "pdf": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/performance/teacher_v3_performance.pdf",
+      "sha256": "42e502d5fcddec7d4ee1bd4c5929c7625c3989f58c1e29070355e3f29fc97b2d"
+    },
+    "png": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/performance/teacher_v3_performance.png",
+      "sha256": "c7f7a42e598530456e5808cb2d567ef060246c899f9bdd0da177f7f44248efcf"
+    },
+    "reliability": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/performance/teacher_v3_performance_reliability.csv",
+      "sha256": "ae44ab2b5a45ba6f4bdb9b8c3f24dea15a6d28a610f40ea37884f1f7cb59cc67"
+    },
+    "source_metrics": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/results/models/teacher_v3_s56_s62_a2v1_current_adp/full/performance/teacher_v3_source_metrics.csv",
+      "sha256": "153edb16801d4310d2725e6d959cf31b5b990d0379d17afb60969150a090e7be"
+    }
+  },
+  "panel_a_scope": "real non-uncertain fixed-test observations shared by all three models",
+  "panel_b_scope": "all active real fixed-test labels under the accepted uncertain-as-other primary policy",
+  "run_id": "teacher_v3_s56_s62_a2v1_current_adp",
+  "schema_version": "twirl_teacher_v3_performance_figure_v1",
+  "small_support_policy": "Class estimates with fewer than 20 observations are marked with a dagger and described as descriptive only.",
+  "style": {
+    "authority": "twirl.plotting.style",
+    "ordered_palette": "viridis",
+    "template": "full_page"
+  }
+}
