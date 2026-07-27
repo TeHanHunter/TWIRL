@@ -405,15 +405,39 @@ sample.
   [PNG, PDF, metrics, and short report](../reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/performance/).
   Final local validation passes `488` tests with `3` skips plus the
   documentation checker.
+- `2026-07-27`: Froze the
+  [Teacher SSL v1 preregistration](../reports/stage5_validation/teacher_ssl_v1_s56_s62_a2v1_current_adp/)
+  and deployed the corrected exact Git object `634e865f` to a new detached
+  ORCD worktree.
+  The primary fold-local VICReg pool contains `6,168` real development
+  observations (`6,054` TICs), including `3,780` uncertain observations whose
+  labels are ignored by the SSL objective. Fixed-test and S63 model tensors,
+  injected SSL rows, and scalar metadata are forbidden; immutable containing
+  files are read only for integrity validation. The model-facing fine-tuned
+  name is **Teacher v4-SSL**, but Teacher v3 remains the frozen operational
+  baseline and automatic promotion/student labeling remain blocked. Local
+  validation passes `514` tests with `6` optional-dependency skips. ORCD
+  preflight job `18999895` passed all `38` Torch/model assertions and exposed
+  one test-harness-only failure because it invoked a bare `python`; the
+  corrected remote asset suite then passed `16/16`, and the obsolete dependent
+  training job was canceled. Replacement one-H200 job `19000602` entered
+  `RUNNING` on `node4900`, confirmed an H200 through `nvidia-smi`, and emitted
+  the checksum-bound `teacher_ssl_v1_start` record with CUDA required. The user
+  approved up to four H200s for later parallel folds/seeds or a validated
+  broader pool; the small single-process native pilot intentionally requests
+  one. The initial runner emits embeddings, neighbors, matched development
+  OOF, and the exact-support Teacher v3 comparison; the preregistered
+  permutation, collapse, confound, review-budget, injection, and WD 1856 gate
+  evaluator remains the next dependent analysis.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Freeze Teacher v3 as enrichment only, publish the reviewed
-S56--S62 candidate table/TIC roll-up, and define the sealed S63 queue,
-thresholds, random-control slice, and prospective metrics before blind review.
-Use model disagreement to target a small uncertain-label audit; do not relabel
-the whole corpus or start student pseudo-labeling. Add dip, multi-sector, and
-false-alarm branches only after this prospective periodic path is robust.
+**Next:** Complete the Teacher v4-SSL follow-up gates, freeze Teacher v3 as
+enrichment only, publish the reviewed S56--S62 candidate table/TIC roll-up,
+and define the sealed S63 queue, thresholds, random-control slice, and
+prospective metrics before blind review. Do not schedule more corpus labeling
+or start student pseudo-labeling. Add dip, multi-sector, and false-alarm
+branches only after this prospective periodic path is robust.
 
 ### Human labels and harmonic review
 

@@ -47,8 +47,15 @@ Last reconciled: `2026-07-27`.
   balanced accuracy from `0.720` to `0.779` and macro F1 from `0.744` to
   `0.809` over metadata only; Planet-like recall remains descriptive at
   `8/14`. Teacher v3 is frozen for enrichment only: automatic promotion is
-  disabled and student training is blocked. The old native-v1 checkpoint is
-  never reused with native-v2 inputs. Teacher v2 was completed as an
+  disabled and student training is blocked. The development-only
+  `teacher_ssl_v1` experiment (model-facing name **Teacher v4-SSL**) is
+  preregistered as a possible companion enrichment model. Its fold-local
+  native pilot ignores labels during VICReg pretraining, leaves the fixed test
+  and S63 out of model use, and is running on one H200 as ORCD job `19000602`
+  from exact Git object `634e865f`. It cannot be promoted until the full
+  geometry, confound, injection-retention, and WD 1856 gates are evaluated.
+  The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
+  v2 was completed as an
   exploratory comparison but missed
   its promotion gates, so it is not a production ranker or student-label
   generator. See [Stage 2 history](twirl_progress_log.md#stage-2).
@@ -263,6 +270,13 @@ source, and exact input provenance.
   versioned data/label manifest, TIC-grouped splits, source-separated
   evaluation, probability calibration, and bootstrap uncertainty before
   changing model architecture.
+- Treat `teacher_ssl_v1` / **Teacher v4-SSL** as a development-only
+  representation experiment on the frozen active S56--S62 candidate pool.
+  Keep Teacher v3 as the operational baseline, forbid fixed-test and S63 model
+  use, and do not generate pseudo-labels. The initial one-H200 run only
+  collects fold-local embeddings and matched development comparisons; a
+  separate preregistered evaluator must complete the permutation, confound,
+  collapse, review-budget, injection, and WD 1856 gates before interpretation.
 - Report a label-policy sensitivity check for the dominant S57--S59
   `uncertain` return (`2,106/3,000` rows): compare the accepted
   uncertain-as-other mapping with masking those rows.
@@ -379,18 +393,19 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
+1. Complete the development-only Teacher v4-SSL native pilot and its
+   preregistered follow-up evaluator without opening fixed-test or S63 model
+   tensors. Keep it only if the representation is non-collapsed, not dominated
+   by nuisance variables, and preserves Teacher v3 enrichment performance.
+   Additional manual labeling is not part of this step.
+2. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
    the hash-bound morphology corpus plus the enrichment-only candidate
    table/TIC index, preserving the raw edit log and all source provenance.
-2. Use S63 as the sealed prospective test: freeze the model, thresholds,
+3. Use S63 as the sealed prospective test: freeze the model, thresholds,
    cohort, queue-construction rule, and metrics before blind labeling; include
    a predeclared random/control slice, report TIC-disjoint hosts as the primary
    evaluation and repeated hosts separately, and unblind once without tuning
    from the result.
-3. Audit a small targeted set of uncertain rows selected by primary versus
-   uncertain-masked disagreement, high confidence, and boundary proximity.
-   Do not relabel the entire corpus, change architecture, or start student
-   pseudo-labeling from the current fixed-test result.
 4. After the periodic/enrichment path is robust, add the dip branch,
    multi-sector merging, and branch-aware false-alarm calibration; then rerun
    frozen-chain candidate-retention and representative pixel-level recovery
