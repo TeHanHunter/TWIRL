@@ -454,10 +454,12 @@ class HarmonicNativeDataset:
             self._cache.move_to_end(index)
             return self._cache[index]
         row = self.rows.iloc[index]
+        period, t0, duration = candidate_bls_ephemeris(row)
         target_payload = {
             "review_id": str(row.get("review_id", "")),
             "tic": int(float(row["tic"])),
-            "period_d": np.float32(candidate_bls_ephemeris(row)[0]),
+            "period_d": np.float32(period),
+            "duration_min": np.float32(duration),
             "metadata": self.metadata[index],
             "morphology_target": int(row["morphology_target_index"]),
             "preserve_target": int(row["preserve_target_index"]),
@@ -506,7 +508,6 @@ class HarmonicNativeDataset:
             raise ValueError(f"unknown native input_variant {variant!r}")
         if float(np.nanmedian(lc.time)) < 1.0e5:
             raise ValueError("native input time must be absolute BJD, not BTJD")
-        period, t0, duration = candidate_bls_ephemeris(row)
         chronology = (
             build_native_channels(lc)
             if "chronology" in self.branches
@@ -625,6 +626,7 @@ def collate_native_samples(samples: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "review_id": [sample["review_id"] for sample in samples],
         "tic": tensor("tic", torch.long),
         "period_d": tensor("period_d", torch.float32),
+        "duration_min": tensor("duration_min", torch.float32),
         "chronology_small": torch.from_numpy(small),
         "chronology_small_mask": torch.from_numpy(small_mask),
         "chronology_supplemental": torch.from_numpy(supplemental),

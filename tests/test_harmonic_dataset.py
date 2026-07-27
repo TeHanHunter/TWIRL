@@ -121,10 +121,11 @@ def test_native_dataset_reuses_one_hdf5_handle(tmp_path: Path) -> None:
         profile="seven_harmonic_shape",
     )
 
-    dataset[0]
+    first_sample = dataset[0]
     first_handle = dataset._native_handles[str(path)]
     dataset[1]
 
+    assert first_sample["duration_min"] == pytest.approx(10.0)
     assert dataset._native_handles[str(path)] is first_handle
     assert first_handle.id.valid
     dataset.close()
