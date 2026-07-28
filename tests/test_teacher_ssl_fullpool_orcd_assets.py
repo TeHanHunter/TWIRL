@@ -109,6 +109,13 @@ def test_fullpool_bls_arrays_and_s62_policy_are_locked() -> None:
     assert "SECTOR=$((56 + TASK_ID))" in merge
 
 
+def test_fullpool_freeze_uses_rebuilt_s56_pair() -> None:
+    wrapper = FREEZE.read_text(encoding="utf-8")
+
+    assert "s56_A2v1_adp_pair_rebuilt.manifest.json" in wrapper
+    assert "s56_A2v1_adp_pair_rebuilt.h5" in wrapper
+
+
 def test_fullpool_bls_canary_is_bounded_and_output_isolated() -> None:
     wrapper = BLS_CANARY.read_text(encoding="utf-8")
 

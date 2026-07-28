@@ -20,7 +20,7 @@ SPLIT_REGISTRY="${TWIRL_SSL_FULLPOOL_SPLIT_REGISTRY:-${TWIRL_ROOT}/reports/stage
 S63_TICS="${TWIRL_SSL_FULLPOOL_S63_TICS:-${RUN_ROOT}/preregistered/s63_reserved_tics.txt}"
 S63_SUMMARY="${TWIRL_SSL_FULLPOOL_S63_SUMMARY:-${RUN_ROOT}/preregistered/s63_reserved_tics.summary.json}"
 
-S56_MANIFEST="${TWIRL_SSL_FULLPOOL_S56_MANIFEST:-${TWIRL_ROOT}/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair.manifest.json}"
+S56_MANIFEST="${TWIRL_SSL_FULLPOOL_S56_MANIFEST:-${TWIRL_ROOT}/data_local/stage1_lightcurves/s56_A2v1/s56_A2v1_adp_pair_rebuilt.manifest.json}"
 S57_MANIFEST="${TWIRL_SSL_FULLPOOL_S57_MANIFEST:-${TWIRL_ROOT}/data_local/stage1_lightcurves/s57_A2v1/s57_A2v1_adp_pair.manifest.json}"
 S58_MANIFEST="${TWIRL_SSL_FULLPOOL_S58_MANIFEST:-${TWIRL_ROOT}/data_local/stage1_lightcurves/s58_A2v1/s58_A2v1_adp_pair.manifest.json}"
 S59_MANIFEST="${TWIRL_SSL_FULLPOOL_S59_MANIFEST:-${TWIRL_ROOT}/data_local/stage1_lightcurves/s59_A2v1/s59_A2v1_adp_pair.manifest.json}"
