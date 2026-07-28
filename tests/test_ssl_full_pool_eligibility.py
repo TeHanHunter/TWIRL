@@ -268,6 +268,18 @@ def _lock_toy_production_authority(
     )
 
 
+def test_production_bls_contract_matches_frozen_explicit_config_tag() -> None:
+    contract = eligibility_module._production_bls_contract()
+
+    assert contract["search_contract_version"] == "custom"
+    assert contract["config_sha256"] == (
+        eligibility_module.bls_config_sha256(contract["config"])
+    )
+    assert contract["config"]["n_periods"] == 50_000
+    assert contract["config"]["n_peaks"] == 10
+    assert contract["apertures"] == list(ADP_ONLY_APERTURES)
+
+
 def test_anchor_eligibility_is_only_adp_small_rank_one_searchability(
     tmp_path: Path,
 ) -> None:

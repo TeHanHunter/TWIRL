@@ -23,7 +23,6 @@ import numpy as np
 import pandas as pd
 
 from twirl.search.a2v1_bls_contract import (
-    A2V1_TEACHER_BLS_SEARCH_CONTRACT,
     approved_a2v1_teacher_bls_config,
     bls_config_sha256,
 )
@@ -78,6 +77,10 @@ PRODUCTION_GLOBAL_BLS_SHA256 = (
 PRODUCTION_GLOBAL_BLS_SUMMARY_SHA256 = (
     "4efced245b292bbdadcbae501382038f66fa6ea1090ef13e00be118a11ee395d"
 )
+# The frozen full-pool BLS job supplied the approved parameters explicitly,
+# so its immutable summary records the search-contract label as ``custom``.
+# The exact config and config SHA below remain identical to the named preset.
+PRODUCTION_GLOBAL_BLS_SEARCH_CONTRACT_VERSION = "custom"
 PRODUCTION_EXCLUDED_BY_SECTOR: Mapping[int, int] = {
     56: 4,
     57: 1,
@@ -773,7 +776,9 @@ def _production_bls_contract() -> dict[str, Any]:
     return {
         "config": config,
         "config_sha256": bls_config_sha256(config),
-        "search_contract_version": A2V1_TEACHER_BLS_SEARCH_CONTRACT,
+        "search_contract_version": (
+            PRODUCTION_GLOBAL_BLS_SEARCH_CONTRACT_VERSION
+        ),
         "source_product_tag": FULL_POOL_BLS_SOURCE_PRODUCT_TAG,
         "apertures": list(ADP_ONLY_APERTURES),
         "orbitid_reconciliation_contract_version": (
