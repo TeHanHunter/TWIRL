@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,13 +20,46 @@ from twirl.vetting.ssl_full_pool_native import (  # noqa: E402
 )
 
 
+def _publish_immutable_json(path: Path, value: object) -> None:
+    """Fsync and atomically publish JSON without overwriting another writer."""
+
+    path = path.expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (
+        json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    ).encode("utf-8")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sector", type=int, required=True)
     parser.add_argument("--frozen-pool", type=Path, required=True)
     parser.add_argument("--frozen-pool-summary", type=Path, required=True)
+    parser.add_argument("--eligibility-exclusions", type=Path, required=True)
+    parser.add_argument("--eligibility-summary", type=Path, required=True)
     parser.add_argument("--sector-allowlist", type=Path, required=True)
     parser.add_argument("--raw-source-h5", type=Path, required=True)
+    parser.add_argument("--raw-source-summary", type=Path, required=True)
+    parser.add_argument("--raw-export-complete", type=Path, required=True)
+    parser.add_argument(
+        "--raw-transfer-validation",
+        type=Path,
+        required=True,
+    )
     parser.add_argument("--compact-adp-h5", type=Path, required=True)
     parser.add_argument("--cadence-reference-table", type=Path, required=True)
     parser.add_argument(
@@ -44,8 +79,13 @@ def main() -> int:
         sector=args.sector,
         pool_path=args.frozen_pool,
         pool_summary_path=args.frozen_pool_summary,
+        eligibility_exclusions_path=args.eligibility_exclusions,
+        eligibility_summary_path=args.eligibility_summary,
         allowlist_path=args.sector_allowlist,
         raw_source_h5=args.raw_source_h5,
+        raw_source_summary_path=args.raw_source_summary,
+        raw_export_complete_path=args.raw_export_complete,
+        raw_transfer_validation_path=args.raw_transfer_validation,
         compact_adp_h5=args.compact_adp_h5,
         cadence_reference_table=args.cadence_reference_table,
         cadence_reference_manifest=args.cadence_reference_manifest,
@@ -56,10 +96,7 @@ def main() -> int:
         orbitid_policy=args.orbitid_policy,
     )
     summary_path = args.out_h5.with_suffix(".summary.json")
-    summary_path.write_text(
-        json.dumps(summary, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf-8",
-    )
+    _publish_immutable_json(summary_path, summary)
     print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))
     return 0
 

@@ -13,7 +13,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from twirl.vetting.teacher_ssl_fullpool import (
+from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
     FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
     run_fullpool_ssl_fold,
 )
@@ -21,6 +21,11 @@ from twirl.vetting.teacher_ssl_fullpool import (
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--eligibility-exclusions", type=Path, required=True)
+    parser.add_argument("--eligibility-summary", type=Path, required=True)
+    parser.add_argument("--native-registry", type=Path, required=True)
+    parser.add_argument("--native-registry-summary", type=Path, required=True)
+    parser.add_argument("--native-release-summary", type=Path, required=True)
     parser.add_argument("--registry", type=Path, required=True)
     parser.add_argument("--registry-summary", type=Path, required=True)
     parser.add_argument("--out-root", type=Path, required=True)
@@ -43,14 +48,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Testing only; production full-pool folds require CUDA.",
     )
     parser.add_argument(
-        "--skip-native-hash-verification",
-        action="store_true",
-        help=(
-            "Trust registry-declared native hashes after checking existence. "
-            "Production launch should omit this option."
-        ),
-    )
-    parser.add_argument(
         "--max-rows",
         type=int,
         help="Deterministic bounded smoke only; omit for the full-pool run.",
@@ -62,6 +59,19 @@ def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     start = {
         "event": "teacher_ssl_fullpool_fold_start",
+        "eligibility_exclusions": str(
+            args.eligibility_exclusions.expanduser().resolve()
+        ),
+        "eligibility_summary": str(
+            args.eligibility_summary.expanduser().resolve()
+        ),
+        "native_registry": str(args.native_registry.expanduser().resolve()),
+        "native_registry_summary": str(
+            args.native_registry_summary.expanduser().resolve()
+        ),
+        "native_release_summary": str(
+            args.native_release_summary.expanduser().resolve()
+        ),
         "registry": str(args.registry.expanduser().resolve()),
         "registry_summary": str(args.registry_summary.expanduser().resolve()),
         "out_root": str(args.out_root.expanduser().resolve()),
@@ -72,11 +82,16 @@ def main(argv: list[str] | None = None) -> int:
         "seed": int(args.seed),
         "resume": bool(args.resume),
         "require_cuda": not args.allow_cpu,
-        "verify_native_hashes": not args.skip_native_hash_verification,
+        "verify_native_hashes": True,
         "max_rows": args.max_rows,
     }
     print(json.dumps(start, sort_keys=True), flush=True)
     summary = run_fullpool_ssl_fold(
+        eligibility_exclusions_path=args.eligibility_exclusions,
+        eligibility_summary_path=args.eligibility_summary,
+        native_registry_path=args.native_registry,
+        native_registry_summary_path=args.native_registry_summary,
+        native_release_summary_path=args.native_release_summary,
         registry_path=args.registry,
         registry_summary_path=args.registry_summary,
         out_root=args.out_root,
@@ -90,7 +105,6 @@ def main(argv: list[str] | None = None) -> int:
         checkpoint_every=int(args.checkpoint_every),
         resume=bool(args.resume),
         require_cuda=not args.allow_cpu,
-        verify_native_hashes=not args.skip_native_hash_verification,
         max_rows=args.max_rows,
     )
     print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))

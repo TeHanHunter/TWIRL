@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-27`.
+Last reconciled: `2026-07-28`.
 
 ## Current status
 
@@ -53,11 +53,17 @@ Last reconciled: `2026-07-27`.
   native run established the fold-local VICReg infrastructure but is too
   selected and too small to answer the broad-representation question. The
   active experiment is therefore a checksum-frozen, leakage-safe S56--S62
-  full-pool run: start from the `212,049` compact real observations, exclude
-  every fixed-test and prospectively reserved S63 host across all sectors,
-  rerun the locked BLS preprocessing, and pretrain five independent fold
-  encoders with up to four one-H200 jobs concurrently. Labels, injections,
-  fixed-test tensors, and S63 tensors remain forbidden during pretraining.
+  full-pool run. Whole-TIC fixed-test and prospective-S63 exclusions reduce
+  the original `212,049` compact observations to an exact survey/search pool
+  of `175,366` observations (`125,630` TICs). The locked two-aperture BLS and
+  all `112` raw-source shards are complete and validated. A separate
+  BLS-derived native/model partition retains `175,347` observations and marks
+  `19` unsearchable observations as model-input exclusions while preserving
+  all `175,366` rows in the final audit. Fresh native-v2 inputs must pass an
+  exclusion-bearing canary, exact registry reconstruction, and a bounded
+  one-epoch smoke before five independent fold encoders run with up to four
+  one-H200 jobs concurrently. Labels, injections, fixed-test tensors, and S63
+  tensors remain forbidden during pretraining.
   Teacher v3 stays operational until supervised fine-tuning and the matched
   preregistered comparison pass.
   The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
@@ -400,14 +406,15 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Freeze and run the leakage-safe Teacher v4-SSL full-pool experiment:
-   checksum the S56--S62 compact population and whole-TIC exclusions, run the
-   locked two-aperture BLS preprocessing, build quality-aware native inputs,
-   pass a bounded throughput smoke, and pretrain five fold encoders with at
-   most four one-H200 jobs concurrently. Then fine-tune on the existing frozen
-   labels and compare with Teacher v3 on matched development support without
-   opening fixed-test or S63 model tensors. Additional manual labeling is not
-   part of this step.
+1. Complete the leakage-safe Teacher v4-SSL full-pool experiment from its
+   frozen `175,366`-observation search pool and validated BLS/raw releases:
+   build fresh native-v2 inputs for the exact `175,347`-observation model
+   partition, preserve the `19` model exclusions in the audit, pass the
+   exclusion-bearing canary and bounded throughput smoke, and pretrain five
+   fold encoders with at most four one-H200 jobs concurrently. Then fine-tune
+   on the existing frozen labels and compare with Teacher v3 on matched
+   development support without opening fixed-test or S63 model tensors.
+   Additional manual labeling is not part of this step.
 2. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
    the hash-bound morphology corpus plus the enrichment-only candidate
    table/TIC index, preserving the raw edit log and all source provenance.

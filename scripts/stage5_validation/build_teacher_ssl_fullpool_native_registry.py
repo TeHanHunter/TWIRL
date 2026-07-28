@@ -22,20 +22,30 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--frozen-pool", type=Path, required=True)
     parser.add_argument("--frozen-pool-summary", type=Path, required=True)
+    parser.add_argument("--eligibility-exclusions", type=Path, required=True)
+    parser.add_argument("--eligibility-summary", type=Path, required=True)
     parser.add_argument(
         "--native-shards", type=Path, nargs="+", required=True
+    )
+    parser.add_argument(
+        "--native-shard-summaries", type=Path, nargs="+", required=True
     )
     parser.add_argument("--source-out", type=Path, required=True)
     parser.add_argument("--registry-out", type=Path, required=True)
     parser.add_argument("--summary-out", type=Path, required=True)
+    parser.add_argument("--release-summary-out", type=Path, required=True)
     args = parser.parse_args()
     result = write_full_pool_native_registry(
         pool_path=args.frozen_pool,
         pool_summary_path=args.frozen_pool_summary,
+        eligibility_exclusions_path=args.eligibility_exclusions,
+        eligibility_summary_path=args.eligibility_summary,
         native_shard_paths=args.native_shards,
+        native_shard_summary_paths=args.native_shard_summaries,
         source_path=args.source_out,
         registry_path=args.registry_out,
         summary_path=args.summary_out,
+        release_summary_path=args.release_summary_out,
     )
     print(json.dumps(result, indent=2, sort_keys=True, allow_nan=False))
     return 0

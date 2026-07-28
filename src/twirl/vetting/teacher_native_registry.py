@@ -458,15 +458,23 @@ def validate_native_input_registry(
     *,
     path_base: Path = Path("."),
     expected_contract_version: str | None = RAW_PAIR_CONTRACT_VERSION,
+    verify_files: bool = True,
 ) -> pd.DataFrame:
-    """Validate identities, storage uniqueness, files, hashes, and groups."""
+    """Validate registry identities and, by default, every native HDF5 file."""
 
     normalized = _validate_registry_shape(registry, path_base=path_base)
-    _inspect_native_files(
-        normalized,
-        expected_contract_version=expected_contract_version,
-        compare_declared_metadata=True,
-    )
+    if verify_files:
+        _inspect_native_files(
+            normalized,
+            expected_contract_version=expected_contract_version,
+            compare_declared_metadata=True,
+        )
+    elif expected_contract_version is not None and not normalized[
+        "native_contract_version"
+    ].eq(expected_contract_version).all():
+        raise ValueError(
+            "native registry declares a different native contract version"
+        )
     return normalized
 
 
@@ -545,6 +553,7 @@ def validate_native_input_registry_path(
     registry_path: Path,
     summary_path: Path | None = None,
     expected_contract_version: str | None = RAW_PAIR_CONTRACT_VERSION,
+    verify_files: bool = True,
 ) -> dict[str, Any]:
     """Validate a registry file and, when supplied, its frozen summary."""
 
@@ -553,8 +562,21 @@ def validate_native_input_registry_path(
         read_table(registry_path),
         path_base=registry_path.parent,
         expected_contract_version=expected_contract_version,
+        verify_files=verify_files,
     )
     digest = file_sha256(registry_path)
+    declared_file_records = [
+        {
+            "native_h5_path": str(path),
+            "native_h5_sha256": str(rows["native_h5_sha256"].iloc[0]),
+            "native_contract_version": str(
+                rows["native_contract_version"].iloc[0]
+            ),
+            "n_observations": int(len(rows)),
+        }
+        for path, rows in registry.groupby("native_h5_path", sort=True)
+    ]
+    native_files = _native_file_records(registry) if verify_files else []
     audit: dict[str, Any] = {
         "passed": True,
         "native_registry": str(registry_path),
@@ -566,7 +588,8 @@ def validate_native_input_registry_path(
             expected_contract_version if expected_contract_version is not None else ""
         ),
         **_registry_counts(registry),
-        "native_files": _native_file_records(registry),
+        "native_files": native_files,
+        "native_files_verified": bool(verify_files),
     }
     if summary_path is not None:
         summary_path = Path(summary_path).resolve()
@@ -599,10 +622,35 @@ def validate_native_input_registry_path(
                 raise ValueError(
                     f"native registry summary {name} does not match the registry"
                 )
-        if summary.get("native_files") != _native_file_records(registry):
-            raise ValueError(
-                "native registry summary file metadata does not match the registry"
-            )
+        summary_native_files = summary.get("native_files")
+        if not isinstance(summary_native_files, list):
+            raise ValueError("native registry summary lacks native file metadata")
+        if verify_files:
+            if summary_native_files != native_files:
+                raise ValueError(
+                    "native registry summary file metadata does not match the registry"
+                )
+        else:
+            summary_declared = [
+                {
+                    "native_h5_path": str(item.get("native_h5_path", "")),
+                    "native_h5_sha256": str(item.get("native_h5_sha256", "")),
+                    "native_contract_version": str(
+                        item.get("native_contract_version", "")
+                    ),
+                    "n_observations": int(item.get("n_observations", -1)),
+                }
+                for item in summary_native_files
+                if isinstance(item, dict)
+            ]
+            if (
+                len(summary_declared) != len(summary_native_files)
+                or summary_declared != declared_file_records
+            ):
+                raise ValueError(
+                    "native registry summary declarations do not match the registry"
+                )
+            audit["native_files"] = summary_native_files
         audit["summary"] = str(summary_path)
         audit["summary_sha256"] = file_sha256(summary_path)
     return audit

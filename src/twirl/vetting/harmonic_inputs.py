@@ -1254,11 +1254,15 @@ def read_native_light_curve_from_h5(
         # Teacher-v3 997-row release binding.
         from twirl.vetting.ssl_full_pool_native import (
             FULL_POOL_NATIVE_CONTRACT_VERSION,
+            FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
             full_pool_native_group_failures,
             full_pool_native_root_failures,
         )
 
-        full_pool_contract = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
+        full_pool_contract = contract in {
+            FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
+            FULL_POOL_NATIVE_CONTRACT_VERSION,
+        }
     if contract != RAW_PAIR_CONTRACT_VERSION and not full_pool_contract:
         raise ValueError(f"unexpected native input contract {contract!r}")
     if str(h5.attrs.get("time_system", "")) != "BJD":

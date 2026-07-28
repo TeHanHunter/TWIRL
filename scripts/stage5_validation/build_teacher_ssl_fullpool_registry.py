@@ -13,8 +13,17 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from twirl.vetting.teacher_native_registry import file_sha256, read_table
-from twirl.vetting.teacher_ssl_fullpool import (
+from twirl.vetting.teacher_native_registry import (  # noqa: E402
+    file_sha256,
+    read_table,
+)
+from twirl.vetting.ssl_full_pool_eligibility import (  # noqa: E402
+    load_native_model_eligibility,
+)
+from twirl.vetting.ssl_full_pool_native import (  # noqa: E402
+    load_full_pool_native_registry_release,
+)
+from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
     FULLPOOL_SSL_ANCHOR_APERTURE,
     FULLPOOL_SSL_SECTORS,
     build_fullpool_ssl_registry,
@@ -72,6 +81,30 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Separate unlabeled observation-keyed native-input registry.",
     )
     parser.add_argument(
+        "--native-registry-summary",
+        type=Path,
+        required=True,
+        help="Generic checksum-bound native-input registry summary.",
+    )
+    parser.add_argument(
+        "--native-release-summary",
+        type=Path,
+        required=True,
+        help="Full-pool native-v2 eligibility/coverage release summary.",
+    )
+    parser.add_argument(
+        "--eligibility-exclusions",
+        type=Path,
+        required=True,
+        help="Frozen native/model exclusions CSV.",
+    )
+    parser.add_argument(
+        "--eligibility-summary",
+        type=Path,
+        required=True,
+        help="Checksum-bound native/model eligibility summary.",
+    )
+    parser.add_argument(
         "--frozen-split-registry",
         type=Path,
         required=True,
@@ -109,6 +142,18 @@ def main(argv: list[str] | None = None) -> int:
         ),
         "bls_summary": args.bls_summary.expanduser().resolve(),
         "native_registry": args.native_registry.expanduser().resolve(),
+        "native_registry_summary": (
+            args.native_registry_summary.expanduser().resolve()
+        ),
+        "native_release_summary": (
+            args.native_release_summary.expanduser().resolve()
+        ),
+        "eligibility_exclusions": (
+            args.eligibility_exclusions.expanduser().resolve()
+        ),
+        "eligibility_summary": (
+            args.eligibility_summary.expanduser().resolve()
+        ),
         "frozen_split_registry": (
             args.frozen_split_registry.expanduser().resolve()
         ),
@@ -153,12 +198,30 @@ def main(argv: list[str] | None = None) -> int:
         frozen_pool_summary_path=inputs["frozen_pool_summary"],
         output_path_override=bls_override,
     )
+    eligibility = load_native_model_eligibility(
+        inputs["eligibility_exclusions"],
+        inputs["eligibility_summary"],
+        pool_path=inputs["frozen_pool"],
+        pool_summary_path=inputs["frozen_pool_summary"],
+        bls_path=bls_path,
+        bls_summary_path=inputs["bls_summary"],
+        production_lock=True,
+    )
+    native_registry, native_release = (
+        load_full_pool_native_registry_release(
+            registry_path=inputs["native_registry"],
+            registry_summary_path=inputs["native_registry_summary"],
+            release_summary_path=inputs["native_release_summary"],
+            eligibility=eligibility,
+        )
+    )
     registry, audit = build_fullpool_ssl_registry(
         bls_rows,
-        read_table(inputs["native_registry"]),
+        native_registry,
         read_table(inputs["frozen_split_registry"]),
         read_tic_inventory(inputs["reserved_hosts"]),
         frozen_pool=frozen_pool,
+        eligibility=eligibility,
         sectors=args.sectors,
         anchor_aperture=str(args.anchor_aperture),
     )
@@ -184,6 +247,32 @@ def main(argv: list[str] | None = None) -> int:
         "artifact_matches_summary": True,
         "summary_schema_version": bls_summary["schema_version"],
         "summary_contract_version": bls_summary["contract_version"],
+    }
+    source_provenance["native_model_eligibility_binding"] = {
+        "contract_version": eligibility.contract_version,
+        "release_binding": eligibility.release_binding,
+        "full_observations": eligibility.n_full,
+        "eligible_observations": eligibility.n_eligible,
+        "excluded_observations": eligibility.n_excluded,
+        "full_observation_identity_sha256": (
+            eligibility.full_observation_identity_sha256
+        ),
+        "eligible_observation_identity_sha256": (
+            eligibility.eligible_observation_identity_sha256
+        ),
+        "excluded_observation_identity_sha256": (
+            eligibility.excluded_observation_identity_sha256
+        ),
+    }
+    source_provenance["native_release_binding"] = {
+        "schema_version": native_release["schema_version"],
+        "release_binding": native_release["release_binding"],
+        "native_contract_version": native_release[
+            "native_contract_version"
+        ],
+        "release_summary_sha256": file_sha256(
+            inputs["native_release_summary"]
+        ),
     }
     result = write_fullpool_ssl_registry(
         registry,

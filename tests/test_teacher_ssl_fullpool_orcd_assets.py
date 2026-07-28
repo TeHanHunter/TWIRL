@@ -23,6 +23,7 @@ NATIVE_REGISTRY = (
     ORCD_ROOT / "slurm_teacher_ssl_fullpool_native_registry_cpu.sbatch"
 )
 REGISTRY = ORCD_ROOT / "slurm_teacher_ssl_fullpool_registry_cpu.sbatch"
+SMOKE = ORCD_ROOT / "slurm_teacher_ssl_fullpool_smoke_h200.sbatch"
 FOLD = ORCD_ROOT / "slurm_teacher_ssl_fullpool_fold_h200.sbatch"
 PDO_RAW = (
     REPO_ROOT
@@ -152,16 +153,16 @@ def test_global_bls_wrapper_requires_all_seven_sector_products() -> None:
 
 def test_registry_wrapper_binds_every_external_authority() -> None:
     wrapper = REGISTRY.read_text(encoding="utf-8")
-    assert (
-        "TWIRL_SSL_FULLPOOL_NATIVE_REGISTRY:?"
-        in wrapper
-    )
     assert "build_teacher_ssl_fullpool_registry.py" in wrapper
     assert "--frozen-pool" in wrapper
     assert "--frozen-pool-summary" in wrapper
     assert "--bls-summary" in wrapper
     assert "--bls-peaks" in wrapper
+    assert "--eligibility-exclusions" in wrapper
+    assert "--eligibility-summary" in wrapper
     assert "--native-registry" in wrapper
+    assert "--native-registry-summary" in wrapper
+    assert "--native-release-summary" in wrapper
     assert "--frozen-split-registry" in wrapper
     assert "--reserved-hosts" in wrapper
     assert "--registry-out" in wrapper
@@ -178,18 +179,23 @@ def test_fullpool_fold_wrapper_uses_four_way_one_h200_array() -> None:
     assert '--fold "${SLURM_ARRAY_TASK_ID}"' in wrapper
 
 
-def test_fullpool_fold_wrapper_has_fail_closed_bounded_smoke() -> None:
-    wrapper = FOLD.read_text(encoding="utf-8")
+def test_fullpool_smoke_is_separate_from_locked_production_folds() -> None:
+    fold = FOLD.read_text(encoding="utf-8")
+    smoke = SMOKE.read_text(encoding="utf-8")
 
-    assert "TWIRL_SSL_FULLPOOL_MAX_ROWS" in wrapper
-    assert "10#${MAX_ROWS}" in wrapper
-    assert "> 10000" in wrapper
-    assert 'if [[ "${EPOCHS}" != "1" ]]' in wrapper
-    assert "TWIRL_SSL_FULLPOOL_SMOKE_OUT_ROOT" in wrapper
-    assert "Smoke and production output roots must be distinct." in wrapper
-    assert 'TRAIN_OUT_ROOT="${SMOKE_OUT_ROOT}"' in wrapper
-    assert 'smoke_args+=(--max-rows "${MAX_ROWS}")' in wrapper
-    assert '--out-root "${TRAIN_OUT_ROOT}"' in wrapper
+    assert "readonly EPOCHS=20" in fold
+    assert "TWIRL_SSL_FULLPOOL_MAX_ROWS" in fold
+    assert "TWIRL_SSL_FULLPOOL_SMOKE_OUT_ROOT" in fold
+    assert "Production fold contract forbids environment override" in fold
+    assert "--max-rows" not in fold
+    assert 'OUT_ROOT="${RUN_ROOT}/training/five_fold"' in fold
+    assert "validate_teacher_ssl_fullpool_v2_smoke.py" in fold
+
+    assert "readonly EPOCHS=1" in smoke
+    assert "readonly MAX_ROWS=4096" in smoke
+    assert '--max-rows "${MAX_ROWS}"' in smoke
+    assert 'OUT_ROOT="${RUN_ROOT}/smoke/one_epoch"' in smoke
+    assert "validate_teacher_ssl_fullpool_v2_smoke.py" in smoke
 
 
 def test_fullpool_controller_is_noninteractive_and_canary_gated() -> None:

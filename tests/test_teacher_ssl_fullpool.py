@@ -10,6 +10,11 @@ import pandas as pd
 import pytest
 
 import twirl.vetting.teacher_ssl_fullpool as fullpool
+from twirl.vetting.ssl_full_pool_eligibility import (
+    ArtifactBinding,
+    EligibilityAuthority,
+    observation_identity_sha256,
+)
 
 
 def _bls_row(
@@ -88,7 +93,9 @@ def _registry_inputs(
                     f"/observations/s{int(row.sector):04d}/tic{int(row.tic)}"
                 ),
                 "native_h5_sha256": f"{int(row.sector) % 10}" * 64,
-                "native_contract_version": "test_native_v1",
+                "native_contract_version": (
+                    fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION
+                ),
             }
         )
     native = pd.DataFrame(native_records)
@@ -150,6 +157,189 @@ def _build(
         split,
         reserved,
         frozen_pool=pool,
+    )
+
+
+def _artifact(tmp_path: Path, name: str) -> ArtifactBinding:
+    path = tmp_path / name
+    path.write_bytes(f"{name}\n".encode("ascii"))
+    return ArtifactBinding(
+        path=path.resolve(),
+        size_bytes=path.stat().st_size,
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
+
+
+def _training_authority_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[
+    EligibilityAuthority,
+    pd.DataFrame,
+    dict[str, object],
+    pd.DataFrame,
+    dict[str, object],
+    dict[str, dict[str, object]],
+]:
+    registry, registry_summary = _build(tmp_path)
+    include = registry["ssl_pool_include"]
+    full_keys = frozenset(
+        zip(registry["sector"].astype(int), registry["tic"].astype(int))
+    )
+    eligible_keys = frozenset(
+        zip(
+            registry.loc[include, "sector"].astype(int),
+            registry.loc[include, "tic"].astype(int),
+        )
+    )
+    excluded_keys = frozenset(full_keys - eligible_keys)
+    full_identity = observation_identity_sha256(full_keys)
+    eligible_identity = observation_identity_sha256(eligible_keys)
+    excluded_identity = observation_identity_sha256(excluded_keys)
+    for name, value in (
+        ("PRODUCTION_FULL_OBSERVATIONS", len(full_keys)),
+        ("PRODUCTION_ELIGIBLE_OBSERVATIONS", len(eligible_keys)),
+        ("PRODUCTION_EXCLUDED_OBSERVATIONS", len(excluded_keys)),
+        ("PRODUCTION_FULL_IDENTITY_SHA256", full_identity),
+        ("PRODUCTION_ELIGIBLE_IDENTITY_SHA256", eligible_identity),
+        ("PRODUCTION_EXCLUDED_IDENTITY_SHA256", excluded_identity),
+    ):
+        monkeypatch.setattr(fullpool, name, value)
+
+    source_bindings = {
+        name: _artifact(tmp_path, f"{name}.dat")
+        for name in (
+            "frozen_pool",
+            "frozen_pool_summary",
+            "global_bls",
+            "global_bls_summary",
+            "exclusions",
+            "eligibility_summary",
+        )
+    }
+    eligibility = EligibilityAuthority(
+        contract_version="eligibility-test-v2",
+        release_binding="eligibility-test-release",
+        anchor_aperture=fullpool.FULLPOOL_SSL_ANCHOR_APERTURE,
+        full_keys=full_keys,
+        eligible_keys=eligible_keys,
+        excluded_keys=excluded_keys,
+        n_full=len(full_keys),
+        n_eligible=len(eligible_keys),
+        n_excluded=len(excluded_keys),
+        full_observation_identity_sha256=full_identity,
+        eligible_observation_identity_sha256=eligible_identity,
+        excluded_observation_identity_sha256=excluded_identity,
+        bindings=source_bindings,
+        exclusions=pd.DataFrame(),
+        summary={},
+    )
+    _, native_registry, _, _, _ = _registry_inputs(tmp_path)
+    native_registry = native_registry.sort_values(
+        ["sector", "tic"], kind="stable"
+    ).reset_index(drop=True)
+    native_release = {
+        "schema_version": "native-release-test-v2",
+        "release_binding": "native-release-test",
+        "native_contract_version": fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION,
+        "counts": {
+            "full_observations": len(full_keys),
+            "eligible_observations": len(eligible_keys),
+            "excluded_observations": len(excluded_keys),
+            "native_registry_observations": len(eligible_keys),
+        },
+        "identity_hashes": {
+            "full_observations_sha256": full_identity,
+            "eligible_observations_sha256": eligible_identity,
+            "excluded_observations_sha256": excluded_identity,
+            "native_registry_observations_sha256": eligible_identity,
+        },
+    }
+    explicit_bindings = {
+        name: _artifact(tmp_path, f"{name}.authority").metadata()
+        for name in (
+            "native_registry",
+            "native_registry_summary",
+            "native_release_summary",
+            "registry",
+            "registry_summary",
+        )
+    }
+    explicit_bindings["eligibility_exclusions"] = source_bindings[
+        "exclusions"
+    ].metadata()
+    explicit_bindings["eligibility_summary"] = source_bindings[
+        "eligibility_summary"
+    ].metadata()
+    split_binding = _artifact(tmp_path, "split-registry.csv").metadata()
+    reserved_binding = _artifact(tmp_path, "reserved-hosts.txt").metadata()
+    registry_summary = dict(registry_summary)
+    registry_summary["source_provenance"] = {
+        "frozen_pool": source_bindings["frozen_pool"].metadata(),
+        "frozen_pool_summary": source_bindings[
+            "frozen_pool_summary"
+        ].metadata(),
+        "bls_summary": source_bindings["global_bls_summary"].metadata(),
+        "eligibility_exclusions": explicit_bindings[
+            "eligibility_exclusions"
+        ],
+        "eligibility_summary": explicit_bindings["eligibility_summary"],
+        "native_registry": explicit_bindings["native_registry"],
+        "native_registry_summary": explicit_bindings[
+            "native_registry_summary"
+        ],
+        "native_release_summary": explicit_bindings[
+            "native_release_summary"
+        ],
+        "frozen_split_registry": split_binding,
+        "reserved_hosts": reserved_binding,
+        "frozen_pool_authority_bindings": {
+            "split_registry_sha256_equal": True,
+            "reserved_hosts_sha256_equal": True,
+            "split_registry_sha256": split_binding["sha256"],
+            "reserved_hosts_sha256": reserved_binding["sha256"],
+        },
+        "global_bls_authority_binding": {
+            "summary_path": str(
+                source_bindings["global_bls_summary"].path
+            ),
+            "summary_sha256": source_bindings["global_bls_summary"].sha256,
+            "artifact_path": str(source_bindings["global_bls"].path),
+            "artifact_sha256": source_bindings["global_bls"].sha256,
+            "artifact_matches_summary": True,
+            "summary_schema_version": (
+                fullpool.GLOBAL_BLS_SUMMARY_SCHEMA_VERSION
+            ),
+            "summary_contract_version": fullpool.GLOBAL_BLS_CONTRACT_VERSION,
+        },
+        "native_model_eligibility_binding": {
+            "contract_version": eligibility.contract_version,
+            "release_binding": eligibility.release_binding,
+            "full_observations": len(full_keys),
+            "eligible_observations": len(eligible_keys),
+            "excluded_observations": len(excluded_keys),
+            "full_observation_identity_sha256": full_identity,
+            "eligible_observation_identity_sha256": eligible_identity,
+            "excluded_observation_identity_sha256": excluded_identity,
+        },
+        "native_release_binding": {
+            "schema_version": native_release["schema_version"],
+            "release_binding": native_release["release_binding"],
+            "native_contract_version": native_release[
+                "native_contract_version"
+            ],
+            "release_summary_sha256": explicit_bindings[
+                "native_release_summary"
+            ]["sha256"],
+        },
+    }
+    return (
+        eligibility,
+        native_registry,
+        native_release,
+        registry,
+        registry_summary,
+        explicit_bindings,
     )
 
 
@@ -255,6 +445,140 @@ def test_fullpool_registry_summary_is_hash_bound_and_immutable(
             registry_path=registry_path,
             summary_path=summary_path,
         )
+
+
+def test_training_authority_chain_is_exact_and_provenance_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        eligibility,
+        native_registry,
+        native_release,
+        registry,
+        registry_summary,
+        authority_bindings,
+    ) = _training_authority_inputs(tmp_path, monkeypatch)
+
+    audit = fullpool._validate_training_authority_chain(
+        eligibility=eligibility,
+        native_registry=native_registry,
+        native_release=native_release,
+        registry=registry,
+        registry_summary=registry_summary,
+        authority_bindings=authority_bindings,
+    )
+    assert audit["production_lock_passed"] is True
+    assert audit["source_provenance_verified"] is True
+    assert set(audit["authority_bindings"]) == {
+        "eligibility_exclusions",
+        "eligibility_summary",
+        "native_registry",
+        "native_registry_summary",
+        "native_release_summary",
+        "registry",
+        "registry_summary",
+    }
+
+    changed_mapping = registry.copy()
+    first_included = changed_mapping["ssl_pool_include"].idxmax()
+    changed_mapping.loc[
+        first_included, "native_group_path"
+    ] = "targets/wrong"
+    with pytest.raises(ValueError, match="native mapping differs"):
+        fullpool._validate_training_authority_chain(
+            eligibility=eligibility,
+            native_registry=native_registry,
+            native_release=native_release,
+            registry=changed_mapping,
+            registry_summary=registry_summary,
+            authority_bindings=authority_bindings,
+        )
+
+    changed_provenance = json.loads(json.dumps(registry_summary))
+    changed_provenance["source_provenance"]["native_registry"][
+        "sha256"
+    ] = "0" * 64
+    with pytest.raises(ValueError, match="provenance native_registry differs"):
+        fullpool._validate_training_authority_chain(
+            eligibility=eligibility,
+            native_registry=native_registry,
+            native_release=native_release,
+            registry=registry,
+            registry_summary=changed_provenance,
+            authority_bindings=authority_bindings,
+        )
+
+
+def test_selected_native_verification_requires_actual_v2_group_identity(
+    tmp_path: Path,
+) -> None:
+    h5py = pytest.importorskip("h5py")
+    native_path = tmp_path / "native.h5"
+    with h5py.File(native_path, "w") as h5:
+        h5.attrs["contract_version"] = (
+            fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION
+        )
+        group = h5.create_group("targets/123")
+        group.attrs["sector"] = 56
+        group.attrs["tic"] = 123
+    selected = pd.DataFrame(
+        {
+            "sector": [56],
+            "tic": [123],
+            "native_h5_path": [str(native_path)],
+            "native_group_path": ["targets/123"],
+            "native_h5_sha256": [
+                hashlib.sha256(native_path.read_bytes()).hexdigest()
+            ],
+            "native_contract_version": [
+                fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION
+            ],
+        }
+    )
+    records = fullpool._verify_native_files(selected)
+    assert records[0]["hash_verified_now"] is True
+    assert records[0]["root_contract_verified_now"] is True
+    assert records[0]["group_identities_verified_now"] is True
+
+    with h5py.File(native_path, "r+") as h5:
+        h5.attrs["contract_version"] = "native-v1"
+    selected.loc[0, "native_h5_sha256"] = hashlib.sha256(
+        native_path.read_bytes()
+    ).hexdigest()
+    with pytest.raises(ValueError, match="not native-v2"):
+        fullpool._verify_native_files(selected)
+
+    with h5py.File(native_path, "r+") as h5:
+        h5.attrs["contract_version"] = (
+            fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION
+        )
+        h5["targets/123"].attrs["tic"] = 999
+    selected.loc[0, "native_h5_sha256"] = hashlib.sha256(
+        native_path.read_bytes()
+    ).hexdigest()
+    with pytest.raises(ValueError, match="group identity differs"):
+        fullpool._verify_native_files(selected)
+
+
+def test_training_cli_requires_full_authority_chain_and_has_no_hash_bypass() -> None:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "stage5_validation"
+        / "train_teacher_ssl_fullpool_fold.py"
+    ).read_text(encoding="utf-8")
+    for option in (
+        "--eligibility-exclusions",
+        "--eligibility-summary",
+        "--native-registry",
+        "--native-registry-summary",
+        "--native-release-summary",
+        "--registry",
+        "--registry-summary",
+    ):
+        assert option in script
+    assert "--skip-native-hash-verification" not in script
 
 
 def test_fold_run_directory_resumes_only_identical_contract(
@@ -521,6 +845,49 @@ def test_rng_state_round_trip_supports_exact_epoch_resume() -> None:
     assert observed[0] == expected[0]
     assert observed[1] == expected[1]
     assert torch.equal(observed[2], expected[2])
+
+
+def test_training_numerics_gates_reject_nonfinite_loss_and_state() -> None:
+    torch = pytest.importorskip("torch")
+    finite = torch.tensor(1.0, requires_grad=True)
+    fullpool._assert_finite_loss_and_components(
+        finite,
+        {"invariance": 0.5},
+        fold=0,
+        epoch=1,
+        batch_index=0,
+    )
+    with pytest.raises(FloatingPointError, match="non-finite.*loss"):
+        fullpool._assert_finite_loss_and_components(
+            torch.tensor(float("nan"), requires_grad=True),
+            {},
+            fold=0,
+            epoch=1,
+            batch_index=0,
+        )
+    with pytest.raises(FloatingPointError, match="components"):
+        fullpool._assert_finite_loss_and_components(
+            finite,
+            {"variance": float("inf")},
+            fold=0,
+            epoch=1,
+            batch_index=0,
+        )
+
+    module = torch.nn.Linear(2, 1)
+    fullpool._assert_finite_module_state(
+        {"encoder": module},
+        fold=0,
+        epoch=1,
+    )
+    with torch.no_grad():
+        module.weight[0, 0] = float("inf")
+    with pytest.raises(FloatingPointError, match="model state"):
+        fullpool._assert_finite_module_state(
+            {"encoder": module},
+            fold=0,
+            epoch=1,
+        )
 
 
 def test_resume_pointer_survives_crash_between_checkpoint_and_state(

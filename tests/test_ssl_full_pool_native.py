@@ -24,6 +24,12 @@ from twirl.vetting.ssl_full_pool import (
     FULL_POOL_SUMMARY_SCHEMA_VERSION,
     POOL_COLUMNS,
 )
+from twirl.vetting.ssl_full_pool_eligibility import (
+    ArtifactBinding,
+    EligibilityAuthority,
+    NATIVE_MODEL_ELIGIBILITY_CONTRACT_VERSION,
+    NATIVE_MODEL_ELIGIBILITY_RELEASE_BINDING,
+)
 from twirl.vetting.teacher_native_registry import read_table
 
 
@@ -297,6 +303,94 @@ def _quality_reference(
     )
 
 
+def _patch_all_eligible(
+    tmp_path: Path,
+    inputs: dict[str, Path | int | np.ndarray],
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[Path, Path]:
+    pool = read_table(Path(inputs["pool"]))
+    full_keys = frozenset(
+        zip(pool["sector"].astype(int), pool["tic"].astype(int))
+    )
+    exclusions_path = tmp_path / "eligibility_exclusions.csv"
+    summary_path = tmp_path / "eligibility.summary.json"
+    exclusions_path.write_text("test\n", encoding="ascii")
+    summary_path.write_text("{}\n", encoding="ascii")
+    bindings = {
+        "exclusions": ArtifactBinding(
+            path=exclusions_path.resolve(),
+            size_bytes=exclusions_path.stat().st_size,
+            sha256=_sha256(exclusions_path),
+        ),
+        "eligibility_summary": ArtifactBinding(
+            path=summary_path.resolve(),
+            size_bytes=summary_path.stat().st_size,
+            sha256=_sha256(summary_path),
+        ),
+    }
+    authority = EligibilityAuthority(
+        contract_version=NATIVE_MODEL_ELIGIBILITY_CONTRACT_VERSION,
+        release_binding=NATIVE_MODEL_ELIGIBILITY_RELEASE_BINDING,
+        anchor_aperture="DET_FLUX_ADP_SML",
+        full_keys=full_keys,
+        eligible_keys=full_keys,
+        excluded_keys=frozenset(),
+        n_full=len(full_keys),
+        n_eligible=len(full_keys),
+        n_excluded=0,
+        full_observation_identity_sha256=_identity_sha256(pool),
+        eligible_observation_identity_sha256=_identity_sha256(pool),
+        excluded_observation_identity_sha256=_identity_sha256(
+            pool.iloc[0:0]
+        ),
+        bindings=bindings,
+        exclusions=pd.DataFrame(),
+        summary={},
+    )
+    monkeypatch.setattr(
+        native,
+        "load_native_model_eligibility",
+        lambda *args, **kwargs: authority,
+    )
+    release_files = []
+    for name in (
+        "raw_source.summary.json",
+        "raw_export.complete.json",
+        "raw_transfer_validation.json",
+    ):
+        path = tmp_path / name
+        path.write_text("{}\n", encoding="ascii")
+        release_files.append(native._bind_file(path))
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_RAW_EXPORT_COMPLETE_SHA256",
+        release_files[1].sha256,
+    )
+    transfer_hashes = dict(native.PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR)
+    transfer_hashes[int(inputs["sector"])] = release_files[2].sha256
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR",
+        transfer_hashes,
+    )
+
+    def fake_raw_release(**kwargs: object) -> native.RawSourceReleaseAuthority:
+        return native.RawSourceReleaseAuthority(
+            raw_source=native._bind_file(Path(kwargs["raw_source_h5"])),
+            raw_source_summary=release_files[0],
+            export_complete=release_files[1],
+            transfer_validation=release_files[2],
+            code_revision=native.PRODUCTION_RAW_CODE_REVISION,
+        )
+
+    monkeypatch.setattr(
+        native,
+        "load_production_raw_source_release",
+        fake_raw_release,
+    )
+    return exclusions_path, summary_path
+
+
 def test_sector_authority_rejects_allowlist_drift(tmp_path: Path) -> None:
     inputs = _frozen_pool_fixture(tmp_path)
     authority = native.load_sector_pool_authority(
@@ -336,6 +430,204 @@ def test_raw_export_is_exactly_sharded_and_bound_to_pool(
         assert group.attrs["ccd"] == 1
 
 
+def test_production_raw_release_uses_exact_csv_pool_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Guard the CSV/Parquet split that raw-v1 provenance exposed."""
+
+    sector = 62
+    tic = 420_062
+    source_rows = pd.DataFrame([{"sector": sector, "tic": tic}])
+    identity = _identity_sha256(source_rows)
+    pool_path = tmp_path / "teacher_ssl_full_pool_observations.csv"
+    pool_path.write_text("sector,tic\n62,420062\n", encoding="ascii")
+    pool_summary_path = tmp_path / "pool.summary.json"
+    pool_summary_path.write_text('{"passed":true}\n', encoding="ascii")
+    allowlist_path = tmp_path / "s62_tics.csv"
+    allowlist_path.write_text("tic\n420062\n", encoding="ascii")
+    raw_source_path = tmp_path / "raw_source_0.h5"
+    raw_source_path.write_bytes(b"immutable raw-v1 fixture")
+    raw_binding = native._bind_file(raw_source_path)
+
+    pool_sha = _sha256(pool_path)
+    pool_summary_sha = _sha256(pool_summary_path)
+    allowlist_sha = _sha256(allowlist_path)
+    monkeypatch.setattr(native, "FULL_POOL_NATIVE_SECTORS", (sector,))
+    monkeypatch.setattr(native, "FULL_POOL_NATIVE_SHARDS_PER_SECTOR", 1)
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_FROZEN_POOL_CSV_SHA256",
+        pool_sha,
+    )
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_FULL_POOL_SUMMARY_SHA256",
+        pool_summary_sha,
+    )
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_RAW_SECTOR_OBSERVATIONS",
+        {sector: 1},
+    )
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_RAW_SECTOR_IDENTITY_SHA256",
+        {sector: identity},
+    )
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_RAW_SECTOR_ALLOWLIST_SHA256",
+        {sector: allowlist_sha},
+    )
+
+    raw_summary_path = tmp_path / "raw_source_0.summary.json"
+    raw_summary_path.write_text(
+        json.dumps(
+            {
+                "schema_version": (
+                    native.FULL_POOL_RAW_SHARD_SUMMARY_SCHEMA_VERSION
+                ),
+                "stage": "pdo_raw_source_export",
+                "sector": sector,
+                "shard_index": 0,
+                "n_shards": 1,
+                "n_sector_observations": 1,
+                "n_shard_observations": 1,
+                "sector_observation_identity_sha256": identity,
+                "shard_observation_identity_sha256": identity,
+                "full_pool_sha256": pool_sha,
+                "full_pool_summary_sha256": pool_summary_sha,
+                "sector_allowlist_sha256": allowlist_sha,
+                "out_h5_size_bytes": raw_binding.size_bytes,
+                "out_h5_sha256": raw_binding.sha256,
+                "real_only": True,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    transfer_path = tmp_path / "transfer_validation.json"
+    transfer_path.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "schema_version": native.FULL_POOL_RAW_TRANSFER_SCHEMA_VERSION,
+                "sector": sector,
+                "n_observations": 1,
+                "n_shards": 1,
+                "full_pool_sha256": pool_sha,
+                "full_pool_summary_sha256": pool_summary_sha,
+                "sector_allowlist_sha256": allowlist_sha,
+                "sector_observation_identity_sha256": identity,
+                "shards": [
+                    {
+                        "shard_index": 0,
+                        "sha256": raw_binding.sha256,
+                        "size_bytes": raw_binding.size_bytes,
+                        "n_observations": 1,
+                        "shard_observation_identity_sha256": identity,
+                    }
+                ],
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    transfer_hashes = dict(native.PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR)
+    transfer_hashes[sector] = _sha256(transfer_path)
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR",
+        transfer_hashes,
+    )
+    aggregate_path = tmp_path / "raw_export.complete.json"
+    aggregate_path.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "schema_version": (
+                    native.FULL_POOL_RAW_EXPORT_CONTROLLER_SCHEMA_VERSION
+                ),
+                "code_release": native.PRODUCTION_RAW_CODE_REVISION,
+                "launcher_sha256": (
+                    native.PRODUCTION_RAW_EXPORT_LAUNCHER_SHA256
+                ),
+                "n_observations": 1,
+                "n_sectors": 1,
+                "n_shards": 1,
+                "n_shards_per_sector": 1,
+                "full_pool_sha256": [pool_sha],
+                "full_pool_summary_sha256": [pool_summary_sha],
+                "sector_observation_identity_sha256": {
+                    str(sector): identity
+                },
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        native,
+        "PRODUCTION_RAW_EXPORT_COMPLETE_SHA256",
+        _sha256(aggregate_path),
+    )
+
+    authority = native.SectorPoolAuthority(
+        sector=sector,
+        rows=source_rows,
+        pool=native._bind_file(pool_path),
+        pool_summary=native._bind_file(pool_summary_path),
+        allowlist=native._bind_file(allowlist_path),
+        compact_h5_sha256="c" * 64,
+        compact_h5_size_bytes=1,
+        observation_identity_sha256=identity,
+    )
+    release = native.load_production_raw_source_release(
+        authority=authority,
+        source_rows=source_rows,
+        sector=sector,
+        shard_index=0,
+        n_shards=1,
+        raw_source_h5=raw_source_path,
+        raw_source_summary_path=raw_summary_path,
+        raw_export_complete_path=aggregate_path,
+        raw_transfer_validation_path=transfer_path,
+    )
+    assert release.raw_source.sha256 == raw_binding.sha256
+
+    alternate_pool = tmp_path / "teacher_ssl_full_pool_observations.parquet"
+    alternate_pool.write_bytes(pool_path.read_bytes() + b"alternate")
+    wrong_authority = native.SectorPoolAuthority(
+        sector=sector,
+        rows=source_rows,
+        pool=native._bind_file(alternate_pool),
+        pool_summary=authority.pool_summary,
+        allowlist=authority.allowlist,
+        compact_h5_sha256=authority.compact_h5_sha256,
+        compact_h5_size_bytes=authority.compact_h5_size_bytes,
+        observation_identity_sha256=identity,
+    )
+    with pytest.raises(
+        ValueError,
+        match="sector authority differs from production lock",
+    ):
+        native.load_production_raw_source_release(
+            authority=wrong_authority,
+            source_rows=source_rows,
+            sector=sector,
+            shard_index=0,
+            n_shards=1,
+            raw_source_h5=raw_source_path,
+            raw_source_summary_path=raw_summary_path,
+            raw_export_complete_path=aggregate_path,
+            raw_transfer_validation_path=transfer_path,
+        )
+
+
 def test_s62_generic_native_contract_corrects_without_frozen_997_row_binding(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -362,11 +654,16 @@ def test_s62_generic_native_contract_corrects_without_frozen_997_row_binding(
             "bls_sde_primary": np.asarray([0.0, 1.0], dtype=np.float32),
         },
     )
+    eligibility_exclusions, eligibility_summary = _patch_all_eligible(
+        tmp_path, inputs, monkeypatch
+    )
     output = tmp_path / "native.h5"
     result = native.build_full_pool_native_shard(
         sector=62,
         pool_path=Path(inputs["pool"]),
         pool_summary_path=Path(inputs["summary"]),
+        eligibility_exclusions_path=eligibility_exclusions,
+        eligibility_summary_path=eligibility_summary,
         allowlist_path=Path(inputs["allowlist"]),
         raw_source_h5=raw_source,
         compact_adp_h5=Path(inputs["compact"]),
@@ -436,11 +733,16 @@ def test_s61_strict_native_contract_preserves_orbit_ids(
             "bls_sde_primary": np.asarray([1.0], dtype=np.float32),
         },
     )
+    eligibility_exclusions, eligibility_summary = _patch_all_eligible(
+        tmp_path, inputs, monkeypatch
+    )
     output = tmp_path / "s61_native.h5"
     result = native.build_full_pool_native_shard(
         sector=61,
         pool_path=Path(inputs["pool"]),
         pool_summary_path=Path(inputs["summary"]),
+        eligibility_exclusions_path=eligibility_exclusions,
+        eligibility_summary_path=eligibility_summary,
         allowlist_path=Path(inputs["allowlist"]),
         raw_source_h5=raw_source,
         compact_adp_h5=Path(inputs["compact"]),
@@ -476,11 +778,16 @@ def test_s62_native_build_rejects_raw_compact_pre_correction_disagreement(
         "load_external_quality_reference",
         lambda **kwargs: reference,
     )
+    eligibility_exclusions, eligibility_summary = _patch_all_eligible(
+        tmp_path, inputs, monkeypatch
+    )
     with pytest.raises(RuntimeError, match="native export failed"):
         native.build_full_pool_native_shard(
             sector=62,
             pool_path=Path(inputs["pool"]),
             pool_summary_path=Path(inputs["summary"]),
+            eligibility_exclusions_path=eligibility_exclusions,
+            eligibility_summary_path=eligibility_summary,
             allowlist_path=Path(inputs["allowlist"]),
             raw_source_h5=raw_source,
             compact_adp_h5=Path(inputs["compact"]),
@@ -522,11 +829,16 @@ def test_registry_freeze_requires_exact_observation_coverage(
             "bls_sde_primary": np.asarray([1.0], dtype=np.float32),
         },
     )
+    eligibility_exclusions, eligibility_summary = _patch_all_eligible(
+        tmp_path, inputs, monkeypatch
+    )
     output = tmp_path / "native.h5"
-    native.build_full_pool_native_shard(
+    built = native.build_full_pool_native_shard(
         sector=62,
         pool_path=Path(inputs["pool"]),
         pool_summary_path=Path(inputs["summary"]),
+        eligibility_exclusions_path=eligibility_exclusions,
+        eligibility_summary_path=eligibility_summary,
         allowlist_path=Path(inputs["allowlist"]),
         raw_source_h5=raw_source,
         compact_adp_h5=Path(inputs["compact"]),
@@ -536,14 +848,23 @@ def test_registry_freeze_requires_exact_observation_coverage(
         orbitid_policy="reference_by_cadence",
         n_periods=1,
     )
-    with pytest.raises(ValueError, match="do not exactly cover"):
+    output_summary = output.with_suffix(".summary.json")
+    output_summary.write_text(
+        json.dumps(built, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="inventory count"):
         native.write_full_pool_native_registry(
             pool_path=Path(inputs["pool"]),
             pool_summary_path=Path(inputs["summary"]),
+            eligibility_exclusions_path=eligibility_exclusions,
+            eligibility_summary_path=eligibility_summary,
             native_shard_paths=[output],
+            native_shard_summary_paths=[output_summary],
             source_path=tmp_path / "source.csv",
             registry_path=tmp_path / "registry.csv",
             summary_path=tmp_path / "registry.summary.json",
+            release_summary_path=tmp_path / "registry.release.json",
         )
 
     # A sector-truncated pool is not a valid substitute for the release.
@@ -575,17 +896,23 @@ def test_registry_freeze_requires_exact_observation_coverage(
         native.write_full_pool_native_registry(
             pool_path=selected_path,
             pool_summary_path=selected_summary,
+            eligibility_exclusions_path=eligibility_exclusions,
+            eligibility_summary_path=eligibility_summary,
             native_shard_paths=[output],
+            native_shard_summary_paths=[output_summary],
             source_path=tmp_path / "source2.csv",
             registry_path=tmp_path / "registry2.csv",
             summary_path=tmp_path / "registry2.summary.json",
+            release_summary_path=tmp_path / "registry2.release.json",
         )
 
     # Minimal contract-carrying shard fixtures are sufficient to exercise the
     # exact observation-keyed registry assembly itself.
     fake_shards: list[Path] = []
+    fake_summaries: list[Path] = []
     pool_sha = _sha256(Path(inputs["pool"]))
     summary_sha = _sha256(Path(inputs["summary"]))
+    monkeypatch.setattr(native, "FULL_POOL_NATIVE_SHARDS_PER_SECTOR", 1)
     for row in pool.itertuples(index=False):
         shard = tmp_path / f"s{int(row.sector)}_native.h5"
         with h5py.File(shard, "w") as h5:
@@ -594,11 +921,101 @@ def test_registry_freeze_requires_exact_observation_coverage(
             )
             h5.attrs["full_pool_sha256"] = pool_sha
             h5.attrs["full_pool_summary_sha256"] = summary_sha
+            h5.attrs["eligibility_exclusions_sha256"] = _sha256(
+                eligibility_exclusions
+            )
+            h5.attrs["eligibility_summary_sha256"] = _sha256(
+                eligibility_summary
+            )
+            h5.attrs["raw_source_release_code_revision"] = (
+                native.PRODUCTION_RAW_CODE_REVISION
+            )
+            h5.attrs["raw_source_summary_sha256"] = "d" * 64
+            h5.attrs["raw_export_complete_sha256"] = (
+                native.PRODUCTION_RAW_EXPORT_COMPLETE_SHA256
+            )
+            h5.attrs["raw_transfer_validation_sha256"] = (
+                native.PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR[
+                    int(row.sector)
+                ]
+            )
             h5.attrs["sector"] = int(row.sector)
             group = h5.create_group(f"targets/{int(row.tic):016d}")
             group.attrs["sector"] = int(row.sector)
             group.attrs["tic"] = int(row.tic)
         fake_shards.append(shard)
+        shard_summary = shard.with_suffix(".summary.json")
+        one_row = pd.DataFrame(
+            [{"sector": int(row.sector), "tic": int(row.tic)}]
+        )
+        shard_summary.write_text(
+            json.dumps(
+                {
+                    "schema_version": (
+                        native.FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION
+                    ),
+                    "stage": "orcd_native_shard_build",
+                    "sector": int(row.sector),
+                    "shard_index": 0,
+                    "n_shards": 1,
+                    "n_source_shard_observations": 1,
+                    "n_shard_observations": 1,
+                    "n_shard_excluded_observations": 0,
+                    "source_shard_observation_identity_sha256": (
+                        _identity_sha256(one_row)
+                    ),
+                    "shard_observation_identity_sha256": (
+                        _identity_sha256(one_row)
+                    ),
+                    "shard_excluded_observation_identity_sha256": (
+                        _identity_sha256(one_row.iloc[0:0])
+                    ),
+                    "full_pool_sha256": pool_sha,
+                    "full_pool_summary_sha256": summary_sha,
+                    "eligibility_exclusions_sha256": _sha256(
+                        eligibility_exclusions
+                    ),
+                    "eligibility_summary_sha256": _sha256(
+                        eligibility_summary
+                    ),
+                    "native_model_full_identity_sha256": (
+                        _identity_sha256(pool)
+                    ),
+                    "native_model_eligible_identity_sha256": (
+                        _identity_sha256(pool)
+                    ),
+                    "native_model_excluded_identity_sha256": (
+                        _identity_sha256(pool.iloc[0:0])
+                    ),
+                    "raw_source_h5_sha256": "c" * 64,
+                    "raw_source_summary_sha256": "d" * 64,
+                    "raw_export_complete_sha256": (
+                        native.PRODUCTION_RAW_EXPORT_COMPLETE_SHA256
+                    ),
+                    "raw_transfer_validation_sha256": (
+                        native.PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR[
+                            int(row.sector)
+                        ]
+                    ),
+                    "raw_source_release_code_revision": (
+                        native.PRODUCTION_RAW_CODE_REVISION
+                    ),
+                    "out_h5": str(shard),
+                    "out_h5_sha256": _sha256(shard),
+                    "out_h5_size_bytes": shard.stat().st_size,
+                    "native_contract_version": (
+                        native.FULL_POOL_NATIVE_CONTRACT_VERSION
+                    ),
+                    "real_only": True,
+                    "verification": {"passed": True},
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        fake_summaries.append(shard_summary)
 
     def fake_verify(path: Path, **kwargs: object) -> dict[str, object]:
         with h5py.File(path, "r") as h5:
@@ -615,15 +1032,99 @@ def test_registry_freeze_requires_exact_observation_coverage(
     result = native.write_full_pool_native_registry(
         pool_path=Path(inputs["pool"]),
         pool_summary_path=Path(inputs["summary"]),
+        eligibility_exclusions_path=eligibility_exclusions,
+        eligibility_summary_path=eligibility_summary,
         native_shard_paths=fake_shards,
+        native_shard_summary_paths=fake_summaries,
         source_path=tmp_path / "source_ok.csv",
         registry_path=tmp_path / "registry_ok.csv",
         summary_path=tmp_path / "registry_ok.summary.json",
+        release_summary_path=tmp_path / "registry_ok.release.json",
+        expected_shards_per_sector=1,
     )
     registry = pd.read_csv(tmp_path / "registry_ok.csv")
     assert len(registry) == 7
     assert registry[["sector", "tic"]].drop_duplicates().shape[0] == 7
     assert result["n_observations"] == 7
+    eligibility = native.load_native_model_eligibility(
+        eligibility_exclusions,
+        eligibility_summary,
+    )
+    loaded_registry, release = native.load_full_pool_native_registry_release(
+        registry_path=tmp_path / "registry_ok.csv",
+        registry_summary_path=tmp_path / "registry_ok.summary.json",
+        release_summary_path=tmp_path / "registry_ok.release.json",
+        eligibility=eligibility,
+    )
+    assert len(loaded_registry) == 7
+    assert release["partition_audit"]["native_registry_equals_eligible"] is True
+
+
+def test_native_v2_verifies_temporary_file_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _frozen_pool_fixture(
+        tmp_path,
+        sector=61,
+        tic=420_061,
+        cadenceno=np.asarray([100, 101, 102, 103]),
+        orbitid=np.asarray([129, 129, 130, 130]),
+    )
+    raw_source = _export_raw(tmp_path, inputs, monkeypatch)
+    reference = _quality_reference(
+        tmp_path,
+        sector=61,
+        cadenceno=np.asarray(inputs["cadenceno"]),
+        reference_orbitid=np.asarray(inputs["orbitid"]),
+    )
+    monkeypatch.setattr(
+        native,
+        "load_external_quality_reference",
+        lambda **kwargs: reference,
+    )
+    monkeypatch.setattr(
+        native.harmonic_export,
+        "_periodogram_payload",
+        lambda **kwargs: {
+            "bls_log_period_grid": np.asarray([-1.0], dtype=np.float32),
+            "bls_power_small": np.asarray([1.0], dtype=np.float32),
+            "bls_sde_small": np.asarray([1.0], dtype=np.float32),
+            "bls_power_primary": np.asarray([1.0], dtype=np.float32),
+            "bls_sde_primary": np.asarray([1.0], dtype=np.float32),
+        },
+    )
+    eligibility_exclusions, eligibility_summary = _patch_all_eligible(
+        tmp_path, inputs, monkeypatch
+    )
+    monkeypatch.setattr(
+        native,
+        "verify_full_pool_native_shard",
+        lambda *args, **kwargs: {
+            "passed": False,
+            "failures": ["forced prepublication verification failure"],
+            "counts": {"targets": 1, "injections": 0},
+        },
+    )
+    output = tmp_path / "must_not_publish.h5"
+    with pytest.raises(RuntimeError, match="temporary.*failed verification"):
+        native.build_full_pool_native_shard(
+            sector=61,
+            pool_path=Path(inputs["pool"]),
+            pool_summary_path=Path(inputs["summary"]),
+            eligibility_exclusions_path=eligibility_exclusions,
+            eligibility_summary_path=eligibility_summary,
+            allowlist_path=Path(inputs["allowlist"]),
+            raw_source_h5=raw_source,
+            compact_adp_h5=Path(inputs["compact"]),
+            cadence_reference_table=reference.table_path,
+            cadence_reference_manifest=reference.manifest_path,
+            out_h5=output,
+            orbitid_policy="strict",
+            n_periods=1,
+        )
+    assert not output.exists()
+    assert not list(tmp_path.glob(".must_not_publish.h5.*.tmp"))
 
 
 def test_fullpool_module_keeps_external_quality_contract_constants() -> None:

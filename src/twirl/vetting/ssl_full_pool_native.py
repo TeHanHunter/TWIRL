@@ -40,7 +40,6 @@ from twirl.vetting.harmonic_inputs import (
     ORBITID_RECONCILIATION_MASK_DATASET,
     PERIODOGRAM_CHANNELS,
     PERIODOGRAM_DATASETS,
-    RAW_PAIR_EXTERNAL_QUALITY_ATTRS,
     RAW_PAIR_ORBITID_RECONCILIATION_ATTRS,
     RAW_PAIR_QUALITY_COUNT_NAMES,
     read_native_light_curve_from_h5,
@@ -50,9 +49,17 @@ from twirl.vetting.ssl_full_pool import (
     FULL_POOL_CONTRACT_VERSION,
     FULL_POOL_SUMMARY_SCHEMA_VERSION,
 )
+from twirl.vetting.ssl_full_pool_eligibility import (
+    EligibilityAuthority,
+    NATIVE_MODEL_ELIGIBILITY_CONTRACT_VERSION,
+    PRODUCTION_FROZEN_POOL_CSV_SHA256,
+    load_native_model_eligibility,
+    observation_identity_sha256,
+)
 from twirl.vetting.teacher_native_registry import (
     file_sha256,
     read_table,
+    validate_native_input_registry_path,
     write_native_input_registry,
 )
 
@@ -60,19 +67,86 @@ from twirl.vetting.teacher_native_registry import (
 FULL_POOL_RAW_SOURCE_CONTRACT_VERSION = (
     "twirl_teacher_ssl_fullpool_tglc_raw_source_v1"
 )
-FULL_POOL_NATIVE_CONTRACT_VERSION = (
+FULL_POOL_NATIVE_CONTRACT_VERSION_V1 = (
     "twirl_teacher_ssl_fullpool_real_native_v1"
 )
-FULL_POOL_NATIVE_RELEASE_BINDING = (
+FULL_POOL_NATIVE_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_real_native_v2"
+)
+FULL_POOL_NATIVE_RELEASE_BINDING_V1 = (
     "teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp_real_only"
 )
+FULL_POOL_NATIVE_RELEASE_BINDING = (
+    "teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
+)
 FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION = (
-    "twirl_teacher_ssl_fullpool_native_shard_summary_v1"
+    "twirl_teacher_ssl_fullpool_native_shard_summary_v2"
 )
 FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION = (
-    "twirl_teacher_ssl_fullpool_native_registry_source_v1"
+    "twirl_teacher_ssl_fullpool_native_registry_source_v2"
+)
+FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_registry_release_v2"
 )
 FULL_POOL_NATIVE_SECTORS = EXPECTED_SECTORS
+FULL_POOL_NATIVE_SHARDS_PER_SECTOR = 16
+FULL_POOL_RAW_EXPORT_CONTROLLER_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_pdo_raw_export_controller_v1"
+)
+FULL_POOL_RAW_TRANSFER_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_raw_transfer_validation_v1"
+)
+FULL_POOL_RAW_SHARD_SUMMARY_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_shard_summary_v1"
+)
+PRODUCTION_RAW_CODE_REVISION = (
+    "991a94b9b36cdb07a4543b87602748c9bb2267f9"
+)
+PRODUCTION_RAW_EXPORT_COMPLETE_SHA256 = (
+    "e61e94b623059e12081d3b5f6b76d8d7fe31bca035d85ca12f4360cae6112749"
+)
+PRODUCTION_RAW_EXPORT_LAUNCHER_SHA256 = (
+    "204f4ad953495ae548786e554b9f2a00671b2aa966dd35bec797ca7936ddb4cf"
+)
+PRODUCTION_FULL_POOL_SUMMARY_SHA256 = (
+    "f9bb5afa6672db0d74f4a7de6c0c6064295e4e0bfae420bf78777ec101b303c4"
+)
+PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR: Mapping[int, str] = {
+    56: "f2d40348cc2cc5350370d103b703300c9ea7eda6753110f7e2b08b4707bbd07c",
+    57: "25c38fc3613a4309aa663bac8058f5575eed74bff6ad33ff0dbefe24f42407a0",
+    58: "7902be769b6b3b535545f621899dcee8b0d912964e142dd4a3badd7cfecdb8c5",
+    59: "2c6b495ba25637a1a3718a8e91d39d1784cceb3b92f97193215a84f408a507a1",
+    60: "3698b2942ffcff4a614a0ff82c29ed9673ac2663d800cd485b4301a3339a02c5",
+    61: "505fdf42cb74efcdc343023797c374d58a42ee7a4e6a9728915107a1e3d10f89",
+    62: "76491700efff698c9f7a7b5583eed27762d3bece35048edb0919ab37a25d77eb",
+}
+PRODUCTION_RAW_SECTOR_OBSERVATIONS: Mapping[int, int] = {
+    56: 30_814,
+    57: 26_777,
+    58: 22_701,
+    59: 21_646,
+    60: 26_581,
+    61: 27_002,
+    62: 19_845,
+}
+PRODUCTION_RAW_SECTOR_IDENTITY_SHA256: Mapping[int, str] = {
+    56: "8c80982649a0befb1a9b4e697008873fcaa4f3e37f62e0ec60e48f3fc1b93933",
+    57: "ed5cace2aafcd87d53942937e5b49a9f92bc786f67ea26137d373c63d539bc4d",
+    58: "00b9a11b1a8e328ea7d3b58f34d5e1344456801aaecf9e0a118999d0f98f57b4",
+    59: "45385a3a1f6b3ffa0e292e8979107211b84d3ac4394cb283075961004215a838",
+    60: "53adf7edd4ca1731683dfd604b7e2744fd08dd1a2302cd7b38ccf4b69625d6e7",
+    61: "8df73671ea4f26a91d8f111dcd90143e8247c77e29156e0b8b532e6c2bcb6834",
+    62: "ac856f3f194fb58448d503c8768a7e695e9be3a888411bf97b4d81f8453ca8ff",
+}
+PRODUCTION_RAW_SECTOR_ALLOWLIST_SHA256: Mapping[int, str] = {
+    56: "dd95621e7a6ce09d145423821497127c03e1eace3fe4fba77bcb69060ae866eb",
+    57: "2913dde75162152a5bce6fae4265ff93e733467dde0db3615dc2d315d69a3238",
+    58: "c263751edd9f6df0b60fb094b72a4fee7849f6fd7e64c85f836030db73561b53",
+    59: "1f0ae5e0a5541efde37ecff2887365fa935f973522069255ab5ec7e4824b0160",
+    60: "e3943c1caba35ba68ea196854b0ef691053f9d1b3ccb5fbde5be80b6ac70e6e6",
+    61: "6ccb5e83f484ba7327072af02a07cbe39cd18ddcbff1e0d73a3fdf45c6be31dd",
+    62: "e9809a0c9150a7a48bef0319133011fa7dc3f360161b00ce5fa77d4be6e4760f",
+}
 S62_CORRECTION_CADENCE_MIN = 766_048
 S62_CORRECTION_CADENCE_MAX = 766_136
 S62_REFERENCE_ORBIT_131_MIN = 760_742
@@ -126,6 +200,17 @@ class SectorPoolAuthority:
     observation_identity_sha256: str
 
 
+@dataclass(frozen=True)
+class RawSourceReleaseAuthority:
+    """Exact validated v1 raw-source release consumed by one v2 shard."""
+
+    raw_source: FileBinding
+    raw_source_summary: FileBinding
+    export_complete: FileBinding
+    transfer_validation: FileBinding
+    code_revision: str
+
+
 def _bind_file(
     path: Path,
     *,
@@ -173,21 +258,7 @@ def _bind_file(
 
 
 def _observation_identity_sha256(rows: pd.DataFrame) -> str:
-    digest = hashlib.sha256()
-    for row in (
-        rows.loc[:, ["sector", "tic"]]
-        .sort_values(["sector", "tic"], kind="stable")
-        .itertuples(index=False)
-    ):
-        digest.update(
-            json.dumps(
-                {"sector": int(row.sector), "tic": int(row.tic)},
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode("ascii")
-        )
-        digest.update(b"\n")
-    return digest.hexdigest()
+    return observation_identity_sha256(rows)
 
 
 def _tic_inventory_sha256(tics: Sequence[int]) -> str:
@@ -231,6 +302,195 @@ def _read_summary(path: Path) -> tuple[dict[str, Any], FileBinding]:
     if value.get("sectors") != list(FULL_POOL_NATIVE_SECTORS):
         raise ValueError("frozen-pool summary is not the S56--S62 release")
     return value, binding
+
+
+def _read_json_binding(
+    path: Path,
+    *,
+    context: str,
+) -> tuple[dict[str, Any], FileBinding]:
+    binding = _bind_file(path)
+    try:
+        value = json.loads(binding.path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid {context}: {binding.path}") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"{context} must be a JSON object")
+    return value, binding
+
+
+def load_production_raw_source_release(
+    *,
+    authority: SectorPoolAuthority,
+    source_rows: pd.DataFrame,
+    sector: int,
+    shard_index: int,
+    n_shards: int,
+    raw_source_h5: Path,
+    raw_source_summary_path: Path,
+    raw_export_complete_path: Path,
+    raw_transfer_validation_path: Path,
+) -> RawSourceReleaseAuthority:
+    """Authenticate one reused raw-v1 shard against the exact published release."""
+
+    sector = int(sector)
+    shard_index = int(shard_index)
+    n_shards = int(n_shards)
+    if (
+        sector not in FULL_POOL_NATIVE_SECTORS
+        or n_shards != FULL_POOL_NATIVE_SHARDS_PER_SECTOR
+        or shard_index not in range(FULL_POOL_NATIVE_SHARDS_PER_SECTOR)
+    ):
+        raise ValueError("raw-source production release requires exact 7x16 layout")
+    if (
+        authority.sector != sector
+        or authority.pool.sha256 != PRODUCTION_FROZEN_POOL_CSV_SHA256
+        or authority.pool_summary.sha256
+        != PRODUCTION_FULL_POOL_SUMMARY_SHA256
+        or authority.allowlist.sha256
+        != PRODUCTION_RAW_SECTOR_ALLOWLIST_SHA256[sector]
+        or authority.observation_identity_sha256
+        != PRODUCTION_RAW_SECTOR_IDENTITY_SHA256[sector]
+        or len(authority.rows) != PRODUCTION_RAW_SECTOR_OBSERVATIONS[sector]
+    ):
+        raise ValueError("raw-source sector authority differs from production lock")
+
+    aggregate, aggregate_binding = _read_json_binding(
+        raw_export_complete_path,
+        context="raw export completion manifest",
+    )
+    if aggregate_binding.sha256 != PRODUCTION_RAW_EXPORT_COMPLETE_SHA256:
+        raise ValueError("raw export completion manifest differs from production")
+    expected_aggregate = {
+        "passed": True,
+        "schema_version": FULL_POOL_RAW_EXPORT_CONTROLLER_SCHEMA_VERSION,
+        "code_release": PRODUCTION_RAW_CODE_REVISION,
+        "launcher_sha256": PRODUCTION_RAW_EXPORT_LAUNCHER_SHA256,
+        "n_observations": sum(PRODUCTION_RAW_SECTOR_OBSERVATIONS.values()),
+        "n_sectors": len(FULL_POOL_NATIVE_SECTORS),
+        "n_shards": (
+            len(FULL_POOL_NATIVE_SECTORS)
+            * FULL_POOL_NATIVE_SHARDS_PER_SECTOR
+        ),
+        "n_shards_per_sector": FULL_POOL_NATIVE_SHARDS_PER_SECTOR,
+        "full_pool_sha256": [PRODUCTION_FROZEN_POOL_CSV_SHA256],
+        "full_pool_summary_sha256": [PRODUCTION_FULL_POOL_SUMMARY_SHA256],
+        "sector_observation_identity_sha256": {
+            str(key): value
+            for key, value in PRODUCTION_RAW_SECTOR_IDENTITY_SHA256.items()
+        },
+    }
+    for name, expected in expected_aggregate.items():
+        if aggregate.get(name) != expected:
+            raise ValueError(
+                f"raw export completion manifest {name} differs from production"
+            )
+
+    transfer, transfer_binding = _read_json_binding(
+        raw_transfer_validation_path,
+        context=f"S{sector} raw transfer validation",
+    )
+    if (
+        transfer_binding.sha256
+        != PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR[sector]
+    ):
+        raise ValueError(
+            f"S{sector} raw transfer validation differs from production"
+        )
+    expected_transfer = {
+        "passed": True,
+        "schema_version": FULL_POOL_RAW_TRANSFER_SCHEMA_VERSION,
+        "sector": sector,
+        "n_observations": PRODUCTION_RAW_SECTOR_OBSERVATIONS[sector],
+        "n_shards": FULL_POOL_NATIVE_SHARDS_PER_SECTOR,
+        "full_pool_sha256": PRODUCTION_FROZEN_POOL_CSV_SHA256,
+        "full_pool_summary_sha256": PRODUCTION_FULL_POOL_SUMMARY_SHA256,
+        "sector_allowlist_sha256": (
+            PRODUCTION_RAW_SECTOR_ALLOWLIST_SHA256[sector]
+        ),
+        "sector_observation_identity_sha256": (
+            PRODUCTION_RAW_SECTOR_IDENTITY_SHA256[sector]
+        ),
+    }
+    for name, expected in expected_transfer.items():
+        if transfer.get(name) != expected:
+            raise ValueError(
+                f"S{sector} raw transfer validation {name} differs"
+            )
+    shard_inventory = transfer.get("shards")
+    if not isinstance(shard_inventory, list):
+        raise ValueError("raw transfer validation lacks shard inventory")
+    by_index: dict[int, Mapping[str, Any]] = {}
+    for item in shard_inventory:
+        if not isinstance(item, Mapping):
+            raise ValueError("raw transfer shard inventory is malformed")
+        index = int(item.get("shard_index", -1))
+        if index in by_index:
+            raise ValueError("raw transfer shard inventory has duplicate indices")
+        by_index[index] = item
+    if set(by_index) != set(range(FULL_POOL_NATIVE_SHARDS_PER_SECTOR)):
+        raise ValueError("raw transfer shard inventory is incomplete")
+    shard_meta = by_index[shard_index]
+
+    raw_binding = _bind_file(
+        raw_source_h5,
+        expected_sha256=str(shard_meta.get("sha256", "")),
+        expected_size_bytes=int(shard_meta.get("size_bytes", -1)),
+    )
+    expected_source_identity = _observation_identity_sha256(source_rows)
+    if (
+        int(shard_meta.get("n_observations", -1)) != len(source_rows)
+        or shard_meta.get("shard_observation_identity_sha256")
+        != expected_source_identity
+    ):
+        raise ValueError("raw transfer shard metadata differs from frozen pool")
+
+    shard_summary, shard_summary_binding = _read_json_binding(
+        raw_source_summary_path,
+        context=f"S{sector} raw source shard {shard_index} summary",
+    )
+    expected_summary = {
+        "schema_version": FULL_POOL_RAW_SHARD_SUMMARY_SCHEMA_VERSION,
+        "stage": "pdo_raw_source_export",
+        "sector": sector,
+        "shard_index": shard_index,
+        "n_shards": FULL_POOL_NATIVE_SHARDS_PER_SECTOR,
+        "n_sector_observations": PRODUCTION_RAW_SECTOR_OBSERVATIONS[sector],
+        "n_shard_observations": len(source_rows),
+        "sector_observation_identity_sha256": (
+            PRODUCTION_RAW_SECTOR_IDENTITY_SHA256[sector]
+        ),
+        "shard_observation_identity_sha256": expected_source_identity,
+        "full_pool_sha256": PRODUCTION_FROZEN_POOL_CSV_SHA256,
+        "full_pool_summary_sha256": PRODUCTION_FULL_POOL_SUMMARY_SHA256,
+        "sector_allowlist_sha256": (
+            PRODUCTION_RAW_SECTOR_ALLOWLIST_SHA256[sector]
+        ),
+        "out_h5_size_bytes": raw_binding.size_bytes,
+        "out_h5_sha256": raw_binding.sha256,
+        "real_only": True,
+    }
+    for name, expected in expected_summary.items():
+        if shard_summary.get(name) != expected:
+            raise ValueError(f"raw source shard summary {name} differs")
+
+    for binding in (
+        authority.pool,
+        authority.pool_summary,
+        authority.allowlist,
+        raw_binding,
+        shard_summary_binding,
+        aggregate_binding,
+        transfer_binding,
+    ):
+        binding.assert_unchanged()
+    return RawSourceReleaseAuthority(
+        raw_source=raw_binding,
+        raw_source_summary=shard_summary_binding,
+        export_complete=aggregate_binding,
+        transfer_validation=transfer_binding,
+        code_revision=PRODUCTION_RAW_CODE_REVISION,
+    )
 
 
 def load_sector_pool_authority(
@@ -715,8 +975,13 @@ def build_full_pool_native_shard(
     sector: int,
     pool_path: Path,
     pool_summary_path: Path,
+    eligibility_exclusions_path: Path,
+    eligibility_summary_path: Path,
     allowlist_path: Path,
     raw_source_h5: Path,
+    raw_source_summary_path: Path | None = None,
+    raw_export_complete_path: Path | None = None,
+    raw_transfer_validation_path: Path | None = None,
     compact_adp_h5: Path,
     cadence_reference_table: Path,
     cadence_reference_manifest: Path,
@@ -751,12 +1016,59 @@ def build_full_pool_native_shard(
         pool_summary_path=pool_summary_path,
         allowlist_path=allowlist_path,
     )
-    rows = select_sector_shard(
+    eligibility = load_native_model_eligibility(
+        eligibility_exclusions_path,
+        eligibility_summary_path,
+        pool_path=pool_path,
+        pool_summary_path=pool_summary_path,
+        production_lock=True,
+        rederive_from_bls=False,
+    )
+    source_rows = select_sector_shard(
         authority,
         shard_index=shard_index,
         n_shards=n_shards,
     )
-    raw_binding = _bind_file(raw_source_h5)
+    source_keys = set(
+        zip(
+            source_rows["sector"].astype(int),
+            source_rows["tic"].astype(int),
+        )
+    )
+    if not source_keys.issubset(eligibility.full_keys):
+        raise ValueError("native source shard lies outside eligibility full pool")
+    eligible_keys = source_keys & eligibility.eligible_keys
+    excluded_keys = source_keys & eligibility.excluded_keys
+    if eligible_keys | excluded_keys != source_keys or eligible_keys & excluded_keys:
+        raise ValueError("native source shard is not exactly eligibility partitioned")
+    rows = source_rows.loc[
+        [
+            (int(row.sector), int(row.tic)) in eligible_keys
+            for row in source_rows.itertuples(index=False)
+        ]
+    ].reset_index(drop=True)
+    excluded_rows = source_rows.loc[
+        [
+            (int(row.sector), int(row.tic)) in excluded_keys
+            for row in source_rows.itertuples(index=False)
+        ]
+    ].reset_index(drop=True)
+    if rows.empty:
+        raise ValueError("eligibility-authorized native shard is empty")
+    eligibility_exclusions_binding = eligibility.bindings["exclusions"]
+    eligibility_summary_binding = eligibility.bindings["eligibility_summary"]
+    raw_release = load_production_raw_source_release(
+        authority=authority,
+        source_rows=source_rows,
+        sector=sector,
+        shard_index=shard_index,
+        n_shards=n_shards,
+        raw_source_h5=raw_source_h5,
+        raw_source_summary_path=raw_source_summary_path,
+        raw_export_complete_path=raw_export_complete_path,
+        raw_transfer_validation_path=raw_transfer_validation_path,
+    )
+    raw_binding = raw_release.raw_source
     compact_binding = _bind_file(
         compact_adp_h5,
         expected_sha256=authority.compact_h5_sha256,
@@ -805,7 +1117,7 @@ def build_full_pool_native_shard(
                 "shard_index": int(shard_index),
                 "n_shards": int(n_shards),
                 "n_sector_observations": int(len(authority.rows)),
-                "n_shard_observations": int(len(rows)),
+                "n_shard_observations": int(len(source_rows)),
                 "full_pool_sha256": authority.pool.sha256,
                 "full_pool_summary_sha256": authority.pool_summary.sha256,
                 "sector_allowlist_sha256": authority.allowlist.sha256,
@@ -813,7 +1125,7 @@ def build_full_pool_native_shard(
                     authority.observation_identity_sha256
                 ),
                 "shard_observation_identity_sha256": (
-                    _observation_identity_sha256(rows)
+                    _observation_identity_sha256(source_rows)
                 ),
                 "real_only": 1,
             }
@@ -831,7 +1143,7 @@ def build_full_pool_native_shard(
                     + json.dumps(mismatches, sort_keys=True)
                 )
             raw_tics = sorted(int(value) for value in raw_file["targets"])
-            expected_tics = rows["tic"].astype(int).tolist()
+            expected_tics = source_rows["tic"].astype(int).tolist()
             if raw_tics != expected_tics:
                 raise ValueError("raw-source TIC inventory differs from shard")
 
@@ -848,6 +1160,12 @@ def build_full_pool_native_shard(
             output.attrs["n_shards"] = int(n_shards)
             output.attrs["n_sector_observations"] = int(len(authority.rows))
             output.attrs["n_shard_observations"] = int(len(rows))
+            output.attrs["n_source_shard_observations"] = int(
+                len(source_rows)
+            )
+            output.attrs["n_shard_excluded_observations"] = int(
+                len(excluded_rows)
+            )
             output.attrs["full_pool_path"] = str(authority.pool.path)
             output.attrs["full_pool_sha256"] = authority.pool.sha256
             output.attrs["full_pool_summary_path"] = str(
@@ -868,8 +1186,44 @@ def build_full_pool_native_shard(
             output.attrs["shard_observation_identity_sha256"] = (
                 _observation_identity_sha256(rows)
             )
+            output.attrs["source_shard_observation_identity_sha256"] = (
+                _observation_identity_sha256(source_rows)
+            )
+            output.attrs["shard_excluded_observation_identity_sha256"] = (
+                _observation_identity_sha256(excluded_rows)
+            )
+            output.attrs["eligibility_contract_version"] = (
+                eligibility.contract_version
+            )
+            output.attrs["eligibility_exclusions_sha256"] = (
+                eligibility_exclusions_binding.sha256
+            )
+            output.attrs["eligibility_summary_sha256"] = (
+                eligibility_summary_binding.sha256
+            )
+            output.attrs["native_model_full_identity_sha256"] = (
+                eligibility.full_observation_identity_sha256
+            )
+            output.attrs["native_model_eligible_identity_sha256"] = (
+                eligibility.eligible_observation_identity_sha256
+            )
+            output.attrs["native_model_excluded_identity_sha256"] = (
+                eligibility.excluded_observation_identity_sha256
+            )
             output.attrs["raw_source_h5"] = str(raw_binding.path)
             output.attrs["raw_source_h5_sha256"] = raw_binding.sha256
+            output.attrs["raw_source_release_code_revision"] = (
+                raw_release.code_revision
+            )
+            output.attrs["raw_source_summary_sha256"] = (
+                raw_release.raw_source_summary.sha256
+            )
+            output.attrs["raw_export_complete_sha256"] = (
+                raw_release.export_complete.sha256
+            )
+            output.attrs["raw_transfer_validation_sha256"] = (
+                raw_release.transfer_validation.sha256
+            )
             output.attrs["compact_adp_h5"] = str(compact_binding.path)
             output.attrs["compact_adp_h5_sha256"] = compact_binding.sha256
             output.attrs["periodogram_grid"] = "log10_period_d"
@@ -1073,28 +1427,59 @@ def build_full_pool_native_shard(
             compact_binding,
             reference_table_binding,
             reference_manifest_binding,
+            raw_release.raw_source_summary,
+            raw_release.export_complete,
+            raw_release.transfer_validation,
         ):
             binding.assert_unchanged()
+        for binding in (
+            eligibility_exclusions_binding,
+            eligibility_summary_binding,
+        ):
+            _bind_file(
+                binding.path,
+                expected_sha256=binding.sha256,
+                expected_size_bytes=binding.size_bytes,
+            )
         quality_reference.assert_unchanged()
-        temporary.replace(out_h5)
+        verification = verify_full_pool_native_shard(
+            temporary,
+            expected_sector=sector,
+            expected_shard_index=int(shard_index),
+            expected_n_shards=int(n_shards),
+            expected_observations=len(rows),
+            expected_source_observations=len(source_rows),
+            expected_excluded_observations=len(excluded_rows),
+            expected_source_identity_sha256=_observation_identity_sha256(
+                source_rows
+            ),
+            expected_output_identity_sha256=_observation_identity_sha256(
+                rows
+            ),
+            expected_excluded_identity_sha256=_observation_identity_sha256(
+                excluded_rows
+            ),
+            require_periodograms=True,
+        )
+        if not verification["passed"]:
+            raise RuntimeError(
+                "temporary full-pool native shard failed verification: "
+                + "; ".join(verification["failures"][:10])
+            )
+        # Publish without a clobber window.  ``Path.replace`` could overwrite
+        # an output created after the initial existence check; the hard link
+        # is atomic and fails closed if another writer won that race.
+        os.link(temporary, out_h5)
+        temporary.unlink()
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
     failures_path = out_h5.with_suffix(".failures.csv")
     failures_path.unlink(missing_ok=True)
-    verification = verify_full_pool_native_shard(
-        out_h5,
-        expected_sector=sector,
-        expected_shard_index=int(shard_index),
-        expected_n_shards=int(n_shards),
-        expected_observations=len(rows),
-        require_periodograms=True,
-    )
-    if not verification["passed"]:
-        raise RuntimeError(
-            "published full-pool native shard failed verification: "
-            + "; ".join(verification["failures"][:10])
-        )
+    verification = {
+        **verification,
+        "path": str(out_h5),
+    }
     return {
         "schema_version": FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION,
         "stage": "orcd_native_shard_build",
@@ -1102,21 +1487,49 @@ def build_full_pool_native_shard(
         "shard_index": int(shard_index),
         "n_shards": int(n_shards),
         "n_sector_observations": int(len(authority.rows)),
+        "n_source_shard_observations": int(len(source_rows)),
         "n_shard_observations": int(len(rows)),
+        "n_shard_excluded_observations": int(len(excluded_rows)),
         "sector_observation_identity_sha256": (
             authority.observation_identity_sha256
         ),
+        "source_shard_observation_identity_sha256": (
+            _observation_identity_sha256(source_rows)
+        ),
         "shard_observation_identity_sha256": (
             _observation_identity_sha256(rows)
+        ),
+        "shard_excluded_observation_identity_sha256": (
+            _observation_identity_sha256(excluded_rows)
         ),
         "full_pool_sha256": authority.pool.sha256,
         "full_pool_summary_sha256": authority.pool_summary.sha256,
         "sector_allowlist_sha256": authority.allowlist.sha256,
         "raw_source_h5_sha256": raw_binding.sha256,
+        "raw_source_release_code_revision": raw_release.code_revision,
+        "raw_source_summary_sha256": raw_release.raw_source_summary.sha256,
+        "raw_export_complete_sha256": raw_release.export_complete.sha256,
+        "raw_transfer_validation_sha256": (
+            raw_release.transfer_validation.sha256
+        ),
         "compact_adp_h5_sha256": compact_binding.sha256,
         "cadence_reference_table_sha256": reference_table_binding.sha256,
         "cadence_reference_manifest_sha256": (
             reference_manifest_binding.sha256
+        ),
+        "eligibility_contract_version": eligibility.contract_version,
+        "eligibility_exclusions_sha256": (
+            eligibility_exclusions_binding.sha256
+        ),
+        "eligibility_summary_sha256": eligibility_summary_binding.sha256,
+        "native_model_full_identity_sha256": (
+            eligibility.full_observation_identity_sha256
+        ),
+        "native_model_eligible_identity_sha256": (
+            eligibility.eligible_observation_identity_sha256
+        ),
+        "native_model_excluded_identity_sha256": (
+            eligibility.excluded_observation_identity_sha256
         ),
         "orbitid_reconciliation": orbitid_summary,
         "out_h5": str(out_h5),
@@ -1132,6 +1545,13 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
     """Validate the generic full-pool orbit/provenance root envelope."""
 
     failures: list[str] = []
+    contract = str(attrs.get("contract_version", ""))
+    if contract not in {
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
+        FULL_POOL_NATIVE_CONTRACT_VERSION,
+    }:
+        return ["wrong full-pool native contract"]
+    is_v2 = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
     required = {
         "real_only",
         "sector",
@@ -1148,6 +1568,25 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         "compact_adp_h5_sha256",
         *RAW_PAIR_ORBITID_RECONCILIATION_ATTRS,
     }
+    if is_v2:
+        required.update(
+            {
+                "eligibility_contract_version",
+                "eligibility_exclusions_sha256",
+                "eligibility_summary_sha256",
+                "native_model_full_identity_sha256",
+                "native_model_eligible_identity_sha256",
+                "native_model_excluded_identity_sha256",
+                "n_source_shard_observations",
+                "n_shard_excluded_observations",
+                "source_shard_observation_identity_sha256",
+                "shard_excluded_observation_identity_sha256",
+                "raw_source_release_code_revision",
+                "raw_source_summary_sha256",
+                "raw_export_complete_sha256",
+                "raw_transfer_validation_sha256",
+            }
+        )
     missing = sorted(name for name in required if name not in attrs)
     if missing:
         return [f"full-pool native root lacks attrs: {','.join(missing)}"]
@@ -1157,6 +1596,12 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         n_shards = int(attrs["n_shards"])
         n_sector = int(attrs["n_sector_observations"])
         n_shard = int(attrs["n_shard_observations"])
+        n_source_shard = (
+            int(attrs["n_source_shard_observations"]) if is_v2 else n_shard
+        )
+        n_excluded_shard = (
+            int(attrs["n_shard_excluded_observations"]) if is_v2 else 0
+        )
         real_only = int(attrs["real_only"])
     except (TypeError, ValueError):
         return ["full-pool native root has invalid integer metadata"]
@@ -1167,11 +1612,14 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         or shard_index >= n_shards
         or n_sector < 1
         or n_shard < 1
-        or n_shard > n_sector
+        or n_source_shard < 1
+        or n_excluded_shard < 0
+        or n_source_shard > n_sector
+        or n_shard + n_excluded_shard != n_source_shard
         or real_only != 1
     ):
         failures.append("full-pool native root metadata is outside bounds")
-    for name in (
+    sha_names = [
         "full_pool_sha256",
         "full_pool_summary_sha256",
         "sector_allowlist_sha256",
@@ -1179,7 +1627,39 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         "shard_observation_identity_sha256",
         "raw_source_h5_sha256",
         "compact_adp_h5_sha256",
-    ):
+    ]
+    if is_v2:
+        sha_names.extend(
+            [
+                "eligibility_exclusions_sha256",
+                "eligibility_summary_sha256",
+                "native_model_full_identity_sha256",
+                "native_model_eligible_identity_sha256",
+                "native_model_excluded_identity_sha256",
+                "source_shard_observation_identity_sha256",
+                "shard_excluded_observation_identity_sha256",
+                "raw_source_summary_sha256",
+                "raw_export_complete_sha256",
+                "raw_transfer_validation_sha256",
+            ]
+        )
+        if str(attrs["eligibility_contract_version"]) != (
+            NATIVE_MODEL_ELIGIBILITY_CONTRACT_VERSION
+        ):
+            failures.append("native/model eligibility contract mismatch")
+        if str(attrs["raw_source_release_code_revision"]) != (
+            PRODUCTION_RAW_CODE_REVISION
+        ):
+            failures.append("raw-source code revision differs from production")
+        if str(attrs["raw_export_complete_sha256"]) != (
+            PRODUCTION_RAW_EXPORT_COMPLETE_SHA256
+        ):
+            failures.append("raw export release differs from production")
+        if str(attrs["raw_transfer_validation_sha256"]) != (
+            PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR.get(sector, "")
+        ):
+            failures.append("raw transfer release differs from production")
+    for name in sha_names:
         if not isinstance(attrs[name], (str, bytes)) or not str(
             attrs[name]
         ).strip("b'").strip("'").lower().isalnum():
@@ -1275,6 +1755,8 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             ),
             "orbitid_reconciliation_release_binding": (
                 FULL_POOL_NATIVE_RELEASE_BINDING
+                if is_v2
+                else FULL_POOL_NATIVE_RELEASE_BINDING_V1
             ),
             "orbitid_reconciliation_bounded_sector": 62,
             "orbitid_reconciliation_source_agreement_required": 1,
@@ -1399,6 +1881,11 @@ def verify_full_pool_native_shard(
     expected_shard_index: int | None = None,
     expected_n_shards: int | None = None,
     expected_observations: int | None = None,
+    expected_source_observations: int | None = None,
+    expected_excluded_observations: int | None = None,
+    expected_source_identity_sha256: str | None = None,
+    expected_output_identity_sha256: str | None = None,
+    expected_excluded_identity_sha256: str | None = None,
     require_periodograms: bool = True,
 ) -> dict[str, Any]:
     """Read and validate every real group in one full-pool native shard."""
@@ -1414,6 +1901,7 @@ def verify_full_pool_native_shard(
             "failures": [f"missing file: {path}"],
             "counts": counts,
         }
+    metadata: dict[str, Any] = {}
     with h5py.File(path, "r") as h5:
         if str(h5.attrs.get("contract_version", "")) != (
             FULL_POOL_NATIVE_CONTRACT_VERSION
@@ -1425,8 +1913,31 @@ def verify_full_pool_native_shard(
             ("shard_index", expected_shard_index),
             ("n_shards", expected_n_shards),
             ("n_shard_observations", expected_observations),
+            ("n_source_shard_observations", expected_source_observations),
+            (
+                "n_shard_excluded_observations",
+                expected_excluded_observations,
+            ),
         ):
             if expected is not None and int(h5.attrs.get(name, -1)) != int(expected):
+                failures.append(f"{name} differs from expected value")
+        for name, expected in (
+            (
+                "source_shard_observation_identity_sha256",
+                expected_source_identity_sha256,
+            ),
+            (
+                "shard_observation_identity_sha256",
+                expected_output_identity_sha256,
+            ),
+            (
+                "shard_excluded_observation_identity_sha256",
+                expected_excluded_identity_sha256,
+            ),
+        ):
+            if expected is not None and str(h5.attrs.get(name, "")) != str(
+                expected
+            ):
                 failures.append(f"{name} differs from expected value")
         if "injections" in h5 and len(h5["injections"]):
             counts["injections"] = len(h5["injections"])
@@ -1473,6 +1984,52 @@ def verify_full_pool_native_shard(
             h5.attrs.get("n_shard_observations", -1)
         ):
             failures.append("target count differs from root declaration")
+        metadata = {
+            "contract_version": str(h5.attrs.get("contract_version", "")),
+            "sector": int(h5.attrs.get("sector", -1)),
+            "shard_index": int(h5.attrs.get("shard_index", -1)),
+            "n_shards": int(h5.attrs.get("n_shards", -1)),
+            "n_source_shard_observations": int(
+                h5.attrs.get("n_source_shard_observations", -1)
+            ),
+            "n_shard_observations": int(
+                h5.attrs.get("n_shard_observations", -1)
+            ),
+            "n_shard_excluded_observations": int(
+                h5.attrs.get("n_shard_excluded_observations", -1)
+            ),
+            "source_shard_observation_identity_sha256": str(
+                h5.attrs.get(
+                    "source_shard_observation_identity_sha256", ""
+                )
+            ),
+            "shard_observation_identity_sha256": str(
+                h5.attrs.get("shard_observation_identity_sha256", "")
+            ),
+            "shard_excluded_observation_identity_sha256": str(
+                h5.attrs.get(
+                    "shard_excluded_observation_identity_sha256", ""
+                )
+            ),
+            "eligibility_exclusions_sha256": str(
+                h5.attrs.get("eligibility_exclusions_sha256", "")
+            ),
+            "eligibility_summary_sha256": str(
+                h5.attrs.get("eligibility_summary_sha256", "")
+            ),
+            "raw_source_release_code_revision": str(
+                h5.attrs.get("raw_source_release_code_revision", "")
+            ),
+            "raw_source_summary_sha256": str(
+                h5.attrs.get("raw_source_summary_sha256", "")
+            ),
+            "raw_export_complete_sha256": str(
+                h5.attrs.get("raw_export_complete_sha256", "")
+            ),
+            "raw_transfer_validation_sha256": str(
+                h5.attrs.get("raw_transfer_validation_sha256", "")
+            ),
+        }
     return {
         "passed": not failures,
         "failures": failures,
@@ -1480,6 +2037,7 @@ def verify_full_pool_native_shard(
         "path": str(path.resolve()),
         "sha256": file_sha256(path),
         "size_bytes": int(path.stat().st_size),
+        **metadata,
     }
 
 
@@ -1487,12 +2045,17 @@ def write_full_pool_native_registry(
     *,
     pool_path: Path,
     pool_summary_path: Path,
+    eligibility_exclusions_path: Path,
+    eligibility_summary_path: Path,
     native_shard_paths: Sequence[Path],
+    native_shard_summary_paths: Sequence[Path],
     source_path: Path,
     registry_path: Path,
     summary_path: Path,
+    release_summary_path: Path,
+    expected_shards_per_sector: int = FULL_POOL_NATIVE_SHARDS_PER_SECTOR,
 ) -> dict[str, Any]:
-    """Freeze exact shard coverage into an observation-keyed native registry."""
+    """Freeze the exact eligible native coverage and its full-pool audit."""
 
     pool_binding = _bind_file(pool_path)
     summary, summary_binding = _read_summary(pool_summary_path)
@@ -1537,26 +2100,224 @@ def write_full_pool_native_registry(
         "s63_reserved_observations_retained": 0,
     }:
         raise ValueError("frozen pool leakage audit did not pass")
-    expected_keys = set(
+    full_keys = set(
         zip(pool["sector"].astype(int), pool["tic"].astype(int))
     )
-    if not expected_keys or len(expected_keys) != len(pool):
+    if not full_keys or len(full_keys) != len(pool):
         raise ValueError("frozen pool has empty or duplicate observation keys")
+    eligibility = load_native_model_eligibility(
+        eligibility_exclusions_path,
+        eligibility_summary_path,
+        pool_path=pool_binding.path,
+        pool_summary_path=summary_binding.path,
+        production_lock=True,
+        rederive_from_bls=False,
+    )
+    expected_keys = set(eligibility.eligible_keys)
+    excluded_keys = set(eligibility.excluded_keys)
+    if (
+        set(eligibility.full_keys) != full_keys
+        or expected_keys | excluded_keys != full_keys
+        or expected_keys & excluded_keys
+    ):
+        raise ValueError("eligibility authority does not partition frozen pool")
+    expected_shards_per_sector = int(expected_shards_per_sector)
+    if expected_shards_per_sector < 1:
+        raise ValueError("expected_shards_per_sector must be positive")
 
     records: list[dict[str, Any]] = []
     shard_metadata: list[dict[str, Any]] = []
-    paths = [Path(value).expanduser().resolve(strict=True) for value in native_shard_paths]
+    paths = [
+        Path(value).expanduser().resolve(strict=True)
+        for value in native_shard_paths
+    ]
+    shard_summaries = [
+        Path(value).expanduser().resolve(strict=True)
+        for value in native_shard_summary_paths
+    ]
     if not paths or len(paths) != len(set(paths)):
         raise ValueError("native shard paths must be nonempty and unique")
+    if (
+        len(shard_summaries) != len(paths)
+        or len(shard_summaries) != len(set(shard_summaries))
+    ):
+        raise ValueError(
+            "native shard summary paths must be unique and pair every shard"
+        )
+    if len(paths) != (
+        len(FULL_POOL_NATIVE_SECTORS) * expected_shards_per_sector
+    ):
+        raise ValueError("native shard inventory count is not exact")
     import h5py
 
-    for path in sorted(paths):
-        audit = verify_full_pool_native_shard(path)
+    observed_shards: dict[int, set[int]] = {
+        sector: set() for sector in FULL_POOL_NATIVE_SECTORS
+    }
+    for path, shard_summary_path in sorted(
+        zip(paths, shard_summaries, strict=True),
+        key=lambda pair: str(pair[0]),
+    ):
+        try:
+            shard_summary = json.loads(
+                shard_summary_path.read_text(encoding="utf-8")
+            )
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError(
+                f"invalid native shard summary: {shard_summary_path}"
+            ) from exc
+        if not isinstance(shard_summary, dict):
+            raise ValueError("native shard summary must be a JSON object")
+        if (
+            shard_summary.get("schema_version")
+            != FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION
+            or shard_summary.get("stage") != "orcd_native_shard_build"
+            or shard_summary.get("native_contract_version")
+            != FULL_POOL_NATIVE_CONTRACT_VERSION
+            or shard_summary.get("real_only") is not True
+            or shard_summary.get("verification", {}).get("passed") is not True
+        ):
+            raise ValueError(
+                f"native shard summary did not pass v2 contract: {path}"
+            )
+        if Path(str(shard_summary.get("out_h5", ""))).resolve() != path:
+            raise ValueError(f"native shard summary binds a different HDF5: {path}")
+        if (
+            shard_summary.get("out_h5_sha256") != file_sha256(path)
+            or int(shard_summary.get("out_h5_size_bytes", -1))
+            != path.stat().st_size
+        ):
+            raise ValueError(f"native shard differs from its summary: {path}")
+        sector = int(shard_summary.get("sector", -1))
+        shard_index = int(shard_summary.get("shard_index", -1))
+        n_shards = int(shard_summary.get("n_shards", -1))
+        if (
+            sector not in FULL_POOL_NATIVE_SECTORS
+            or n_shards != expected_shards_per_sector
+            or shard_index not in range(expected_shards_per_sector)
+            or shard_index in observed_shards[sector]
+        ):
+            raise ValueError("native shard sector/index inventory is invalid")
+        observed_shards[sector].add(shard_index)
+
+        sector_rows = pool.loc[pool["sector"].eq(sector)].copy()
+        assignments = sector_rows["tic"].map(
+            lambda tic: shard_for_tic(
+                sector=sector,
+                tic=int(tic),
+                n_shards=expected_shards_per_sector,
+            )
+        )
+        source_rows = (
+            sector_rows.loc[assignments.eq(shard_index)]
+            .sort_values("tic", kind="stable")
+            .reset_index(drop=True)
+        )
+        source_keys = set(
+            zip(
+                source_rows["sector"].astype(int),
+                source_rows["tic"].astype(int),
+            )
+        )
+        eligible_rows = source_rows.loc[
+            [
+                (int(row.sector), int(row.tic)) in expected_keys
+                for row in source_rows.itertuples(index=False)
+            ]
+        ].reset_index(drop=True)
+        excluded_rows = source_rows.loc[
+            [
+                (int(row.sector), int(row.tic)) in excluded_keys
+                for row in source_rows.itertuples(index=False)
+            ]
+        ].reset_index(drop=True)
+        if (
+            source_keys
+            != set(
+                zip(
+                    eligible_rows["sector"].astype(int),
+                    eligible_rows["tic"].astype(int),
+                )
+            )
+            | set(
+                zip(
+                    excluded_rows["sector"].astype(int),
+                    excluded_rows["tic"].astype(int),
+                )
+            )
+        ):
+            raise ValueError("native shard source partition is incomplete")
+        audit = verify_full_pool_native_shard(
+            path,
+            expected_sector=sector,
+            expected_shard_index=shard_index,
+            expected_n_shards=expected_shards_per_sector,
+            expected_observations=len(eligible_rows),
+            expected_source_observations=len(source_rows),
+            expected_excluded_observations=len(excluded_rows),
+            expected_source_identity_sha256=_observation_identity_sha256(
+                source_rows
+            ),
+            expected_output_identity_sha256=_observation_identity_sha256(
+                eligible_rows
+            ),
+            expected_excluded_identity_sha256=_observation_identity_sha256(
+                excluded_rows
+            ),
+        )
         if not audit["passed"]:
             raise ValueError(
                 f"native shard failed verification {path}: "
                 + "; ".join(audit["failures"][:10])
             )
+        for name, expected in (
+            ("full_pool_sha256", pool_binding.sha256),
+            ("full_pool_summary_sha256", summary_binding.sha256),
+            (
+                "eligibility_exclusions_sha256",
+                eligibility.bindings["exclusions"].sha256,
+            ),
+            (
+                "eligibility_summary_sha256",
+                eligibility.bindings["eligibility_summary"].sha256,
+            ),
+            (
+                "native_model_full_identity_sha256",
+                eligibility.full_observation_identity_sha256,
+            ),
+            (
+                "native_model_eligible_identity_sha256",
+                eligibility.eligible_observation_identity_sha256,
+            ),
+            (
+                "native_model_excluded_identity_sha256",
+                eligibility.excluded_observation_identity_sha256,
+            ),
+            (
+                "raw_source_release_code_revision",
+                PRODUCTION_RAW_CODE_REVISION,
+            ),
+            (
+                "raw_export_complete_sha256",
+                PRODUCTION_RAW_EXPORT_COMPLETE_SHA256,
+            ),
+            (
+                "raw_transfer_validation_sha256",
+                PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR[sector],
+            ),
+        ):
+            if shard_summary.get(name) != expected:
+                raise ValueError(
+                    f"native shard summary {name} binding differs: {path}"
+                )
+        for name, expected in (
+            ("n_source_shard_observations", len(source_rows)),
+            ("n_shard_observations", len(eligible_rows)),
+            ("n_shard_excluded_observations", len(excluded_rows)),
+        ):
+            if int(shard_summary.get(name, -1)) != expected:
+                raise ValueError(
+                    f"native shard summary {name} differs: {path}"
+                )
         with h5py.File(path, "r") as h5:
             if h5.attrs.get("full_pool_sha256") != pool_binding.sha256:
                 raise ValueError(f"native shard binds a different pool: {path}")
@@ -1567,7 +2328,36 @@ def write_full_pool_native_registry(
                 raise ValueError(
                     f"native shard binds a different pool summary: {path}"
                 )
-            sector = int(h5.attrs["sector"])
+            if h5.attrs.get("eligibility_exclusions_sha256") != (
+                eligibility.bindings["exclusions"].sha256
+            ) or h5.attrs.get("eligibility_summary_sha256") != (
+                eligibility.bindings["eligibility_summary"].sha256
+            ):
+                raise ValueError(
+                    f"native shard binds a different eligibility release: {path}"
+                )
+            for name, expected in (
+                (
+                    "raw_source_release_code_revision",
+                    PRODUCTION_RAW_CODE_REVISION,
+                ),
+                (
+                    "raw_export_complete_sha256",
+                    PRODUCTION_RAW_EXPORT_COMPLETE_SHA256,
+                ),
+                (
+                    "raw_transfer_validation_sha256",
+                    PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR[sector],
+                ),
+                (
+                    "raw_source_summary_sha256",
+                    shard_summary.get("raw_source_summary_sha256"),
+                ),
+            ):
+                if h5.attrs.get(name) != expected:
+                    raise ValueError(
+                        f"native shard raw-release binding differs: {path}"
+                    )
             for key, group in h5["targets"].items():
                 tic = int(key)
                 if (
@@ -1586,6 +2376,12 @@ def write_full_pool_native_registry(
                         "native_group_path": f"targets/{key}",
                         "full_pool_sha256": pool_binding.sha256,
                         "full_pool_summary_sha256": summary_binding.sha256,
+                        "eligibility_exclusions_sha256": (
+                            eligibility.bindings["exclusions"].sha256
+                        ),
+                        "eligibility_summary_sha256": (
+                            eligibility.bindings["eligibility_summary"].sha256
+                        ),
                     }
                 )
         shard_metadata.append(
@@ -1593,10 +2389,44 @@ def write_full_pool_native_registry(
                 "path": str(path),
                 "sha256": audit["sha256"],
                 "size_bytes": audit["size_bytes"],
-                "sector": int(audit.get("sector", sector)),
-                "n_observations": int(audit["counts"]["targets"]),
+                "summary_path": str(shard_summary_path),
+                "summary_sha256": file_sha256(shard_summary_path),
+                "sector": sector,
+                "shard_index": shard_index,
+                "n_shards": n_shards,
+                "n_source_observations": len(source_rows),
+                "n_observations": len(eligible_rows),
+                "n_excluded_observations": len(excluded_rows),
+                "source_observation_identity_sha256": (
+                    _observation_identity_sha256(source_rows)
+                ),
+                "observation_identity_sha256": (
+                    _observation_identity_sha256(eligible_rows)
+                ),
+                "excluded_observation_identity_sha256": (
+                    _observation_identity_sha256(excluded_rows)
+                ),
+                "raw_source_h5_sha256": shard_summary.get(
+                    "raw_source_h5_sha256"
+                ),
+                "raw_source_summary_sha256": shard_summary.get(
+                    "raw_source_summary_sha256"
+                ),
+                "raw_export_complete_sha256": shard_summary.get(
+                    "raw_export_complete_sha256"
+                ),
+                "raw_transfer_validation_sha256": shard_summary.get(
+                    "raw_transfer_validation_sha256"
+                ),
+                "raw_source_release_code_revision": shard_summary.get(
+                    "raw_source_release_code_revision"
+                ),
+                "verification_passed": True,
             }
         )
+    for sector, indices in observed_shards.items():
+        if indices != set(range(expected_shards_per_sector)):
+            raise ValueError(f"S{sector} native shard index coverage is incomplete")
     source = pd.DataFrame.from_records(records)
     observed_keys = set(
         zip(source["sector"].astype(int), source["tic"].astype(int))
@@ -1622,30 +2452,381 @@ def write_full_pool_native_registry(
         summary_path=summary_path,
         expected_contract_version=FULL_POOL_NATIVE_CONTRACT_VERSION,
     )
+    source_binding = _bind_file(source_path)
+    registry_binding = _bind_file(registry_path)
+    registry_summary_binding = _bind_file(summary_path)
+    release_summary = {
+        "passed": True,
+        "schema_version": FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION,
+        "release_binding": FULL_POOL_NATIVE_RELEASE_BINDING,
+        "native_contract_version": FULL_POOL_NATIVE_CONTRACT_VERSION,
+        "eligibility_contract_version": eligibility.contract_version,
+        "sectors": list(FULL_POOL_NATIVE_SECTORS),
+        "shards_per_sector": expected_shards_per_sector,
+        "counts": {
+            "full_observations": len(full_keys),
+            "eligible_observations": len(expected_keys),
+            "excluded_observations": len(excluded_keys),
+            "native_registry_observations": len(source),
+            "native_shards": len(shard_metadata),
+        },
+        "identity_hashes": {
+            "full_observations_sha256": (
+                eligibility.full_observation_identity_sha256
+            ),
+            "eligible_observations_sha256": (
+                eligibility.eligible_observation_identity_sha256
+            ),
+            "excluded_observations_sha256": (
+                eligibility.excluded_observation_identity_sha256
+            ),
+            "native_registry_observations_sha256": (
+                _observation_identity_sha256(source)
+            ),
+        },
+        "partition_audit": {
+            "eligible_excluded_disjoint": not bool(
+                expected_keys & excluded_keys
+            ),
+            "eligible_excluded_union_equals_full": (
+                expected_keys | excluded_keys == full_keys
+            ),
+            "native_registry_equals_eligible": observed_keys == expected_keys,
+            "excluded_present_in_native_registry": bool(
+                excluded_keys & observed_keys
+            ),
+        },
+        "source_authorities": {
+            "frozen_pool": {
+                "path": str(pool_binding.path),
+                "sha256": pool_binding.sha256,
+                "size_bytes": pool_binding.size_bytes,
+            },
+            "frozen_pool_summary": {
+                "path": str(summary_binding.path),
+                "sha256": summary_binding.sha256,
+                "size_bytes": summary_binding.size_bytes,
+            },
+            "eligibility_exclusions": (
+                eligibility.bindings["exclusions"].metadata()
+            ),
+            "eligibility_summary": (
+                eligibility.bindings["eligibility_summary"].metadata()
+            ),
+            "raw_v1_release": {
+                "code_revision": PRODUCTION_RAW_CODE_REVISION,
+                "raw_export_complete_sha256": (
+                    PRODUCTION_RAW_EXPORT_COMPLETE_SHA256
+                ),
+                "raw_transfer_validation_sha256_by_sector": {
+                    str(key): value
+                    for key, value in (
+                        PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR.items()
+                    )
+                },
+            },
+        },
+        "outputs": {
+            "source_table": {
+                "path": str(source_binding.path),
+                "sha256": source_binding.sha256,
+                "size_bytes": source_binding.size_bytes,
+            },
+            "native_registry": {
+                "path": str(registry_binding.path),
+                "sha256": registry_binding.sha256,
+                "size_bytes": registry_binding.size_bytes,
+            },
+            "native_registry_summary": {
+                "path": str(registry_summary_binding.path),
+                "sha256": registry_summary_binding.sha256,
+                "size_bytes": registry_summary_binding.size_bytes,
+            },
+        },
+        "native_shards": shard_metadata,
+    }
+    release_summary_path = Path(release_summary_path).expanduser().resolve()
+    _publish_immutable_bytes(
+        release_summary_path,
+        (
+            json.dumps(
+                release_summary,
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8"),
+    )
     pool_binding.assert_unchanged()
     summary_binding.assert_unchanged()
     return {
         **registry_summary,
+        "passed": True,
         "full_pool_sha256": pool_binding.sha256,
         "full_pool_summary_sha256": summary_binding.sha256,
+        "eligibility_exclusions_sha256": (
+            eligibility.bindings["exclusions"].sha256
+        ),
+        "eligibility_summary_sha256": (
+            eligibility.bindings["eligibility_summary"].sha256
+        ),
         "native_shards": shard_metadata,
         "coverage_identity_sha256": _observation_identity_sha256(source),
+        "release_summary": str(release_summary_path),
+        "release_summary_sha256": file_sha256(release_summary_path),
     }
+
+
+def load_full_pool_native_registry_release(
+    *,
+    registry_path: Path,
+    registry_summary_path: Path,
+    release_summary_path: Path,
+    eligibility: EligibilityAuthority | None = None,
+    verify_shard_files: bool = True,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Validate the generic registry and the stronger full-pool v2 release.
+
+    ``verify_shard_files=False`` retains all release, inventory, and declared
+    binding checks but defers the expensive HDF5 hashes.  The training gate
+    uses that mode immediately before hashing every selected native file
+    itself, avoiding a duplicate full read of the same 112 shards.
+    """
+
+    registry_path = Path(registry_path).expanduser().resolve(strict=True)
+    registry_summary_path = (
+        Path(registry_summary_path).expanduser().resolve(strict=True)
+    )
+    release_summary_path = (
+        Path(release_summary_path).expanduser().resolve(strict=True)
+    )
+    validate_native_input_registry_path(
+        registry_path=registry_path,
+        summary_path=registry_summary_path,
+        expected_contract_version=FULL_POOL_NATIVE_CONTRACT_VERSION,
+        verify_files=verify_shard_files,
+    )
+    registry = read_table(registry_path)
+    try:
+        release = json.loads(
+            release_summary_path.read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            f"invalid full-pool native release summary: {release_summary_path}"
+        ) from exc
+    if not isinstance(release, dict):
+        raise ValueError("full-pool native release summary must be a JSON object")
+    if (
+        release.get("passed") is not True
+        or release.get("schema_version")
+        != FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION
+        or release.get("release_binding") != FULL_POOL_NATIVE_RELEASE_BINDING
+        or release.get("native_contract_version")
+        != FULL_POOL_NATIVE_CONTRACT_VERSION
+        or release.get("eligibility_contract_version")
+        != NATIVE_MODEL_ELIGIBILITY_CONTRACT_VERSION
+        or release.get("sectors") != list(FULL_POOL_NATIVE_SECTORS)
+    ):
+        raise ValueError("full-pool native release has the wrong v2 contract")
+    outputs = release.get("outputs")
+    if not isinstance(outputs, dict):
+        raise ValueError("full-pool native release lacks outputs")
+    for name, path in (
+        ("native_registry", registry_path),
+        ("native_registry_summary", registry_summary_path),
+    ):
+        metadata = outputs.get(name)
+        if not isinstance(metadata, dict) or (
+            metadata.get("sha256") != file_sha256(path)
+            or int(metadata.get("size_bytes", -1)) != path.stat().st_size
+        ):
+            raise ValueError(f"full-pool native release {name} binding differs")
+    keys = set(
+        zip(
+            pd.to_numeric(registry["sector"], errors="raise").astype(int),
+            pd.to_numeric(registry["tic"], errors="raise").astype(int),
+        )
+    )
+    if len(keys) != len(registry):
+        raise ValueError("full-pool native registry has duplicate keys")
+    counts = release.get("counts")
+    identities = release.get("identity_hashes")
+    partition = release.get("partition_audit")
+    if (
+        not isinstance(counts, dict)
+        or not isinstance(identities, dict)
+        or partition
+        != {
+            "eligible_excluded_disjoint": True,
+            "eligible_excluded_union_equals_full": True,
+            "native_registry_equals_eligible": True,
+            "excluded_present_in_native_registry": False,
+        }
+        or int(counts.get("native_registry_observations", -1))
+        != len(registry)
+        or identities.get("native_registry_observations_sha256")
+        != _observation_identity_sha256(registry)
+    ):
+        raise ValueError("full-pool native release coverage audit failed")
+    if eligibility is not None:
+        if (
+            keys != set(eligibility.eligible_keys)
+            or int(counts.get("full_observations", -1))
+            != eligibility.n_full
+            or int(counts.get("eligible_observations", -1))
+            != eligibility.n_eligible
+            or int(counts.get("excluded_observations", -1))
+            != eligibility.n_excluded
+            or identities.get("full_observations_sha256")
+            != eligibility.full_observation_identity_sha256
+            or identities.get("eligible_observations_sha256")
+            != eligibility.eligible_observation_identity_sha256
+            or identities.get("excluded_observations_sha256")
+            != eligibility.excluded_observation_identity_sha256
+        ):
+            raise ValueError(
+                "full-pool native release differs from eligibility authority"
+            )
+    source_authorities = release.get("source_authorities")
+    raw_release = (
+        source_authorities.get("raw_v1_release")
+        if isinstance(source_authorities, dict)
+        else None
+    )
+    if raw_release != {
+        "code_revision": PRODUCTION_RAW_CODE_REVISION,
+        "raw_export_complete_sha256": PRODUCTION_RAW_EXPORT_COMPLETE_SHA256,
+        "raw_transfer_validation_sha256_by_sector": {
+            str(key): value
+            for key, value in PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR.items()
+        },
+    }:
+        raise ValueError("full-pool native release raw-v1 authority differs")
+    shards = release.get("native_shards")
+    if not isinstance(shards, list) or int(
+        counts.get("native_shards", -1)
+    ) != len(shards):
+        raise ValueError("full-pool native release shard inventory is invalid")
+    expected_pairs = {
+        (sector, shard_index)
+        for sector in FULL_POOL_NATIVE_SECTORS
+        for shard_index in range(FULL_POOL_NATIVE_SHARDS_PER_SECTOR)
+    }
+    observed_pairs: set[tuple[int, int]] = set()
+    observed_paths: set[str] = set()
+    observed_summary_paths: set[str] = set()
+    for item in shards:
+        if not isinstance(item, dict) or item.get("verification_passed") is not True:
+            raise ValueError("full-pool native release contains an unverified shard")
+        sector = int(item.get("sector", -1))
+        shard_index = int(item.get("shard_index", -1))
+        pair = (sector, shard_index)
+        if (
+            pair in observed_pairs
+            or pair not in expected_pairs
+            or int(item.get("n_shards", -1))
+            != FULL_POOL_NATIVE_SHARDS_PER_SECTOR
+        ):
+            raise ValueError("full-pool native release shard layout is invalid")
+        observed_pairs.add(pair)
+        shard_path = Path(str(item.get("path", ""))).resolve()
+        shard_summary_path = Path(
+            str(item.get("summary_path", ""))
+        ).resolve()
+        if (
+            str(shard_path) in observed_paths
+            or str(shard_summary_path) in observed_summary_paths
+        ):
+            raise ValueError("full-pool native release repeats a shard artifact")
+        observed_paths.add(str(shard_path))
+        observed_summary_paths.add(str(shard_summary_path))
+        if (
+            not shard_path.is_file()
+            or not shard_summary_path.is_file()
+            or int(item.get("size_bytes", -1)) != shard_path.stat().st_size
+            or item.get("summary_sha256")
+            != file_sha256(shard_summary_path)
+        ):
+            raise ValueError("full-pool native release shard binding changed")
+        if verify_shard_files and item.get("sha256") != file_sha256(
+            shard_path
+        ):
+            raise ValueError("full-pool native release shard hash changed")
+        shard_rows = registry.loc[
+            registry["native_h5_path"].astype(str).eq(str(shard_path))
+        ]
+        if (
+            len(shard_rows) != int(item.get("n_observations", -1))
+            or shard_rows.empty
+            or not shard_rows["sector"].astype(int).eq(sector).all()
+            or _observation_identity_sha256(shard_rows)
+            != item.get("observation_identity_sha256")
+        ):
+            raise ValueError(
+                "full-pool native release shard rows differ from registry"
+            )
+        expected_groups = shard_rows["tic"].astype(int).map(
+            lambda tic: f"targets/{tic:016d}"
+        )
+        if not shard_rows["native_group_path"].astype(str).eq(
+            expected_groups
+        ).all():
+            raise ValueError(
+                "full-pool native release shard group paths are invalid"
+            )
+        for name, expected in (
+            ("raw_source_release_code_revision", PRODUCTION_RAW_CODE_REVISION),
+            (
+                "raw_export_complete_sha256",
+                PRODUCTION_RAW_EXPORT_COMPLETE_SHA256,
+            ),
+            (
+                "raw_transfer_validation_sha256",
+                PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR[sector],
+            ),
+        ):
+            if item.get(name) != expected:
+                raise ValueError(
+                    "full-pool native release raw-source binding differs"
+                )
+    if observed_pairs != expected_pairs:
+        raise ValueError("full-pool native release is not the exact 7x16 inventory")
+    registry_paths = set(registry["native_h5_path"].astype(str))
+    if observed_paths != registry_paths:
+        raise ValueError(
+            "full-pool native release shard paths differ from registry"
+        )
+    return registry, release
 
 
 __all__ = [
     "FULL_POOL_NATIVE_CONTRACT_VERSION",
+    "FULL_POOL_NATIVE_CONTRACT_VERSION_V1",
+    "FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION",
     "FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION",
     "FULL_POOL_NATIVE_RELEASE_BINDING",
+    "FULL_POOL_NATIVE_RELEASE_BINDING_V1",
     "FULL_POOL_NATIVE_SECTORS",
+    "FULL_POOL_NATIVE_SHARDS_PER_SECTOR",
     "FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION",
+    "FULL_POOL_RAW_EXPORT_CONTROLLER_SCHEMA_VERSION",
+    "FULL_POOL_RAW_SHARD_SUMMARY_SCHEMA_VERSION",
     "FULL_POOL_RAW_SOURCE_CONTRACT_VERSION",
+    "FULL_POOL_RAW_TRANSFER_SCHEMA_VERSION",
+    "PRODUCTION_RAW_CODE_REVISION",
+    "PRODUCTION_RAW_EXPORT_COMPLETE_SHA256",
+    "PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR",
+    "RawSourceReleaseAuthority",
     "SectorPoolAuthority",
     "build_full_pool_native_shard",
     "export_full_pool_raw_source_shard",
     "full_pool_native_group_failures",
     "full_pool_native_root_failures",
+    "load_production_raw_source_release",
     "load_sector_pool_authority",
+    "load_full_pool_native_registry_release",
     "select_sector_shard",
     "shard_for_tic",
     "verify_full_pool_native_shard",

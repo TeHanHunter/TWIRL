@@ -296,6 +296,36 @@ def test_registry_and_attachment_summaries_bind_all_tables(tmp_path: Path) -> No
         )
 
 
+def test_registry_can_defer_file_reads_but_still_binds_summary(
+    tmp_path: Path,
+) -> None:
+    source, native_h5 = _mapping_source(tmp_path)
+    source_path = tmp_path / "source.csv"
+    registry_path = tmp_path / "registry.csv"
+    summary_path = tmp_path / "registry.summary.json"
+    source.to_csv(source_path, index=False)
+    write_native_input_registry(
+        source_path=source_path,
+        registry_path=registry_path,
+        summary_path=summary_path,
+    )
+    native_h5.unlink()
+
+    audit = validate_native_input_registry_path(
+        registry_path=registry_path,
+        summary_path=summary_path,
+        verify_files=False,
+    )
+
+    assert audit["passed"] is True
+    assert audit["native_files_verified"] is False
+    with pytest.raises(FileNotFoundError, match="missing native HDF5"):
+        validate_native_input_registry_path(
+            registry_path=registry_path,
+            summary_path=summary_path,
+        )
+
+
 def test_prepare_training_rows_preserves_explicit_groups_and_s56_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -63,25 +63,45 @@ from twirl.vetting.ssl_full_pool_bls import (
     GLOBAL_BLS_CONTRACT_VERSION,
     GLOBAL_BLS_SUMMARY_SCHEMA_VERSION,
 )
+from twirl.vetting.ssl_full_pool_eligibility import (
+    EligibilityAuthority,
+    PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+    PRODUCTION_ELIGIBLE_OBSERVATIONS,
+    PRODUCTION_EXCLUDED_IDENTITY_SHA256,
+    PRODUCTION_EXCLUDED_OBSERVATIONS,
+    PRODUCTION_FULL_IDENTITY_SHA256,
+    PRODUCTION_FULL_OBSERVATIONS,
+    derive_anchor_eligibility,
+    load_native_model_eligibility,
+)
+from twirl.vetting.ssl_full_pool_native import (
+    FULL_POOL_NATIVE_CONTRACT_VERSION,
+    load_full_pool_native_registry_release,
+)
 from twirl.vetting.teacher_native_registry import file_sha256, read_table
 from twirl.vetting.teacher_split_registry import validate_tic_split_assignments
 
 
-FULLPOOL_SSL_REGISTRY_SCHEMA = "twirl_teacher_ssl_fullpool_registry_v1"
+FULLPOOL_SSL_REGISTRY_SCHEMA = "twirl_teacher_ssl_fullpool_registry_v2"
 FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_registry_summary_v1"
+    "twirl_teacher_ssl_fullpool_registry_summary_v2"
 )
-FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v1"
-FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v1"
-FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v1"
-FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v1"
-FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v1"
-FULLPOOL_SSL_RUN_ID = "teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp"
-FULLPOOL_SSL_ENCODER_NAME = "teacher_ssl_fullpool_v1"
+FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v2"
+FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v2"
+FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v2"
+FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v2"
+FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v2"
+FULLPOOL_SSL_RUN_ID = (
+    "teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
+)
+FULLPOOL_SSL_ENCODER_NAME = "teacher_ssl_fullpool_v2"
 FULLPOOL_SSL_MODEL_FACING_NAME = "Teacher v4-SSL full-pool"
 FULLPOOL_SSL_PROFILE = "shape_plus_periodogram_bls"
 FULLPOOL_SSL_CHECKPOINT_NAMESPACE = (
-    "twirl_teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp"
+    "twirl_teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
+)
+FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA = (
+    "twirl_teacher_ssl_fullpool_training_authority_v2"
 )
 FULLPOOL_SSL_SECTORS: tuple[int, ...] = tuple(range(56, 63))
 FULLPOOL_SSL_N_FOLDS = 5
@@ -641,6 +661,7 @@ def build_fullpool_ssl_registry(
     reserved_hosts: pd.DataFrame | Sequence[int],
     *,
     frozen_pool: pd.DataFrame,
+    eligibility: EligibilityAuthority | None = None,
     sectors: Sequence[int] = FULLPOOL_SSL_SECTORS,
     anchor_aperture: str = FULLPOOL_SSL_ANCHOR_APERTURE,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -676,9 +697,13 @@ def build_fullpool_ssl_registry(
             f"frozen SSL pool sectors {pool_sectors} != {expected_sectors}"
         )
 
-    anchor = _rank_one_anchor_rows(
+    decisions = derive_anchor_eligibility(
         bls_rows,
-        aperture=str(anchor_aperture),
+        frozen_pool=pool,
+        anchor_aperture=str(anchor_aperture),
+    )
+    anchor = decisions.rename(
+        columns={"observation_id": "ssl_observation_id"}
     )
     observed_sectors = tuple(sorted(anchor["sector"].unique().astype(int)))
     if observed_sectors != expected_sectors:
@@ -686,9 +711,7 @@ def build_fullpool_ssl_registry(
             "full-pool BLS sectors do not match the requested release: "
             f"{observed_sectors} != {expected_sectors}"
         )
-    pool_keys = set(
-        zip(pool["sector"].astype(int), pool["tic"].astype(int))
-    )
+    pool_keys = set(zip(pool["sector"].astype(int), pool["tic"].astype(int)))
     anchor_keys = set(
         zip(anchor["sector"].astype(int), anchor["tic"].astype(int))
     )
@@ -699,18 +722,26 @@ def build_fullpool_ssl_registry(
             "BLS anchor coverage differs from the frozen SSL pool; "
             f"missing={missing}, extra={extra}"
         )
-    anchor = (
-        anchor.drop(columns="ssl_observation_id")
-        .merge(
-            pool.loc[:, ["sector", "tic", "observation_id"]],
-            on=["sector", "tic"],
-            how="inner",
-            validate="one_to_one",
+    anchor = anchor.sort_values(
+        ["sector", "tic"], kind="stable"
+    ).reset_index(drop=True)
+    if eligibility is not None and (
+        set(eligibility.full_keys) != pool_keys
+        or set(
+            zip(
+                anchor.loc[
+                    anchor["native_model_eligible"], "sector"
+                ].astype(int),
+                anchor.loc[
+                    anchor["native_model_eligible"], "tic"
+                ].astype(int),
+            )
         )
-        .rename(columns={"observation_id": "ssl_observation_id"})
-        .sort_values(["sector", "tic"], kind="stable")
-        .reset_index(drop=True)
-    )
+        != set(eligibility.eligible_keys)
+    ):
+        raise ValueError(
+            "BLS-derived eligibility differs from the frozen eligibility authority"
+        )
 
     native_required = {
         "sector",
@@ -758,6 +789,9 @@ def build_fullpool_ssl_registry(
         native["native_contract_version"],
         name="native_contract_version",
     )
+    native_keys = set(
+        zip(native["sector"].astype(int), native["tic"].astype(int))
+    )
 
     assignments = validate_tic_split_assignments(
         split_registry,
@@ -790,7 +824,7 @@ def build_fullpool_ssl_registry(
     epoch = pd.to_numeric(merged["t0_bjd"], errors="coerce")
     duration = pd.to_numeric(merged["duration_min"], errors="coerce")
     rank = _integer_series(merged["peak_rank"], name="peak_rank")
-    bls_eligible = (
+    recomputed_bls_eligible = (
         merged["status"].eq("ok")
         & rank.eq(1)
         & np.isfinite(period)
@@ -799,6 +833,38 @@ def build_fullpool_ssl_registry(
         & np.isfinite(duration)
         & duration.gt(0)
     )
+    bls_eligible = merged["native_model_eligible"].astype(bool)
+    if not bls_eligible.equals(recomputed_bls_eligible.astype(bool)):
+        raise RuntimeError("shared BLS eligibility decision drifted during merge")
+    bls_eligible_keys = set(
+        zip(
+            merged.loc[bls_eligible, "sector"].astype(int),
+            merged.loc[bls_eligible, "tic"].astype(int),
+        )
+    )
+    if native_keys != bls_eligible_keys:
+        missing = sorted(bls_eligible_keys - native_keys)[:10]
+        unexpected = sorted(native_keys - bls_eligible_keys)[:10]
+        if missing:
+            raise ValueError(
+                "leakage-safe searchable BLS rows lack full-pool native "
+                f"mappings; first={missing}"
+            )
+        raise ValueError(
+            "full-pool native registry contains observations outside the "
+            f"BLS-eligible partition; first={unexpected}"
+        )
+    if eligibility is not None:
+        if native_keys != set(eligibility.eligible_keys):
+            raise ValueError(
+                "full-pool native registry differs from eligibility authority"
+            )
+        if not native["native_contract_version"].eq(
+            FULL_POOL_NATIVE_CONTRACT_VERSION
+        ).all():
+            raise ValueError(
+                "production full-pool registry requires native-v2 inputs"
+            )
     native_present = merged["_native_join"].eq("both")
     if "is_injected_row" in merged:
         injected = _strict_bool_series(
@@ -896,15 +962,19 @@ def build_fullpool_ssl_registry(
         "registry_schema_version": FULLPOOL_SSL_REGISTRY_SCHEMA,
         "sectors": list(expected_sectors),
         "anchor_aperture": str(anchor_aperture),
-        "rank_policy": "peak_rank_1_or_rank_0_status_row",
+        "rank_policy": (
+            "shared_native_model_eligibility_v2:"
+            "peak_rank_1_or_rank_0_status_row"
+        ),
         "frozen_pool_contract_version": FULL_POOL_CONTRACT_VERSION,
         "frozen_pool_identity_sha256": _pool_identity_sha256(pool),
         "real_only": True,
         "labels_consumed": False,
+        "injections_consumed": False,
         "fixed_test_exclusion_scope": "whole_tic",
         "prospective_exclusion_scope": "whole_tic",
         "fold_assignment_policy": (
-            "frozen_development_fold_else_present_in_all_pretraining_folds_v1"
+            "frozen_development_fold_else_present_in_all_pretraining_folds_v2"
         ),
         "n_bls_rows": int(len(bls_rows)),
         "n_anchor_observations": int(len(registry)),
@@ -923,6 +993,28 @@ def build_fullpool_ssl_registry(
         ),
         "n_injected_observations_excluded": int(injected.sum()),
         "n_bls_unsearchable_observations": int((~bls_eligible).sum()),
+        "native_model_eligibility_contract_version": (
+            eligibility.contract_version if eligibility is not None else ""
+        ),
+        "native_model_full_identity_sha256": (
+            eligibility.full_observation_identity_sha256
+            if eligibility is not None
+            else _pool_identity_sha256(pool)
+        ),
+        "native_model_eligible_identity_sha256": (
+            eligibility.eligible_observation_identity_sha256
+            if eligibility is not None
+            else _pool_identity_sha256(
+                registry.loc[registry["ssl_pool_include"]]
+            )
+        ),
+        "native_model_excluded_identity_sha256": (
+            eligibility.excluded_observation_identity_sha256
+            if eligibility is not None
+            else _pool_identity_sha256(
+                registry.loc[~registry["ssl_pool_include"]]
+            )
+        ),
         "fixed_split_registry_tics": int(assignments["tic"].nunique()),
         "fixed_test_registry_tics": int(len(fixed_test_tics)),
         "reserved_inventory_tics": int(len(reserved_tics)),
@@ -1109,6 +1201,10 @@ def validate_fullpool_ssl_registry(
         _SHA256_PATTERN
     ).all():
         raise ValueError("included full-pool rows have invalid native hashes")
+    if not work.loc[include, "native_contract_version"].eq(
+        FULL_POOL_NATIVE_CONTRACT_VERSION
+    ).all():
+        raise ValueError("included full-pool rows require native-v2 inputs")
     if not work.loc[include, "native_h5_path"].map(
         lambda value: Path(value).is_absolute()
     ).all():
@@ -1521,26 +1617,577 @@ def _code_revision() -> str:
     return revision
 
 
+def _artifact_metadata(path: Path) -> dict[str, Any]:
+    """Return a stable path/size/hash binding for one required authority."""
+
+    resolved = Path(path).expanduser().resolve(strict=True)
+    before = resolved.stat()
+    if not resolved.is_file() or before.st_size <= 0:
+        raise FileNotFoundError(f"training authority is missing or empty: {resolved}")
+    digest = file_sha256(resolved)
+    after = resolved.stat()
+    before_identity = (
+        int(before.st_size),
+        int(before.st_mtime_ns),
+        int(before.st_dev),
+        int(before.st_ino),
+    )
+    after_identity = (
+        int(after.st_size),
+        int(after.st_mtime_ns),
+        int(after.st_dev),
+        int(after.st_ino),
+    )
+    if before_identity != after_identity:
+        raise RuntimeError(f"training authority changed while hashing: {resolved}")
+    return {
+        "path": str(resolved),
+        "size_bytes": int(after.st_size),
+        "sha256": digest,
+    }
+
+
+def _metadata_from_record(
+    record: Any,
+    *,
+    context: str,
+) -> dict[str, Any]:
+    if not isinstance(record, Mapping):
+        raise ValueError(f"{context} must be an artifact binding")
+    path_text = record.get("path")
+    digest = str(record.get("sha256", "")).lower()
+    try:
+        size_bytes = int(record.get("size_bytes", -1))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{context} has an invalid size") from exc
+    if not isinstance(path_text, str) or not path_text.strip():
+        raise ValueError(f"{context} has an invalid path")
+    if len(digest) != 64 or any(
+        character not in "0123456789abcdef" for character in digest
+    ):
+        raise ValueError(f"{context} has an invalid SHA-256")
+    if size_bytes <= 0:
+        raise ValueError(f"{context} has an invalid size")
+    return {
+        "path": str(Path(path_text).expanduser().resolve()),
+        "size_bytes": size_bytes,
+        "sha256": digest,
+    }
+
+
+def _observation_keys(rows: pd.DataFrame) -> frozenset[tuple[int, int]]:
+    return frozenset(
+        zip(
+            pd.to_numeric(rows["sector"], errors="raise").astype(int),
+            pd.to_numeric(rows["tic"], errors="raise").astype(int),
+        )
+    )
+
+
+def _normalized_native_mapping(
+    rows: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    required = {
+        "sector",
+        "tic",
+        "native_h5_path",
+        "native_group_path",
+        "native_h5_sha256",
+        "native_contract_version",
+    }
+    missing = sorted(required - set(rows))
+    if missing:
+        raise KeyError(f"native authority mapping lacks columns: {missing}")
+    records: list[dict[str, Any]] = []
+    for row in rows.sort_values(["sector", "tic"], kind="stable").itertuples(
+        index=False
+    ):
+        path = Path(str(row.native_h5_path)).expanduser()
+        if not path.is_absolute():
+            raise ValueError("production native mappings must use absolute paths")
+        records.append(
+            {
+                "sector": int(row.sector),
+                "tic": int(row.tic),
+                "native_h5_path": str(path.resolve()),
+                "native_group_path": str(row.native_group_path).strip(),
+                "native_h5_sha256": str(row.native_h5_sha256).strip().lower(),
+                "native_contract_version": str(
+                    row.native_contract_version
+                ).strip(),
+            }
+        )
+    return records
+
+
+def _validate_training_authority_chain(
+    *,
+    eligibility: EligibilityAuthority,
+    native_registry: pd.DataFrame,
+    native_release: Mapping[str, Any],
+    registry: pd.DataFrame,
+    registry_summary: Mapping[str, Any],
+    authority_bindings: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Fail closed unless every production training authority agrees exactly."""
+
+    expected_partition = {
+        "full": {
+            "count": PRODUCTION_FULL_OBSERVATIONS,
+            "identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+        },
+        "eligible": {
+            "count": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+            "identity_sha256": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+        },
+        "excluded": {
+            "count": PRODUCTION_EXCLUDED_OBSERVATIONS,
+            "identity_sha256": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
+        },
+    }
+    observed_partition = {
+        "full": {
+            "count": int(eligibility.n_full),
+            "identity_sha256": (
+                eligibility.full_observation_identity_sha256
+            ),
+        },
+        "eligible": {
+            "count": int(eligibility.n_eligible),
+            "identity_sha256": (
+                eligibility.eligible_observation_identity_sha256
+            ),
+        },
+        "excluded": {
+            "count": int(eligibility.n_excluded),
+            "identity_sha256": (
+                eligibility.excluded_observation_identity_sha256
+            ),
+        },
+    }
+    if observed_partition != expected_partition:
+        raise ValueError(
+            "training eligibility differs from the locked production partition"
+        )
+    if (
+        eligibility.eligible_keys & eligibility.excluded_keys
+        or eligibility.eligible_keys | eligibility.excluded_keys
+        != eligibility.full_keys
+    ):
+        raise ValueError("training eligibility is not an exact partition")
+    for authority_name, eligibility_name in (
+        ("eligibility_exclusions", "exclusions"),
+        ("eligibility_summary", "eligibility_summary"),
+    ):
+        observed = _metadata_from_record(
+            authority_bindings.get(authority_name),
+            context=f"authority_bindings.{authority_name}",
+        )
+        expected = eligibility.bindings[eligibility_name].metadata()
+        if observed != expected:
+            raise ValueError(
+                f"explicit {authority_name} differs from loaded eligibility"
+            )
+
+    full_keys = _observation_keys(registry)
+    include = registry["ssl_pool_include"].astype(bool)
+    included_keys = _observation_keys(registry.loc[include])
+    excluded_keys = _observation_keys(registry.loc[~include])
+    if (
+        full_keys != eligibility.full_keys
+        or included_keys != eligibility.eligible_keys
+        or excluded_keys != eligibility.excluded_keys
+    ):
+        raise ValueError(
+            "final SSL registry does not equal the eligibility partition"
+        )
+    if (
+        registry["is_injected_row"].astype(bool).any()
+        or registry["fixed_test_member"].astype(bool).any()
+        or registry["reserved_prospective_member"].astype(bool).any()
+    ):
+        raise ValueError(
+            "production SSL registry contains forbidden injected or held hosts"
+        )
+    native_columns = (
+        "native_h5_path",
+        "native_group_path",
+        "native_h5_sha256",
+        "native_contract_version",
+    )
+    excluded_native_present = (
+        registry.loc[~include, list(native_columns)]
+        .fillna("")
+        .astype(str)
+        .apply(lambda column: column.str.strip())
+        .ne("")
+        .to_numpy(dtype=bool)
+        .any()
+    )
+    if excluded_native_present:
+        raise ValueError("excluded SSL rows unexpectedly have native mappings")
+    if not registry.loc[
+        ~include, "ssl_pool_exclusion_reason"
+    ].astype(str).eq("bls_unsearchable+native_missing").all():
+        raise ValueError(
+            "final SSL exclusions do not match the locked BLS/native complement"
+        )
+
+    final_mapping = _normalized_native_mapping(registry.loc[include])
+    native_mapping = _normalized_native_mapping(native_registry)
+    if final_mapping != native_mapping:
+        raise ValueError(
+            "final SSL registry native mapping differs from native-v2 release"
+        )
+    mapping_frame = pd.DataFrame.from_records(native_mapping)
+    mapping_sha256 = _frame_sha256(
+        mapping_frame,
+        (
+            "sector",
+            "tic",
+            "native_h5_path",
+            "native_group_path",
+            "native_h5_sha256",
+            "native_contract_version",
+        ),
+    )
+
+    expected_summary_values = {
+        "n_anchor_observations": PRODUCTION_FULL_OBSERVATIONS,
+        "n_ssl_pool_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+        "n_bls_unsearchable_observations": PRODUCTION_EXCLUDED_OBSERVATIONS,
+        "native_model_full_identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+        "native_model_eligible_identity_sha256": (
+            PRODUCTION_ELIGIBLE_IDENTITY_SHA256
+        ),
+        "native_model_excluded_identity_sha256": (
+            PRODUCTION_EXCLUDED_IDENTITY_SHA256
+        ),
+        "canonical_native_registry_sha256": mapping_sha256,
+        "frozen_pool_identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+    }
+    for name, expected in expected_summary_values.items():
+        if registry_summary.get(name) != expected:
+            raise ValueError(
+                f"final SSL registry summary {name} differs from production"
+            )
+    if (
+        registry_summary.get("real_only") is not True
+        or registry_summary.get("labels_consumed") is not False
+        or registry_summary.get("injections_consumed") is not False
+        or int(registry_summary.get("n_injected_observations_excluded", -1))
+        != 0
+    ):
+        raise ValueError("final SSL registry data-usage audit failed")
+    if registry_summary.get("canonical_registry_sha256") != _frame_sha256(
+        registry,
+        FULLPOOL_SSL_REGISTRY_COLUMNS,
+    ):
+        raise ValueError("final SSL registry canonical identity differs")
+
+    release_counts = native_release.get("counts")
+    release_identities = native_release.get("identity_hashes")
+    if not isinstance(release_counts, Mapping) or not isinstance(
+        release_identities, Mapping
+    ):
+        raise ValueError("native-v2 release lacks partition metadata")
+    if {
+        "full": int(release_counts.get("full_observations", -1)),
+        "eligible": int(release_counts.get("eligible_observations", -1)),
+        "excluded": int(release_counts.get("excluded_observations", -1)),
+        "native": int(
+            release_counts.get("native_registry_observations", -1)
+        ),
+    } != {
+        "full": PRODUCTION_FULL_OBSERVATIONS,
+        "eligible": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+        "excluded": PRODUCTION_EXCLUDED_OBSERVATIONS,
+        "native": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+    }:
+        raise ValueError("native-v2 release counts differ from production")
+    if {
+        "full": release_identities.get("full_observations_sha256"),
+        "eligible": release_identities.get("eligible_observations_sha256"),
+        "excluded": release_identities.get("excluded_observations_sha256"),
+        "native": release_identities.get(
+            "native_registry_observations_sha256"
+        ),
+    } != {
+        "full": PRODUCTION_FULL_IDENTITY_SHA256,
+        "eligible": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+        "excluded": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
+        "native": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+    }:
+        raise ValueError("native-v2 release identities differ from production")
+
+    provenance = registry_summary.get("source_provenance")
+    if not isinstance(provenance, Mapping):
+        raise ValueError("final SSL registry summary lacks source provenance")
+    required_provenance = {
+        "frozen_pool": eligibility.bindings["frozen_pool"].metadata(),
+        "frozen_pool_summary": (
+            eligibility.bindings["frozen_pool_summary"].metadata()
+        ),
+        "bls_summary": eligibility.bindings["global_bls_summary"].metadata(),
+        "eligibility_exclusions": authority_bindings[
+            "eligibility_exclusions"
+        ],
+        "eligibility_summary": authority_bindings["eligibility_summary"],
+        "native_registry": authority_bindings["native_registry"],
+        "native_registry_summary": authority_bindings[
+            "native_registry_summary"
+        ],
+        "native_release_summary": authority_bindings[
+            "native_release_summary"
+        ],
+    }
+    for name, expected in required_provenance.items():
+        observed = _metadata_from_record(
+            provenance.get(name),
+            context=f"source_provenance.{name}",
+        )
+        normalized_expected = _metadata_from_record(
+            expected,
+            context=f"authority_bindings.{name}",
+        )
+        if observed != normalized_expected:
+            raise ValueError(
+                f"final SSL registry provenance {name} differs from authority"
+            )
+    for name in ("frozen_split_registry", "reserved_hosts"):
+        _metadata_from_record(
+            provenance.get(name),
+            context=f"source_provenance.{name}",
+        )
+    if "bls_peaks_override" in provenance:
+        if _metadata_from_record(
+            provenance["bls_peaks_override"],
+            context="source_provenance.bls_peaks_override",
+        ) != eligibility.bindings["global_bls"].metadata():
+            raise ValueError(
+                "final SSL registry BLS override differs from eligibility"
+            )
+
+    frozen_binding = provenance.get("frozen_pool_authority_bindings")
+    split_binding = _metadata_from_record(
+        provenance["frozen_split_registry"],
+        context="source_provenance.frozen_split_registry",
+    )
+    reserved_binding = _metadata_from_record(
+        provenance["reserved_hosts"],
+        context="source_provenance.reserved_hosts",
+    )
+    expected_frozen_binding = {
+        "split_registry_sha256_equal": True,
+        "reserved_hosts_sha256_equal": True,
+        "split_registry_sha256": split_binding["sha256"],
+        "reserved_hosts_sha256": reserved_binding["sha256"],
+    }
+    if frozen_binding != expected_frozen_binding:
+        raise ValueError("final SSL frozen-pool provenance binding failed")
+
+    global_bls_binding = provenance.get("global_bls_authority_binding")
+    expected_global_bls_binding = {
+        "summary_path": str(
+            eligibility.bindings["global_bls_summary"].path
+        ),
+        "summary_sha256": (
+            eligibility.bindings["global_bls_summary"].sha256
+        ),
+        "artifact_path": str(eligibility.bindings["global_bls"].path),
+        "artifact_sha256": eligibility.bindings["global_bls"].sha256,
+        "artifact_matches_summary": True,
+        "summary_schema_version": GLOBAL_BLS_SUMMARY_SCHEMA_VERSION,
+        "summary_contract_version": GLOBAL_BLS_CONTRACT_VERSION,
+    }
+    if global_bls_binding != expected_global_bls_binding:
+        raise ValueError("final SSL global-BLS provenance binding failed")
+
+    eligibility_binding = provenance.get(
+        "native_model_eligibility_binding"
+    )
+    expected_eligibility_binding = {
+        "contract_version": eligibility.contract_version,
+        "release_binding": eligibility.release_binding,
+        "full_observations": PRODUCTION_FULL_OBSERVATIONS,
+        "eligible_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+        "excluded_observations": PRODUCTION_EXCLUDED_OBSERVATIONS,
+        "full_observation_identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+        "eligible_observation_identity_sha256": (
+            PRODUCTION_ELIGIBLE_IDENTITY_SHA256
+        ),
+        "excluded_observation_identity_sha256": (
+            PRODUCTION_EXCLUDED_IDENTITY_SHA256
+        ),
+    }
+    if eligibility_binding != expected_eligibility_binding:
+        raise ValueError("final SSL eligibility provenance binding failed")
+
+    native_binding = provenance.get("native_release_binding")
+    expected_native_binding = {
+        "schema_version": native_release.get("schema_version"),
+        "release_binding": native_release.get("release_binding"),
+        "native_contract_version": native_release.get(
+            "native_contract_version"
+        ),
+        "release_summary_sha256": authority_bindings[
+            "native_release_summary"
+        ]["sha256"],
+    }
+    if native_binding != expected_native_binding:
+        raise ValueError("final SSL native-release provenance binding failed")
+
+    return {
+        "schema_version": FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA,
+        "production_lock_passed": True,
+        "partition": expected_partition,
+        "native_mapping_sha256": mapping_sha256,
+        "source_provenance_verified": True,
+        "authority_bindings": {
+            name: dict(metadata)
+            for name, metadata in sorted(authority_bindings.items())
+        },
+    }
+
+
+def _load_training_authority_chain(
+    *,
+    eligibility_exclusions_path: Path,
+    eligibility_summary_path: Path,
+    native_registry_path: Path,
+    native_registry_summary_path: Path,
+    native_release_summary_path: Path,
+    registry_path: Path,
+    registry_summary_path: Path,
+) -> tuple[
+    pd.DataFrame,
+    dict[str, Any],
+    pd.DataFrame,
+    dict[str, Any],
+    dict[str, Any],
+]:
+    paths = {
+        "eligibility_exclusions": eligibility_exclusions_path,
+        "eligibility_summary": eligibility_summary_path,
+        "native_registry": native_registry_path,
+        "native_registry_summary": native_registry_summary_path,
+        "native_release_summary": native_release_summary_path,
+        "registry": registry_path,
+        "registry_summary": registry_summary_path,
+    }
+    authority_bindings = {
+        name: _artifact_metadata(path) for name, path in paths.items()
+    }
+    eligibility = load_native_model_eligibility(
+        authority_bindings["eligibility_exclusions"]["path"],
+        authority_bindings["eligibility_summary"]["path"],
+        production_lock=True,
+        rederive_from_bls=False,
+    )
+    native_registry, native_release = (
+        load_full_pool_native_registry_release(
+            registry_path=authority_bindings["native_registry"]["path"],
+            registry_summary_path=authority_bindings[
+                "native_registry_summary"
+            ]["path"],
+            release_summary_path=authority_bindings[
+                "native_release_summary"
+            ]["path"],
+            eligibility=eligibility,
+            verify_shard_files=False,
+        )
+    )
+    registry, registry_summary = load_fullpool_ssl_registry(
+        registry_path=authority_bindings["registry"]["path"],
+        summary_path=authority_bindings["registry_summary"]["path"],
+    )
+    audit = _validate_training_authority_chain(
+        eligibility=eligibility,
+        native_registry=native_registry,
+        native_release=native_release,
+        registry=registry,
+        registry_summary=registry_summary,
+        authority_bindings=authority_bindings,
+    )
+    return (
+        registry,
+        registry_summary,
+        native_registry,
+        native_release,
+        audit,
+    )
+
+
 def _verify_native_files(
     selected: pd.DataFrame,
-    *,
-    verify_hashes: bool,
 ) -> list[dict[str, Any]]:
+    """Hash selected files and inspect their actual v2 root/group identities."""
+
+    import h5py
+
     records: list[dict[str, Any]] = []
     for path_text, group in selected.groupby("native_h5_path", sort=True):
         path = Path(str(path_text))
         if not path.is_file() or path.stat().st_size <= 0:
             raise FileNotFoundError(f"missing full-pool native file: {path}")
         declared = str(group["native_h5_sha256"].iloc[0])
-        observed = file_sha256(path) if verify_hashes else None
-        if observed is not None and observed != declared:
+        before = path.stat()
+        observed = file_sha256(path)
+        if observed != declared:
             raise ValueError(f"native file hash changed: {path}")
+        with h5py.File(path, "r") as h5:
+            actual_contract = str(h5.attrs.get("contract_version", "")).strip()
+            if actual_contract != FULL_POOL_NATIVE_CONTRACT_VERSION:
+                raise ValueError(
+                    f"selected native file is not native-v2: {path}"
+                )
+            for row in group.itertuples(index=False):
+                if str(row.native_contract_version) != actual_contract:
+                    raise ValueError(
+                        f"selected native contract declaration changed: {path}"
+                    )
+                group_path = str(row.native_group_path)
+                if group_path not in h5 or not isinstance(
+                    h5[group_path], h5py.Group
+                ):
+                    raise KeyError(
+                        f"missing selected native group {group_path!r} in {path}"
+                    )
+                native_group = h5[group_path]
+                actual_key = (
+                    int(native_group.attrs.get("sector", -1)),
+                    int(native_group.attrs.get("tic", -1)),
+                )
+                expected_key = (int(row.sector), int(row.tic))
+                if actual_key != expected_key:
+                    raise ValueError(
+                        "selected native group identity differs from registry: "
+                        f"{path}:{group_path} {actual_key} != {expected_key}"
+                    )
+        after = path.stat()
+        if (
+            int(before.st_size),
+            int(before.st_mtime_ns),
+            int(before.st_dev),
+            int(before.st_ino),
+        ) != (
+            int(after.st_size),
+            int(after.st_mtime_ns),
+            int(after.st_dev),
+            int(after.st_ino),
+        ):
+            raise RuntimeError(
+                f"selected native file changed during verification: {path}"
+            )
         records.append(
             {
                 "native_h5_path": str(path),
                 "native_h5_sha256": declared,
                 "native_h5_size_bytes": int(path.stat().st_size),
-                "hash_verified_now": bool(verify_hashes),
+                "native_contract_version": actual_contract,
+                "hash_verified_now": True,
+                "root_contract_verified_now": True,
+                "group_identities_verified_now": True,
                 "n_selected_observations": int(len(group)),
             }
         )
@@ -1563,6 +2210,58 @@ def _loss_and_components(result: Any) -> tuple[Any, dict[str, float]]:
         except AttributeError:
             components[str(name)] = float(value)
     return loss, components
+
+
+def _assert_finite_loss_and_components(
+    loss: Any,
+    components: Mapping[str, float],
+    *,
+    fold: int,
+    epoch: int,
+    batch_index: int,
+) -> None:
+    """Fail before backpropagation when a training objective is non-finite."""
+
+    import torch
+
+    detached = loss.detach()
+    if detached.numel() != 1 or not bool(torch.isfinite(detached).all().item()):
+        raise FloatingPointError(
+            "non-finite full-pool SSL loss "
+            f"(fold={fold}, epoch={epoch}, batch={batch_index})"
+        )
+    invalid = {
+        str(name): float(value)
+        for name, value in components.items()
+        if not math.isfinite(float(value))
+    }
+    if invalid:
+        raise FloatingPointError(
+            "non-finite full-pool SSL loss components "
+            f"(fold={fold}, epoch={epoch}, batch={batch_index}): {invalid}"
+        )
+
+
+def _assert_finite_module_state(
+    modules: Mapping[str, Any],
+    *,
+    fold: int,
+    epoch: int,
+) -> None:
+    """Reject a numerically invalid encoder/projector before publication."""
+
+    import torch
+
+    for module_name, module in modules.items():
+        for tensor_name, tensor in module.state_dict().items():
+            if not torch.is_tensor(tensor) or not bool(
+                torch.isfinite(tensor.detach()).all().item()
+            ):
+                raise FloatingPointError(
+                    "non-finite full-pool SSL model state "
+                    f"(fold={fold}, epoch={epoch}, "
+                    f"tensor={module_name}.{tensor_name})"
+                )
 
 
 def _projection_head(input_dim: int) -> Any:
@@ -1737,6 +2436,11 @@ def _restore_rng_state(state: Mapping[str, Any]) -> None:
 
 def run_fullpool_ssl_fold(
     *,
+    eligibility_exclusions_path: Path,
+    eligibility_summary_path: Path,
+    native_registry_path: Path,
+    native_registry_summary_path: Path,
+    native_release_summary_path: Path,
     registry_path: Path,
     registry_summary_path: Path,
     out_root: Path,
@@ -1750,7 +2454,6 @@ def run_fullpool_ssl_fold(
     checkpoint_every: int = 1,
     resume: bool = False,
     require_cuda: bool = True,
-    verify_native_hashes: bool = True,
     max_rows: int | None = None,
 ) -> dict[str, Any]:
     """Train or resume one broad-pool fold-local VICReg encoder."""
@@ -1774,22 +2477,34 @@ def run_fullpool_ssl_fold(
     if not np.isfinite(weight_decay) or float(weight_decay) < 0:
         raise ValueError("weight_decay must be finite and nonnegative")
 
-    registry_path = Path(registry_path).expanduser().resolve()
-    registry_summary_path = Path(registry_summary_path).expanduser().resolve()
-    registry, registry_summary = load_fullpool_ssl_registry(
+    (
+        registry,
+        registry_summary,
+        _native_registry,
+        _native_release,
+        authority_audit,
+    ) = _load_training_authority_chain(
+        eligibility_exclusions_path=eligibility_exclusions_path,
+        eligibility_summary_path=eligibility_summary_path,
+        native_registry_path=native_registry_path,
+        native_registry_summary_path=native_registry_summary_path,
+        native_release_summary_path=native_release_summary_path,
         registry_path=registry_path,
-        summary_path=registry_summary_path,
+        registry_summary_path=registry_summary_path,
     )
+    registry_binding = authority_audit["authority_bindings"]["registry"]
+    registry_summary_binding = authority_audit["authority_bindings"][
+        "registry_summary"
+    ]
+    registry_path = Path(registry_binding["path"])
+    registry_summary_path = Path(registry_summary_binding["path"])
     selected, selection_audit = select_fullpool_ssl_fold(
         registry,
         held_out_fold=fold,
         max_rows=max_rows,
     )
     dataset_rows = fullpool_dataset_rows(selected)
-    native_files = _verify_native_files(
-        selected,
-        verify_hashes=bool(verify_native_hashes),
-    )
+    native_files = _verify_native_files(selected)
     fold_seed = int(seed) + 1000 * fold
     code_revision = _code_revision()
     model_config = HarmonicModelConfig(metadata_dim=0)
@@ -1806,15 +2521,18 @@ def run_fullpool_ssl_fold(
         "profile": FULLPOOL_SSL_PROFILE,
         "fold": fold,
         "registry_path": str(registry_path),
-        "registry_sha256": file_sha256(registry_path),
+        "registry_sha256": registry_binding["sha256"],
         "registry_summary_path": str(registry_summary_path),
-        "registry_summary_sha256": file_sha256(registry_summary_path),
+        "registry_summary_sha256": registry_summary_binding["sha256"],
         "registry_summary_schema": registry_summary.get(
             "summary_schema_version"
         ),
+        "training_authority": authority_audit,
         "selection_audit": selection_audit,
         "native_files": native_files,
-        "native_hashes_verified_now": bool(verify_native_hashes),
+        "native_hashes_verified_now": True,
+        "native_root_contracts_verified_now": True,
+        "native_group_identities_verified_now": True,
         "model_config": asdict(model_config),
         "augmentation_config": asdict(augmentation_config),
         "vicreg_config": asdict(vicreg_config),
@@ -1958,6 +2676,13 @@ def run_fullpool_ssl_fold(
                         config=vicreg_config,
                     )
                 )
+                _assert_finite_loss_and_components(
+                    loss,
+                    components,
+                    fold=fold,
+                    epoch=epoch,
+                    batch_index=batch_index,
+                )
                 loss.backward()
                 optimizer.step()
                 count = len(raw_batch["review_id"])
@@ -1978,6 +2703,22 @@ def run_fullpool_ssl_fold(
                     for name, value in totals.items()
                 },
             }
+            invalid_record = {
+                name: value
+                for name, value in record.items()
+                if name not in {"epoch", "n_observations"}
+                and not math.isfinite(float(value))
+            }
+            if invalid_record:
+                raise FloatingPointError(
+                    "non-finite full-pool SSL epoch metrics "
+                    f"(fold={fold}, epoch={epoch}): {invalid_record}"
+                )
+            _assert_finite_module_state(
+                {"encoder": model, "projector": projector},
+                fold=fold,
+                epoch=epoch,
+            )
             history.append(record)
             print(
                 f"[teacher_ssl_fullpool fold={fold}] epoch={epoch}/{epochs} "
