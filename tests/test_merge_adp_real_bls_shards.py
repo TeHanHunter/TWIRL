@@ -11,10 +11,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = (
-    REPO_ROOT
-    / "scripts"
-    / "stage5_validation"
-    / "merge_adp_real_bls_shards.py"
+    REPO_ROOT / "scripts" / "stage5_validation" / "merge_adp_real_bls_shards.py"
 )
 
 
@@ -99,6 +96,59 @@ def _write_shards(tmp_path: Path) -> tuple[object, Path]:
             encoding="utf-8",
         )
     return module, shard_dir
+
+
+def _write_fullpool_shards(
+    tmp_path: Path,
+) -> tuple[object, Path, Path]:
+    module, shard_dir = _write_shards(tmp_path)
+    allowlist_path = tmp_path / "allowlist.txt"
+    allowlist_path.write_text("1001\n1002\n", encoding="utf-8")
+    selected_tics = [1001, 1002]
+    for shard_index, tic in enumerate(selected_tics):
+        table_path = shard_dir / f"real_adp_bls_peaks_{shard_index:03d}.parquet"
+        frame = pd.read_parquet(table_path)
+        frame["orbitid_policy"] = "reference_by_cadence"
+        frame["orbitid_reconciliation_contract_version"] = (
+            module._ORBITID_RECONCILIATION_CONTRACT_VERSION
+        )
+        frame["n_cad_orbitid_reference_matched"] = 100
+        frame["n_cad_orbitid_mismatch"] = shard_index
+        frame["n_cad_orbitid_corrected"] = shard_index
+        frame["orbitid_correction_signature_sha256"] = hashlib.sha256(
+            f"tic={tic};mismatch={shard_index}".encode("ascii")
+        ).hexdigest()
+        frame.to_parquet(table_path, index=False)
+
+        summary_path = shard_dir / f"summary_{shard_index:03d}.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary.update(
+            {
+                "target_selection_contract_version": (
+                    module._TARGET_SELECTION_CONTRACT_VERSION
+                ),
+                "target_allowlist": str(allowlist_path),
+                "target_allowlist_sha256": _sha256(allowlist_path),
+                "target_allowlist_count": len(selected_tics),
+                "target_allowlist_tics_sha256": (
+                    module._tic_inventory_sha256(selected_tics)
+                ),
+                "orbitid_policy": "reference_by_cadence",
+                "orbitid_reconciliation_contract_version": (
+                    module._ORBITID_RECONCILIATION_CONTRACT_VERSION
+                ),
+                "peak_table_sha256": _sha256(table_path),
+                **module._orbitid_summary_from_rows(
+                    frame,
+                    orbitid_policy="reference_by_cadence",
+                ),
+            }
+        )
+        summary_path.write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return module, shard_dir, allowlist_path
 
 
 def test_merge_revalidates_provenance_and_emits_validator_summary(
@@ -194,6 +244,81 @@ def test_merge_rejects_shard_table_hash_mismatch(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="peak-table SHA256 mismatch"):
+        module.merge_shards(
+            shard_dir=shard_dir,
+            out_path=tmp_path / "merged.parquet",
+            n_shards=2,
+        )
+
+
+def test_merge_enforces_fullpool_allowlist_and_orbitid_provenance(
+    tmp_path: Path,
+) -> None:
+    module, shard_dir, allowlist_path = _write_fullpool_shards(tmp_path)
+    out_path = tmp_path / "merged-fullpool.parquet"
+
+    summary = module.merge_shards(
+        shard_dir=shard_dir,
+        out_path=out_path,
+        n_shards=2,
+    )
+
+    assert summary["target_allowlist"] == str(allowlist_path)
+    assert summary["target_allowlist_sha256"] == _sha256(allowlist_path)
+    assert summary["target_allowlist_count"] == 2
+    assert summary["orbitid_policy"] == "reference_by_cadence"
+    assert summary["n_cad_orbitid_reference_matched"] == 200
+    assert summary["n_cad_orbitid_mismatch"] == 1
+    assert summary["n_cad_orbitid_corrected"] == 1
+    assert summary["n_targets_orbitid_mismatch"] == 1
+    assert len(summary["orbitid_corrections_sha256"]) == 64
+
+
+def test_merge_rejects_changed_allowlist(tmp_path: Path) -> None:
+    module, shard_dir, allowlist_path = _write_fullpool_shards(tmp_path)
+    allowlist_path.write_text("1001\n1003\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="allowlist SHA256 mismatch"):
+        module.merge_shards(
+            shard_dir=shard_dir,
+            out_path=tmp_path / "merged.parquet",
+            n_shards=2,
+        )
+
+
+def test_merge_rejects_orbitid_policy_invariant_disagreement(
+    tmp_path: Path,
+) -> None:
+    module, shard_dir, _ = _write_fullpool_shards(tmp_path)
+    summary_path = shard_dir / "summary_001.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["orbitid_policy"] = "strict"
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="provenance field orbitid_policy"):
+        module.merge_shards(
+            shard_dir=shard_dir,
+            out_path=tmp_path / "merged.parquet",
+            n_shards=2,
+        )
+
+
+def test_merge_rejects_orbitid_correction_summary_mismatch(
+    tmp_path: Path,
+) -> None:
+    module, shard_dir, _ = _write_fullpool_shards(tmp_path)
+    summary_path = shard_dir / "summary_001.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["n_cad_orbitid_corrected"] = 0
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="orbit-ID summary mismatch"):
         module.merge_shards(
             shard_dir=shard_dir,
             out_path=tmp_path / "merged.parquet",

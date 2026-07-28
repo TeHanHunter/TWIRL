@@ -21,10 +21,7 @@ from twirl.lightcurves.a2v1_cadence_reference import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = (
-    REPO_ROOT
-    / "scripts"
-    / "stage5_validation"
-    / "build_s56_adp_real_bls_peaks.py"
+    REPO_ROOT / "scripts" / "stage5_validation" / "build_s56_adp_real_bls_peaks.py"
 )
 
 
@@ -68,6 +65,17 @@ def _write_compact(path: Path, *, n_cadences: int = 220) -> tuple[int, np.ndarra
         group.create_dataset("DET_FLUX_ADP_SML", data=flux)
         group.create_dataset("DET_FLUX_ADP", data=flux)
     return tic, cadences
+
+
+def _copy_compact_target(path: Path, *, source_tic: int, target_tic: int) -> None:
+    with h5py.File(path, "r+") as h5:
+        targets = h5["targets"]
+        targets.copy(
+            targets[f"{source_tic:016d}"],
+            targets,
+            name=f"{target_tic:016d}",
+        )
+        targets[f"{target_tic:016d}"].attrs["tic"] = int(target_tic)
 
 
 def _reference_frame(cadences: np.ndarray) -> pd.DataFrame:
@@ -137,9 +145,7 @@ def _write_reference_pair(
         "orbits": sorted(set(frame["orbitid"].astype(int))),
         "n_nonzero_spoc_quality": int(np.count_nonzero(frame["spoc_quality"])),
         "n_nonzero_qlp_quality": int(np.count_nonzero(frame["qlp_quality"])),
-        "n_nonzero_external_quality": int(
-            np.count_nonzero(external_quality)
-        ),
+        "n_nonzero_external_quality": int(np.count_nonzero(external_quality)),
         "n_spoc_rows_excluded_by_quat": len(exclusion_rows),
         "authority_exclusions": authority_exclusions,
         "authority_exclusions_sha256": exclusions_sha256,
@@ -183,6 +189,19 @@ def _fake_bls_runner(captured_quality: list[np.ndarray]):
             status="ok",
             peaks=[],
         )
+
+    return run
+
+
+def _fake_bls_runner_with_orbits(
+    captured_quality: list[np.ndarray],
+    captured_orbits: list[np.ndarray],
+):
+    base_runner = _fake_bls_runner(captured_quality)
+
+    def run(lc, cfg, *, aperture):
+        captured_orbits.append(np.asarray(lc.orbitid).copy())
+        return base_runner(lc, cfg, aperture=aperture)
 
     return run
 
@@ -245,9 +264,7 @@ def test_exact_declared_authority_exclusion_is_masked_before_bls(
     table_path, manifest_path = _write_reference_pair(
         tmp_path,
         incomplete,
-        authority_exclusion_rows=[
-            {"cadenceno": excluded_cadence, "spoc_quality": 0}
-        ],
+        authority_exclusion_rows=[{"cadenceno": excluded_cadence, "spoc_quality": 0}],
     )
     reference, provenance = module.load_external_quality_reference(
         table_path=table_path, manifest_path=manifest_path, sector=56
@@ -303,6 +320,79 @@ def test_missing_external_cadence_coverage_fails_closed(
         module._process_target((tic, str(compact_path), _cfg_payload()))
 
 
+def test_strict_orbitid_policy_rejects_reference_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    compact_path = tmp_path / "compact.h5"
+    tic, cadences = _write_compact(compact_path)
+    reference_frame = _reference_frame(cadences)
+    reference_frame.loc[5, "orbitid"] = 120
+    table_path, manifest_path = _write_reference_pair(tmp_path, reference_frame)
+    reference, provenance = module.load_external_quality_reference(
+        table_path=table_path, manifest_path=manifest_path, sector=56
+    )
+    module._initialize_external_quality_worker(
+        module._reference_worker_payload(reference),
+        provenance,
+        "strict",
+    )
+    monkeypatch.setattr(module, "run_bls_on_lc", _fake_bls_runner([]))
+
+    with pytest.raises(ValueError, match="orbit mapping mismatch"):
+        module._process_target((tic, str(compact_path), _cfg_payload()))
+
+
+def test_reference_by_cadence_corrects_only_matched_orbitids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    compact_path = tmp_path / "compact.h5"
+    tic, cadences = _write_compact(compact_path)
+    with h5py.File(compact_path, "r+") as h5:
+        h5["targets"][f"{tic:016d}"]["orbitid"][-1] = 999
+    excluded_cadence = int(cadences[-1])
+    reference_frame = _reference_frame(cadences)
+    reference_frame.loc[5, "orbitid"] = 120
+    reference_frame = reference_frame.iloc[:-1].copy()
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path,
+        reference_frame,
+        authority_exclusion_rows=[{"cadenceno": excluded_cadence, "spoc_quality": 0}],
+    )
+    reference, provenance = module.load_external_quality_reference(
+        table_path=table_path, manifest_path=manifest_path, sector=56
+    )
+    module._initialize_external_quality_worker(
+        module._reference_worker_payload(reference),
+        provenance,
+        "reference_by_cadence",
+    )
+    captured_quality: list[np.ndarray] = []
+    captured_orbits: list[np.ndarray] = []
+    monkeypatch.setattr(
+        module,
+        "run_bls_on_lc",
+        _fake_bls_runner_with_orbits(captured_quality, captured_orbits),
+    )
+
+    rows = module._process_target((tic, str(compact_path), _cfg_payload()))
+
+    assert len(captured_orbits) == 2
+    for reconciled in captured_orbits:
+        assert int(reconciled[5]) == 120
+        assert int(reconciled[-1]) == 999
+    assert {row["orbitid_policy"] for row in rows} == {"reference_by_cadence"}
+    assert {row["n_cad_orbitid_reference_matched"] for row in rows} == {
+        len(cadences) - 1
+    }
+    assert {row["n_cad_orbitid_mismatch"] for row in rows} == {1}
+    assert {row["n_cad_orbitid_corrected"] for row in rows} == {1}
+    signatures = {row["orbitid_correction_signature_sha256"] for row in rows}
+    assert len(signatures) == 1
+    assert len(signatures.pop()) == 64
+
+
 def test_reference_rejects_declared_exclusion_still_present_in_table(
     tmp_path: Path,
 ) -> None:
@@ -311,9 +401,7 @@ def test_reference_rejects_declared_exclusion_still_present_in_table(
     table_path, manifest_path = _write_reference_pair(
         tmp_path,
         _reference_frame(cadences),
-        authority_exclusion_rows=[
-            {"cadenceno": int(cadences[-1]), "spoc_quality": 0}
-        ],
+        authority_exclusion_rows=[{"cadenceno": int(cadences[-1]), "spoc_quality": 0}],
     )
 
     with pytest.raises(ValueError, match="is still present in the table"):
@@ -346,9 +434,7 @@ def test_reference_rejects_authority_exclusion_hash_mismatch(
 def test_reference_rejects_legacy_generic_quality_column(tmp_path: Path) -> None:
     module = _load_module()
     _, cadences = _write_compact(tmp_path / "compact.h5")
-    frame = _reference_frame(cadences).rename(
-        columns={"external_quality": "quality"}
-    )
+    frame = _reference_frame(cadences).rename(columns={"external_quality": "quality"})
     table_path, manifest_path = _write_reference_pair(tmp_path, frame)
 
     with pytest.raises(ValueError, match="columns must be exactly"):
@@ -402,12 +488,13 @@ def test_summary_and_resume_bind_all_quality_inputs(
     )
     assert summary["n_authority_exclusions"] == 0
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert summary["authority_exclusions_sha256"] == (
-        manifest["authority_exclusions_sha256"]
+    assert (
+        summary["authority_exclusions_sha256"]
+        == (manifest["authority_exclusions_sha256"])
     )
-    assert summary["quality_counts_over_unique_targets"][
-        "n_cad_authority_excluded"
-    ] == 0
+    assert (
+        summary["quality_counts_over_unique_targets"]["n_cad_authority_excluded"] == 0
+    )
     assert summary["peak_table_sha256"] == _sha256(
         Path(summary["outputs"]["peak_table"])
     )
@@ -431,3 +518,101 @@ def test_summary_and_resume_bind_all_quality_inputs(
         source_product_tag="A2v1-test",
     )
     assert resumed == summary
+
+
+def test_target_allowlist_is_hash_bound_and_exactly_covered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    compact_path = tmp_path / "compact.h5"
+    source_tic, cadences = _write_compact(compact_path)
+    selected_tic = source_tic + 1
+    _copy_compact_target(
+        compact_path,
+        source_tic=source_tic,
+        target_tic=selected_tic,
+    )
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path, _reference_frame(cadences)
+    )
+    allowlist_path = tmp_path / "allowlist.csv"
+    pd.DataFrame({"tic": [selected_tic], "reason": ["fullpool-development"]}).to_csv(
+        allowlist_path, index=False
+    )
+    monkeypatch.setattr(module, "run_bls_on_lc", _fake_bls_runner([]))
+
+    summary = module.build_peak_table(
+        compact_lc=compact_path,
+        cadence_reference=table_path,
+        cadence_reference_manifest=manifest_path,
+        out_dir=tmp_path / "output",
+        workers=1,
+        n_periods=50,
+        n_peaks=2,
+        max_targets=None,
+        progress_every=0,
+        resume=False,
+        source_product_tag="A2v1-test",
+        target_allowlist=allowlist_path,
+        expected_compact_lc_sha256=_sha256(compact_path),
+        expected_target_allowlist_sha256=_sha256(allowlist_path),
+    )
+
+    output = pd.read_parquet(summary["outputs"]["peak_table"])
+    assert set(output["tic"].astype(int)) == {selected_tic}
+    assert summary["n_targets"] == summary["n_targets_total"] == 1
+    assert summary["target_allowlist_count"] == 1
+    assert summary["target_allowlist_sha256"] == _sha256(allowlist_path)
+    assert summary["target_allowlist_tics_sha256"] == (
+        module._tic_inventory_sha256([selected_tic])
+    )
+
+    with pytest.raises(RuntimeError, match="compact light-curve SHA-256"):
+        module.build_peak_table(
+            compact_lc=compact_path,
+            cadence_reference=table_path,
+            cadence_reference_manifest=manifest_path,
+            out_dir=tmp_path / "wrong-compact-contract",
+            workers=1,
+            n_periods=50,
+            n_peaks=2,
+            max_targets=None,
+            progress_every=0,
+            resume=False,
+            source_product_tag="A2v1-test",
+            target_allowlist=allowlist_path,
+            expected_compact_lc_sha256="0" * 64,
+        )
+    with pytest.raises(RuntimeError, match="target-allowlist SHA-256"):
+        module.build_peak_table(
+            compact_lc=compact_path,
+            cadence_reference=table_path,
+            cadence_reference_manifest=manifest_path,
+            out_dir=tmp_path / "wrong-allowlist-contract",
+            workers=1,
+            n_periods=50,
+            n_peaks=2,
+            max_targets=None,
+            progress_every=0,
+            resume=False,
+            source_product_tag="A2v1-test",
+            target_allowlist=allowlist_path,
+            expected_target_allowlist_sha256="0" * 64,
+        )
+
+    pd.DataFrame({"tic": [selected_tic + 1000]}).to_csv(allowlist_path, index=False)
+    with pytest.raises(ValueError, match="not exactly covered"):
+        module.build_peak_table(
+            compact_lc=compact_path,
+            cadence_reference=table_path,
+            cadence_reference_manifest=manifest_path,
+            out_dir=tmp_path / "missing-output",
+            workers=1,
+            n_periods=50,
+            n_peaks=2,
+            max_targets=None,
+            progress_every=0,
+            resume=False,
+            source_product_tag="A2v1-test",
+            target_allowlist=allowlist_path,
+        )

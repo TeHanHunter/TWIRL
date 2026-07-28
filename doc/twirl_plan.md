@@ -48,12 +48,18 @@ Last reconciled: `2026-07-27`.
   `0.809` over metadata only; Planet-like recall remains descriptive at
   `8/14`. Teacher v3 is frozen for enrichment only: automatic promotion is
   disabled and student training is blocked. The development-only
-  `teacher_ssl_v1` experiment (model-facing name **Teacher v4-SSL**) is
-  preregistered as a possible companion enrichment model. Its fold-local
-  native pilot ignores labels during VICReg pretraining, leaves the fixed test
-  and S63 out of model use, and is running on one H200 as ORCD job `19000602`
-  from exact Git object `634e865f`. It cannot be promoted until the full
-  geometry, confound, injection-retention, and WD 1856 gates are evaluated.
+  `teacher_ssl_v1` experiment (model-facing name **Teacher v4-SSL**) remains a
+  possible companion enrichment model. Its completed `6,168`-observation
+  native run established the fold-local VICReg infrastructure but is too
+  selected and too small to answer the broad-representation question. The
+  active experiment is therefore a checksum-frozen, leakage-safe S56--S62
+  full-pool run: start from the `212,049` compact real observations, exclude
+  every fixed-test and prospectively reserved S63 host across all sectors,
+  rerun the locked BLS preprocessing, and pretrain five independent fold
+  encoders with up to four one-H200 jobs concurrently. Labels, injections,
+  fixed-test tensors, and S63 tensors remain forbidden during pretraining.
+  Teacher v3 stays operational until supervised fine-tuning and the matched
+  preregistered comparison pass.
   The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
   v2 was completed as an
   exploratory comparison but missed
@@ -270,13 +276,14 @@ source, and exact input provenance.
   versioned data/label manifest, TIC-grouped splits, source-separated
   evaluation, probability calibration, and bootstrap uncertainty before
   changing model architecture.
-- Treat `teacher_ssl_v1` / **Teacher v4-SSL** as a development-only
-  representation experiment on the frozen active S56--S62 candidate pool.
-  Keep Teacher v3 as the operational baseline, forbid fixed-test and S63 model
-  use, and do not generate pseudo-labels. The initial one-H200 run only
-  collects fold-local embeddings and matched development comparisons; a
-  separate preregistered evaluator must complete the permutation, confound,
-  collapse, review-budget, injection, and WD 1856 gates before interpretation.
+- Treat **Teacher v4-SSL full-pool** as a development-only representation
+  experiment over the broad leakage-safe S56--S62 real-light-curve pool, not
+  only the previously selected labeled-candidate pool. Freeze whole-TIC
+  fixed-test and prospective-S63 exclusions before BLS or tensor construction;
+  ignore development labels during VICReg pretraining; do not use injections
+  or generate pseudo-labels. The five fold encoders must be fine-tuned only on
+  the existing frozen labels and compared with Teacher v3 on matched
+  development support before any fixed-test or prospective evaluation.
 - Report a label-policy sensitivity check for the dominant S57--S59
   `uncertain` return (`2,106/3,000` rows): compare the accepted
   uncertain-as-other mapping with masking those rows.
@@ -393,11 +400,14 @@ Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
 parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
 queue does not block the S56--S62 candidate/teacher critical path below.
 
-1. Complete the development-only Teacher v4-SSL native pilot and its
-   preregistered follow-up evaluator without opening fixed-test or S63 model
-   tensors. Keep it only if the representation is non-collapsed, not dominated
-   by nuisance variables, and preserves Teacher v3 enrichment performance.
-   Additional manual labeling is not part of this step.
+1. Freeze and run the leakage-safe Teacher v4-SSL full-pool experiment:
+   checksum the S56--S62 compact population and whole-TIC exclusions, run the
+   locked two-aperture BLS preprocessing, build quality-aware native inputs,
+   pass a bounded throughput smoke, and pretrain five fold encoders with at
+   most four one-H200 jobs concurrently. Then fine-tune on the existing frozen
+   labels and compare with Teacher v3 on matched development support without
+   opening fixed-test or S63 model tensors. Additional manual labeling is not
+   part of this step.
 2. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
    the hash-bound morphology corpus plus the enrichment-only candidate
    table/TIC index, preserving the raw edit log and all source provenance.

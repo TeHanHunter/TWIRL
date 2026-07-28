@@ -1246,7 +1246,20 @@ def read_native_light_curve_from_h5(
     """Read one native light curve from an already-open read-only HDF5 file."""
 
     contract = str(h5.attrs.get("contract_version", ""))
+    full_pool_contract = False
     if contract != RAW_PAIR_CONTRACT_VERSION:
+        # The broad SSL pool intentionally has a separate real-only contract.
+        # Its S62 reconciliation is validated per cadence, while the legacy
+        # RAW_PAIR_CONTRACT_VERSION path below retains the exact immutable
+        # Teacher-v3 997-row release binding.
+        from twirl.vetting.ssl_full_pool_native import (
+            FULL_POOL_NATIVE_CONTRACT_VERSION,
+            full_pool_native_group_failures,
+            full_pool_native_root_failures,
+        )
+
+        full_pool_contract = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
+    if contract != RAW_PAIR_CONTRACT_VERSION and not full_pool_contract:
         raise ValueError(f"unexpected native input contract {contract!r}")
     if str(h5.attrs.get("time_system", "")) != "BJD":
         raise ValueError("native input contract must declare time_system='BJD'")
@@ -1256,9 +1269,13 @@ def read_native_light_curve_from_h5(
             "native input external-quality contract failed: "
             + "; ".join(quality_failures)
         )
-    orbitid_failures, orbitid_policy = _orbitid_reconciliation_root_failures(
-        h5.attrs
-    )
+    if full_pool_contract:
+        orbitid_failures = full_pool_native_root_failures(h5.attrs)
+        orbitid_policy = str(h5.attrs.get("orbitid_reconciliation_policy", ""))
+    else:
+        orbitid_failures, orbitid_policy = (
+            _orbitid_reconciliation_root_failures(h5.attrs)
+        )
     if orbitid_failures:
         raise ValueError(
             "native input orbitid reconciliation contract failed: "
@@ -1274,11 +1291,18 @@ def read_native_light_curve_from_h5(
     group_quality_failures = _external_quality_group_failures(
         group, context=f"/{group_path}"
     )
-    group_orbitid_failures, _ = _orbitid_reconciliation_group_failures(
-        group,
-        context=f"/{group_path}",
-        root_policy=orbitid_policy,
-    )
+    if full_pool_contract:
+        group_orbitid_failures, _ = full_pool_native_group_failures(
+            group,
+            context=f"/{group_path}",
+            root_policy=orbitid_policy,
+        )
+    else:
+        group_orbitid_failures, _ = _orbitid_reconciliation_group_failures(
+            group,
+            context=f"/{group_path}",
+            root_policy=orbitid_policy,
+        )
     if group_quality_failures or group_orbitid_failures:
         raise ValueError(
             "native group contract failed: "
