@@ -199,6 +199,10 @@ def test_fullpool_controller_is_noninteractive_and_canary_gated() -> None:
     assert "submit-preprocess" in controller
     assert "slurm_teacher_ssl_fullpool_freeze_cpu.sbatch" in controller
     assert "slurm_teacher_ssl_fullpool_bls_canary_cpu.sbatch" in controller
+    assert 'cd \\"\\${repo}\\"' in controller
+    assert controller.index('cd \\"\\${repo}\\"') < controller.index(
+        "freeze=\\$(sbatch"
+    )
     assert "--dependency=afterok:\\${freeze}" in controller
     assert "--dependency=afterok:\\${canary}" in controller
     assert "--dependency=afterok:\\${bls}" in controller

@@ -194,6 +194,7 @@ case "${ACTION}" in
       [[ -z \$(git -C \"\${repo}\" status --porcelain=v1 --untracked-files=all) ]]
       [[ \$(sha256sum '${REMOTE_PREREG}/s63_reserved_tics.txt' | awk '{print \$1}') == '${S63_TICS_SHA256}' ]]
       [[ \$(sha256sum '${REMOTE_PREREG}/s63_reserved_tics.summary.json' | awk '{print \$1}') == '${S63_SUMMARY_SHA256}' ]]
+      cd \"\${repo}\"
       mkdir -p '${TWIRL_ROOT}/logs'
       export_arg='ALL,TWIRL_ORCD_REPO=${REMOTE_REPO},TWIRL_SSL_FULLPOOL_RUN_ROOT=${RUN_ROOT}'
       freeze=\$(sbatch --parsable --export=\"\${export_arg}\" scripts/orcd/slurm_teacher_ssl_fullpool_freeze_cpu.sbatch)
