@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 from collections.abc import Mapping, Sequence
 import hashlib
-import io
 import json
 import os
 from pathlib import Path
@@ -16,6 +15,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +43,9 @@ from twirl.vetting.ssl_full_pool_numeric import (  # noqa: E402
     MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
     MODEL_INPUT_NUMERIC_ENVELOPE_SHA256,
     MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+    normalize_numeric_audit_frame,
+    numeric_audit_parquet_bytes,
+    read_numeric_audit_parquet,
     validate_numeric_gate_release,
 )
 from twirl.vetting.teacher_native_registry import file_sha256  # noqa: E402
@@ -211,30 +214,27 @@ def _publish_immutable(path: Path, payload: bytes) -> None:
 
 
 def _parquet_bytes(frame: pd.DataFrame) -> bytes:
-    buffer = io.BytesIO()
-    frame.to_parquet(buffer, index=False)
-    return buffer.getvalue()
+    return numeric_audit_parquet_bytes(frame)
 
 
-def _validate_numeric_audit_frame(frame: pd.DataFrame) -> None:
-    if tuple(frame.columns) != AUDIT_COLUMNS:
-        raise ValueError("numeric audit table has the wrong exact schema")
+def _validate_numeric_audit_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    normalized = normalize_numeric_audit_frame(frame)
     observed_dtypes = {
-        name: str(frame[name].dtype) for name in AUDIT_COLUMNS
+        name: str(normalized[name].dtype) for name in AUDIT_COLUMNS
     }
     if observed_dtypes != AUDIT_DTYPES:
         raise ValueError("numeric audit table has the wrong exact dtypes")
     if (
-        len(frame) != PRODUCTION_FULL_OBSERVATIONS
-        or frame["ssl_observation_id"].duplicated().any()
-        or frame[["sector", "tic"]].duplicated().any()
-        or observation_identity_sha256(frame)
+        len(normalized) != PRODUCTION_FULL_OBSERVATIONS
+        or normalized["ssl_observation_id"].duplicated().any()
+        or normalized[["sector", "tic"]].duplicated().any()
+        or observation_identity_sha256(normalized)
         != PRODUCTION_FULL_IDENTITY_SHA256
     ):
         raise ValueError("numeric audit table differs from the full pool")
-    include = frame["ssl_pool_include"].astype(bool)
-    included = frame.loc[include]
-    excluded = frame.loc[~include]
+    include = normalized["ssl_pool_include"].astype(bool)
+    included = normalized.loc[include]
+    excluded = normalized.loc[~include]
     if (
         len(included) != PRODUCTION_ELIGIBLE_OBSERVATIONS
         or observation_identity_sha256(included)
@@ -258,6 +258,7 @@ def _validate_numeric_audit_frame(frame: pd.DataFrame) -> None:
         or not excluded["failures_json"].eq("[]").all()
     ):
         raise ValueError("numeric audit excluded partition is invalid")
+    return normalized
 
 
 def _validate_passed_shard_rows(
@@ -627,10 +628,11 @@ def merge_numeric_release(
         if audit_out is not None
         else release_out.parent / "model_input_numeric_audit.parquet"
     )
-    _validate_numeric_audit_frame(audit)
+    audit = _validate_numeric_audit_frame(audit)
     if audit_out.exists():
-        existing_audit = pd.read_parquet(audit_out)
-        _validate_numeric_audit_frame(existing_audit)
+        existing_audit = _validate_numeric_audit_frame(
+            read_numeric_audit_parquet(audit_out)
+        )
         try:
             pd.testing.assert_frame_equal(
                 existing_audit,
@@ -646,7 +648,7 @@ def merge_numeric_release(
     else:
         audit_payload = _parquet_bytes(audit)
         _validate_numeric_audit_frame(
-            pd.read_parquet(io.BytesIO(audit_payload))
+            read_numeric_audit_parquet(pa.BufferReader(audit_payload))
         )
         _publish_immutable(audit_out, audit_payload)
     audit_sha256 = hashlib.sha256(audit_payload).hexdigest()

@@ -92,7 +92,11 @@ def _registry_inputs(
                 "native_group_path": (
                     f"/observations/s{int(row.sector):04d}/tic{int(row.tic)}"
                 ),
-                "native_h5_sha256": f"{int(row.sector) % 10}" * 64,
+                # Keep the synthetic SHA string-valued through CSV round trips.
+                # A digits-only 64-character fixture can be inferred as numeric.
+                "native_h5_sha256": (
+                    "a" + f"{int(row.sector) % 10}" * 63
+                ),
                 "native_contract_version": (
                     fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION
                 ),

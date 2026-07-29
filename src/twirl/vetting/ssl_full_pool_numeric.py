@@ -17,6 +17,8 @@ from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from twirl.vetting.harmonic_dataset import collate_native_samples
 from twirl.vetting.harmonic_inputs import (
@@ -81,6 +83,26 @@ _MODEL_INPUT_NUMERIC_AUDIT_DTYPES: tuple[str, ...] = (
     "float64",
     "float64",
     "float64",
+)
+MODEL_INPUT_NUMERIC_AUDIT_ARROW_SCHEMA = pa.schema(
+    [
+        pa.field("ssl_observation_id", pa.string(), nullable=False),
+        pa.field("sector", pa.int64(), nullable=False),
+        pa.field("tic", pa.int64(), nullable=False),
+        pa.field("ssl_pool_include", pa.bool_(), nullable=False),
+        pa.field("numeric_status", pa.string(), nullable=False),
+        pa.field(
+            "model_input_numeric_passed",
+            pa.bool_(),
+            nullable=True,
+        ),
+        pa.field("n_failures", pa.int64(), nullable=False),
+        pa.field("failure_codes", pa.string(), nullable=False),
+        pa.field("failures_json", pa.string(), nullable=False),
+        pa.field("harmonic_max_abs", pa.float64(), nullable=True),
+        pa.field("local_max_abs", pa.float64(), nullable=True),
+        pa.field("periodogram_max_abs", pa.float64(), nullable=True),
+    ]
 )
 _MODEL_INPUT_NUMERIC_AUDIT_TEXT_COLUMNS: tuple[str, ...] = (
     "ssl_observation_id",
@@ -185,6 +207,92 @@ def _canonical_sha256(value: Mapping[str, Any]) -> str:
 MODEL_INPUT_NUMERIC_ENVELOPE_SHA256 = _canonical_sha256(
     FULL_POOL_NUMERIC_ENVELOPE_V1.as_dict()
 )
+
+
+def normalize_numeric_audit_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return one version-stable pandas view of the exact audit schema.
+
+    Pandas 2.x materializes Arrow strings as ``object`` while pandas 3.x
+    materializes the same physical Parquet strings as ``str``.  The storage
+    contract is therefore expressed by
+    :data:`MODEL_INPUT_NUMERIC_AUDIT_ARROW_SCHEMA`; this helper separately
+    verifies scalar semantics and normalizes the pandas-only representation.
+    """
+
+    if tuple(frame.columns) != _MODEL_INPUT_NUMERIC_AUDIT_COLUMNS:
+        raise ValueError("numeric audit table has the wrong exact schema")
+    normalized = frame.copy()
+    for name in _MODEL_INPUT_NUMERIC_AUDIT_TEXT_COLUMNS:
+        if normalized[name].isna().any() or not normalized[name].map(
+            lambda value: type(value) is str
+        ).all():
+            raise ValueError(f"numeric audit column {name} must contain strings")
+        normalized[name] = normalized[name].astype("object")
+
+    pass_values = normalized["model_input_numeric_passed"].tolist()
+    if any(
+        not pd.isna(value) and type(value) not in (bool, np.bool_)
+        for value in pass_values
+    ):
+        raise ValueError(
+            "numeric audit model_input_numeric_passed must contain "
+            "booleans or nulls"
+        )
+    normalized["model_input_numeric_passed"] = pd.array(
+        pass_values,
+        dtype="boolean",
+    )
+    observed_dtypes = tuple(
+        str(normalized[name].dtype)
+        for name in _MODEL_INPUT_NUMERIC_AUDIT_COLUMNS
+    )
+    if observed_dtypes != _MODEL_INPUT_NUMERIC_AUDIT_DTYPES:
+        raise ValueError("numeric audit table has the wrong exact dtypes")
+    return normalized
+
+
+def numeric_audit_parquet_bytes(frame: pd.DataFrame) -> bytes:
+    """Serialize the audit with an explicit, version-independent Arrow schema."""
+
+    normalized = normalize_numeric_audit_frame(frame)
+    try:
+        table = pa.Table.from_pandas(
+            normalized,
+            schema=MODEL_INPUT_NUMERIC_AUDIT_ARROW_SCHEMA,
+            preserve_index=False,
+            safe=True,
+        )
+    except (pa.ArrowException, TypeError, ValueError) as exc:
+        raise ValueError(
+            "numeric audit cannot be represented by the exact Arrow schema"
+        ) from exc
+    if not table.schema.equals(
+        MODEL_INPUT_NUMERIC_AUDIT_ARROW_SCHEMA,
+        check_metadata=False,
+    ):
+        raise ValueError("numeric audit table has the wrong exact Arrow schema")
+    sink = pa.BufferOutputStream()
+    pq.write_table(table, sink)
+    return sink.getvalue().to_pybytes()
+
+
+def read_numeric_audit_parquet(source: Any) -> pd.DataFrame:
+    """Read and normalize an audit after verifying its physical Arrow schema."""
+
+    try:
+        table = pq.ParquetFile(source).read()
+    except Exception as exc:
+        raise ValueError("numeric audit is not a readable Parquet table") from exc
+    if not table.schema.equals(
+        MODEL_INPUT_NUMERIC_AUDIT_ARROW_SCHEMA,
+        check_metadata=False,
+    ):
+        raise ValueError("numeric audit table has the wrong exact Arrow schema")
+    try:
+        frame = table.to_pandas()
+    except Exception as exc:
+        raise ValueError("numeric audit cannot be materialized as pandas") from exc
+    return normalize_numeric_audit_frame(frame)
 
 
 def _as_numpy(value: Any) -> np.ndarray:
@@ -773,22 +881,7 @@ def _strict_json_object(path: Path, *, context: str) -> dict[str, Any]:
 
 
 def _validate_numeric_audit(path: Path) -> pd.DataFrame:
-    try:
-        frame = pd.read_parquet(path)
-    except Exception as exc:
-        raise ValueError("numeric audit is not a readable Parquet table") from exc
-    if tuple(frame.columns) != _MODEL_INPUT_NUMERIC_AUDIT_COLUMNS:
-        raise ValueError("numeric audit table has the wrong exact schema")
-    observed_dtypes = tuple(
-        str(frame[name].dtype) for name in _MODEL_INPUT_NUMERIC_AUDIT_COLUMNS
-    )
-    if observed_dtypes != _MODEL_INPUT_NUMERIC_AUDIT_DTYPES:
-        raise ValueError("numeric audit table has the wrong exact dtypes")
-    for name in _MODEL_INPUT_NUMERIC_AUDIT_TEXT_COLUMNS:
-        if frame[name].isna().any() or not frame[name].map(
-            lambda value: type(value) is str
-        ).all():
-            raise ValueError(f"numeric audit column {name} must contain strings")
+    frame = read_numeric_audit_parquet(path)
     if (
         frame["ssl_observation_id"].map(
             lambda value: bool(value) and value.strip() == value
@@ -1298,6 +1391,7 @@ __all__ = [
     "FullPoolNumericEnvelope",
     "MODEL_INPUT_CONTRACT_VERSION",
     "MODEL_INPUT_NUMERIC_ABS_MAX",
+    "MODEL_INPUT_NUMERIC_AUDIT_ARROW_SCHEMA",
     "MODEL_INPUT_NUMERIC_AUDIT_SCHEMA",
     "MODEL_INPUT_NUMERIC_AUTHORITY_NAMES",
     "MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT",
@@ -1306,5 +1400,8 @@ __all__ = [
     "TEACHER_SSL_NUMERIC_ENVELOPE_V1",
     "audit_collated_sample",
     "audit_model_facing_sample",
+    "normalize_numeric_audit_frame",
+    "numeric_audit_parquet_bytes",
+    "read_numeric_audit_parquet",
     "validate_numeric_gate_release",
 ]

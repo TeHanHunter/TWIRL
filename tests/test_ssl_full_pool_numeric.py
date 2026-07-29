@@ -6,6 +6,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from twirl.vetting import ssl_full_pool_numeric as numeric_module
@@ -452,7 +454,7 @@ def _write_numeric_release(
     ):
         audit_frame[name] = audit_frame[name].astype("float64")
     audit = tmp_path / "model_input_numeric_audit.parquet"
-    audit_frame.to_parquet(audit, index=False)
+    audit.write_bytes(numeric_module.numeric_audit_parquet_bytes(audit_frame))
     audit_binding = _bound_artifact(audit)
 
     shard_reports: list[dict[str, object]] = []
@@ -535,6 +537,105 @@ def _write_numeric_release(
     path = tmp_path / "numeric_release.json"
     _write_json_artifact(path, payload)
     return path, payload
+
+
+def _two_row_numeric_audit() -> pd.DataFrame:
+    frame = pd.DataFrame.from_records(
+        [
+            {
+                "ssl_observation_id": "s0060-tic0000000000722078603",
+                "sector": 60,
+                "tic": 722_078_603,
+                "ssl_pool_include": True,
+                "numeric_status": "passed",
+                "model_input_numeric_passed": True,
+                "n_failures": 0,
+                "failure_codes": "[]",
+                "failures_json": "[]",
+                "harmonic_max_abs": 1.0,
+                "local_max_abs": 2.0,
+                "periodogram_max_abs": 3.0,
+            },
+            {
+                "ssl_observation_id": "s0062-tic0000000000999999999",
+                "sector": 62,
+                "tic": 999_999_999,
+                "ssl_pool_include": False,
+                "numeric_status": "not_model_eligible",
+                "model_input_numeric_passed": pd.NA,
+                "n_failures": 0,
+                "failure_codes": "[]",
+                "failures_json": "[]",
+                "harmonic_max_abs": np.nan,
+                "local_max_abs": np.nan,
+                "periodogram_max_abs": np.nan,
+            },
+        ],
+        columns=list(numeric_module._MODEL_INPUT_NUMERIC_AUDIT_COLUMNS),
+    )
+    return frame.astype(
+        dict(
+            zip(
+                numeric_module._MODEL_INPUT_NUMERIC_AUDIT_COLUMNS,
+                numeric_module._MODEL_INPUT_NUMERIC_AUDIT_DTYPES,
+                strict=True,
+            )
+        )
+    )
+
+
+def test_numeric_audit_arrow_schema_is_exact_and_nullable_pass_survives() -> None:
+    frame = _two_row_numeric_audit()
+    for name in numeric_module._MODEL_INPUT_NUMERIC_AUDIT_TEXT_COLUMNS:
+        frame[name] = frame[name].astype("string")
+
+    payload = numeric_module.numeric_audit_parquet_bytes(frame)
+    parquet = pq.ParquetFile(pa.BufferReader(payload))
+
+    assert parquet.schema_arrow.equals(
+        numeric_module.MODEL_INPUT_NUMERIC_AUDIT_ARROW_SCHEMA,
+        check_metadata=False,
+    )
+    observed = numeric_module.read_numeric_audit_parquet(
+        pa.BufferReader(payload)
+    )
+    assert tuple(
+        str(observed[name].dtype)
+        for name in numeric_module._MODEL_INPUT_NUMERIC_AUDIT_COLUMNS
+    ) == numeric_module._MODEL_INPUT_NUMERIC_AUDIT_DTYPES
+    assert observed["model_input_numeric_passed"].iloc[0] == np.bool_(True)
+    assert pd.isna(observed["model_input_numeric_passed"].iloc[1])
+
+
+def test_numeric_audit_reader_rejects_arrow_physical_type_drift() -> None:
+    payload = numeric_module.numeric_audit_parquet_bytes(
+        _two_row_numeric_audit()
+    )
+    table = pq.ParquetFile(pa.BufferReader(payload)).read()
+    sector_index = table.schema.get_field_index("sector")
+    drifted = table.set_column(
+        sector_index,
+        pa.field("sector", pa.int32(), nullable=False),
+        table.column(sector_index).cast(pa.int32()),
+    )
+    sink = pa.BufferOutputStream()
+    pq.write_table(drifted, sink)
+
+    with pytest.raises(ValueError, match="wrong exact Arrow schema"):
+        numeric_module.read_numeric_audit_parquet(
+            pa.BufferReader(sink.getvalue())
+        )
+
+
+def test_numeric_audit_normalization_rejects_string_pass_value() -> None:
+    frame = _two_row_numeric_audit()
+    frame["model_input_numeric_passed"] = frame[
+        "model_input_numeric_passed"
+    ].astype("object")
+    frame.loc[0, "model_input_numeric_passed"] = "True"
+
+    with pytest.raises(ValueError, match="must contain booleans or nulls"):
+        numeric_module.normalize_numeric_audit_frame(frame)
 
 
 def test_numeric_release_validator_rehashes_exact_authorities(

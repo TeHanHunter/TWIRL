@@ -149,3 +149,49 @@ def test_merge_audit_validator_locks_roundtrip_dtypes(
     drifted["sector"] = drifted["sector"].astype("int16")
     with pytest.raises(ValueError, match="wrong exact dtypes"):
         MERGE._validate_numeric_audit_frame(drifted)
+
+
+def test_merge_audit_accepts_version_native_strings_and_normalizes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame = _small_audit(monkeypatch)
+    for name in (
+        "ssl_observation_id",
+        "numeric_status",
+        "failure_codes",
+        "failures_json",
+    ):
+        frame[name] = frame[name].astype("string")
+
+    normalized = MERGE._validate_numeric_audit_frame(frame)
+
+    assert all(
+        str(normalized[name].dtype) == "object"
+        for name in (
+            "ssl_observation_id",
+            "numeric_status",
+            "failure_codes",
+            "failures_json",
+        )
+    )
+    assert str(normalized["model_input_numeric_passed"].dtype) == "boolean"
+    assert pd.isna(normalized["model_input_numeric_passed"].iloc[1])
+
+
+def test_merge_parquet_roundtrip_preserves_normalized_audit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame = _small_audit(monkeypatch)
+
+    payload = MERGE._parquet_bytes(frame)
+    observed = MERGE.read_numeric_audit_parquet(
+        MERGE.pa.BufferReader(payload)
+    )
+    normalized = MERGE._validate_numeric_audit_frame(observed)
+
+    pd.testing.assert_frame_equal(
+        normalized,
+        frame,
+        check_dtype=True,
+        check_exact=True,
+    )

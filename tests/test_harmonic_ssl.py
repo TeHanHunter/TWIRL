@@ -233,7 +233,7 @@ def test_ssl_augmentation_is_deterministic_and_does_not_mutate_input() -> None:
 @pytest.mark.parametrize(
     ("invalid_value", "message"),
     (
-        (float("inf"), "nonfinite model-active values"),
+        (float("inf"), "nonfinite tensor payload"),
         (1_000_001.0, "exceeds the model-active absolute bound"),
     ),
 )

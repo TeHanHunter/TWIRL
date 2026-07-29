@@ -6,8 +6,11 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+import numpy as np
+import pandas as pd
 import pytest
 
+from twirl.vetting import ssl_full_pool_numeric as NUMERIC
 from twirl.vetting.ssl_full_pool_eligibility import (
     PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
     PRODUCTION_ELIGIBLE_OBSERVATIONS,
@@ -15,6 +18,7 @@ from twirl.vetting.ssl_full_pool_eligibility import (
     PRODUCTION_EXCLUDED_OBSERVATIONS,
     PRODUCTION_FULL_IDENTITY_SHA256,
     PRODUCTION_FULL_OBSERVATIONS,
+    observation_identity_sha256,
 )
 from twirl.vetting.ssl_full_pool_native import (
     FULL_POOL_NATIVE_CONTRACT_VERSION,
@@ -54,6 +58,68 @@ VALIDATOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VALIDATOR)
 
 
+def _numeric_test_keys() -> tuple[tuple[int, int], ...]:
+    keys: list[tuple[int, int]] = []
+    for task_id in range(112):
+        sector = 56 + task_id // 16
+        shard_index = task_id % 16
+        tic = (
+            722_078_603
+            if (sector, shard_index) == (60, 0)
+            else 1_000_000_000 + task_id
+        )
+        keys.append((sector, tic))
+    return tuple(keys)
+
+
+NUMERIC_ELIGIBLE_KEYS = _numeric_test_keys()
+NUMERIC_EXCLUDED_KEYS = ((62, 2_000_000_000),)
+NUMERIC_FULL_KEYS = NUMERIC_ELIGIBLE_KEYS + NUMERIC_EXCLUDED_KEYS
+NUMERIC_ELIGIBLE_IDENTITY_SHA256 = observation_identity_sha256(
+    NUMERIC_ELIGIBLE_KEYS
+)
+NUMERIC_EXCLUDED_IDENTITY_SHA256 = observation_identity_sha256(
+    NUMERIC_EXCLUDED_KEYS
+)
+NUMERIC_FULL_IDENTITY_SHA256 = observation_identity_sha256(NUMERIC_FULL_KEYS)
+
+
+@pytest.fixture(autouse=True)
+def _bounded_numeric_partition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        NUMERIC,
+        "PRODUCTION_FULL_OBSERVATIONS",
+        len(NUMERIC_FULL_KEYS),
+    )
+    monkeypatch.setattr(
+        NUMERIC,
+        "PRODUCTION_ELIGIBLE_OBSERVATIONS",
+        len(NUMERIC_ELIGIBLE_KEYS),
+    )
+    monkeypatch.setattr(
+        NUMERIC,
+        "PRODUCTION_EXCLUDED_OBSERVATIONS",
+        len(NUMERIC_EXCLUDED_KEYS),
+    )
+    monkeypatch.setattr(
+        NUMERIC,
+        "PRODUCTION_FULL_IDENTITY_SHA256",
+        NUMERIC_FULL_IDENTITY_SHA256,
+    )
+    monkeypatch.setattr(
+        NUMERIC,
+        "PRODUCTION_ELIGIBLE_IDENTITY_SHA256",
+        NUMERIC_ELIGIBLE_IDENTITY_SHA256,
+    )
+    monkeypatch.setattr(
+        NUMERIC,
+        "PRODUCTION_EXCLUDED_IDENTITY_SHA256",
+        NUMERIC_EXCLUDED_IDENTITY_SHA256,
+    )
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -71,6 +137,56 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
         json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
+
+
+def _write_numeric_audit(path: Path) -> None:
+    records: list[dict[str, Any]] = []
+    for sector, tic in NUMERIC_ELIGIBLE_KEYS:
+        records.append(
+            {
+                "ssl_observation_id": f"s{sector:04d}-tic{tic:016d}",
+                "sector": sector,
+                "tic": tic,
+                "ssl_pool_include": True,
+                "numeric_status": "passed",
+                "model_input_numeric_passed": True,
+                "n_failures": 0,
+                "failure_codes": "[]",
+                "failures_json": "[]",
+                "harmonic_max_abs": 1.0,
+                "local_max_abs": 2.0,
+                "periodogram_max_abs": 3.0,
+            }
+        )
+    for sector, tic in NUMERIC_EXCLUDED_KEYS:
+        records.append(
+            {
+                "ssl_observation_id": f"s{sector:04d}-tic{tic:016d}",
+                "sector": sector,
+                "tic": tic,
+                "ssl_pool_include": False,
+                "numeric_status": "not_model_eligible",
+                "model_input_numeric_passed": pd.NA,
+                "n_failures": 0,
+                "failure_codes": "[]",
+                "failures_json": "[]",
+                "harmonic_max_abs": np.nan,
+                "local_max_abs": np.nan,
+                "periodogram_max_abs": np.nan,
+            }
+        )
+    dtypes = dict(
+        zip(
+            NUMERIC._MODEL_INPUT_NUMERIC_AUDIT_COLUMNS,
+            NUMERIC._MODEL_INPUT_NUMERIC_AUDIT_DTYPES,
+            strict=True,
+        )
+    )
+    frame = pd.DataFrame.from_records(
+        records,
+        columns=list(NUMERIC._MODEL_INPUT_NUMERIC_AUDIT_COLUMNS),
+    ).astype(dtypes)
+    path.write_bytes(NUMERIC.numeric_audit_parquet_bytes(frame))
 
 
 def _fixture(tmp_path: Path) -> dict[str, Any]:
@@ -95,17 +211,17 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
             MODEL_INPUT_NUMERIC_ENVELOPE_SHA256
         ),
         "counts": {
-            "full_observations": PRODUCTION_FULL_OBSERVATIONS,
-            "eligible_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
-            "excluded_observations": PRODUCTION_EXCLUDED_OBSERVATIONS,
-            "scanned_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+            "full_observations": len(NUMERIC_FULL_KEYS),
+            "eligible_observations": len(NUMERIC_ELIGIBLE_KEYS),
+            "excluded_observations": len(NUMERIC_EXCLUDED_KEYS),
+            "scanned_observations": len(NUMERIC_ELIGIBLE_KEYS),
             "failed_observations": 0,
             "native_shards": 112,
         },
         "identity_hashes": {
-            "full": PRODUCTION_FULL_IDENTITY_SHA256,
-            "eligible": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
-            "excluded": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
+            "full": NUMERIC_FULL_IDENTITY_SHA256,
+            "eligible": NUMERIC_ELIGIBLE_IDENTITY_SHA256,
+            "excluded": NUMERIC_EXCLUDED_IDENTITY_SHA256,
         },
         "code_revision": expected_revision,
         "authority_bindings": {
@@ -121,29 +237,42 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         },
     }
     numeric_audit = tmp_path / "model_input_numeric_audit.parquet"
-    numeric_audit.write_bytes(b"bound numeric-audit evidence\n")
+    _write_numeric_audit(numeric_audit)
     numeric_audit_digest = _sha256(numeric_audit)
     Path(str(numeric_audit) + ".sha256").write_text(
         f"{numeric_audit_digest}  {numeric_audit.name}\n",
         encoding="ascii",
     )
-    base, remainder = divmod(PRODUCTION_ELIGIBLE_OBSERVATIONS, 112)
     shard_reports: list[dict[str, Any]] = []
     for task_id in range(112):
         sector = 56 + task_id // 16
         shard_index = task_id % 16
-        scanned = base + int(task_id < remainder)
+        expected_key = NUMERIC_ELIGIBLE_KEYS[task_id]
+        assert expected_key[0] == sector
+        tic = expected_key[1]
+        scanned = 1
         numeric_native = tmp_path / f"numeric_native_{task_id}.h5"
         numeric_native.write_bytes(f"native-{task_id}\n".encode("ascii"))
         native_binding = _metadata(numeric_native)
-        identity = hashlib.sha256(
-            f"{sector}:{shard_index}:{scanned}".encode("ascii")
-        ).hexdigest()
+        identity = observation_identity_sha256([(sector, tic)])
+        row = {
+            "ssl_observation_id": f"s{sector:04d}-tic{tic:016d}",
+            "sector": sector,
+            "tic": tic,
+            "passed": True,
+            "n_failures": 0,
+            "failure_codes": [],
+            "failures": [],
+            "harmonic_max_abs": 1.0,
+            "local_max_abs": 2.0,
+            "periodogram_max_abs": 3.0,
+        }
         report_payload = {
             "schema_version": MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
             "code_revision": expected_revision,
             "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
             "envelope_contract": MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
+            "envelope": FULL_POOL_NUMERIC_ENVELOPE_V1.as_dict(),
             "envelope_canonical_sha256": (
                 MODEL_INPUT_NUMERIC_ENVELOPE_SHA256
             ),
@@ -157,6 +286,7 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
                 "failed_observations": 0,
             },
             "observation_identity_sha256": identity,
+            "rows": [row],
             "native_h5": native_binding,
             "authority_bindings": numeric_gate_payload[
                 "authority_bindings"
