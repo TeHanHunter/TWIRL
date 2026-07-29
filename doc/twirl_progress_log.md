@@ -444,6 +444,20 @@ sample.
   preserving phase and quality, plus a fail-closed numerical release gate over
   all `175,347` eligible rows. No corrected remote numerical gate, fresh smoke,
   or replacement five-fold result is claimed yet.
+- `2026-07-29`: Corrected full-pool numerical diagnostic array `19204195`
+  completed all `112` checksum-valid reports and failed closed: `106` Slurm
+  tasks completed, `6` failed, and `175,338/175,347` observations passed.
+  Exactly nine S60 observations exceeded the harmonic/local numerical
+  envelope; their periodograms remained normal. Read-only reconstruction
+  traced all nine to compact ADP03q splines fitted before the authoritative
+  external-quality overlay, allowing `801` external-only bad cadences in the
+  affected detector/orbit to contaminate later nominal-quality values.
+  Recomputing both ADP apertures in memory from immutable raw-v1 flux and
+  uncertainty with the final effective quality reduced every affected
+  transformed maximum to at most `6.44`, without clipping, imputation, or a
+  new exclusion. No numeric release, smoke, or fold was launched. A wholly
+  fresh, uniform effective-quality-aware ADP native rebuild is the recommended
+  next contract and remains pending explicit approval.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 

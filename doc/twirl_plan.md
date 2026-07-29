@@ -63,11 +63,17 @@ Last reconciled: `2026-07-29`.
   registry are complete at `112/112` shards with exact `175,347`-observation
   coverage. The first five-fold launch failed before epoch 1 because one
   quality-flagged sentinel remained model-active, not because of H200 health.
-  The active correction masks quality-bad photometry/errors while preserving
-  phase and quality, then requires an exact `175,347`-row numerical gate and a
-  fresh bounded one-epoch smoke before relaunching the five independent fold
-  encoders with up to four one-H200 jobs concurrently. Labels, injections,
-  fixed-test tensors, and S63 tensors remain forbidden during pretraining.
+  A full corrected numerical rerun then failed closed at `175,338/175,347`
+  passing observations: all nine failures are in S60 and trace to legacy
+  compact ADP flux fitted before the final external-quality overlay. The
+  quality-aware model mask therefore is not a sufficient correction. The
+  proposed next contract, pending explicit approval, rebuilds all `112` native
+  shards uniformly from immutable raw-v1 photometry with the final effective
+  quality applied during both ADP03q fits, then repeats the exact numerical
+  gate and bounded one-epoch smoke before relaunching the five independent
+  fold encoders with up to four one-H200 jobs concurrently. Labels,
+  injections, fixed-test tensors, and S63 tensors remain forbidden during
+  pretraining.
   Teacher v3 stays operational until supervised fine-tuning and the matched
   preregistered comparison pass.
   The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
@@ -412,10 +418,12 @@ queue does not block the S56--S62 candidate/teacher critical path below.
 
 1. Complete the leakage-safe Teacher v4-SSL full-pool experiment from its
    frozen `175,366`-observation search pool and validated BLS/raw releases:
-   retain the completed `112/112` native-v2 shards and exact registry for the
-   `175,347`-observation model partition while preserving the `19` exclusions
-   in the `175,366`-row audit. Apply the quality-aware model-input mask, pass
-   the exact full-partition numerical gate and a fresh bounded throughput
+   preserve the completed native-v2 products as diagnostic provenance but do
+   not admit them to the fresh model release. After explicit approval of the
+   effective-quality-aware ADP contract, rebuild all `112` native shards from
+   immutable raw-v1 photometry for the exact `175,347`-observation model
+   partition while preserving the `19` exclusions in the `175,366`-row audit.
+   Pass the exact full-partition numerical gate and a fresh bounded throughput
    smoke, then relaunch five fold encoders with at most four one-H200 jobs
    concurrently. Fine-tune on the existing frozen labels and compare with
    Teacher v3 on matched development support without opening fixed-test or
