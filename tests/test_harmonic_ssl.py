@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import copy
+import math
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -219,6 +219,189 @@ def test_ssl_augmentation_is_deterministic_and_does_not_mutate_input() -> None:
             assert torch.equal(batch[key], value)
         else:
             assert batch[key] == value
+
+
+@pytest.mark.parametrize(
+    ("tensor_name", "mask_name", "index"),
+    (
+        ("harmonic_values", "harmonic_mask", (0, 0, 0, 1)),
+        ("local_values", "local_mask", (0, 0, 0, 1)),
+        ("periodogram_values", "periodogram_mask", (0, 0, 1)),
+        ("metadata", None, (0, 1)),
+    ),
+)
+@pytest.mark.parametrize(
+    ("invalid_value", "message"),
+    (
+        (float("inf"), "nonfinite model-active values"),
+        (1_000_001.0, "exceeds the model-active absolute bound"),
+    ),
+)
+def test_ssl_augmentation_rejects_invalid_active_model_values(
+    tensor_name: str,
+    mask_name: str | None,
+    index: tuple[int, ...],
+    invalid_value: float,
+    message: str,
+) -> None:
+    torch = pytest.importorskip("torch")
+    batch = _native_batch(torch)
+    batch[tensor_name][index] = invalid_value
+
+    with pytest.raises(ValueError, match=message):
+        augment_ssl_batch(
+            batch,
+            duration_min=torch.tensor([120.0, 180.0]),
+            config=EventPreservingAugmentationConfig(
+                harmonic_cadence_dropout_probability=0.0,
+                harmonic_flux_noise_scale=0.0,
+                local_flux_noise_scale=0.0,
+                periodogram_bin_dropout_probability=0.0,
+            ),
+            seed=56,
+            view_index=0,
+        )
+
+    if mask_name is not None and math.isfinite(invalid_value):
+        batch[mask_name][index] = False
+        augment_ssl_batch(
+            batch,
+            duration_min=torch.tensor([120.0, 180.0]),
+            config=EventPreservingAugmentationConfig(
+                harmonic_cadence_dropout_probability=0.0,
+                harmonic_flux_noise_scale=0.0,
+                local_flux_noise_scale=0.0,
+                periodogram_bin_dropout_probability=0.0,
+            ),
+            seed=56,
+            view_index=0,
+        )
+
+
+def test_ssl_augmentation_rejects_masked_nonfinite_tensor_payload() -> None:
+    torch = pytest.importorskip("torch")
+    batch = _native_batch(torch)
+    batch["harmonic_values"][0, 0, 0, 1] = float("nan")
+    batch["harmonic_mask"][0, 0, 0, 1] = False
+
+    with pytest.raises(ValueError, match="nonfinite tensor payload"):
+        augment_ssl_batch(
+            batch,
+            duration_min=torch.tensor([120.0, 180.0]),
+            seed=56,
+            view_index=0,
+        )
+
+
+@pytest.mark.parametrize(
+    ("channel", "invalid_value", "message"),
+    (
+        (3, -0.1, "error channels must be nonnegative"),
+        (5, 0.5001, "phase channel must be in"),
+        (6, 0.5, "quality channel must be binary"),
+    ),
+)
+def test_ssl_augmentation_rejects_harmonic_channel_domain_violations(
+    channel: int,
+    invalid_value: float,
+    message: str,
+) -> None:
+    torch = pytest.importorskip("torch")
+    batch = _native_batch(torch)
+    batch["harmonic_values"][0, 0, channel, 1] = invalid_value
+
+    with pytest.raises(ValueError, match=message):
+        augment_ssl_batch(
+            batch,
+            duration_min=torch.tensor([120.0, 180.0]),
+            seed=56,
+            view_index=0,
+        )
+
+
+def test_ssl_augmentation_requires_quality_bad_photometry_mask() -> None:
+    torch = pytest.importorskip("torch")
+    batch = _native_batch(torch)
+    cadence = 3
+    for values_name, mask_name in (
+        ("harmonic_values", "harmonic_mask"),
+        ("local_values", "local_mask"),
+    ):
+        batch[values_name][0, 0, 6, cadence] = 1.0
+        batch[mask_name][0, 0, :5, cadence] = False
+
+    config = EventPreservingAugmentationConfig(
+        harmonic_cadence_dropout_probability=0.0,
+        harmonic_flux_noise_scale=0.0,
+        local_flux_noise_scale=0.0,
+        periodogram_bin_dropout_probability=0.0,
+    )
+    augmented = augment_ssl_batch(
+        batch,
+        duration_min=torch.tensor([120.0, 180.0]),
+        config=config,
+        seed=56,
+        view_index=0,
+    )
+    for values_name, mask_name in (
+        ("harmonic_values", "harmonic_mask"),
+        ("local_values", "local_mask"),
+    ):
+        assert torch.equal(
+            augmented[values_name][:, :, 5:7, :],
+            batch[values_name][:, :, 5:7, :],
+        )
+        assert torch.equal(
+            augmented[mask_name][:, :, 5:7, :],
+            batch[mask_name][:, :, 5:7, :],
+        )
+
+    invalid = _native_batch(torch)
+    invalid["harmonic_values"][0, 0, 6, cadence] = 1.0
+    with pytest.raises(ValueError, match="quality-bad cadences must mask"):
+        augment_ssl_batch(
+            invalid,
+            duration_min=torch.tensor([120.0, 180.0]),
+            seed=56,
+            view_index=0,
+        )
+
+
+def test_ssl_augmentation_rejects_hidden_quality_coordinate_mask() -> None:
+    torch = pytest.importorskip("torch")
+    batch = _native_batch(torch)
+    batch["harmonic_mask"][0, 0, 6, 1] = False
+
+    with pytest.raises(ValueError, match="phase/quality masks must match"):
+        augment_ssl_batch(
+            batch,
+            duration_min=torch.tensor([120.0, 180.0]),
+            seed=56,
+            view_index=0,
+        )
+
+
+def test_ssl_augmentation_rejects_post_augmentation_envelope_overflow() -> None:
+    torch = pytest.importorskip("torch")
+    batch = _native_batch(torch)
+    batch["local_values"][:, :, 3:5, :] = 1_000_000.0
+
+    with pytest.raises(
+        ValueError,
+        match="post-augmentation local_values exceeds",
+    ):
+        augment_ssl_batch(
+            batch,
+            duration_min=torch.tensor([120.0, 180.0]),
+            config=EventPreservingAugmentationConfig(
+                harmonic_cadence_dropout_probability=0.0,
+                harmonic_flux_noise_scale=0.0,
+                local_flux_noise_scale=10.0,
+                periodogram_bin_dropout_probability=0.0,
+            ),
+            seed=56,
+            view_index=0,
+        )
 
 
 def test_ssl_augmentation_protects_harmonic_event_samples() -> None:

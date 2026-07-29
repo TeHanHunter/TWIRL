@@ -30,6 +30,10 @@ from twirl.vetting.orbitid_reconciliation import (
 
 RAW_PAIR_CONTRACT_VERSION = "s56_adp_raw_pair_v2"
 A2V1_TEACHER_INPUT_CONTRACT = "s56_A2v1_adp_raw_pair_v2"
+MODEL_INPUT_CONTRACT_VERSION = (
+    "twirl_harmonic_model_input_effective_quality_mask_v1"
+)
+MODEL_INPUT_NUMERIC_ABS_MAX = 1.0e6
 CANDIDATE_PROVENANCE_CONTRACT_VERSION = (
     "s56_a2v1_teacher_scoring_candidates_v1"
 )
@@ -393,6 +397,37 @@ def _safe_scale(values: np.ndarray, errors: np.ndarray | None = None) -> float:
     return 1.0
 
 
+def checked_model_float32(values: np.ndarray, *, context: str) -> np.ndarray:
+    """Convert model-valid values without silently turning overflow into masks."""
+
+    array = np.asarray(values, dtype=np.float64)
+    if not np.isfinite(array).all():
+        raise FloatingPointError(f"{context} produced non-finite model-valid values")
+    if np.any(np.abs(array) > np.finfo(np.float32).max):
+        raise FloatingPointError(f"{context} exceeds the float32 model-input range")
+    return array.astype(np.float32)
+
+
+def _finite_difference(
+    left: np.ndarray,
+    right: np.ndarray,
+    *,
+    context: str,
+) -> np.ndarray:
+    left = np.asarray(left)
+    right = np.asarray(right)
+    if left.shape != right.shape:
+        raise ValueError(f"{context} inputs must have identical shapes")
+    out = np.full(left.shape, np.nan, dtype=np.float32)
+    finite = np.isfinite(left) & np.isfinite(right)
+    out[finite] = checked_model_float32(
+        np.asarray(left[finite], dtype=np.float64)
+        - np.asarray(right[finite], dtype=np.float64),
+        context=context,
+    )
+    return out
+
+
 def _normalize_raw_by_orbit(
     flux: np.ndarray,
     error: np.ndarray,
@@ -407,15 +442,20 @@ def _normalize_raw_by_orbit(
     normalized_error = np.full(len(flux), np.nan, dtype=np.float32)
     for orbit in np.unique(orbitid):
         in_orbit = orbitid == orbit
-        reference = in_orbit & (quality == 0) & np.isfinite(flux)
-        if not np.any(reference):
-            reference = in_orbit & np.isfinite(flux)
+        quality_good = in_orbit & (quality == 0)
+        reference = quality_good & np.isfinite(flux)
         center = float(np.nanmedian(flux[reference])) if np.any(reference) else 0.0
-        scale = _safe_scale(flux[reference], error[in_orbit])
-        finite_flux = in_orbit & np.isfinite(flux)
-        finite_error = in_orbit & np.isfinite(error) & (error > 0)
-        normalized[finite_flux] = ((flux[finite_flux] - center) / scale).astype(np.float32)
-        normalized_error[finite_error] = (error[finite_error] / scale).astype(np.float32)
+        scale = _safe_scale(flux[reference], error[quality_good])
+        finite_flux = quality_good & np.isfinite(flux)
+        finite_error = quality_good & np.isfinite(error) & (error > 0)
+        normalized[finite_flux] = checked_model_float32(
+            (flux[finite_flux] - center) / scale,
+            context="orbit-normalized raw flux",
+        )
+        normalized_error[finite_error] = checked_model_float32(
+            error[finite_error] / scale,
+            context="orbit-normalized raw uncertainty",
+        )
     return normalized, normalized_error
 
 
@@ -426,15 +466,20 @@ def _relative_det_flux(flux: np.ndarray, orbitid: np.ndarray, quality: np.ndarra
     out = np.full(len(flux), np.nan, dtype=np.float32)
     for orbit in np.unique(orbitid):
         in_orbit = orbitid == orbit
-        reference = in_orbit & (quality == 0) & np.isfinite(flux)
-        if not np.any(reference):
-            reference = in_orbit & np.isfinite(flux)
+        quality_good = in_orbit & (quality == 0)
+        reference = quality_good & np.isfinite(flux)
         baseline = float(np.nanmedian(flux[reference])) if np.any(reference) else 1.0
-        finite = in_orbit & np.isfinite(flux)
+        finite = quality_good & np.isfinite(flux)
         if np.isfinite(baseline) and abs(baseline) > 1.0e-8:
-            out[finite] = (flux[finite] / baseline - 1.0).astype(np.float32)
+            out[finite] = checked_model_float32(
+                flux[finite] / baseline - 1.0,
+                context="relative detrended flux",
+            )
         else:
-            out[finite] = (flux[finite] - baseline).astype(np.float32)
+            out[finite] = checked_model_float32(
+                flux[finite] - baseline,
+                context="centered detrended flux",
+            )
     return out
 
 
@@ -525,8 +570,16 @@ def build_native_channels(lc: NativeLightCurve) -> NativeChannels:
             raw_primary,
             det_primary,
             err_primary,
-            raw_primary - raw_small,
-            det_primary - det_small,
+            _finite_difference(
+                raw_primary,
+                raw_small,
+                context="raw-aperture difference",
+            ),
+            _finite_difference(
+                det_primary,
+                det_small,
+                context="detrended-aperture difference",
+            ),
         ],
         axis=0,
     ).astype(np.float32)
@@ -569,6 +622,7 @@ def build_harmonic_views(
     channels = build_native_channels(lc)
     det_small = channels.small_values[1]
     det_primary = channels.supplemental_values[1]
+    det_difference = channels.supplemental_values[4]
     err_small = channels.small_values[2]
     err_primary = channels.supplemental_values[2]
     quality_nonzero = (np.asarray(lc.quality) != 0).astype(np.float32)
@@ -590,7 +644,7 @@ def build_harmonic_views(
             [
                 det_small,
                 det_primary,
-                det_primary - det_small,
+                det_difference,
                 err_small,
                 err_primary,
                 phase.astype(np.float32),
@@ -1680,6 +1734,8 @@ __all__ = [
     "HARMONIC_NAMES",
     "HARMONIC_VIEW_CHANNELS",
     "HarmonicViews",
+    "MODEL_INPUT_CONTRACT_VERSION",
+    "MODEL_INPUT_NUMERIC_ABS_MAX",
     "NATIVE_DATASETS",
     "ORBITID_RECONCILIATION_MASK_DATASET",
     "PERIODOGRAM_DATASETS",
@@ -1697,6 +1753,7 @@ __all__ = [
     "build_harmonic_views",
     "build_native_channels",
     "candidate_provenance_from_summary",
+    "checked_model_float32",
     "injected_raw_uncertainty",
     "native_group_path",
     "orbital_phase",

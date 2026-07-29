@@ -33,8 +33,11 @@ NATIVE_RELEASE_SUMMARY="${NATIVE_REGISTRY_DIR}/native_fullpool_release.summary.j
 REGISTRY_DIR="${RUN_ROOT}/frozen/ssl_registry"
 REGISTRY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.parquet"
 REGISTRY_SUMMARY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.summary.json"
-SMOKE_SUMMARY="${RUN_ROOT}/smoke/one_epoch/encoder_pretraining/fold_0/summary.json"
-OUT_ROOT="${RUN_ROOT}/training/five_fold"
+NUMERIC_GATE_DIR="${RUN_ROOT}/frozen/model_input_numeric_gate_v1"
+NUMERIC_GATE_RELEASE="${NUMERIC_GATE_DIR}/model_input_numeric_gate.release.json"
+MODEL_RUN_ROOT="${RUN_ROOT}/model_runs/effective_quality_mask_v1"
+SMOKE_SUMMARY="${MODEL_RUN_ROOT}/smoke/one_epoch/encoder_pretraining/fold_2/summary.json"
+OUT_ROOT="${MODEL_RUN_ROOT}/training/five_fold"
 readonly EPOCHS=20
 readonly BATCH_SIZE=64
 readonly WORKERS=8
@@ -62,8 +65,12 @@ if [[ "${SOURCE_RUN_ROOT}" != "${EXPECTED_SOURCE_RUN_ROOT}" || "${RUN_ROOT}" != 
   echo "Fold roots differ from the exact Teacher v4-SSL v2 contract." >&2
   exit 3
 fi
-if [[ "${OUT_ROOT}" != "${EXPECTED_RUN_ROOT}/training/five_fold" ]]; then
-  echo "Training output must use the exact v2 five-fold namespace." >&2
+if [[ "${MODEL_RUN_ROOT}" != "${EXPECTED_RUN_ROOT}/model_runs/effective_quality_mask_v1" ]]; then
+  echo "Training model-run root differs from the effective-quality-mask contract." >&2
+  exit 3
+fi
+if [[ "${OUT_ROOT}" != "${MODEL_RUN_ROOT}/training/five_fold" ]]; then
+  echo "Training output must use the fresh effective-quality-mask namespace." >&2
   exit 3
 fi
 if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
@@ -87,12 +94,16 @@ for input in \
   "${NATIVE_RELEASE_SUMMARY}" \
   "${REGISTRY}" \
   "${REGISTRY_SUMMARY}" \
+  "${NUMERIC_GATE_RELEASE}" \
   "${SMOKE_SUMMARY}"; do
   if [[ ! -s "${input}" ]]; then
     echo "Missing full-pool SSL input: ${input}" >&2
     exit 3
   fi
 done
+PYTHONPATH="${REPO}/src" "${PYTHON}" -c \
+  'from pathlib import Path; import sys; from twirl.vetting.ssl_full_pool_numeric import validate_numeric_gate_release; validate_numeric_gate_release(Path(sys.argv[1]), expected_code_revision=sys.argv[2])' \
+  "${NUMERIC_GATE_RELEASE}" "${EXPECTED_SHA}"
 if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
   echo "This wrapper must run as the declared fold array." >&2
   exit 4
@@ -123,7 +134,8 @@ echo "[teacher-ssl-fullpool] start=$(date -Is) fold=${SLURM_ARRAY_TASK_ID} epoch
   --native-release-summary "${NATIVE_RELEASE_SUMMARY}" \
   --registry "${REGISTRY}" \
   --registry-summary "${REGISTRY_SUMMARY}" \
-  --expected-fold 0
+  --numeric-gate-release "${NUMERIC_GATE_RELEASE}" \
+  --expected-fold 2
 "${PYTHON}" scripts/stage5_validation/train_teacher_ssl_fullpool_fold.py \
   --eligibility-exclusions "${ELIGIBILITY_EXCLUSIONS}" \
   --eligibility-summary "${ELIGIBILITY_SUMMARY}" \
@@ -132,6 +144,7 @@ echo "[teacher-ssl-fullpool] start=$(date -Is) fold=${SLURM_ARRAY_TASK_ID} epoch
   --native-release-summary "${NATIVE_RELEASE_SUMMARY}" \
   --registry "${REGISTRY}" \
   --registry-summary "${REGISTRY_SUMMARY}" \
+  --numeric-gate-release "${NUMERIC_GATE_RELEASE}" \
   --out-root "${OUT_ROOT}" \
   --fold "${SLURM_ARRAY_TASK_ID}" \
   --epochs "${EPOCHS}" \

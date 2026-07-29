@@ -8,8 +8,6 @@ from typing import Any, Callable
 
 import pytest
 
-torch = pytest.importorskip("torch")
-
 from twirl.vetting.ssl_full_pool_eligibility import (
     PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
     PRODUCTION_ELIGIBLE_OBSERVATIONS,
@@ -21,6 +19,14 @@ from twirl.vetting.ssl_full_pool_eligibility import (
 from twirl.vetting.ssl_full_pool_native import (
     FULL_POOL_NATIVE_CONTRACT_VERSION,
 )
+from twirl.vetting.ssl_full_pool_numeric import (
+    FULL_POOL_NUMERIC_ENVELOPE_V1,
+    MODEL_INPUT_CONTRACT_VERSION,
+    MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
+    MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
+    MODEL_INPUT_NUMERIC_ENVELOPE_SHA256,
+    MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+)
 from twirl.vetting.teacher_ssl_fullpool import (
     FULLPOOL_SSL_RUN_CONTRACT_SCHEMA,
     FULLPOOL_SSL_RUN_ID,
@@ -28,6 +34,8 @@ from twirl.vetting.teacher_ssl_fullpool import (
     FULLPOOL_SSL_SUMMARY_SCHEMA,
     FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA,
 )
+
+torch = pytest.importorskip("torch")
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,6 +76,8 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 def _fixture(tmp_path: Path) -> dict[str, Any]:
     authority_paths: dict[str, Path] = {}
     for name in VALIDATOR.AUTHORITY_NAMES:
+        if name == "numeric_gate_release":
+            continue
         path = tmp_path / f"{name}.dat"
         path.write_bytes(f"{name}\n".encode("ascii"))
         authority_paths[name] = path
@@ -75,11 +85,146 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         name: _metadata(path) for name, path in authority_paths.items()
     }
     expected_revision = "1" * 40
+    numeric_gate_payload = {
+        "schema_version": MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+        "passed": True,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "envelope_contract": MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
+        "envelope": FULL_POOL_NUMERIC_ENVELOPE_V1.as_dict(),
+        "envelope_canonical_sha256": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_SHA256
+        ),
+        "counts": {
+            "full_observations": PRODUCTION_FULL_OBSERVATIONS,
+            "eligible_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+            "excluded_observations": PRODUCTION_EXCLUDED_OBSERVATIONS,
+            "scanned_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+            "failed_observations": 0,
+            "native_shards": 112,
+        },
+        "identity_hashes": {
+            "full": PRODUCTION_FULL_IDENTITY_SHA256,
+            "eligible": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+            "excluded": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
+        },
+        "code_revision": expected_revision,
+        "authority_bindings": {
+            "ssl_registry": authority_metadata["registry"],
+            "ssl_registry_summary": authority_metadata["registry_summary"],
+            "native_registry": authority_metadata["native_registry"],
+            "native_registry_summary": authority_metadata[
+                "native_registry_summary"
+            ],
+            "native_release_summary": authority_metadata[
+                "native_release_summary"
+            ],
+        },
+    }
+    numeric_audit = tmp_path / "model_input_numeric_audit.parquet"
+    numeric_audit.write_bytes(b"bound numeric-audit evidence\n")
+    numeric_audit_digest = _sha256(numeric_audit)
+    Path(str(numeric_audit) + ".sha256").write_text(
+        f"{numeric_audit_digest}  {numeric_audit.name}\n",
+        encoding="ascii",
+    )
+    base, remainder = divmod(PRODUCTION_ELIGIBLE_OBSERVATIONS, 112)
+    shard_reports: list[dict[str, Any]] = []
+    for task_id in range(112):
+        sector = 56 + task_id // 16
+        shard_index = task_id % 16
+        scanned = base + int(task_id < remainder)
+        numeric_native = tmp_path / f"numeric_native_{task_id}.h5"
+        numeric_native.write_bytes(f"native-{task_id}\n".encode("ascii"))
+        native_binding = _metadata(numeric_native)
+        identity = hashlib.sha256(
+            f"{sector}:{shard_index}:{scanned}".encode("ascii")
+        ).hexdigest()
+        report_payload = {
+            "schema_version": MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
+            "code_revision": expected_revision,
+            "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+            "envelope_contract": MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
+            "envelope_canonical_sha256": (
+                MODEL_INPUT_NUMERIC_ENVELOPE_SHA256
+            ),
+            "sector": sector,
+            "shard_index": shard_index,
+            "n_shards": 16,
+            "passed": True,
+            "counts": {
+                "scanned_observations": scanned,
+                "passed_observations": scanned,
+                "failed_observations": 0,
+            },
+            "observation_identity_sha256": identity,
+            "native_h5": native_binding,
+            "authority_bindings": numeric_gate_payload[
+                "authority_bindings"
+            ],
+            "action": "audit_only_no_clip_no_exclusion",
+        }
+        report = tmp_path / f"numeric_{task_id}.json"
+        _write_json(report, report_payload)
+        report_digest = _sha256(report)
+        Path(str(report) + ".sha256").write_text(
+            f"{report_digest}  {report.name}\n",
+            encoding="ascii",
+        )
+        shard_reports.append(
+            {
+                "sector": sector,
+                "shard_index": shard_index,
+                **_metadata(report),
+                "native_h5": native_binding,
+                "observation_identity_sha256": identity,
+                "scanned_observations": scanned,
+            }
+        )
+    numeric_gate_payload.update(
+        {
+            "outputs": {
+                "numeric_audit": {
+                    "path": str(numeric_audit),
+                    "size_bytes": numeric_audit.stat().st_size,
+                    "sha256": numeric_audit_digest,
+                }
+            },
+            "shard_reports": shard_reports,
+            "quality_bad_photometry_policy_verified": True,
+            "float32_conversion_verified": True,
+            "real_only": True,
+            "labels_consumed": False,
+            "injections_consumed": False,
+            "action": "audit_only_no_clip_no_exclusion",
+        }
+    )
+    numeric_gate_path = tmp_path / "numeric_gate_release.json"
+    _write_json(numeric_gate_path, numeric_gate_payload)
+    numeric_gate_digest = _sha256(numeric_gate_path)
+    Path(str(numeric_gate_path) + ".sha256").write_text(
+        f"{numeric_gate_digest}  {numeric_gate_path.name}\n",
+        encoding="ascii",
+    )
+    authority_paths["numeric_gate_release"] = numeric_gate_path
+    authority_metadata["numeric_gate_release"] = _metadata(
+        numeric_gate_path
+    )
+    numeric_gate_summary = {
+        "binding": authority_metadata["numeric_gate_release"],
+        "schema_version": MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+        "envelope_canonical_sha256": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_SHA256
+        ),
+        "counts": numeric_gate_payload["counts"],
+        "identity_hashes": numeric_gate_payload["identity_hashes"],
+        "code_revision": expected_revision,
+        "passed": True,
+    }
     native_path = tmp_path / "native_0.h5"
     native_path.write_bytes(b"native-v2-smoke")
     selection = {
         "selection_schema_version": FULLPOOL_SSL_SELECTION_SCHEMA,
-        "held_out_fold": 0,
+        "held_out_fold": VALIDATOR.SMOKE_FOLD,
         "n_registry_observations": PRODUCTION_FULL_OBSERVATIONS,
         "n_eligible_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
         "n_eligible_tics": 125_620,
@@ -88,6 +233,13 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "n_selected_observations": VALIDATOR.SMOKE_MAX_ROWS,
         "n_selected_tics": VALIDATOR.SMOKE_MAX_ROWS,
         "max_rows": VALIDATOR.SMOKE_MAX_ROWS,
+        "required_observation_ids": list(
+            VALIDATOR.SMOKE_REQUIRED_OBSERVATION_IDS
+        ),
+        "n_required_observations": len(
+            VALIDATOR.SMOKE_REQUIRED_OBSERVATION_IDS
+        ),
+        "required_observations_selected": True,
         "selected_rows_sha256": "2" * 64,
         "selected_tics_sha256": "3" * 64,
         "tic_disjoint": {
@@ -99,7 +251,12 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
     contract = {
         "schema_version": FULLPOOL_SSL_RUN_CONTRACT_SCHEMA,
         "run_id": FULLPOOL_SSL_RUN_ID,
-        "fold": 0,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": numeric_gate_summary,
+        "fold": VALIDATOR.SMOKE_FOLD,
         "registry_path": authority_metadata["registry"]["path"],
         "registry_sha256": authority_metadata["registry"]["sha256"],
         "registry_summary_path": authority_metadata["registry_summary"]["path"],
@@ -122,6 +279,11 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
                 },
             },
             "native_mapping_sha256": "4" * 64,
+            "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+            "model_input_numeric_envelope_contract": (
+                MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+            ),
+            "numeric_gate_release": numeric_gate_summary,
             "source_provenance_verified": True,
             "authority_bindings": authority_metadata,
         },
@@ -150,6 +312,9 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "checkpoint_every": 1,
         "require_cuda": True,
         "max_rows": VALIDATOR.SMOKE_MAX_ROWS,
+        "required_observation_ids": list(
+            VALIDATOR.SMOKE_REQUIRED_OBSERVATION_IDS
+        ),
         "labels_loaded": False,
         "fixed_test_tensors_constructed": False,
         "prospective_sector_tensors_constructed": False,
@@ -168,7 +333,12 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
     checkpoint = {
         "schema_version": VALIDATOR.FULLPOOL_SSL_CHECKPOINT_SCHEMA,
         "run_id": FULLPOOL_SSL_RUN_ID,
-        "fold": 0,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": numeric_gate_summary,
+        "fold": VALIDATOR.SMOKE_FOLD,
         "run_contract_sha256": _sha256(contract_path),
         "selection_audit": selection,
         "epochs": 1,
@@ -180,7 +350,12 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
     summary = {
         "schema_version": FULLPOOL_SSL_SUMMARY_SCHEMA,
         "run_id": FULLPOOL_SSL_RUN_ID,
-        "fold": 0,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": numeric_gate_summary,
+        "fold": VALIDATOR.SMOKE_FOLD,
         "run_contract": str(contract_path.resolve()),
         "run_contract_sha256": _sha256(contract_path),
         "checkpoint": str(checkpoint_path.resolve()),
@@ -205,7 +380,11 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
     }
 
 
-def _validate(case: dict[str, Any]) -> dict[str, Any]:
+def _validate(
+    case: dict[str, Any],
+    *,
+    expected_fold: int = VALIDATOR.SMOKE_FOLD,
+) -> dict[str, Any]:
     paths = case["authority_paths"]
     return VALIDATOR.validate_teacher_ssl_fullpool_smoke(
         summary_path=case["summary_path"],
@@ -217,6 +396,8 @@ def _validate(case: dict[str, Any]) -> dict[str, Any]:
         native_release_summary_path=paths["native_release_summary"],
         registry_path=paths["registry"],
         registry_summary_path=paths["registry_summary"],
+        numeric_gate_release_path=paths["numeric_gate_release"],
+        expected_fold=expected_fold,
     )
 
 
@@ -235,6 +416,16 @@ def _rewrite_contract(
         _write_json(case["summary_path"], summary)
 
 
+def _rewrite_numeric_gate_release(
+    case: dict[str, Any],
+    mutate: Callable[[dict[str, Any]], None],
+) -> None:
+    path = case["authority_paths"]["numeric_gate_release"]
+    release = json.loads(path.read_text(encoding="utf-8"))
+    mutate(release)
+    _write_json(path, release)
+
+
 def test_smoke_validator_accepts_exact_production_result(tmp_path: Path) -> None:
     case = _fixture(tmp_path)
 
@@ -243,6 +434,15 @@ def test_smoke_validator_accepts_exact_production_result(tmp_path: Path) -> None
     assert audit["passed"] is True
     assert audit["max_rows"] == 4096
     assert set(audit["authority_bindings"]) == set(VALIDATOR.AUTHORITY_NAMES)
+
+
+def test_smoke_validator_rejects_any_fold_other_than_two(
+    tmp_path: Path,
+) -> None:
+    case = _fixture(tmp_path)
+
+    with pytest.raises(ValueError, match="locked smoke fold must equal 2"):
+        _validate(case, expected_fold=0)
 
 
 def test_smoke_validator_recomputes_run_contract_hash(tmp_path: Path) -> None:
@@ -265,8 +465,47 @@ def test_smoke_validator_rehashes_all_authority_artifacts(
 
     with pytest.raises(
         ValueError,
-        match="native_release_summary metadata differs",
+        match="native_release_summary",
     ):
+        _validate(case)
+
+
+def test_smoke_validator_rejects_failed_numeric_gate_release(
+    tmp_path: Path,
+) -> None:
+    case = _fixture(tmp_path)
+    _rewrite_numeric_gate_release(
+        case,
+        lambda release: release.update({"passed": False}),
+    )
+
+    with pytest.raises(ValueError, match="numeric-gate release did not pass"):
+        _validate(case)
+
+
+def test_smoke_validator_rejects_model_input_contract_drift(
+    tmp_path: Path,
+) -> None:
+    case = _fixture(tmp_path)
+    _rewrite_contract(
+        case,
+        lambda contract: contract.update(
+            {"model_input_contract_version": "obsolete"}
+        ),
+        rebind_summary=True,
+    )
+
+    with pytest.raises(ValueError, match="wrong model-input contract"):
+        _validate(case)
+
+
+def test_smoke_validator_rejects_numeric_authority_hash_tamper(
+    tmp_path: Path,
+) -> None:
+    case = _fixture(tmp_path)
+    case["authority_paths"]["registry"].write_bytes(b"tampered-registry\n")
+
+    with pytest.raises(ValueError, match="authority_bindings.ssl_registry"):
         _validate(case)
 
 
@@ -347,6 +586,18 @@ def test_smoke_validator_rejects_nonfinite_checkpoint_state(
         (
             lambda contract: contract.update({"seed": 1}),
             "smoke seed must equal 560064",
+        ),
+        (
+            lambda contract: contract.update(
+                {"required_observation_ids": []}
+            ),
+            "locked diagnostic observation",
+        ),
+        (
+            lambda contract: contract["selection_audit"].update(
+                {"required_observations_selected": False}
+            ),
+            "omitted the locked diagnostic observation",
         ),
     ],
 )

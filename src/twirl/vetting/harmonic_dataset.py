@@ -22,6 +22,7 @@ from twirl.vetting.harmonic_inputs import (
     HARMONIC_FACTORS,
     build_harmonic_views,
     build_native_channels,
+    checked_model_float32,
     native_group_path,
     pad_channel_sequences,
     read_native_light_curve_from_h5,
@@ -545,7 +546,17 @@ class HarmonicNativeDataset:
                         scale = float(np.nanstd(finite))
                     if not np.isfinite(scale) or scale <= 1.0e-8:
                         scale = 1.0
-                    periodogram[channel] = (values - center) / scale
+                    valid = np.isfinite(values)
+                    normalized = checked_model_float32(
+                        (
+                            np.asarray(values[valid], dtype=np.float64)
+                            - center
+                        )
+                        / scale,
+                        context="normalized periodogram",
+                    )
+                    periodogram[channel] = np.nan
+                    periodogram[channel, valid] = normalized
         else:
             periodogram = np.full((4, 1), np.nan, dtype=np.float32)
         sample = {

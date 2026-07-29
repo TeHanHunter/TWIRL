@@ -30,6 +30,11 @@ from twirl.vetting.ssl_full_pool_eligibility import (  # noqa: E402
 from twirl.vetting.ssl_full_pool_native import (  # noqa: E402
     FULL_POOL_NATIVE_CONTRACT_VERSION,
 )
+from twirl.vetting.ssl_full_pool_numeric import (  # noqa: E402
+    MODEL_INPUT_CONTRACT_VERSION,
+    MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
+    validate_numeric_gate_release,
+)
 from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
     FULLPOOL_SSL_CHECKPOINT_SCHEMA,
     FULLPOOL_SSL_RUN_CONTRACT_SCHEMA,
@@ -49,6 +54,10 @@ SMOKE_SEED = 560064
 SMOKE_LEARNING_RATE = 3.0e-4
 SMOKE_WEIGHT_DECAY = 1.0e-4
 SMOKE_GLOBAL_STEPS = SMOKE_MAX_ROWS // SMOKE_BATCH_SIZE
+SMOKE_FOLD = 2
+SMOKE_REQUIRED_OBSERVATION_IDS: tuple[str, ...] = (
+    "s0060-tic0000000722078603",
+)
 AUTHORITY_NAMES: tuple[str, ...] = (
     "eligibility_exclusions",
     "eligibility_summary",
@@ -57,6 +66,7 @@ AUTHORITY_NAMES: tuple[str, ...] = (
     "native_release_summary",
     "registry",
     "registry_summary",
+    "numeric_gate_release",
 )
 
 
@@ -184,6 +194,48 @@ def _expected_partition() -> dict[str, dict[str, Any]]:
     }
 
 
+def _expected_numeric_gate_summary(
+    release: Mapping[str, Any],
+    *,
+    binding: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Match the exact numerical-gate authority embedded by training."""
+
+    return {
+        "binding": dict(binding),
+        "schema_version": release.get("schema_version"),
+        "envelope_canonical_sha256": release.get(
+            "envelope_canonical_sha256"
+        ),
+        "counts": dict(release.get("counts", {})),
+        "identity_hashes": dict(release.get("identity_hashes", {})),
+        "code_revision": release.get("code_revision"),
+        "passed": True,
+    }
+
+
+def _validate_numeric_model_bindings(
+    value: Mapping[str, Any],
+    *,
+    expected_release: Mapping[str, Any],
+    context: str,
+) -> None:
+    if value.get("model_input_contract_version") != (
+        MODEL_INPUT_CONTRACT_VERSION
+    ):
+        raise ValueError(f"{context} has the wrong model-input contract")
+    if value.get("model_input_numeric_envelope_contract") != (
+        MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+    ):
+        raise ValueError(
+            f"{context} has the wrong model-input numeric envelope"
+        )
+    if value.get("numeric_gate_release") != expected_release:
+        raise ValueError(
+            f"{context} numerical-gate release binding differs"
+        )
+
+
 def _validate_partition(value: Any) -> dict[str, dict[str, Any]]:
     expected = _expected_partition()
     if not isinstance(value, Mapping) or set(value) != set(expected):
@@ -281,6 +333,7 @@ def _validate_smoke_checkpoint(
     expected_fold: int,
     expected_run_contract_sha256: str,
     expected_selection: Mapping[str, Any],
+    expected_numeric_gate_release: Mapping[str, Any],
     history_columns: list[str],
     history_row: Mapping[str, float],
 ) -> int:
@@ -298,6 +351,11 @@ def _validate_smoke_checkpoint(
         raise ValueError("smoke checkpoint has the wrong schema")
     if checkpoint.get("run_id") != FULLPOOL_SSL_RUN_ID:
         raise ValueError("smoke checkpoint has the wrong run ID")
+    _validate_numeric_model_bindings(
+        checkpoint,
+        expected_release=expected_numeric_gate_release,
+        context="smoke checkpoint",
+    )
     _exact_int(
         checkpoint.get("fold"),
         expected_fold,
@@ -360,7 +418,8 @@ def validate_teacher_ssl_fullpool_smoke(
     native_release_summary_path: Path,
     registry_path: Path,
     registry_summary_path: Path,
-    expected_fold: int = 0,
+    numeric_gate_release_path: Path,
+    expected_fold: int = SMOKE_FOLD,
 ) -> dict[str, Any]:
     """Validate one bounded smoke result against all production authorities."""
 
@@ -373,9 +432,11 @@ def validate_teacher_ssl_fullpool_smoke(
         )
     ):
         raise ValueError("expected code revision must be a lowercase 40-hex Git SHA")
-    _exact_int(expected_fold, expected_fold, context="expected fold")
-    if expected_fold not in range(5):
-        raise ValueError("expected fold must be in [0,4]")
+    _exact_int(
+        expected_fold,
+        SMOKE_FOLD,
+        context="locked smoke fold",
+    )
 
     expected_authorities = {
         "eligibility_exclusions": _artifact_metadata(
@@ -391,9 +452,33 @@ def validate_teacher_ssl_fullpool_smoke(
         ),
         "registry": _artifact_metadata(registry_path),
         "registry_summary": _artifact_metadata(registry_summary_path),
+        "numeric_gate_release": _artifact_metadata(
+            numeric_gate_release_path
+        ),
     }
     if tuple(expected_authorities) != AUTHORITY_NAMES:
         raise AssertionError("internal smoke authority order changed")
+    numeric_gate_release = validate_numeric_gate_release(
+        Path(expected_authorities["numeric_gate_release"]["path"]),
+        expected_code_revision=expected_code_revision,
+        expected_authority_bindings={
+            "ssl_registry": expected_authorities["registry"],
+            "ssl_registry_summary": expected_authorities[
+                "registry_summary"
+            ],
+            "native_registry": expected_authorities["native_registry"],
+            "native_registry_summary": expected_authorities[
+                "native_registry_summary"
+            ],
+            "native_release_summary": expected_authorities[
+                "native_release_summary"
+            ],
+        },
+    )
+    expected_numeric_gate_summary = _expected_numeric_gate_summary(
+        numeric_gate_release,
+        binding=expected_authorities["numeric_gate_release"],
+    )
 
     summary_metadata = _artifact_metadata(summary_path)
     summary = _read_json(
@@ -404,6 +489,11 @@ def validate_teacher_ssl_fullpool_smoke(
         raise ValueError("smoke summary has the wrong schema")
     if summary.get("run_id") != FULLPOOL_SSL_RUN_ID:
         raise ValueError("smoke summary has the wrong run ID")
+    _validate_numeric_model_bindings(
+        summary,
+        expected_release=expected_numeric_gate_summary,
+        context="smoke summary",
+    )
     _exact_int(summary.get("fold"), expected_fold, context="smoke summary fold")
     _exact_int(
         summary.get("completed_epochs"),
@@ -442,6 +532,11 @@ def validate_teacher_ssl_fullpool_smoke(
         raise ValueError("smoke run contract has the wrong schema")
     if contract.get("run_id") != FULLPOOL_SSL_RUN_ID:
         raise ValueError("smoke run contract has the wrong run ID")
+    _validate_numeric_model_bindings(
+        contract,
+        expected_release=expected_numeric_gate_summary,
+        context="smoke run contract",
+    )
     if contract.get("code_revision") != expected_code_revision:
         raise ValueError("smoke run contract has the wrong code revision")
     _exact_int(contract.get("fold"), expected_fold, context="smoke contract fold")
@@ -479,6 +574,12 @@ def validate_teacher_ssl_fullpool_smoke(
             raise ValueError(f"smoke {name.replace('_', ' ')} must equal {expected}")
     if contract.get("require_cuda") is not True:
         raise ValueError("smoke did not require CUDA")
+    if contract.get("required_observation_ids") != list(
+        SMOKE_REQUIRED_OBSERVATION_IDS
+    ):
+        raise ValueError(
+            "smoke did not bind the locked diagnostic observation"
+        )
     if (
         contract.get("labels_loaded") is not False
         or contract.get("fixed_test_tensors_constructed") is not False
@@ -499,6 +600,11 @@ def validate_teacher_ssl_fullpool_smoke(
         raise ValueError("smoke training authority production lock failed")
     if authority.get("source_provenance_verified") is not True:
         raise ValueError("smoke training authority source provenance failed")
+    _validate_numeric_model_bindings(
+        authority,
+        expected_release=expected_numeric_gate_summary,
+        context="smoke training authority",
+    )
     partition = _validate_partition(authority.get("partition"))
     mapping_sha = authority.get("native_mapping_sha256")
     if (
@@ -512,7 +618,7 @@ def validate_teacher_ssl_fullpool_smoke(
         declared_authorities
     ) != set(AUTHORITY_NAMES):
         raise ValueError(
-            "smoke training authority does not bind exactly seven artifacts"
+            "smoke training authority does not bind the exact artifact inventory"
         )
     for name in AUTHORITY_NAMES:
         observed = _declared_metadata(
@@ -618,6 +724,21 @@ def validate_teacher_ssl_fullpool_smoke(
             expected,
             context=f"smoke selection {name}",
         )
+    if selection.get("required_observation_ids") != list(
+        SMOKE_REQUIRED_OBSERVATION_IDS
+    ):
+        raise ValueError(
+            "smoke selection does not name the locked diagnostic observation"
+        )
+    _exact_int(
+        selection.get("n_required_observations"),
+        len(SMOKE_REQUIRED_OBSERVATION_IDS),
+        context="smoke required-observation count",
+    )
+    if selection.get("required_observations_selected") is not True:
+        raise ValueError(
+            "smoke selection omitted the locked diagnostic observation"
+        )
     if selection.get("tic_disjoint") != {
         "held_fold_tics": True,
         "fixed_test_tics": True,
@@ -645,6 +766,7 @@ def validate_teacher_ssl_fullpool_smoke(
         expected_fold=expected_fold,
         expected_run_contract_sha256=run_contract_metadata["sha256"],
         expected_selection=selection,
+        expected_numeric_gate_release=expected_numeric_gate_summary,
         history_columns=history_columns,
         history_row=history_row,
     )
@@ -654,6 +776,11 @@ def validate_teacher_ssl_fullpool_smoke(
         raise RuntimeError("smoke checkpoint changed while it was validated")
     if _artifact_metadata(Path(history_metadata["path"])) != history_metadata:
         raise RuntimeError("smoke history changed while it was validated")
+    for name, metadata in expected_authorities.items():
+        if _artifact_metadata(Path(metadata["path"])) != metadata:
+            raise RuntimeError(
+                f"smoke authority {name} changed while it was validated"
+            )
     return {
         "passed": True,
         "schema_version": SMOKE_VALIDATION_SCHEMA,
@@ -666,6 +793,12 @@ def validate_teacher_ssl_fullpool_smoke(
         "workers": SMOKE_WORKERS,
         "seed": SMOKE_SEED,
         "global_steps": SMOKE_GLOBAL_STEPS,
+        "required_observation_ids": list(SMOKE_REQUIRED_OBSERVATION_IDS),
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": expected_numeric_gate_summary,
         "partition": partition,
         "authority_bindings": expected_authorities,
         "summary": summary_metadata,
@@ -689,7 +822,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--native-release-summary", type=Path, required=True)
     parser.add_argument("--registry", type=Path, required=True)
     parser.add_argument("--registry-summary", type=Path, required=True)
-    parser.add_argument("--expected-fold", type=int, choices=range(5), default=0)
+    parser.add_argument("--numeric-gate-release", type=Path, required=True)
+    parser.add_argument(
+        "--expected-fold",
+        type=int,
+        choices=(SMOKE_FOLD,),
+        default=SMOKE_FOLD,
+    )
     return parser
 
 
@@ -705,6 +844,7 @@ def main(argv: list[str] | None = None) -> int:
         native_release_summary_path=args.native_release_summary,
         registry_path=args.registry,
         registry_summary_path=args.registry_summary,
+        numeric_gate_release_path=args.numeric_gate_release,
         expected_fold=args.expected_fold,
     )
     print(json.dumps(audit, indent=2, sort_keys=True, allow_nan=False))

@@ -179,6 +179,7 @@ def _training_authority_inputs(
     dict[str, object],
     pd.DataFrame,
     dict[str, object],
+    dict[str, object],
     dict[str, dict[str, object]],
 ]:
     registry, registry_summary = _build(tmp_path)
@@ -263,6 +264,7 @@ def _training_authority_inputs(
             "native_release_summary",
             "registry",
             "registry_summary",
+            "numeric_gate_release",
         )
     }
     explicit_bindings["eligibility_exclusions"] = source_bindings[
@@ -333,12 +335,40 @@ def _training_authority_inputs(
             ]["sha256"],
         },
     }
+    numeric_gate_release = {
+        "schema_version": (
+            "twirl_teacher_ssl_fullpool_model_input_numeric_release_v1"
+        ),
+        "passed": True,
+        "model_input_contract_version": (
+            fullpool.MODEL_INPUT_CONTRACT_VERSION
+        ),
+        "envelope_contract": (
+            fullpool.MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "envelope_canonical_sha256": "9" * 64,
+        "counts": {
+            "full_observations": len(full_keys),
+            "eligible_observations": len(eligible_keys),
+            "excluded_observations": len(excluded_keys),
+            "scanned_observations": len(eligible_keys),
+            "failed_observations": 0,
+            "native_shards": native_registry["native_h5_path"].nunique(),
+        },
+        "identity_hashes": {
+            "full": full_identity,
+            "eligible": eligible_identity,
+            "excluded": excluded_identity,
+        },
+        "code_revision": "1" * 40,
+    }
     return (
         eligibility,
         native_registry,
         native_release,
         registry,
         registry_summary,
+        numeric_gate_release,
         explicit_bindings,
     )
 
@@ -388,6 +418,96 @@ def test_unseen_tics_are_present_in_all_folds_and_frozen_fold_is_held(
     assert audit_2["n_held_tics"] == 1
     assert audit_1["n_held_tics"] == 0
     assert all(audit_2["tic_disjoint"].values())
+
+
+def test_bounded_selection_pins_required_observation_without_changing_default(
+    tmp_path: Path,
+) -> None:
+    registry, _ = _build(tmp_path)
+    production_default, default_audit = fullpool.select_fullpool_ssl_fold(
+        registry,
+        held_out_fold=1,
+    )
+    production_explicit_empty, empty_audit = (
+        fullpool.select_fullpool_ssl_fold(
+            registry,
+            held_out_fold=1,
+            required_observation_ids=[],
+        )
+    )
+    pd.testing.assert_frame_equal(
+        production_default,
+        production_explicit_empty,
+    )
+    assert default_audit == empty_audit
+
+    baseline, _ = fullpool.select_fullpool_ssl_fold(
+        registry,
+        held_out_fold=1,
+        max_rows=2,
+    )
+    forced_id = next(
+        value
+        for value in production_default["ssl_observation_id"].astype(str)
+        if value not in set(baseline["ssl_observation_id"].astype(str))
+    )
+    selected, audit = fullpool.select_fullpool_ssl_fold(
+        registry,
+        held_out_fold=1,
+        max_rows=2,
+        required_observation_ids=[forced_id],
+    )
+
+    assert len(selected) == 2
+    assert forced_id in set(selected["ssl_observation_id"].astype(str))
+    assert audit["required_observation_ids"] == [forced_id]
+    assert audit["n_required_observations"] == 1
+    assert audit["required_observations_selected"] is True
+
+
+def test_required_observation_selection_fails_closed(
+    tmp_path: Path,
+) -> None:
+    registry, _ = _build(tmp_path)
+    eligible_id = str(
+        registry.loc[
+            registry["ssl_pool_include"], "ssl_observation_id"
+        ].iloc[0]
+    )
+    held_id = str(
+        registry.loc[
+            registry["ssl_held_out_fold"].eq(2),
+            "ssl_observation_id",
+        ].iloc[0]
+    )
+
+    with pytest.raises(ValueError, match="only valid with bounded max_rows"):
+        fullpool.select_fullpool_ssl_fold(
+            registry,
+            held_out_fold=1,
+            required_observation_ids=[eligible_id],
+        )
+    with pytest.raises(ValueError, match="contains duplicates"):
+        fullpool.select_fullpool_ssl_fold(
+            registry,
+            held_out_fold=1,
+            max_rows=2,
+            required_observation_ids=[eligible_id, eligible_id],
+        )
+    with pytest.raises(ValueError, match="absent from the full-pool registry"):
+        fullpool.select_fullpool_ssl_fold(
+            registry,
+            held_out_fold=1,
+            max_rows=2,
+            required_observation_ids=["s9999-tic9999999999999999999"],
+        )
+    with pytest.raises(ValueError, match="held-out fold"):
+        fullpool.select_fullpool_ssl_fold(
+            registry,
+            held_out_fold=2,
+            max_rows=2,
+            required_observation_ids=[held_id],
+        )
 
 
 def test_fullpool_dataset_adapter_uses_no_supervised_targets(
@@ -457,6 +577,7 @@ def test_training_authority_chain_is_exact_and_provenance_bound(
         native_release,
         registry,
         registry_summary,
+        numeric_gate_release,
         authority_bindings,
     ) = _training_authority_inputs(tmp_path, monkeypatch)
 
@@ -466,10 +587,20 @@ def test_training_authority_chain_is_exact_and_provenance_bound(
         native_release=native_release,
         registry=registry,
         registry_summary=registry_summary,
+        numeric_gate_release=numeric_gate_release,
         authority_bindings=authority_bindings,
     )
     assert audit["production_lock_passed"] is True
     assert audit["source_provenance_verified"] is True
+    assert audit["model_input_contract_version"] == (
+        fullpool.MODEL_INPUT_CONTRACT_VERSION
+    )
+    assert audit["model_input_numeric_envelope_contract"] == (
+        fullpool.MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+    )
+    assert audit["numeric_gate_release"]["binding"] == (
+        authority_bindings["numeric_gate_release"]
+    )
     assert set(audit["authority_bindings"]) == {
         "eligibility_exclusions",
         "eligibility_summary",
@@ -478,6 +609,7 @@ def test_training_authority_chain_is_exact_and_provenance_bound(
         "native_release_summary",
         "registry",
         "registry_summary",
+        "numeric_gate_release",
     }
 
     changed_mapping = registry.copy()
@@ -492,6 +624,7 @@ def test_training_authority_chain_is_exact_and_provenance_bound(
             native_release=native_release,
             registry=changed_mapping,
             registry_summary=registry_summary,
+            numeric_gate_release=numeric_gate_release,
             authority_bindings=authority_bindings,
         )
 
@@ -506,6 +639,20 @@ def test_training_authority_chain_is_exact_and_provenance_bound(
             native_release=native_release,
             registry=registry,
             registry_summary=changed_provenance,
+            numeric_gate_release=numeric_gate_release,
+            authority_bindings=authority_bindings,
+        )
+
+    wrong_numeric_contract = dict(numeric_gate_release)
+    wrong_numeric_contract["model_input_contract_version"] = "old"
+    with pytest.raises(ValueError, match="wrong input contract"):
+        fullpool._validate_training_authority_chain(
+            eligibility=eligibility,
+            native_registry=native_registry,
+            native_release=native_release,
+            registry=registry,
+            registry_summary=registry_summary,
+            numeric_gate_release=wrong_numeric_contract,
             authority_bindings=authority_bindings,
         )
 
@@ -576,9 +723,30 @@ def test_training_cli_requires_full_authority_chain_and_has_no_hash_bypass() -> 
         "--native-release-summary",
         "--registry",
         "--registry-summary",
+        "--numeric-gate-release",
+        "--required-observation-id",
     ):
         assert option in script
+    assert 'action="append"' in script
     assert "--skip-native-hash-verification" not in script
+    assert "--skip-numeric-gate" not in script
+
+
+def test_quality_mask_model_run_uses_fresh_v3_namespace() -> None:
+    assert fullpool.FULLPOOL_SSL_REGISTRY_SCHEMA.endswith("_v2")
+    assert fullpool.FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA.endswith("_v2")
+    assert fullpool.FULLPOOL_SSL_SELECTION_SCHEMA.endswith("_v3")
+    assert fullpool.FULLPOOL_SSL_RUN_CONTRACT_SCHEMA.endswith("_v3")
+    assert fullpool.FULLPOOL_SSL_RESUME_SCHEMA.endswith("_v3")
+    assert fullpool.FULLPOOL_SSL_CHECKPOINT_SCHEMA.endswith("_v3")
+    assert fullpool.FULLPOOL_SSL_SUMMARY_SCHEMA.endswith("_v3")
+    assert fullpool.FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA.endswith("_v3")
+    assert "effective_quality_mask_v1" in fullpool.FULLPOOL_SSL_RUN_ID
+    assert "effective_quality_mask_v1" in fullpool.FULLPOOL_SSL_ENCODER_NAME
+    assert (
+        "effective_quality_mask_v1"
+        in fullpool.FULLPOOL_SSL_CHECKPOINT_NAMESPACE
+    )
 
 
 def test_fold_run_directory_resumes_only_identical_contract(

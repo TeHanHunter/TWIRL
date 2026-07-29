@@ -20,6 +20,7 @@ from twirl.vetting.harmonic_inputs import (
     CHANNEL_CONTRACT,
     CANDIDATE_PROVENANCE_CONTRACT_VERSION,
     HARMONIC_FACTORS,
+    MODEL_INPUT_CONTRACT_VERSION,
     NATIVE_DATASETS,
     RAW_PAIR_CONTRACT_VERSION,
     RAW_PAIR_CANDIDATE_PROVENANCE_ATTRS,
@@ -107,20 +108,89 @@ def _native_lc(n: int = 300) -> NativeLightCurve:
 def test_native_channels_keep_every_cadence_and_negative_raw_flux() -> None:
     lc = _native_lc()
     channels = build_native_channels(lc)
+    quality_good = np.asarray(lc.quality) == 0
+    quality_bad = ~quality_good
 
     assert channels.small_values.shape == (10, len(lc.time))
     assert channels.supplemental_values.shape == (5, len(lc.time))
     assert channels.small_mask.shape == channels.small_values.shape
-    assert channels.small_mask[0].all()
-    assert np.isfinite(channels.small_values[0]).all()
+    assert channels.small_mask[:3, quality_good].all()
+    assert not channels.small_mask[:3, quality_bad].any()
+    assert channels.supplemental_mask[:, quality_good].all()
+    assert not channels.supplemental_mask[:, quality_bad].any()
+    assert np.isfinite(channels.small_values[0, quality_good]).all()
     assert not np.allclose(channels.small_values[0], 0.0)
-    assert channels.small_values[1].min() < -0.10
+    assert np.nanmin(channels.small_values[1]) < -0.10
     assert channels.small_values[3, 0] == 0.0
     assert channels.small_values[3, -1] == 1.0
     assert channels.small_values[5, 0] == 0.0
     assert channels.small_values[5, -1] == 1.0
     assert set(np.unique(channels.small_values[7])) == {0.0, 1.0}
     assert set(np.unique(channels.small_values[9])) == {0.0, 1.0}
+    assert channels.small_mask[3:, quality_bad].all()
+    assert np.equal(channels.small_values[9, quality_bad], 1.0).all()
+
+
+def test_model_input_contract_masks_catastrophic_flagged_photometry() -> None:
+    assert (
+        MODEL_INPUT_CONTRACT_VERSION
+        == "twirl_harmonic_model_input_effective_quality_mask_v1"
+    )
+    lc = _native_lc(180)
+    bad_index = 71
+    lc.quality[bad_index] = 1
+    lc.raw_flux_small[bad_index] = -8.580622277056428e39
+    lc.raw_flux_err_small[bad_index] = 5.0e35
+    lc.raw_flux_primary[bad_index] = 7.0e38
+    lc.raw_flux_err_primary[bad_index] = 4.0e35
+    lc.det_flux_adp_sml[bad_index] = -5.347626523357893e36
+    lc.det_flux_adp[bad_index] = 6.0e35
+
+    channels = build_native_channels(lc)
+    views = build_harmonic_views(
+        lc,
+        period_d=0.25,
+        t0_bjd=2459825.02,
+        duration_min=15.0,
+    )
+
+    assert not channels.small_mask[:3, bad_index].any()
+    assert not channels.supplemental_mask[:, bad_index].any()
+    assert channels.small_mask[3:, bad_index].all()
+    assert channels.small_values[9, bad_index] == 1.0
+    for factor, values, masks in zip(
+        views.factors,
+        views.full_values,
+        views.full_masks,
+    ):
+        period = 0.25 * factor
+        phase = (
+            (lc.time - 2459825.02 + 0.5 * period) % period
+        ) / period - 0.5
+        order = np.argsort(phase, kind="stable")
+        matching = np.flatnonzero(order == bad_index)
+        expected_phase = (
+            (lc.time[bad_index] - 2459825.02 + 0.5 * period) % period
+        ) / period - 0.5
+        assert matching.size == 1
+        index = int(matching[0])
+        assert values[5, index] == pytest.approx(expected_phase)
+        assert not masks[:5, index].any()
+        assert masks[5:, index].all()
+        assert values[6, index] == 1.0
+
+
+def test_model_input_contract_never_silently_masks_float32_overflow() -> None:
+    lc = _native_lc(180)
+    good_index = 71
+    assert lc.quality[good_index] == 0
+    lc.det_flux_adp_sml[good_index] = np.finfo(np.float64).max / 4.0
+
+    with pytest.raises(
+        FloatingPointError,
+        match="relative detrended flux exceeds the float32 model-input range",
+    ):
+        build_native_channels(lc)
 
 
 def test_seven_harmonic_views_are_complete_and_local_windows_are_unbinned() -> None:

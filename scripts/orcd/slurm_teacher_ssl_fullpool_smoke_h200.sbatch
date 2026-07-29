@@ -34,14 +34,18 @@ NATIVE_RELEASE_SUMMARY="${NATIVE_REGISTRY_DIR}/native_fullpool_release.summary.j
 REGISTRY_DIR="${RUN_ROOT}/frozen/ssl_registry"
 REGISTRY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.parquet"
 REGISTRY_SUMMARY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.summary.json"
-OUT_ROOT="${RUN_ROOT}/smoke/one_epoch"
-PRODUCTION_OUT_ROOT="${RUN_ROOT}/training/five_fold"
-FOLD="${TWIRL_SSL_FULLPOOL_SMOKE_FOLD:-0}"
+NUMERIC_GATE_DIR="${RUN_ROOT}/frozen/model_input_numeric_gate_v1"
+NUMERIC_GATE_RELEASE="${NUMERIC_GATE_DIR}/model_input_numeric_gate.release.json"
+MODEL_RUN_ROOT="${RUN_ROOT}/model_runs/effective_quality_mask_v1"
+OUT_ROOT="${MODEL_RUN_ROOT}/smoke/one_epoch"
+PRODUCTION_OUT_ROOT="${MODEL_RUN_ROOT}/training/five_fold"
+readonly FOLD=2
 readonly EPOCHS=1
 readonly MAX_ROWS=4096
 readonly BATCH_SIZE=64
 readonly WORKERS=8
 readonly SEED=560064
+readonly REQUIRED_OBSERVATION_ID="s0060-tic0000000722078603"
 
 for forbidden_var in \
   TWIRL_SSL_FULLPOOL_SMOKE_EPOCHS \
@@ -49,10 +53,13 @@ for forbidden_var in \
   TWIRL_SSL_FULLPOOL_SMOKE_BATCH_SIZE \
   TWIRL_SSL_FULLPOOL_SMOKE_WORKERS \
   TWIRL_SSL_FULLPOOL_SMOKE_OUT_ROOT \
+  TWIRL_SSL_FULLPOOL_SMOKE_FOLD \
+  TWIRL_SSL_FULLPOOL_SMOKE_REQUIRED_OBSERVATION_ID \
   TWIRL_SSL_FULLPOOL_EPOCHS \
   TWIRL_SSL_FULLPOOL_BATCH_SIZE \
   TWIRL_SSL_FULLPOOL_WORKERS \
   TWIRL_SSL_FULLPOOL_SEED \
+  TWIRL_SSL_FULLPOOL_REQUIRED_OBSERVATION_ID \
   TWIRL_SSL_FULLPOOL_MAX_ROWS; do
   if [[ -n "${!forbidden_var+x}" ]]; then
     echo "Smoke contract forbids environment override ${forbidden_var}." >&2
@@ -63,12 +70,12 @@ if [[ "${SOURCE_RUN_ROOT}" != "${EXPECTED_SOURCE_RUN_ROOT}" || "${RUN_ROOT}" != 
   echo "Smoke roots differ from the exact Teacher v4-SSL v2 contract." >&2
   exit 2
 fi
-if [[ "${OUT_ROOT}" == "${PRODUCTION_OUT_ROOT}" ]]; then
-  echo "Smoke and production output roots must be distinct." >&2
+if [[ "${MODEL_RUN_ROOT}" != "${EXPECTED_RUN_ROOT}/model_runs/effective_quality_mask_v1" ]]; then
+  echo "Smoke model-run root differs from the effective-quality-mask contract." >&2
   exit 2
 fi
-if [[ ! "${FOLD}" =~ ^[0-4]$ ]]; then
-  echo "TWIRL_SSL_FULLPOOL_SMOKE_FOLD must be in [0,4]." >&2
+if [[ "${OUT_ROOT}" == "${PRODUCTION_OUT_ROOT}" ]]; then
+  echo "Smoke and production output roots must be distinct." >&2
   exit 2
 fi
 if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
@@ -87,12 +94,16 @@ for input in \
   "${NATIVE_REGISTRY_SUMMARY}" \
   "${NATIVE_RELEASE_SUMMARY}" \
   "${REGISTRY}" \
-  "${REGISTRY_SUMMARY}"; do
+  "${REGISTRY_SUMMARY}" \
+  "${NUMERIC_GATE_RELEASE}"; do
   if [[ ! -s "${input}" ]]; then
     echo "Missing verified v2 smoke authority: ${input}" >&2
     exit 3
   fi
 done
+PYTHONPATH="${REPO}/src" "${PYTHON}" -c \
+  'from pathlib import Path; import sys; from twirl.vetting.ssl_full_pool_numeric import validate_numeric_gate_release; validate_numeric_gate_release(Path(sys.argv[1]), expected_code_revision=sys.argv[2])' \
+  "${NUMERIC_GATE_RELEASE}" "${EXPECTED_SHA}"
 if [[ -e "${OUT_ROOT}/encoder_pretraining/fold_${FOLD}/summary.json" ]]; then
   echo "Refusing to overwrite an existing completed smoke." >&2
   exit 4
@@ -111,7 +122,7 @@ export HDF5_USE_FILE_LOCKING=FALSE
 module load cuda/13.1.0 || module load cuda/12.9.1 || true
 nvidia-smi
 
-echo "[teacher-ssl-fullpool-v2-smoke] start=$(date -Is) fold=${FOLD} rows=${MAX_ROWS}"
+echo "[teacher-ssl-fullpool-v2-smoke] start=$(date -Is) fold=${FOLD} rows=${MAX_ROWS} required=${REQUIRED_OBSERVATION_ID}"
 "${PYTHON}" scripts/stage5_validation/train_teacher_ssl_fullpool_fold.py \
   --eligibility-exclusions "${ELIGIBILITY_EXCLUSIONS}" \
   --eligibility-summary "${ELIGIBILITY_SUMMARY}" \
@@ -120,13 +131,15 @@ echo "[teacher-ssl-fullpool-v2-smoke] start=$(date -Is) fold=${FOLD} rows=${MAX_
   --native-release-summary "${NATIVE_RELEASE_SUMMARY}" \
   --registry "${REGISTRY}" \
   --registry-summary "${REGISTRY_SUMMARY}" \
+  --numeric-gate-release "${NUMERIC_GATE_RELEASE}" \
   --out-root "${OUT_ROOT}" \
   --fold "${FOLD}" \
   --epochs "${EPOCHS}" \
   --batch-size "${BATCH_SIZE}" \
   --workers "${WORKERS}" \
   --seed "${SEED}" \
-  --max-rows "${MAX_ROWS}"
+  --max-rows "${MAX_ROWS}" \
+  --required-observation-id "${REQUIRED_OBSERVATION_ID}"
 
 SMOKE_SUMMARY="${OUT_ROOT}/encoder_pretraining/fold_${FOLD}/summary.json"
 "${PYTHON}" \
@@ -140,5 +153,6 @@ SMOKE_SUMMARY="${OUT_ROOT}/encoder_pretraining/fold_${FOLD}/summary.json"
   --native-release-summary "${NATIVE_RELEASE_SUMMARY}" \
   --registry "${REGISTRY}" \
   --registry-summary "${REGISTRY_SUMMARY}" \
+  --numeric-gate-release "${NUMERIC_GATE_RELEASE}" \
   --expected-fold "${FOLD}"
 echo "[teacher-ssl-fullpool-v2-smoke] complete=$(date -Is) summary=${SMOKE_SUMMARY}"

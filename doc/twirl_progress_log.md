@@ -429,6 +429,21 @@ sample.
   OOF, and the exact-support Teacher v3 comparison; the preregistered
   permutation, collapse, confound, review-budget, injection, and WD 1856 gate
   evaluator remains the next dependent analysis.
+- `2026-07-29`: Completed and registry-validated all `112/112` fresh
+  Teacher v4-SSL full-pool native-v2 shards for the exact `175,347` eligible
+  observations, with the `19` locked model exclusions retained in the
+  `175,366`-row audit. The initial five-fold run then failed before epoch 1.
+  One-H200 diagnostic job `19198212` completed normally on `node4900` and
+  isolated the failure to observation `s0060-tic0000000722078603`, cadence
+  `738841`, whose `quality=1` sentinel remained model-active. Its extreme
+  harmonic activation first became nonfinite in
+  `model.harmonic_encoder.sequence_encoder.stem.1.norm`; the same failure in
+  BF16 and FP32, with finite pre-forward model and optimizer state, confirms a
+  model-input LayerNorm overflow rather than an H200 fault. A clean local
+  worktree now implements quality-aware photometry/error masking while
+  preserving phase and quality, plus a fail-closed numerical release gate over
+  all `175,347` eligible rows. No corrected remote numerical gate, fresh smoke,
+  or replacement five-fold result is claimed yet.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 

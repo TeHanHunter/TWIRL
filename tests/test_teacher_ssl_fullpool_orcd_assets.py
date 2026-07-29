@@ -188,13 +188,22 @@ def test_fullpool_smoke_is_separate_from_locked_production_folds() -> None:
     assert "TWIRL_SSL_FULLPOOL_SMOKE_OUT_ROOT" in fold
     assert "Production fold contract forbids environment override" in fold
     assert "--max-rows" not in fold
-    assert 'OUT_ROOT="${RUN_ROOT}/training/five_fold"' in fold
+    assert (
+        'OUT_ROOT="${MODEL_RUN_ROOT}/training/five_fold"'
+        in fold
+    )
+    assert "model_runs/effective_quality_mask_v1" in fold
     assert "validate_teacher_ssl_fullpool_v2_smoke.py" in fold
 
     assert "readonly EPOCHS=1" in smoke
     assert "readonly MAX_ROWS=4096" in smoke
     assert '--max-rows "${MAX_ROWS}"' in smoke
-    assert 'OUT_ROOT="${RUN_ROOT}/smoke/one_epoch"' in smoke
+    assert (
+        'OUT_ROOT="${MODEL_RUN_ROOT}/smoke/one_epoch"'
+        in smoke
+    )
+    assert "model_runs/effective_quality_mask_v1" in smoke
+    assert "--required-observation-id" in smoke
     assert "validate_teacher_ssl_fullpool_v2_smoke.py" in smoke
 
 

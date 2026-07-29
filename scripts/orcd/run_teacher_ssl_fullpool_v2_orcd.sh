@@ -21,6 +21,8 @@ Actions:
   submit-native           Submit seven independent 16-shard native-v2 CPU arrays.
   submit-native-registry  Freeze exact 112-shard native coverage and release summaries.
   submit-ssl-registry     Build the 175,366-row audit / 175,347-row include registry.
+  submit-numeric-audit    Audit all 112 native shards under the model-facing transform.
+  submit-numeric-release  Merge 112 passed audits into one immutable numeric release.
   submit-smoke            Run one bounded one-epoch smoke on one H200.
   submit-folds            Launch five one-H200 folds as array 0-4%4.
   status                  Show v2 jobs and published gate artifacts.
@@ -69,7 +71,7 @@ fi
 REMOTE_SOURCE="${TWIRL_ORCD_SOURCE_REPO:-${TWIRL_ROOT}/code/TWIRL}"
 EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA:-$(git -C "${LOCAL_REPO}" rev-parse HEAD)}"
 REMOTE_REPO="${TWIRL_ORCD_REPO:-${TWIRL_ROOT}/code/TWIRL_teacher_ssl_fullpool_v2_${EXPECTED_SHA:0:12}}"
-GIT_BRANCH="${TWIRL_GIT_BRANCH:-codex/s56-tier1-qa}"
+GIT_BRANCH="${TWIRL_GIT_BRANCH:-codex/teacher-ssl-quality-mask}"
 SOURCE_RUN_ROOT="${TWIRL_SSL_FULLPOOL_V1_RUN_ROOT:-${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp}"
 RUN_ROOT="${TWIRL_SSL_FULLPOOL_V2_RUN_ROOT:-${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible}"
 ELIGIBILITY_DIR="${RUN_ROOT}/frozen/native_model_eligibility"
@@ -84,14 +86,24 @@ NATIVE_RELEASE_SUMMARY="${NATIVE_REGISTRY_DIR}/native_fullpool_release.summary.j
 SSL_REGISTRY_DIR="${RUN_ROOT}/frozen/ssl_registry"
 SSL_REGISTRY="${SSL_REGISTRY_DIR}/teacher_ssl_fullpool_registry.parquet"
 SSL_REGISTRY_SUMMARY="${SSL_REGISTRY_DIR}/teacher_ssl_fullpool_registry.summary.json"
-SMOKE_ROOT="${RUN_ROOT}/smoke/one_epoch"
-SMOKE_FOLD=0
+NUMERIC_GATE_DIR="${RUN_ROOT}/frozen/model_input_numeric_gate_v1"
+NUMERIC_SHARD_DIR="${NUMERIC_GATE_DIR}/shard_reports"
+NUMERIC_AUDIT="${NUMERIC_GATE_DIR}/model_input_numeric_audit.parquet"
+NUMERIC_RELEASE="${NUMERIC_GATE_DIR}/model_input_numeric_gate.release.json"
+MODEL_RUN_ROOT="${RUN_ROOT}/model_runs/effective_quality_mask_v1"
+SMOKE_ROOT="${MODEL_RUN_ROOT}/smoke/one_epoch"
+readonly SMOKE_FOLD=2
 SMOKE_SUMMARY="${SMOKE_ROOT}/encoder_pretraining/fold_${SMOKE_FOLD}/summary.json"
 NATIVE_SHARDS=16
 FULL_POOL_IDENTITY_SHA256="8e9e9c12a24d5ebc7be94b03a4e35411cd10066d62a87d921a8443b06cc188d1"
 ELIGIBLE_IDENTITY_SHA256="6ddc8e57bb5fb938ce05389c1629221c73e0e73ac3bf40da47a2019e1a5660e6"
 EXCLUDED_IDENTITY_SHA256="b9f536144265e54a70bff17c782e0668ddbd96efcdf6c223ebc58f46edb7d976"
 CANARY_EXCLUDED_IDENTITY_SHA256="ddda9b053eddc744e5032ba350598d58d74cea4f4cc5cd705932ccf6e41022ab"
+
+if [[ -n "${TWIRL_SSL_FULLPOOL_SMOKE_FOLD+x}" ]]; then
+  echo "Controller forbids a smoke-fold environment override." >&2
+  exit 2
+fi
 
 EXPECTED_SOURCE_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp"
 EXPECTED_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
@@ -264,6 +276,53 @@ case "${ACTION}" in
         scripts/orcd/slurm_teacher_ssl_fullpool_registry_cpu.sbatch
     "
     ;;
+  submit-numeric-audit)
+    require_socket
+    remote "
+      set -euo pipefail
+      test -s '${ELIGIBILITY_EXCLUSIONS}'
+      test -s '${ELIGIBILITY_SUMMARY}'
+      test -s '${NATIVE_REGISTRY}'
+      test -s '${NATIVE_REGISTRY_SUMMARY}'
+      test -s '${NATIVE_RELEASE_SUMMARY}'
+      test -s '${SSL_REGISTRY}'
+      test -s '${SSL_REGISTRY_SUMMARY}'
+      for sector in {56..62}; do
+        for shard in {0..15}; do
+          report='${NUMERIC_SHARD_DIR}/s'\${sector}'/native_'\${shard}'.numeric.json'
+          if [[ -e "\${report}.sha256" ]]; then
+            test -s "\${report}"
+          fi
+        done
+      done
+      test ! -e '${NUMERIC_AUDIT}'
+      test ! -e '${NUMERIC_AUDIT}.sha256'
+      test ! -e '${NUMERIC_RELEASE}'
+      test ! -e '${NUMERIC_RELEASE}.sha256'
+      [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]
+      [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]
+      cd '${REMOTE_REPO}'
+      sbatch --parsable --export='$(base_export)' \
+        scripts/orcd/slurm_teacher_ssl_fullpool_numeric_audit_cpu.sbatch
+    "
+    ;;
+  submit-numeric-release)
+    require_socket
+    remote "
+      set -euo pipefail
+      for sector in {56..62}; do
+        for shard in {0..15}; do
+          test -s '${NUMERIC_SHARD_DIR}/s'\${sector}'/native_'\${shard}'.numeric.json'
+          test -s '${NUMERIC_SHARD_DIR}/s'\${sector}'/native_'\${shard}'.numeric.json.sha256'
+        done
+      done
+      [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]
+      [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]
+      cd '${REMOTE_REPO}'
+      sbatch --parsable --export='$(base_export)' \
+        scripts/orcd/slurm_teacher_ssl_fullpool_numeric_release_cpu.sbatch
+    "
+    ;;
   submit-smoke)
     require_socket
     remote "
@@ -275,10 +334,12 @@ case "${ACTION}" in
       test -s '${NATIVE_RELEASE_SUMMARY}'
       test -s '${SSL_REGISTRY}'
       test -s '${SSL_REGISTRY_SUMMARY}'
+      test -s '${NUMERIC_RELEASE}'
+      PYTHONPATH='${REMOTE_REPO}/src' '${TWIRL_ROOT}/envs/twirl-s56/bin/python' -c 'from pathlib import Path; import sys; from twirl.vetting.ssl_full_pool_numeric import validate_numeric_gate_release; validate_numeric_gate_release(Path(sys.argv[1]), expected_code_revision=sys.argv[2])' '${NUMERIC_RELEASE}' '${EXPECTED_SHA}'
       [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]
       [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]
       cd '${REMOTE_REPO}'
-      sbatch --parsable --export='$(base_export),TWIRL_SSL_FULLPOOL_SMOKE_FOLD=${SMOKE_FOLD}' \
+      sbatch --parsable --export='$(base_export)' \
         scripts/orcd/slurm_teacher_ssl_fullpool_smoke_h200.sbatch
     "
     ;;
@@ -294,6 +355,8 @@ case "${ACTION}" in
       test -s '${NATIVE_RELEASE_SUMMARY}'
       test -s '${SSL_REGISTRY}'
       test -s '${SSL_REGISTRY_SUMMARY}'
+      test -s '${NUMERIC_RELEASE}'
+      PYTHONPATH='${REMOTE_REPO}/src' '${TWIRL_ROOT}/envs/twirl-s56/bin/python' -c 'from pathlib import Path; import sys; from twirl.vetting.ssl_full_pool_numeric import validate_numeric_gate_release; validate_numeric_gate_release(Path(sys.argv[1]), expected_code_revision=sys.argv[2])' '${NUMERIC_RELEASE}' '${EXPECTED_SHA}'
       [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]
       [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]
       cd '${REMOTE_REPO}'
@@ -308,6 +371,7 @@ case "${ACTION}" in
         --native-release-summary '${NATIVE_RELEASE_SUMMARY}' \
         --registry '${SSL_REGISTRY}' \
         --registry-summary '${SSL_REGISTRY_SUMMARY}' \
+        --numeric-gate-release '${NUMERIC_RELEASE}' \
         --expected-fold '${SMOKE_FOLD}'
       sbatch --parsable --export='$(base_export)' \
         scripts/orcd/slurm_teacher_ssl_fullpool_fold_h200.sbatch
@@ -317,7 +381,7 @@ case "${ACTION}" in
     require_socket
     remote "
       squeue -u tehan -o '%.18i %.32j %.2t %.10M %.4D %R'
-      find '${RUN_ROOT}' -maxdepth 6 -type f \\( -name '*summary.json' -o -name '*.sha256' \\) 2>/dev/null | sort
+      find '${RUN_ROOT}' -maxdepth 8 -type f \\( -name '*summary.json' -o -name '*.sha256' -o -name '*.release.json' \\) 2>/dev/null | sort
     "
     ;;
   *)

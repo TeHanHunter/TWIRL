@@ -46,6 +46,7 @@ from twirl.vetting.harmonic_cnn import (
     build_harmonic_cnn,
 )
 from twirl.vetting.harmonic_dataset import HarmonicNativeDataset
+from twirl.vetting.harmonic_inputs import MODEL_INPUT_CONTRACT_VERSION
 from twirl.vetting.harmonic_ssl import (
     HARMONIC_SSL_CONTRACT_VERSION,
     EventPreservingAugmentationConfig,
@@ -78,6 +79,10 @@ from twirl.vetting.ssl_full_pool_native import (
     FULL_POOL_NATIVE_CONTRACT_VERSION,
     load_full_pool_native_registry_release,
 )
+from twirl.vetting.ssl_full_pool_numeric import (
+    MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
+    validate_numeric_gate_release,
+)
 from twirl.vetting.teacher_native_registry import file_sha256, read_table
 from twirl.vetting.teacher_split_registry import validate_tic_split_assignments
 
@@ -86,22 +91,26 @@ FULLPOOL_SSL_REGISTRY_SCHEMA = "twirl_teacher_ssl_fullpool_registry_v2"
 FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA = (
     "twirl_teacher_ssl_fullpool_registry_summary_v2"
 )
-FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v2"
-FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v2"
-FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v2"
-FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v2"
-FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v2"
+FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v3"
+FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v3"
+FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v3"
+FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v3"
+FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v3"
 FULLPOOL_SSL_RUN_ID = (
-    "teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
+    "teacher_ssl_fullpool_v3_s56_s62_a2v1_current_adp_bls_eligible_"
+    "effective_quality_mask_v1"
 )
-FULLPOOL_SSL_ENCODER_NAME = "teacher_ssl_fullpool_v2"
+FULLPOOL_SSL_ENCODER_NAME = (
+    "teacher_ssl_fullpool_v3_effective_quality_mask_v1"
+)
 FULLPOOL_SSL_MODEL_FACING_NAME = "Teacher v4-SSL full-pool"
 FULLPOOL_SSL_PROFILE = "shape_plus_periodogram_bls"
 FULLPOOL_SSL_CHECKPOINT_NAMESPACE = (
-    "twirl_teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
+    "twirl_teacher_ssl_fullpool_v3_s56_s62_a2v1_current_adp_bls_eligible_"
+    "effective_quality_mask_v1"
 )
 FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_training_authority_v2"
+    "twirl_teacher_ssl_fullpool_training_authority_v3"
 )
 FULLPOOL_SSL_SECTORS: tuple[int, ...] = tuple(range(56, 63))
 FULLPOOL_SSL_N_FOLDS = 5
@@ -1429,27 +1438,88 @@ def select_fullpool_ssl_fold(
     *,
     held_out_fold: int,
     max_rows: int | None = None,
+    required_observation_ids: Sequence[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Select the four-fold, real-only corpus for one encoder job."""
 
     fold = int(held_out_fold)
     if fold not in range(FULLPOOL_SSL_N_FOLDS):
         raise ValueError("held_out_fold must be in [0,4]")
+    if isinstance(required_observation_ids, (str, bytes)):
+        raise TypeError(
+            "required_observation_ids must be a sequence of complete IDs"
+        )
+    required_values = (
+        () if required_observation_ids is None else required_observation_ids
+    )
+    required: list[str] = []
+    for index, value in enumerate(required_values):
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+        ):
+            raise ValueError(
+                "required_observation_ids contains an invalid value at "
+                f"index {index}"
+            )
+        required.append(value)
+    if len(required) != len(set(required)):
+        raise ValueError("required_observation_ids contains duplicates")
+    required = sorted(required)
+    if required and max_rows is None:
+        raise ValueError(
+            "required_observation_ids are only valid with bounded max_rows"
+        )
     work = validate_fullpool_ssl_registry(registry)
     include = work["ssl_pool_include"]
     held = include & work["ssl_held_out_fold"].eq(fold)
     selected = work.loc[include & ~held].copy()
+    registry_ids = set(work["ssl_observation_id"].astype(str))
+    missing_required = sorted(set(required) - registry_ids)
+    if missing_required:
+        raise ValueError(
+            "required observations are absent from the full-pool registry: "
+            f"{missing_required}"
+        )
+    excluded_required = sorted(
+        set(required)
+        & set(work.loc[~include, "ssl_observation_id"].astype(str))
+    )
+    if excluded_required:
+        raise ValueError(
+            "required observations are not model eligible: "
+            f"{excluded_required}"
+        )
+    held_required = sorted(
+        set(required)
+        & set(work.loc[held, "ssl_observation_id"].astype(str))
+    )
+    if held_required:
+        raise ValueError(
+            "required observations belong to the held-out fold: "
+            f"{held_required}"
+        )
     if max_rows is not None:
         if int(max_rows) < 2:
             raise ValueError("max_rows must be at least 2")
+        if len(required) > int(max_rows):
+            raise ValueError(
+                "required observations exceed the bounded max_rows"
+            )
         if len(selected) > int(max_rows):
             order = selected["ssl_observation_id"].map(
                 lambda value: hashlib.sha256(
                     f"smoke:{fold}:{value}".encode("utf-8")
                 ).hexdigest()
             )
+            required_mask = selected["ssl_observation_id"].isin(required)
+            required_indices = selected.index[required_mask]
+            remaining_indices = order.loc[~required_mask].sort_values(
+                kind="stable"
+            ).index[: int(max_rows) - len(required_indices)]
             selected = selected.loc[
-                order.sort_values(kind="stable").index[: int(max_rows)]
+                list(required_indices) + list(remaining_indices)
             ]
     selected = selected.sort_values(
         ["sector", "tic"], kind="stable"
@@ -1464,6 +1534,12 @@ def select_fullpool_ssl_fold(
     prospective_tics = set(
         work.loc[work["reserved_prospective_member"], "tic"].astype(int)
     )
+    selected_observation_ids = set(selected["ssl_observation_id"].astype(str))
+    required_selected = set(required) <= selected_observation_ids
+    if not required_selected:
+        raise RuntimeError(
+            "fold-local selection omitted a required observation"
+        )
     disjoint = {
         "held_fold_tics": not bool(selected_tics & held_tics),
         "fixed_test_tics": not bool(selected_tics & fixed_test_tics),
@@ -1497,6 +1573,9 @@ def select_fullpool_ssl_fold(
         "n_selected_observations": int(len(selected)),
         "n_selected_tics": int(len(selected_tics)),
         "max_rows": None if max_rows is None else int(max_rows),
+        "required_observation_ids": required,
+        "n_required_observations": int(len(required)),
+        "required_observations_selected": required_selected,
         "selected_rows_sha256": _frame_sha256(selected, selection_columns),
         "selected_tics_sha256": _canonical_sha256(sorted(selected_tics)),
         "tic_disjoint": disjoint,
@@ -1727,10 +1806,30 @@ def _validate_training_authority_chain(
     native_release: Mapping[str, Any],
     registry: pd.DataFrame,
     registry_summary: Mapping[str, Any],
+    numeric_gate_release: Mapping[str, Any],
     authority_bindings: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Fail closed unless every production training authority agrees exactly."""
 
+    if (
+        not isinstance(numeric_gate_release, Mapping)
+        or numeric_gate_release.get("passed") is not True
+    ):
+        raise ValueError("model-input numerical gate did not pass")
+    if (
+        numeric_gate_release.get("model_input_contract_version")
+        != MODEL_INPUT_CONTRACT_VERSION
+    ):
+        raise ValueError(
+            "model-input numerical gate binds the wrong input contract"
+        )
+    if (
+        numeric_gate_release.get("envelope_contract")
+        != MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+    ):
+        raise ValueError(
+            "model-input numerical gate binds the wrong envelope contract"
+        )
     expected_partition = {
         "full": {
             "count": PRODUCTION_FULL_OBSERVATIONS,
@@ -2042,6 +2141,23 @@ def _validate_training_authority_chain(
         "production_lock_passed": True,
         "partition": expected_partition,
         "native_mapping_sha256": mapping_sha256,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": {
+            "binding": dict(authority_bindings["numeric_gate_release"]),
+            "schema_version": numeric_gate_release.get("schema_version"),
+            "envelope_canonical_sha256": numeric_gate_release.get(
+                "envelope_canonical_sha256"
+            ),
+            "counts": dict(numeric_gate_release.get("counts", {})),
+            "identity_hashes": dict(
+                numeric_gate_release.get("identity_hashes", {})
+            ),
+            "code_revision": numeric_gate_release.get("code_revision"),
+            "passed": True,
+        },
         "source_provenance_verified": True,
         "authority_bindings": {
             name: dict(metadata)
@@ -2059,6 +2175,8 @@ def _load_training_authority_chain(
     native_release_summary_path: Path,
     registry_path: Path,
     registry_summary_path: Path,
+    numeric_gate_release_path: Path,
+    expected_code_revision: str,
 ) -> tuple[
     pd.DataFrame,
     dict[str, Any],
@@ -2074,6 +2192,7 @@ def _load_training_authority_chain(
         "native_release_summary": native_release_summary_path,
         "registry": registry_path,
         "registry_summary": registry_summary_path,
+        "numeric_gate_release": numeric_gate_release_path,
     }
     authority_bindings = {
         name: _artifact_metadata(path) for name, path in paths.items()
@@ -2101,12 +2220,34 @@ def _load_training_authority_chain(
         registry_path=authority_bindings["registry"]["path"],
         summary_path=authority_bindings["registry_summary"]["path"],
     )
+    numeric_gate_release = validate_numeric_gate_release(
+        Path(authority_bindings["numeric_gate_release"]["path"]),
+        expected_code_revision=expected_code_revision,
+        expected_authority_bindings={
+            "ssl_registry": authority_bindings["registry"],
+            "ssl_registry_summary": authority_bindings["registry_summary"],
+            "native_registry": authority_bindings["native_registry"],
+            "native_registry_summary": authority_bindings[
+                "native_registry_summary"
+            ],
+            "native_release_summary": authority_bindings[
+                "native_release_summary"
+            ],
+        },
+    )
+    if _artifact_metadata(
+        authority_bindings["numeric_gate_release"]["path"]
+    ) != authority_bindings["numeric_gate_release"]:
+        raise RuntimeError(
+            "numeric-gate release changed during authority validation"
+        )
     audit = _validate_training_authority_chain(
         eligibility=eligibility,
         native_registry=native_registry,
         native_release=native_release,
         registry=registry,
         registry_summary=registry_summary,
+        numeric_gate_release=numeric_gate_release,
         authority_bindings=authority_bindings,
     )
     return (
@@ -2443,6 +2584,7 @@ def run_fullpool_ssl_fold(
     native_release_summary_path: Path,
     registry_path: Path,
     registry_summary_path: Path,
+    numeric_gate_release_path: Path,
     out_root: Path,
     fold: int,
     epochs: int = 20,
@@ -2455,6 +2597,7 @@ def run_fullpool_ssl_fold(
     resume: bool = False,
     require_cuda: bool = True,
     max_rows: int | None = None,
+    required_observation_ids: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Train or resume one broad-pool fold-local VICReg encoder."""
 
@@ -2477,6 +2620,7 @@ def run_fullpool_ssl_fold(
     if not np.isfinite(weight_decay) or float(weight_decay) < 0:
         raise ValueError("weight_decay must be finite and nonnegative")
 
+    code_revision = _code_revision()
     (
         registry,
         registry_summary,
@@ -2491,6 +2635,8 @@ def run_fullpool_ssl_fold(
         native_release_summary_path=native_release_summary_path,
         registry_path=registry_path,
         registry_summary_path=registry_summary_path,
+        numeric_gate_release_path=numeric_gate_release_path,
+        expected_code_revision=code_revision,
     )
     registry_binding = authority_audit["authority_bindings"]["registry"]
     registry_summary_binding = authority_audit["authority_bindings"][
@@ -2502,11 +2648,11 @@ def run_fullpool_ssl_fold(
         registry,
         held_out_fold=fold,
         max_rows=max_rows,
+        required_observation_ids=required_observation_ids,
     )
     dataset_rows = fullpool_dataset_rows(selected)
     native_files = _verify_native_files(selected)
     fold_seed = int(seed) + 1000 * fold
-    code_revision = _code_revision()
     model_config = HarmonicModelConfig(metadata_dim=0)
     augmentation_config = EventPreservingAugmentationConfig()
     vicreg_config = VICRegConfig()
@@ -2518,6 +2664,11 @@ def run_fullpool_ssl_fold(
         "checkpoint_namespace": FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
         "model_version": MODEL_VERSION,
         "ssl_contract_version": HARMONIC_SSL_CONTRACT_VERSION,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": authority_audit["numeric_gate_release"],
         "profile": FULLPOOL_SSL_PROFILE,
         "fold": fold,
         "registry_path": str(registry_path),
@@ -2546,6 +2697,9 @@ def run_fullpool_ssl_fold(
         "checkpoint_every": int(checkpoint_every),
         "require_cuda": bool(require_cuda),
         "max_rows": None if max_rows is None else int(max_rows),
+        "required_observation_ids": selection_audit[
+            "required_observation_ids"
+        ],
         "labels_loaded": False,
         "fixed_test_tensors_constructed": False,
         "prospective_sector_tensors_constructed": False,
@@ -2776,6 +2930,11 @@ def run_fullpool_ssl_fold(
         "checkpoint_namespace": FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
         "model_version": MODEL_VERSION,
         "ssl_contract_version": HARMONIC_SSL_CONTRACT_VERSION,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": authority_audit["numeric_gate_release"],
         "profile": FULLPOOL_SSL_PROFILE,
         "fold": fold,
         "run_contract_sha256": contract_sha256,
@@ -2801,6 +2960,12 @@ def run_fullpool_ssl_fold(
         "run_id": FULLPOOL_SSL_RUN_ID,
         "encoder_name": FULLPOOL_SSL_ENCODER_NAME,
         "model_facing_name": FULLPOOL_SSL_MODEL_FACING_NAME,
+        "checkpoint_namespace": FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
+        "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
+        "model_input_numeric_envelope_contract": (
+            MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
+        ),
+        "numeric_gate_release": authority_audit["numeric_gate_release"],
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "fold": fold,
         "run_contract": str(fold_dir / "run_contract.json"),

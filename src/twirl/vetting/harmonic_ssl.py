@@ -18,12 +18,21 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from twirl.vetting.harmonic_inputs import HARMONIC_FACTORS
+from twirl.vetting.harmonic_inputs import (
+    HARMONIC_FACTORS,
+    MODEL_INPUT_NUMERIC_ABS_MAX,
+)
 
 
 HARMONIC_SSL_CONTRACT_VERSION = "twirl_harmonic_ssl_v1"
 _CACHE_IDENTITY_SCHEMA = "twirl_harmonic_ssl_cache_identity_v1"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_MODEL_PHOTOMETRY_ERROR_CHANNELS = slice(0, 5)
+_MODEL_ERROR_CHANNELS = (3, 4)
+_MODEL_PHASE_CHANNEL = 5
+_MODEL_QUALITY_CHANNEL = 6
+_MODEL_PHASE_MIN = -0.5
+_MODEL_PHASE_MAX = 0.5
 _SSL_SELECTION_COLUMNS = (
     "review_id",
     "tic",
@@ -436,6 +445,164 @@ def select_ssl_fold_rows(
     return selected, audit
 
 
+def _first_true_index(mask: Any) -> tuple[int, ...]:
+    import torch
+
+    indices = torch.nonzero(mask, as_tuple=False)
+    if int(indices.shape[0]) == 0:
+        raise ValueError("cannot identify an index in an empty failure mask")
+    return tuple(int(value) for value in indices[0].detach().cpu().tolist())
+
+
+def _validate_active_numeric_values(
+    *,
+    name: str,
+    values: Any,
+    mask: Any,
+    stage: str,
+) -> None:
+    import torch
+
+    payload_nonfinite = ~torch.isfinite(values)
+    if bool(payload_nonfinite.any()):
+        raise ValueError(
+            f"{stage} {name} contains nonfinite tensor payload; "
+            f"first_index={_first_true_index(payload_nonfinite)}"
+        )
+    nonfinite = mask & ~torch.isfinite(values)
+    if bool(nonfinite.any()):
+        raise ValueError(
+            f"{stage} {name} contains nonfinite model-active values; "
+            f"first_index={_first_true_index(nonfinite)}"
+        )
+    envelope_exceeded = (
+        mask
+        & torch.isfinite(values)
+        & values.abs().gt(float(MODEL_INPUT_NUMERIC_ABS_MAX))
+    )
+    if bool(envelope_exceeded.any()):
+        raise ValueError(
+            f"{stage} {name} exceeds the model-active absolute bound "
+            f"{MODEL_INPUT_NUMERIC_ABS_MAX:g}; "
+            f"first_index={_first_true_index(envelope_exceeded)}"
+        )
+
+
+def _validate_sequence_numeric_domains(
+    *,
+    name: str,
+    values: Any,
+    mask: Any,
+    stage: str,
+) -> None:
+    import torch
+
+    if int(values.shape[2]) <= _MODEL_QUALITY_CHANNEL:
+        raise ValueError(
+            f"{stage} {name} must provide the seven locked harmonic channels"
+        )
+    _validate_active_numeric_values(
+        name=name,
+        values=values,
+        mask=mask,
+        stage=stage,
+    )
+
+    phase_mask = mask[:, :, _MODEL_PHASE_CHANNEL, :]
+    quality_mask = mask[:, :, _MODEL_QUALITY_CHANNEL, :]
+    coordinate_mask_mismatch = phase_mask.ne(quality_mask)
+    if bool(coordinate_mask_mismatch.any()):
+        raise ValueError(
+            f"{stage} {name} phase/quality masks must match; "
+            f"first_index={_first_true_index(coordinate_mask_mismatch)}"
+        )
+    photometry_without_coordinates = (
+        mask[:, :, _MODEL_PHOTOMETRY_ERROR_CHANNELS, :].any(dim=2)
+        & ~(phase_mask & quality_mask)
+    )
+    if bool(photometry_without_coordinates.any()):
+        raise ValueError(
+            f"{stage} {name} active photometry requires phase and quality; "
+            f"first_index={_first_true_index(photometry_without_coordinates)}"
+        )
+
+    for channel in _MODEL_ERROR_CHANNELS:
+        negative = mask[:, :, channel, :] & values[:, :, channel, :].lt(0.0)
+        if bool(negative.any()):
+            raise ValueError(
+                f"{stage} {name} error channels must be nonnegative; "
+                f"channel={channel}, first_index={_first_true_index(negative)}"
+            )
+
+    phase = values[:, :, _MODEL_PHASE_CHANNEL, :]
+    phase_active = mask[:, :, _MODEL_PHASE_CHANNEL, :] & torch.isfinite(phase)
+    phase_invalid = phase_active & (
+        phase.lt(float(_MODEL_PHASE_MIN))
+        | phase.gt(float(_MODEL_PHASE_MAX))
+    )
+    if bool(phase_invalid.any()):
+        raise ValueError(
+            f"{stage} {name} phase channel must be in "
+            f"[{_MODEL_PHASE_MIN}, {_MODEL_PHASE_MAX}]; "
+            f"first_index={_first_true_index(phase_invalid)}"
+        )
+
+    quality = values[:, :, _MODEL_QUALITY_CHANNEL, :]
+    quality_active = (
+        quality_mask & torch.isfinite(quality)
+    )
+    quality_invalid = quality_active & quality.ne(0.0) & quality.ne(1.0)
+    if bool(quality_invalid.any()):
+        raise ValueError(
+            f"{stage} {name} quality channel must be binary; "
+            f"first_index={_first_true_index(quality_invalid)}"
+        )
+
+    quality_bad = quality_active & quality.eq(1.0)
+    bad_photometry_active = (
+        mask[:, :, _MODEL_PHOTOMETRY_ERROR_CHANNELS, :]
+        & quality_bad.unsqueeze(2)
+    )
+    if bool(bad_photometry_active.any()):
+        raise ValueError(
+            f"{stage} {name} quality-bad cadences must mask photometry/error "
+            "channels 0:5; "
+            f"first_index={_first_true_index(bad_photometry_active)}"
+        )
+
+
+def _validate_model_input_numeric_contract(
+    batch: Mapping[str, Any],
+    *,
+    stage: str,
+) -> None:
+    import torch
+
+    for name, mask_name in (
+        ("harmonic_values", "harmonic_mask"),
+        ("local_values", "local_mask"),
+    ):
+        _validate_sequence_numeric_domains(
+            name=name,
+            values=batch[name],
+            mask=batch[mask_name],
+            stage=stage,
+        )
+    _validate_active_numeric_values(
+        name="periodogram_values",
+        values=batch["periodogram_values"],
+        mask=batch["periodogram_mask"],
+        stage=stage,
+    )
+    metadata = batch["metadata"]
+    _validate_active_numeric_values(
+        name="metadata",
+        values=metadata,
+        mask=torch.ones_like(metadata, dtype=torch.bool),
+        stage=stage,
+    )
+
+
 def _validate_batch_tensor_contract(batch: Mapping[str, Any], duration_min: Any) -> tuple[Any, Any]:
     import torch
 
@@ -524,6 +691,7 @@ def _validate_batch_tensor_contract(batch: Mapping[str, Any], duration_min: Any)
         raise ValueError("period_d must be finite and positive")
     if not torch.isfinite(duration).all() or not (duration > 0).all():
         raise ValueError("duration_min must be finite and positive")
+    _validate_model_input_numeric_contract(batch, stage="pre-augmentation")
     return period, duration
 
 
@@ -753,7 +921,10 @@ def augment_ssl_batch(
         & ~protected
     )
     augmented_harmonic_mask = augmented_harmonic_mask & ~dropped.unsqueeze(2)
-    augmented_harmonic = augmented_harmonic.masked_fill(dropped.unsqueeze(2), 0.0)
+    augmented_harmonic = augmented_harmonic.masked_fill(
+        dropped.unsqueeze(2),
+        0.0,
+    )
     augmented_harmonic = _add_flux_noise(
         augmented_harmonic,
         augmented_harmonic_mask,
@@ -794,6 +965,7 @@ def augment_ssl_batch(
     out["periodogram_values"] = augmented_periodogram
     out["periodogram_mask"] = augmented_periodogram_mask
     out["metadata"] = torch.zeros_like(batch["metadata"])
+    _validate_model_input_numeric_contract(out, stage="post-augmentation")
     return out
 
 
