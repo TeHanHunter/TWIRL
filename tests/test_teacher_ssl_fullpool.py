@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import random
+import time
 
 import numpy as np
 import pandas as pd
@@ -1581,6 +1582,10 @@ def test_training_input_revalidation_detects_late_native_mutation(
         full_native_hash=False,
     )
 
+    # Some ORCD node-local filesystems coalesce ctime updates within one
+    # timestamp tick.  Cross a full tick so this test exercises the metadata
+    # revalidation path rather than filesystem timestamp granularity.
+    time.sleep(1.1)
     with native_path.open("r+b") as handle:
         handle.seek(-1, os.SEEK_END)
         original = handle.read(1)
@@ -1748,6 +1753,8 @@ def test_completion_metadata_detects_ctime_only_mutation(
 
     def mutate_after_hash(path: Path) -> str:
         digest = real_sha256(path)
+        # See the ctime-granularity note in the late-native-mutation test.
+        time.sleep(1.1)
         path.chmod(0o600)
         return digest
 

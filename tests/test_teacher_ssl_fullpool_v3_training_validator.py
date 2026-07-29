@@ -212,6 +212,36 @@ def _fixture(
             "detrend_config_sha256"
         ]
         h5.attrs["detrend_quality_source"] = "final_effective_quality"
+        h5.attrs["detrend_time_contract_version"] = freshness[
+            "detrend_time_contract_version"
+        ]
+        h5.attrs["detrend_time_dataset"] = freshness[
+            "detrend_time_dataset"
+        ]
+        h5.attrs["detrend_time_system"] = freshness[
+            "detrend_time_system"
+        ]
+        h5.attrs["published_time_system"] = freshness[
+            "published_time_system"
+        ]
+        h5.attrs["btjd_to_bjd_offset_d"] = freshness[
+            "btjd_to_bjd_offset_d"
+        ]
+        h5.attrs["warning_capture_policy"] = freshness[
+            "warning_capture_policy"
+        ]
+        h5.attrs["rank_warning_publication_policy"] = freshness[
+            "rank_warning_publication_policy"
+        ]
+        h5.attrs["rank_warning_count"] = freshness[
+            "rank_warning_count"
+        ]
+        h5.attrs["rank_warning_ledger_json"] = freshness[
+            "rank_warning_ledger_json"
+        ]
+        h5.attrs["rank_warning_ledger_sha256"] = freshness[
+            "rank_warning_ledger_sha256"
+        ]
         h5.attrs["raw_photometry_only"] = 1
         h5.attrs["compact_adp_photometry_reused"] = 0
         h5.attrs["compact_adp_flux_reused"] = 0
@@ -238,6 +268,36 @@ def _fixture(
             "detrend_config_sha256"
         ],
         "native_detrend_quality_source": "final_effective_quality",
+        "native_detrend_time_contract_version": freshness[
+            "detrend_time_contract_version"
+        ],
+        "native_detrend_time_dataset": freshness[
+            "detrend_time_dataset"
+        ],
+        "native_detrend_time_system": freshness[
+            "detrend_time_system"
+        ],
+        "native_published_time_system": freshness[
+            "published_time_system"
+        ],
+        "native_btjd_to_bjd_offset_d": freshness[
+            "btjd_to_bjd_offset_d"
+        ],
+        "native_warning_capture_policy": freshness[
+            "warning_capture_policy"
+        ],
+        "native_rank_warning_publication_policy": freshness[
+            "rank_warning_publication_policy"
+        ],
+        "native_rank_warning_count": freshness[
+            "rank_warning_count"
+        ],
+        "native_rank_warning_ledger_json": freshness[
+            "rank_warning_ledger_json"
+        ],
+        "native_rank_warning_ledger_sha256": freshness[
+            "rank_warning_ledger_sha256"
+        ],
         "raw_photometry_only": True,
         "compact_adp_photometry_reused": False,
         "compact_adp_flux_reused": False,

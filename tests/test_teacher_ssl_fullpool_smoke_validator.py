@@ -842,7 +842,7 @@ def test_smoke_validator_rejects_nonfinite_checkpoint_state(
         ),
         (
             lambda contract: contract.update({"seed": 1}),
-            "smoke seed must equal 560064",
+            f"smoke seed must equal {VALIDATOR.SMOKE_SEED}",
         ),
         (
             lambda contract: contract.update(
