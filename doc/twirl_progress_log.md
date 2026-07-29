@@ -465,8 +465,20 @@ sample.
   proved the locked embedding-only optimizer partition exactly: `146` total
   encoder/projector parameters = `90` active + `56` excluded, with all `90`
   active gradients and AdamW states present, no excluded gradients, finite
-  loss, and the deployed `decoupled_weight_decay=true` schema. No v3 remote
-  artifact or job has yet been claimed.
+  loss, and the deployed `decoupled_weight_decay=true` schema. At that
+  checkpoint, no v3 remote artifact or job had yet been claimed.
+- `2026-07-29`: Fresh-v3 diagnostic canaries `19218089` (S56 shard 3) and
+  `19218090` (S60 shard 4) reached terminal `COMPLETED` without downstream
+  submission. S56 produced `1,952` source rows = `1,951` eligible + the one
+  locked exclusion, zero stderr, and zero recorded rank warnings. S60
+  produced `1,655` eligible rows but emitted exactly `3,324` NumPy
+  `RankWarning`s and `3,324` corresponding source lines. Read-only diagnosis
+  found that v3 supplied absolute BJD to the ADP spline; the warning-free S56
+  result does not make that coordinate contract valid. Both HDF5 files remain
+  diagnostic-only and no v3 registry, numerical release, smoke, or fold was
+  launched. The corrected fresh-v3r1 contract detrends on compact BTJD,
+  publishes exact absolute BJD separately, rejects non-authorized warnings,
+  and requires a zero RankWarning ledger through every downstream gate.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 

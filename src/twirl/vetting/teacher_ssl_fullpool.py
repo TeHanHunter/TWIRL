@@ -82,11 +82,18 @@ from twirl.vetting.ssl_full_pool_eligibility import (
 )
 from twirl.vetting.ssl_full_pool_native import (
     FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
     FULL_POOL_NATIVE_CONTRACT_VERSION,
     FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
     FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON,
+    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256,
     FULL_POOL_NATIVE_PERIODOGRAM_N,
+    FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY,
     FULL_POOL_NATIVE_RELEASE_BINDING,
+    FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
     full_pool_native_root_failures,
     load_full_pool_native_registry_release,
 )
@@ -102,31 +109,31 @@ from twirl.vetting.teacher_native_registry import file_sha256, read_table
 from twirl.vetting.teacher_split_registry import validate_tic_split_assignments
 
 
-FULLPOOL_SSL_REGISTRY_SCHEMA = "twirl_teacher_ssl_fullpool_registry_v2"
+FULLPOOL_SSL_REGISTRY_SCHEMA = "twirl_teacher_ssl_fullpool_registry_v3"
 FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_registry_summary_v2"
+    "twirl_teacher_ssl_fullpool_registry_summary_v3"
 )
-FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v4"
-FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v4"
-FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v4"
-FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v4"
-FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v4"
-FULLPOOL_SSL_MODEL_NAMESPACE = "effective_quality_adp_v1"
+FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v5"
+FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v5"
+FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v5"
+FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v5"
+FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v5"
+FULLPOOL_SSL_MODEL_NAMESPACE = "effective_quality_adp_btjd_v2"
 FULLPOOL_SSL_RUN_ID = (
-    "teacher_ssl_fullpool_v4_s56_s62_a2v1_effective_quality_adp_"
-    "bls_eligible_effective_quality_adp_v1"
+    "teacher_ssl_fullpool_v4_s56_s62_a2v1_effective_quality_adp_btjd_"
+    "bls_eligible_effective_quality_adp_btjd_v2"
 )
 FULLPOOL_SSL_ENCODER_NAME = (
-    "teacher_ssl_fullpool_v4_effective_quality_adp_v1"
+    "teacher_ssl_fullpool_v4_effective_quality_adp_btjd_v2"
 )
 FULLPOOL_SSL_MODEL_FACING_NAME = "Teacher v4-SSL full-pool"
 FULLPOOL_SSL_PROFILE = "shape_plus_periodogram_bls"
 FULLPOOL_SSL_CHECKPOINT_NAMESPACE = (
-    "twirl_teacher_ssl_fullpool_v4_s56_s62_a2v1_effective_quality_adp_"
-    "bls_eligible_effective_quality_adp_v1"
+    "twirl_teacher_ssl_fullpool_v4_s56_s62_a2v1_effective_quality_adp_btjd_"
+    "bls_eligible_effective_quality_adp_btjd_v2"
 )
 FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_training_authority_v4"
+    "twirl_teacher_ssl_fullpool_training_authority_v5"
 )
 FULLPOOL_SSL_SECTORS: tuple[int, ...] = tuple(range(56, 63))
 FULLPOOL_SSL_N_FOLDS = 5
@@ -2358,7 +2365,7 @@ def _verify_native_files(
             actual_contract = str(h5.attrs.get("contract_version", "")).strip()
             if actual_contract != FULL_POOL_NATIVE_CONTRACT_VERSION:
                 raise ValueError(
-                    f"selected native file is not fresh native-v3: {path}"
+                    f"selected native file is not fresh native-v3r1: {path}"
                 )
             expected_root = {
                 "expected_git_sha": expected_git_sha,
@@ -2373,6 +2380,26 @@ def _verify_native_files(
                     FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
                 ),
                 "detrend_quality_source": "final_effective_quality",
+                "detrend_time_contract_version": (
+                    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+                ),
+                "detrend_time_dataset": (
+                    FULL_POOL_NATIVE_DETREND_TIME_DATASET
+                ),
+                "detrend_time_system": "BTJD",
+                "published_time_system": "BJD",
+                "warning_capture_policy": (
+                    FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+                ),
+                "rank_warning_publication_policy": (
+                    FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+                ),
+                "rank_warning_ledger_json": (
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+                ),
+                "rank_warning_ledger_sha256": (
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+                ),
                 "periodogram_n": str(FULL_POOL_NATIVE_PERIODOGRAM_N),
             }
             observed_root = {
@@ -2381,17 +2408,24 @@ def _verify_native_files(
             }
             if observed_root != expected_root:
                 raise ValueError(
-                    f"selected native-v3 provenance differs: {path}"
+                    f"selected native-v3r1 provenance differs: {path}"
                 )
             for name, expected in (
                 ("raw_photometry_only", 1),
                 ("compact_adp_photometry_reused", 0),
                 ("compact_adp_flux_reused", 0),
+                ("rank_warning_count", 0),
             ):
                 if int(h5.attrs.get(name, -1)) != expected:
                     raise ValueError(
-                        f"selected native-v3 {name} differs: {path}"
+                        f"selected native-v3r1 {name} differs: {path}"
                     )
+            if float(h5.attrs.get("btjd_to_bjd_offset_d", np.nan)) != (
+                FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+            ):
+                raise ValueError(
+                    f"selected native-v3r1 BTJD/BJD offset differs: {path}"
+                )
             builder_code_sha256 = str(
                 h5.attrs.get("builder_code_sha256", "")
             ).strip()
@@ -2403,7 +2437,7 @@ def _verify_native_files(
                 ]
             ):
                 raise ValueError(
-                    f"selected native-v3 builder code SHA is invalid: {path}"
+                    f"selected native-v3r1 builder code SHA is invalid: {path}"
                 )
             for row in group.itertuples(index=False):
                 if str(row.native_contract_version) != actual_contract:
@@ -2425,7 +2459,7 @@ def _verify_native_files(
                         != FULL_POOL_NATIVE_PERIODOGRAM_N
                     ):
                         raise ValueError(
-                            "selected native-v3 periodogram resolution "
+                            "selected native-v3r1 periodogram resolution "
                             f"differs: {path}:{group_path}:{dataset_name}"
                         )
                 actual_key = (
@@ -2479,6 +2513,30 @@ def _verify_native_files(
                 ),
                 "native_detrend_quality_source": (
                     "final_effective_quality"
+                ),
+                "native_detrend_time_contract_version": (
+                    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+                ),
+                "native_detrend_time_dataset": (
+                    FULL_POOL_NATIVE_DETREND_TIME_DATASET
+                ),
+                "native_detrend_time_system": "BTJD",
+                "native_published_time_system": "BJD",
+                "native_btjd_to_bjd_offset_d": (
+                    FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+                ),
+                "native_warning_capture_policy": (
+                    FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+                ),
+                "native_rank_warning_publication_policy": (
+                    FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+                ),
+                "native_rank_warning_count": 0,
+                "native_rank_warning_ledger_json": (
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+                ),
+                "native_rank_warning_ledger_sha256": (
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
                 ),
                 "raw_photometry_only": True,
                 "compact_adp_photometry_reused": False,

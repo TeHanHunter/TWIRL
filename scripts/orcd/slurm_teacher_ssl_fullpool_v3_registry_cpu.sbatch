@@ -1,10 +1,10 @@
 #!/bin/bash
-# Build the immutable 175,366-row SSL audit registry for native-v3.
+# Build the immutable 175,366-row SSL audit registry for native-v3r1.
 # Exactly 175,347 rows may be model-included; the 19 locked exclusions remain
 # present as excluded audit rows.
 #SBATCH -p pg_mki_aryeh
 #SBATCH --exclude=node4900
-#SBATCH --job-name=twirl-ssl-v3-registry
+#SBATCH --job-name=twirl-ssl-v3r1-registry
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 2
@@ -17,20 +17,20 @@ set -euo pipefail
 
 readonly TWIRL_ROOT="/orcd/data/mki_aryeh/001/twirl"
 readonly EXPECTED_SOURCE_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp"
-readonly EXPECTED_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+readonly EXPECTED_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible"
 : "${TWIRL_ORCD_REPO:?controller must export TWIRL_ORCD_REPO}"
 : "${TWIRL_EXPECTED_GIT_SHA:?controller must export TWIRL_EXPECTED_GIT_SHA}"
 : "${TWIRL_SSL_FULLPOOL_V1_RUN_ROOT:?controller must export the immutable source root}"
-: "${TWIRL_SSL_FULLPOOL_V3_RUN_ROOT:?controller must export the exact fresh v3 run root}"
+: "${TWIRL_SSL_FULLPOOL_V3R1_RUN_ROOT:?controller must export the exact fresh v3r1 run root}"
 
 REPO="$(realpath -m -- "${TWIRL_ORCD_REPO}")"
 EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA}"
 SOURCE_RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V1_RUN_ROOT}")"
-RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V3_RUN_ROOT}")"
+RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V3R1_RUN_ROOT}")"
 PYTHON="${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python"
 
 if [[ "${SOURCE_RUN_ROOT}" != "${EXPECTED_SOURCE_RUN_ROOT}" || "${RUN_ROOT}" != "${EXPECTED_RUN_ROOT}" ]]; then
-  echo "SSL registry-v3 roots differ from the exact production contract." >&2
+  echo "SSL registry-v3r1 roots differ from the exact production contract." >&2
   exit 2
 fi
 if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
@@ -38,7 +38,7 @@ if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
   exit 2
 fi
 if [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${EXPECTED_SHA}" ]] || [[ -n "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]]; then
-  echo "SSL registry-v3 repository is not the exact clean deployed revision." >&2
+  echo "SSL registry-v3r1 repository is not the exact clean deployed revision." >&2
   exit 2
 fi
 
@@ -76,7 +76,7 @@ inputs=(
 )
 for input in "${inputs[@]}"; do
   if [[ ! -s "${input}" ]]; then
-    echo "Missing SSL registry-v3 authority: ${input}" >&2
+    echo "Missing SSL registry-v3r1 authority: ${input}" >&2
     exit 3
   fi
 done
@@ -88,7 +88,7 @@ for sector in {56..62}; do
 done
 for output in "${REGISTRY_OUT}" "${SUMMARY_OUT}"; do
   if [[ -e "${output}" ]]; then
-    echo "Refusing to overwrite or resume an existing SSL registry-v3 artifact: ${output}" >&2
+    echo "Refusing to overwrite or resume an existing SSL registry-v3r1 artifact: ${output}" >&2
     exit 4
   fi
 done
@@ -103,7 +103,7 @@ export MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-echo "[ssl-full-pool-registry-v3] host=$(hostname) start=$(date -Is)"
+echo "[ssl-full-pool-registry-v3r1] host=$(hostname) start=$(date -Is)"
 "${PYTHON}" scripts/stage5_validation/build_teacher_ssl_fullpool_registry.py \
   --frozen-pool "${POOL_TABLE}" \
   --frozen-pool-summary "${POOL_SUMMARY}" \
@@ -121,8 +121,8 @@ echo "[ssl-full-pool-registry-v3] host=$(hostname) start=$(date -Is)"
 
 for output in "${REGISTRY_OUT}" "${SUMMARY_OUT}"; do
   if [[ ! -s "${output}" ]]; then
-    echo "SSL registry-v3 producer did not publish: ${output}" >&2
+    echo "SSL registry-v3r1 producer did not publish: ${output}" >&2
     exit 5
   fi
 done
-echo "[ssl-full-pool-registry-v3] complete=$(date -Is) output=${REGISTRY_OUT}"
+echo "[ssl-full-pool-registry-v3r1] complete=$(date -Is) output=${REGISTRY_OUT}"

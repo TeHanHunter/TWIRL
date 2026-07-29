@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import warnings
 
 import h5py
 import numpy as np
@@ -340,13 +341,13 @@ def _raw_payload(
 
 def _independent_effective_quality_adp(
     *,
-    time: np.ndarray,
+    time_btjd: np.ndarray,
     raw_flux: np.ndarray,
     raw_error: np.ndarray,
     quality: np.ndarray,
 ) -> np.ndarray:
     result = flux_space_detrend_result(
-        np.asarray(time, dtype=float),
+        np.asarray(time_btjd, dtype=float),
         np.asarray(raw_flux, dtype=float),
         quality=np.asarray(quality),
         flux_err=np.asarray(raw_error, dtype=float),
@@ -542,6 +543,65 @@ def _patch_all_eligible(
     return exclusions_path, summary_path
 
 
+def _prepared_s61_native_build(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    output_name: str,
+) -> tuple[Path, dict[str, object]]:
+    """Return a complete one-target S61 build invocation for failure tests."""
+
+    inputs = _frozen_pool_fixture(
+        tmp_path,
+        sector=61,
+        tic=420_061,
+        cadenceno=np.asarray([100, 101, 102, 103]),
+        orbitid=np.asarray([129, 129, 130, 130]),
+    )
+    raw_source = _export_raw(tmp_path, inputs, monkeypatch)
+    reference = _quality_reference(
+        tmp_path,
+        sector=61,
+        cadenceno=np.asarray(inputs["cadenceno"]),
+        reference_orbitid=np.asarray(inputs["orbitid"]),
+    )
+    monkeypatch.setattr(
+        native,
+        "load_external_quality_reference",
+        lambda **kwargs: reference,
+    )
+    monkeypatch.setattr(
+        native.harmonic_export,
+        "_periodogram_payload",
+        lambda **kwargs: {
+            name: np.ones(
+                native.FULL_POOL_NATIVE_PERIODOGRAM_N, dtype=np.float32
+            )
+            for name in native.PERIODOGRAM_DATASETS
+        },
+    )
+    eligibility_exclusions, eligibility_summary = _patch_all_eligible(
+        tmp_path, inputs, monkeypatch
+    )
+    output = tmp_path / output_name
+    return output, {
+        "sector": 61,
+        "pool_path": Path(inputs["pool"]),
+        "pool_summary_path": Path(inputs["summary"]),
+        "eligibility_exclusions_path": eligibility_exclusions,
+        "eligibility_summary_path": eligibility_summary,
+        "allowlist_path": Path(inputs["allowlist"]),
+        "raw_source_h5": raw_source,
+        "compact_adp_h5": Path(inputs["compact"]),
+        "cadence_reference_table": reference.table_path,
+        "cadence_reference_manifest": reference.manifest_path,
+        "out_h5": output,
+        "expected_git_sha": "d" * 40,
+        "orbitid_policy": "strict",
+        "n_periods": native.FULL_POOL_NATIVE_PERIODOGRAM_N,
+    }
+
+
 def test_sector_authority_rejects_allowlist_drift(tmp_path: Path) -> None:
     inputs = _frozen_pool_fixture(tmp_path)
     authority = native.load_sector_pool_authority(
@@ -565,7 +625,7 @@ def test_sector_authority_rejects_allowlist_drift(tmp_path: Path) -> None:
 
 def test_effective_quality_adp_fit_ignores_external_only_bad_cadence() -> None:
     n = 240
-    time = 2459000.0 + np.arange(n) * (200.0 / 86400.0)
+    time_btjd = 2000.0 + np.arange(n) * (200.0 / 86400.0)
     clean = 1000.0 + 0.2 * np.sin(np.arange(n) / 15.0)
     contaminated = clean.copy()
     bad_index = 117
@@ -575,13 +635,13 @@ def test_effective_quality_adp_fit_ignores_external_only_bad_cadence() -> None:
     final_effective_quality[bad_index] = 1
 
     observed, observed_diagnostics = native._effective_quality_adp03q(
-        time=time,
+        time_btjd=time_btjd,
         raw_flux=contaminated,
         raw_error=error,
         quality=final_effective_quality,
     )
     reference, reference_diagnostics = native._effective_quality_adp03q(
-        time=time,
+        time_btjd=time_btjd,
         raw_flux=clean,
         raw_error=error,
         quality=final_effective_quality,
@@ -591,6 +651,160 @@ def test_effective_quality_adp_fit_ignores_external_only_bad_cadence() -> None:
     assert np.allclose(observed[good], reference[good], rtol=0.0, atol=1e-12)
     assert observed_diagnostics["fit_count"] == n - 1
     assert observed_diagnostics["fit_count"] == reference_diagnostics["fit_count"]
+    assert observed_diagnostics["rank_warning_count"] == 0
+
+
+def test_effective_quality_adp_btjd_matches_centered_time(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    n = 240
+    time_btjd = 3200.0 + np.arange(n) * (200.0 / 86400.0)
+    centered = time_btjd - time_btjd[0]
+    flux = 1000.0 + 0.4 * np.sin(np.arange(n) / 21.0)
+    error = np.full(n, 0.2)
+    quality = np.zeros(n, dtype=np.int32)
+
+    observed, observed_diagnostics = native._effective_quality_adp03q(
+        time_btjd=time_btjd,
+        raw_flux=flux,
+        raw_error=error,
+        quality=quality,
+    )
+    reference, reference_diagnostics = native._effective_quality_adp03q(
+        time_btjd=centered,
+        raw_flux=flux,
+        raw_error=error,
+        quality=quality,
+    )
+
+    assert np.allclose(observed, reference, rtol=0.0, atol=5.0e-12)
+    assert observed_diagnostics["rank_warning_count"] == 0
+    assert reference_diagnostics["rank_warning_count"] == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_effective_quality_adp_rejects_absolute_bjd_defect() -> None:
+    n = 240
+    with pytest.raises(ValueError, match="outside the BTJD bound"):
+        native._effective_quality_adp03q(
+            time_btjd=2_459_000.0 + np.arange(n) * (200.0 / 86400.0),
+            raw_flux=np.ones(n),
+            raw_error=np.full(n, 0.1),
+            quality=np.zeros(n, dtype=np.int32),
+        )
+
+
+def test_effective_quality_adp_captures_exact_rankwarning_without_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    original = native.flux_space_detrend_result
+
+    def warning_result(*args: object, **kwargs: object) -> object:
+        result = original(*args, **kwargs)
+        warnings.warn(
+            native.FULL_POOL_NATIVE_RANK_WARNING_MESSAGE,
+            native._NUMPY_RANK_WARNING,
+            stacklevel=1,
+        )
+        return result
+
+    monkeypatch.setattr(native, "flux_space_detrend_result", warning_result)
+    n = 240
+    _, diagnostics = native._effective_quality_adp03q(
+        time_btjd=3000.0 + np.arange(n) * (200.0 / 86400.0),
+        raw_flux=1000.0 + np.sin(np.arange(n) / 20.0),
+        raw_error=np.full(n, 0.1),
+        quality=np.zeros(n, dtype=np.int32),
+    )
+
+    assert diagnostics["rank_warning_count"] == 1
+    assert json.loads(diagnostics["rank_warning_categories_json"]) == [
+        native.FULL_POOL_NATIVE_RANK_WARNING_CATEGORY
+    ]
+    assert capsys.readouterr().err == ""
+
+
+def test_effective_quality_adp_rejects_every_other_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = native.flux_space_detrend_result
+
+    def warning_result(*args: object, **kwargs: object) -> object:
+        result = original(*args, **kwargs)
+        warnings.warn("unexpected warning", RuntimeWarning, stacklevel=1)
+        return result
+
+    monkeypatch.setattr(native, "flux_space_detrend_result", warning_result)
+    n = 240
+    with pytest.raises(RuntimeError, match="unauthorized warning"):
+        native._effective_quality_adp03q(
+            time_btjd=3000.0 + np.arange(n) * (200.0 / 86400.0),
+            raw_flux=1000.0 + np.sin(np.arange(n) / 20.0),
+            raw_error=np.full(n, 0.1),
+            quality=np.zeros(n, dtype=np.int32),
+        )
+
+
+def test_native_v3r1_rankwarning_refuses_publication_and_removes_temporary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output, build_kwargs = _prepared_s61_native_build(
+        tmp_path,
+        monkeypatch,
+        output_name="rankwarning_must_not_publish.h5",
+    )
+    original = native.flux_space_detrend_result
+
+    def warning_result(*args: object, **kwargs: object) -> object:
+        result = original(*args, **kwargs)
+        warnings.warn(
+            native.FULL_POOL_NATIVE_RANK_WARNING_MESSAGE,
+            native._NUMPY_RANK_WARNING,
+            stacklevel=1,
+        )
+        return result
+
+    monkeypatch.setattr(native, "flux_space_detrend_result", warning_result)
+    with pytest.raises(RuntimeError, match="native export failed"):
+        native.build_full_pool_native_shard(**build_kwargs)
+
+    assert not output.exists()
+    assert not list(tmp_path.glob(".rankwarning_must_not_publish.h5.*.tmp"))
+    failures = pd.read_csv(output.with_suffix(".failures.csv"))
+    assert failures["error"].str.contains(
+        "publication requires zero exact RankWarnings"
+    ).any()
+    assert capsys.readouterr().err == ""
+
+
+def test_native_v3r1_verifier_rejects_tampered_btjd_bjd_relation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output, build_kwargs = _prepared_s61_native_build(
+        tmp_path,
+        monkeypatch,
+        output_name="tampered_time_relation.h5",
+    )
+    result = native.build_full_pool_native_shard(**build_kwargs)
+    assert result["verification"]["passed"] is True
+
+    with h5py.File(output, "r+") as h5:
+        group = h5[f"targets/{420_061:016d}"]
+        group["time"][0] = float(group["time"][0]) + 1.0e-4
+
+    verification = native.verify_full_pool_native_shard(
+        output,
+        expected_git_sha="d" * 40,
+    )
+    assert verification["passed"] is False
+    assert any(
+        "published BJD differs from BTJD offset" in failure
+        for failure in verification["failures"]
+    )
 
 
 @pytest.mark.parametrize("n_periods", [1, 2])
@@ -972,18 +1186,44 @@ def test_s61_strict_native_contract_preserves_orbit_ids(
     assert result["orbitid_reconciliation"]["n_cad_corrected"] == 0
     with h5py.File(output, "r") as h5:
         group = h5[f"targets/{int(inputs['tic']):016d}"]
+        time_btjd = np.asarray(
+            group[native.FULL_POOL_NATIVE_DETREND_TIME_DATASET]
+        )
+        published_bjd = np.asarray(group["time"])
+        assert np.array_equal(
+            published_bjd,
+            time_btjd + native.FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+        )
+        assert float(np.min(time_btjd)) >= native.FULL_POOL_NATIVE_BTJD_MIN
+        assert float(np.max(time_btjd)) < native.FULL_POOL_NATIVE_BTJD_MAX
+        assert h5.attrs["detrend_time_contract_version"] == (
+            native.FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+        )
+        assert h5.attrs["warning_capture_policy"] == (
+            native.FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+        )
+        assert h5.attrs["rank_warning_publication_policy"] == "require_zero"
+        assert h5.attrs["rank_warning_count"] == 0
+        assert h5.attrs["rank_warning_ledger_json"] == "[]"
+        assert h5.attrs["rank_warning_ledger_sha256"] == (
+            native.FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+        )
         assert np.array_equal(
             group["orbitid"][:], group["orbitid_pre_reference"][:]
         )
         quality = np.asarray(group["quality"])
         expected_small = _independent_effective_quality_adp(
-            time=np.asarray(group["time"]),
+            time_btjd=np.asarray(
+                group[native.FULL_POOL_NATIVE_DETREND_TIME_DATASET]
+            ),
             raw_flux=np.asarray(group["raw_flux_small"]),
             raw_error=np.asarray(group["raw_flux_err_small"]),
             quality=quality,
         )
         expected_primary = _independent_effective_quality_adp(
-            time=np.asarray(group["time"]),
+            time_btjd=np.asarray(
+                group[native.FULL_POOL_NATIVE_DETREND_TIME_DATASET]
+            ),
             raw_flux=np.asarray(group["raw_flux_primary"]),
             raw_error=np.asarray(group["raw_flux_err_primary"]),
             quality=quality,
@@ -1107,13 +1347,17 @@ def test_native_v3_builder_reconstructs_adp_from_raw_with_external_bad_cadence(
         group = h5[f"targets/{tic:016d}"]
         quality = np.asarray(group["quality"])
         expected_small = _independent_effective_quality_adp(
-            time=np.asarray(group["time"]),
+            time_btjd=np.asarray(
+                group[native.FULL_POOL_NATIVE_DETREND_TIME_DATASET]
+            ),
             raw_flux=np.asarray(clean["raw_flux_small"]),
             raw_error=np.asarray(clean["raw_flux_err_small"]),
             quality=quality,
         )
         expected_primary = _independent_effective_quality_adp(
-            time=np.asarray(group["time"]),
+            time_btjd=np.asarray(
+                group[native.FULL_POOL_NATIVE_DETREND_TIME_DATASET]
+            ),
             raw_flux=np.asarray(clean["raw_flux_primary"]),
             raw_error=np.asarray(clean["raw_flux_err_primary"]),
             quality=quality,
@@ -1441,6 +1685,26 @@ def test_registry_freeze_requires_exact_observation_coverage(
             h5.attrs["detrend_quality_source"] = (
                 "final_effective_quality"
             )
+            h5.attrs["detrend_time_contract_version"] = (
+                native.FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+            )
+            h5.attrs["detrend_time_dataset"] = (
+                native.FULL_POOL_NATIVE_DETREND_TIME_DATASET
+            )
+            h5.attrs["detrend_time_system"] = "BTJD"
+            h5.attrs["published_time_system"] = "BJD"
+            h5.attrs["btjd_to_bjd_offset_d"] = (
+                native.FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+            )
+            h5.attrs["warning_capture_policy"] = (
+                native.FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+            )
+            h5.attrs["rank_warning_publication_policy"] = "require_zero"
+            h5.attrs["rank_warning_count"] = 0
+            h5.attrs["rank_warning_ledger_json"] = "[]"
+            h5.attrs["rank_warning_ledger_sha256"] = (
+                native.FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+            )
             h5.attrs["raw_photometry_only"] = 1
             h5.attrs["compact_adp_photometry_reused"] = 0
             h5.attrs["compact_adp_flux_reused"] = 0
@@ -1553,6 +1817,26 @@ def test_registry_freeze_requires_exact_observation_coverage(
                     ),
                     "detrend_quality_source": (
                         "final_effective_quality"
+                    ),
+                    "detrend_time_contract_version": (
+                        native.FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+                    ),
+                    "detrend_time_dataset": (
+                        native.FULL_POOL_NATIVE_DETREND_TIME_DATASET
+                    ),
+                    "detrend_time_system": "BTJD",
+                    "published_time_system": "BJD",
+                    "btjd_to_bjd_offset_d": (
+                        native.FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+                    ),
+                    "warning_capture_policy": (
+                        native.FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+                    ),
+                    "rank_warning_publication_policy": "require_zero",
+                    "rank_warning_count": 0,
+                    "rank_warning_ledger_json": "[]",
+                    "rank_warning_ledger_sha256": (
+                        native.FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
                     ),
                     "raw_photometry_only": True,
                     "compact_adp_photometry_reused": False,

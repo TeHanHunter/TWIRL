@@ -555,7 +555,7 @@ Acceptance checks:
 - source and export TIC/Gaia IDs match
 - cadence counts match for representative targets
 
-## Teacher v4-SSL full-pool v3
+## Teacher v4-SSL full-pool v3r1
 
 The effective-quality-aware ADP rebuild is controlled by
 `scripts/orcd/run_teacher_ssl_fullpool_v3_orcd.sh`. The controller is a
@@ -564,6 +564,18 @@ remote mutation requires `--run`, and every mutating stage takes a persistent
 atomic claim before its first copy, temporary file, or `sbatch`. A failed or
 partially submitted stage is therefore diagnostic evidence and is not retried
 automatically.
+
+The original fresh-v3 canaries are terminal diagnostic provenance only. They
+conditioned the ADP spline on absolute BJD: S56 happened to complete without
+a warning, while S60 emitted `3,324` exact NumPy `RankWarning`s. No downstream
+v3 stage ran, and neither v3 HDF5 may enter v3r1. The v3r1 contract instead
+detrends on the compact-source BTJD coordinate, validates bounded finite
+monotonic BTJD, and publishes absolute BJD as exactly
+`BTJD + 2,457,000`. Warning capture is local to each ADP fit; only the exact
+authorized NumPy rank-warning category and message may enter the audit ledger,
+every other warning is fatal, and publication requires an empty ledger and
+zero count at aperture, group, shard, registry, numerical-release, and
+training gates.
 
 The controller accepts only `tehan@orcd-login.mit.edu` through the exact
 user-opened control socket
@@ -593,17 +605,22 @@ The two native canaries are S56 shard 3 and S60 shard 4. The separate canary
 audit re-derives S60 shard-4 eligibility from the primary frozen-pool and BLS
 authorities and runs every eligible row through the production
 dataset/collator/numerical-envelope path before the seven `0-15%4` native
-arrays can launch. Production then requires exactly 112 fresh v3 HDF5 files,
+arrays can launch. Production then requires exactly 112 fresh v3r1 HDF5 files,
 summaries, and SHA sidecars; exact `175,347` native coverage; the exact
 19-observation complement in the 175,366-row audit; the 4,096-period
 periodogram contract; and the full numerical release before the H200 smoke.
+The fresh namespaces are rooted at
+`teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible`,
+with numerical gates under `model_input_numeric_gate_v3r1` and model runs
+under `effective_quality_adp_btjd_v2`. Historical native-v3 products and
+namespaces are rejected explicitly.
 
 For this explicitly approved full-pool run only, the five independent
 one-H200 folds launch as `0-4%4`, so no task requests more than one H200 and no
 more than four run concurrently. This is not a general increase to the
 routine H200 allowance. Final completion requires the independent CPU
 validator and the immutable release
-`frozen/model/teacher_ssl_fullpool_v3_five_fold.complete.json`; Slurm exit
+`frozen/model/teacher_ssl_fullpool_v3r1_five_fold.complete.json`; Slurm exit
 codes alone are insufficient.
 
 Current helper scripts:

@@ -49,11 +49,40 @@ ASSETS = (
     FOLD_VALIDATION,
 )
 
-V3_ROOT = (
+HISTORICAL_V3_ROOT = (
     "teacher_ssl_fullpool_v3_s56_s62_a2v1_"
     "effective_quality_adp_bls_eligible"
 )
-MODEL_NAMESPACE = "model_runs/effective_quality_adp_v1"
+V3R1_ROOT = (
+    "teacher_ssl_fullpool_v3r1_s56_s62_a2v1_"
+    "effective_quality_adp_btjd_bls_eligible"
+)
+V3R1_RUN_ROOT_ENV = "TWIRL_SSL_FULLPOOL_V3R1_RUN_ROOT"
+MODEL_NAMESPACE = "model_runs/effective_quality_adp_btjd_v2"
+NUMERIC_GATE_NAMESPACE = "model_input_numeric_gate_v3r1"
+COMPLETION_RELEASE = "teacher_ssl_fullpool_v3r1_five_fold.complete.json"
+NATIVE_CONTRACT = (
+    "twirl_teacher_ssl_fullpool_real_native_v3r1_"
+    "effective_quality_adp_btjd"
+)
+RELEASE_BINDING = (
+    "teacher_ssl_fullpool_v3r1_s56_s62_a2v1_"
+    "effective_quality_adp_btjd_bls_eligible"
+)
+BUILDER_CONTRACT = (
+    "twirl_teacher_ssl_fullpool_effective_quality_adp_btjd_builder_v2"
+)
+DETREND_CONTRACT = "twirl_fs_adp03q_effective_quality_btjd_v2"
+DETREND_TIME_CONTRACT = (
+    "twirl_teacher_ssl_fullpool_adp_detrend_time_btjd_v1"
+)
+DETREND_TIME_DATASET = "adp_detrend_time_btjd"
+WARNING_CAPTURE_POLICY = (
+    "twirl_teacher_ssl_fullpool_exact_numpy_rankwarning_capture_v1"
+)
+EMPTY_WARNING_LEDGER_SHA256 = (
+    "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+)
 
 
 @pytest.mark.parametrize("asset", ASSETS)
@@ -93,11 +122,14 @@ def test_v3_canary_auditor_has_valid_python_syntax() -> None:
         FOLD_VALIDATION,
     ),
 )
-def test_v3_jobs_require_exact_clean_revision_and_fresh_root(
+def test_v3r1_jobs_require_exact_clean_revision_and_fresh_root(
     asset: Path,
 ) -> None:
     wrapper = asset.read_text(encoding="utf-8")
-    assert V3_ROOT in wrapper
+    assert V3R1_ROOT in wrapper
+    assert V3R1_RUN_ROOT_ENV in wrapper
+    assert HISTORICAL_V3_ROOT not in wrapper
+    assert "TWIRL_SSL_FULLPOOL_V3_RUN_ROOT" not in wrapper
     assert "TWIRL_EXPECTED_GIT_SHA" in wrapper
     assert 'git -C "${REPO}" rev-parse HEAD' in wrapper
     assert (
@@ -107,9 +139,11 @@ def test_v3_jobs_require_exact_clean_revision_and_fresh_root(
     assert "--resume" not in wrapper
 
 
-def test_native_v3_uses_raw_v1_and_effective_quality_contract() -> None:
+def test_native_v3r1_uses_raw_v1_and_btjd_effective_quality_contract() -> None:
     wrapper = NATIVE.read_text(encoding="utf-8")
     assert "teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp" in wrapper
+    assert V3R1_ROOT in wrapper
+    assert V3R1_RUN_ROOT_ENV in wrapper
     assert 'RAW_DIR="${SOURCE_RUN_ROOT}/native_preparation/raw_sources"' in wrapper
     assert "--raw-source" in wrapper
     assert "--compact-adp-h5" in wrapper
@@ -117,6 +151,8 @@ def test_native_v3_uses_raw_v1_and_effective_quality_contract() -> None:
     assert "--eligibility-summary" in wrapper
     assert "--expected-code-revision" in wrapper
     assert "Refusing to overwrite or resume" in wrapper
+    assert "native-v3r1" in wrapper
+    assert HISTORICAL_V3_ROOT not in wrapper
 
     cli = (
         STAGE5_ROOT / "build_teacher_ssl_fullpool_native_shard.py"
@@ -160,9 +196,125 @@ def test_controller_is_noninteractive_explicit_and_fail_closed() -> None:
         "verify-completion)",
     ):
         assert action in wrapper
-    assert V3_ROOT in wrapper
+    assert V3R1_ROOT in wrapper
+    assert V3R1_RUN_ROOT_ENV in wrapper
     assert MODEL_NAMESPACE in wrapper
+    assert NUMERIC_GATE_NAMESPACE in wrapper
     assert "sbatch --dependency" not in wrapper
+
+
+def test_controller_locks_fresh_v3r1_identities_and_historical_v3_only_as_history(
+) -> None:
+    wrapper = CONTROLLER.read_text(encoding="utf-8")
+
+    for value in (
+        V3R1_ROOT,
+        V3R1_RUN_ROOT_ENV,
+        MODEL_NAMESPACE,
+        NUMERIC_GATE_NAMESPACE,
+        COMPLETION_RELEASE,
+        NATIVE_CONTRACT,
+        RELEASE_BINDING,
+        BUILDER_CONTRACT,
+        DETREND_CONTRACT,
+        DETREND_TIME_CONTRACT,
+        DETREND_TIME_DATASET,
+        WARNING_CAPTURE_POLICY,
+        EMPTY_WARNING_LEDGER_SHA256,
+    ):
+        assert value in wrapper
+
+    assert (
+        f'readonly HISTORICAL_V3_ROOT="${{TWIRL_ROOT}}/'
+        f"reports/stage5_validation/{HISTORICAL_V3_ROOT}\""
+        in wrapper
+    )
+    assert (
+        'readonly HISTORICAL_V3_NATIVE_CONTRACT="'
+        'twirl_teacher_ssl_fullpool_real_native_v3_effective_quality_adp"'
+        in wrapper
+    )
+    assert (
+        'readonly HISTORICAL_V3_RELEASE_BINDING="'
+        f'{HISTORICAL_V3_ROOT}"'
+        in wrapper
+    )
+    assert (
+        f'readonly RUN_ROOT="${{TWIRL_ROOT}}/reports/stage5_validation/'
+        f'{V3R1_ROOT}"'
+        in wrapper
+    )
+    assert (
+        f'readonly CLAIM_PREFIX="${{TWIRL_ROOT}}/reports/stage5_validation/.'
+        f'{V3R1_ROOT}"'
+        in wrapper
+    )
+    assert (
+        f",TWIRL_SSL_FULLPOOL_V3R1_RUN_ROOT=${{RUN_ROOT}}"
+        in wrapper
+    )
+    assert ",TWIRL_SSL_FULLPOOL_V3_RUN_ROOT=" not in wrapper
+
+
+@pytest.mark.parametrize(
+    ("asset", "job_name", "event_label"),
+    (
+        (
+            CANARY_AUDIT,
+            "twirl-ssl-v3r1-canary-numeric",
+            "[teacher-ssl-fullpool-v3r1-canary-numeric]",
+        ),
+        (
+            NATIVE,
+            "twirl-ssl-v3r1-native",
+            "[fullpool-native-v3r1]",
+        ),
+        (
+            NATIVE_REGISTRY,
+            "twirl-ssl-v3r1-native-registry",
+            "[ssl-full-pool-native-registry-v3r1]",
+        ),
+        (
+            SSL_REGISTRY,
+            "twirl-ssl-v3r1-registry",
+            "[ssl-full-pool-registry-v3r1]",
+        ),
+        (
+            NUMERIC_AUDIT,
+            "twirl-ssl-v3r1-numeric-audit",
+            "[teacher-ssl-numeric-audit-v3r1]",
+        ),
+        (
+            NUMERIC_RELEASE,
+            "twirl-ssl-v3r1-numeric-release",
+            "[teacher-ssl-numeric-release-v3r1]",
+        ),
+        (
+            SMOKE,
+            "twirl-ssl-v3r1-smoke",
+            "[teacher-ssl-fullpool-v3r1-smoke]",
+        ),
+        (
+            FOLDS,
+            "twirl-ssl-v3r1-fold",
+            "[teacher-ssl-fullpool-v3r1]",
+        ),
+        (
+            FOLD_VALIDATION,
+            "twirl-ssl-v3r1-validate-folds",
+            "[teacher-ssl-fullpool-v3r1-fold-validation]",
+        ),
+    ),
+)
+def test_runtime_job_and_event_labels_are_unambiguously_v3r1(
+    asset: Path,
+    job_name: str,
+    event_label: str,
+) -> None:
+    wrapper = asset.read_text(encoding="utf-8")
+    assert f"#SBATCH --job-name={job_name}" in wrapper
+    assert wrapper.count(event_label) >= 1
+    assert "#SBATCH --job-name=twirl-ssl-v3-" not in wrapper
 
 
 def _controller_action_block(action: str) -> str:
@@ -247,6 +399,41 @@ def test_controller_gates_canaries_and_all_native_products() -> None:
     assert "'COMPLETED|0:0'" in wrapper
     assert "test ! -s" in wrapper
     assert "sha256sum -c" in wrapper
+    for value in (
+        NATIVE_CONTRACT,
+        RELEASE_BINDING,
+        BUILDER_CONTRACT,
+        DETREND_CONTRACT,
+        DETREND_TIME_CONTRACT,
+        DETREND_TIME_DATASET,
+        WARNING_CAPTURE_POLICY,
+        EMPTY_WARNING_LEDGER_SHA256,
+    ):
+        assert value in wrapper
+    assert 'd[\\"detrend_time_contract_version\\"]' in wrapper
+    assert 'd[\\"detrend_time_dataset\\"]' in wrapper
+    assert 'd[\\"detrend_time_system\\"]==\\"BTJD\\"' in wrapper
+    assert 'd[\\"published_time_system\\"]==\\"BJD\\"' in wrapper
+    assert 'd[\\"rank_warning_publication_policy\\"]==\\"require_zero\\"' in wrapper
+    assert 'int(d[\\"rank_warning_count\\"])==0' in wrapper
+    assert 'd[\\"rank_warning_ledger_json\\"]==\\"[]\\"' in wrapper
+    assert 'd[\\"rank_warning_ledger_sha256\\"]' in wrapper
+    assert 'h.attrs[\\"detrend_time_contract_version\\"]' in wrapper
+    assert 'assert \\"${DETREND_TIME_DATASET}\\" in g' in wrapper
+    assert "np.isfinite(btjd).all()" in wrapper
+    assert "btjd.min()>=0.0" in wrapper
+    assert "btjd.max()<100000.0" in wrapper
+    assert "np.array_equal(bjd,btjd+2457000.0)" in wrapper
+    assert (
+        'int(g.attrs[\\"effective_quality_adp_small_'
+        'rank_warning_count\\"])==0'
+        in wrapper
+    )
+    assert (
+        'int(g.attrs[\\"effective_quality_adp_primary_'
+        'rank_warning_count\\"])==0'
+        in wrapper
+    )
     assert "sum(int(d[\\\"n_source_shard_observations\\\"]) for d in ds)==175366" in wrapper
     assert "sum(int(d[\\\"n_shard_observations\\\"]) for d in ds)==175347" in wrapper
     assert "sum(int(d[\\\"n_shard_excluded_observations\\\"]) for d in ds)==19" in wrapper
@@ -271,8 +458,10 @@ def test_numeric_smoke_and_fold_contracts_are_exact() -> None:
     folds = FOLDS.read_text(encoding="utf-8")
 
     assert "#SBATCH --array=0-111%4" in numeric
-    assert "model_input_numeric_gate_v2" in numeric
+    assert NUMERIC_GATE_NAMESPACE in numeric
+    assert "model_input_numeric_gate_v2" not in numeric
     assert '"${#reports[@]}" -ne 112' in release
+    assert NUMERIC_GATE_NAMESPACE in release
     assert "#SBATCH --gres=gpu:h200:1" in smoke
     assert "#SBATCH --array" not in smoke
     assert "readonly FOLD=2" in smoke
@@ -293,7 +482,8 @@ def test_five_fold_completion_validation_is_independent_and_immutable() -> None:
 
     assert "#SBATCH --gres" not in wrapper
     assert "#SBATCH --array" not in wrapper
-    assert V3_ROOT in wrapper
+    assert V3R1_ROOT in wrapper
+    assert V3R1_RUN_ROOT_ENV in wrapper
     assert MODEL_NAMESPACE in wrapper
     assert "training/five_fold" in wrapper
     assert "validate_teacher_ssl_fullpool_v3_training.py" in wrapper
@@ -302,13 +492,20 @@ def test_five_fold_completion_validation_is_independent_and_immutable() -> None:
     assert '--output-release "${OUTPUT_RELEASE}"' in wrapper
     assert (
         'OUTPUT_RELEASE="${RUN_ROOT}/frozen/model/'
-        'teacher_ssl_fullpool_v3_five_fold.complete.json"'
+        f'{COMPLETION_RELEASE}"'
         in wrapper
     )
-    assert "Refusing to overwrite or reuse native-v3 completion release" in wrapper
+    assert "Refusing to overwrite or reuse native-v3r1 completion release" in wrapper
     assert "completion.release.json" not in wrapper
-    assert "twirl_teacher_ssl_fullpool_v3_five_fold_completion_release_v1" in wrapper
-    assert "teacher_ssl_fullpool_v3_effective_quality_adp_five_fold_complete_v1" in wrapper
+    assert (
+        "twirl_teacher_ssl_fullpool_v3r1_five_fold_completion_release_v2"
+        in wrapper
+    )
+    assert (
+        "teacher_ssl_fullpool_v3r1_effective_quality_adp_btjd_"
+        "five_fold_complete_v2"
+        in wrapper
+    )
     assert '"counts"]=={"folds":5,"completed_epochs":100}' in wrapper
 
     action = _controller_action_block("validate-folds")
@@ -320,15 +517,15 @@ def test_five_fold_completion_validation_is_independent_and_immutable() -> None:
     assert "fold_validation.job" in controller
     assert "slurm_teacher_ssl_fullpool_v3_validate_folds_cpu.sbatch" in action
     assert (
-        "frozen/model/teacher_ssl_fullpool_v3_five_fold.complete.json"
+        f"frozen/model/{COMPLETION_RELEASE}"
         in controller
     )
 
     verification = _controller_action_block("verify-completion")
     assert "'COMPLETED|0:0'" in verification
-    assert "twirl-ssl-v3-validate-folds-" in verification
+    assert "twirl-ssl-v3r1-validate-folds-" in verification
     assert "test ! -s" in verification
-    assert "sha256sum -c 'teacher_ssl_fullpool_v3_five_fold.complete.json.sha256'" in verification
+    assert f"sha256sum -c '{COMPLETION_RELEASE}.sha256'" in verification
     assert "validate_teacher_ssl_fullpool_v3_training.py" in verification
     assert "--model-root '${MODEL_RUN_ROOT}/training/five_fold'" in verification
     assert "--output-release '${FOLD_COMPLETION_RELEASE}'" in verification
@@ -362,9 +559,25 @@ def test_s60_canary_auditor_uses_only_primary_label_free_authorities() -> None:
     assert "PRODUCTION_FULL_IDENTITY_SHA256" in auditor
     assert "PRODUCTION_ELIGIBLE_IDENTITY_SHA256" in auditor
     assert "FULL_POOL_NATIVE_CONTRACT_VERSION" in auditor
+    assert "FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION" in auditor
+    assert "FULL_POOL_NATIVE_DETREND_TIME_DATASET" in auditor
+    assert "FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D" in auditor
+    assert "FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY" in auditor
+    assert "FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY" in auditor
+    assert "FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON" in auditor
+    assert "FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256" in auditor
     assert "expected_code_revision != _code_revision()" in auditor
     assert "_publish_new(report_out, payload)" in auditor
     assert "audit_only_no_clip_no_exclusion" in auditor
+    assert (
+        "twirl_teacher_ssl_fullpool_v3r1_s60_shard4_"
+        "model_facing_canary_v2"
+        in auditor
+    )
+    assert '"detrend_time_system": "BTJD"' in auditor
+    assert '"published_time_system": "BJD"' in auditor
+    assert '"rank_warning_count": 0' in auditor
+    assert "teacher_ssl_fullpool_v3r1_canary_numeric_complete" in auditor
 
     assert "#SBATCH --gres" not in wrapper
     assert "#SBATCH --array" not in wrapper
@@ -413,7 +626,7 @@ def test_s60_canary_rejects_a_drifted_native_sha_sidecar(
     spec.loader.exec_module(module)
 
     native = tmp_path / "native_4.h5"
-    native.write_bytes(b"current-v3-canary")
+    native.write_bytes(b"current-v3r1-canary")
     sidecar = tmp_path / "native_4.h5.sha256"
     sidecar.write_text(
         f"{'0' * 64}  {native}\n",

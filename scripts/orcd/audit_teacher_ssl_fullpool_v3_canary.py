@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed model-facing audit for the fresh S60/native_4 v3 canary."""
+"""Fail-closed model-facing audit for the fresh S60/native_4 v3r1 canary."""
 from __future__ import annotations
 
 import argparse
@@ -43,11 +43,18 @@ from twirl.vetting.ssl_full_pool_eligibility import (  # noqa: E402
 )
 from twirl.vetting.ssl_full_pool_native import (  # noqa: E402
     FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
     FULL_POOL_NATIVE_CONTRACT_VERSION,
     FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
     FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON,
+    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256,
+    FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY,
     FULL_POOL_NATIVE_RELEASE_BINDING,
     FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION,
+    FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
     full_pool_native_group_failures,
     shard_for_tic,
     verify_full_pool_native_shard,
@@ -67,7 +74,7 @@ from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
 
 
 CANARY_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_v3_s60_shard4_model_facing_canary_v1"
+    "twirl_teacher_ssl_fullpool_v3r1_s60_shard4_model_facing_canary_v2"
 )
 CANARY_SECTOR = 60
 CANARY_SHARD_INDEX = 4
@@ -184,6 +191,24 @@ def _validate_summary(
         "detrend_contract_version": FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
         "detrend_config_sha256": FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
         "detrend_quality_source": "final_effective_quality",
+        "detrend_time_contract_version": (
+            FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+        ),
+        "detrend_time_dataset": FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+        "detrend_time_system": "BTJD",
+        "published_time_system": "BJD",
+        "btjd_to_bjd_offset_d": FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+        "warning_capture_policy": FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+        "rank_warning_publication_policy": (
+            FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+        ),
+        "rank_warning_count": 0,
+        "rank_warning_ledger_json": (
+            FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+        ),
+        "rank_warning_ledger_sha256": (
+            FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+        ),
         "raw_photometry_only": True,
         "compact_adp_photometry_reused": False,
         "compact_adp_flux_reused": False,
@@ -559,7 +584,7 @@ def audit_canary(
         _assert_unchanged(binding)
     report = {
         "schema_version": CANARY_SCHEMA,
-        "stage": "pre_production_native_v3_model_facing_canary",
+        "stage": "pre_production_native_v3r1_model_facing_canary",
         "code_revision": expected_code_revision,
         "sector": CANARY_SECTOR,
         "shard_index": CANARY_SHARD_INDEX,
@@ -590,6 +615,21 @@ def audit_canary(
         "builder_contract_version": FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
         "detrend_contract_version": FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
         "detrend_config_sha256": FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
+        "detrend_time_contract_version": (
+            FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+        ),
+        "detrend_time_dataset": FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+        "detrend_time_system": "BTJD",
+        "published_time_system": "BJD",
+        "btjd_to_bjd_offset_d": FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+        "warning_capture_policy": FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+        "rank_warning_publication_policy": (
+            FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+        ),
+        "rank_warning_count": 0,
+        "rank_warning_ledger_sha256": (
+            FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+        ),
         "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
         "numeric_envelope_contract": (
             FULL_POOL_NUMERIC_ENVELOPE_V1.contract_version
@@ -646,7 +686,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         json.dumps(
             {
-                "event": "teacher_ssl_fullpool_v3_canary_numeric_complete",
+                "event": "teacher_ssl_fullpool_v3r1_canary_numeric_complete",
                 "counts": report["counts"],
                 "report": str(args.report_out.expanduser().resolve()),
             },

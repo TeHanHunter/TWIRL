@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and freeze the completed native-v3 five-fold SSL training run."""
+"""Validate and freeze the completed native-v3r1 five-fold SSL training run."""
 from __future__ import annotations
 
 import argparse
@@ -72,10 +72,10 @@ from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
 
 
 COMPLETION_RELEASE_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_v3_five_fold_completion_release_v1"
+    "twirl_teacher_ssl_fullpool_v3r1_five_fold_completion_release_v2"
 )
 COMPLETION_RELEASE_BINDING = (
-    "teacher_ssl_fullpool_v3_effective_quality_adp_five_fold_complete_v1"
+    "teacher_ssl_fullpool_v3r1_effective_quality_adp_btjd_five_fold_complete_v2"
 )
 PRODUCTION_EPOCHS = 20
 PRODUCTION_BATCH_SIZE = 64
@@ -583,6 +583,44 @@ def _validate_native_record(
             ]
         ),
         "native_detrend_quality_source": "final_effective_quality",
+        "native_detrend_time_contract_version": (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "detrend_time_contract_version"
+            ]
+        ),
+        "native_detrend_time_dataset": (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "detrend_time_dataset"
+            ]
+        ),
+        "native_detrend_time_system": "BTJD",
+        "native_published_time_system": "BJD",
+        "native_btjd_to_bjd_offset_d": (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "btjd_to_bjd_offset_d"
+            ]
+        ),
+        "native_warning_capture_policy": (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "warning_capture_policy"
+            ]
+        ),
+        "native_rank_warning_publication_policy": (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "rank_warning_publication_policy"
+            ]
+        ),
+        "native_rank_warning_count": 0,
+        "native_rank_warning_ledger_json": (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "rank_warning_ledger_json"
+            ]
+        ),
+        "native_rank_warning_ledger_sha256": (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "rank_warning_ledger_sha256"
+            ]
+        ),
         "raw_photometry_only": True,
         "compact_adp_photometry_reused": False,
         "compact_adp_flux_reused": False,
@@ -633,6 +671,26 @@ def _validate_native_record(
                     "native_detrend_config_sha256"
                 ],
                 "detrend_quality_source": "final_effective_quality",
+                "detrend_time_contract_version": expected[
+                    "native_detrend_time_contract_version"
+                ],
+                "detrend_time_dataset": expected[
+                    "native_detrend_time_dataset"
+                ],
+                "detrend_time_system": "BTJD",
+                "published_time_system": "BJD",
+                "warning_capture_policy": expected[
+                    "native_warning_capture_policy"
+                ],
+                "rank_warning_publication_policy": expected[
+                    "native_rank_warning_publication_policy"
+                ],
+                "rank_warning_ledger_json": expected[
+                    "native_rank_warning_ledger_json"
+                ],
+                "rank_warning_ledger_sha256": expected[
+                    "native_rank_warning_ledger_sha256"
+                ],
             }
             if {
                 name: str(h5.attrs.get(name, "")) for name in root_expected
@@ -644,6 +702,7 @@ def _validate_native_record(
                 ("raw_photometry_only", 1),
                 ("compact_adp_photometry_reused", 0),
                 ("compact_adp_flux_reused", 0),
+                ("rank_warning_count", 0),
                 (
                     "periodogram_n",
                     MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS["periodogram_n"],
@@ -653,6 +712,12 @@ def _validate_native_record(
                     raise ValueError(
                         f"native record {index} HDF5 root {name} changed"
                     )
+            if float(h5.attrs.get("btjd_to_bjd_offset_d", math.nan)) != (
+                expected["native_btjd_to_bjd_offset_d"]
+            ):
+                raise ValueError(
+                    f"native record {index} HDF5 BTJD offset changed"
+                )
     except OSError as exc:
         raise ValueError(f"native record {index} is not loadable HDF5") from exc
     return _metadata(path)

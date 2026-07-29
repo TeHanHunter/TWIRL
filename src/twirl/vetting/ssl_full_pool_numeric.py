@@ -39,13 +39,20 @@ from twirl.vetting.ssl_full_pool_eligibility import (
 )
 from twirl.vetting.ssl_full_pool_native import (
     FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
     FULL_POOL_NATIVE_CONTRACT_VERSION,
     FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
     FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
     FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON,
+    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256,
     FULL_POOL_NATIVE_PERIODOGRAM_N,
+    FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY,
     FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION,
     FULL_POOL_NATIVE_RELEASE_BINDING,
+    FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
 )
 import twirl.vetting.ssl_full_pool_native as _native_module
 
@@ -54,13 +61,13 @@ TEACHER_SSL_NUMERIC_ENVELOPE_V1 = (
     "twirl_teacher_ssl_fullpool_numeric_envelope_v1"
 )
 MODEL_INPUT_NUMERIC_AUDIT_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_model_input_numeric_audit_v2"
+    "twirl_teacher_ssl_fullpool_model_input_numeric_audit_v3"
 )
 MODEL_INPUT_NUMERIC_RELEASE_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_model_input_numeric_release_v2"
+    "twirl_teacher_ssl_fullpool_model_input_numeric_release_v3"
 )
 MODEL_INPUT_NUMERIC_RELEASE_BINDING = (
-    "teacher_ssl_fullpool_v3_effective_quality_adp_numeric_v2"
+    "teacher_ssl_fullpool_v3r1_effective_quality_adp_btjd_numeric_v3"
 )
 MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT = TEACHER_SSL_NUMERIC_ENVELOPE_V1
 MODEL_INPUT_NUMERIC_AUTHORITY_NAMES: tuple[str, ...] = (
@@ -82,6 +89,24 @@ MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS: dict[str, Any] = {
     "detrend_config_json": FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
     "detrend_config_sha256": FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
     "detrend_quality_source": "final_effective_quality",
+    "detrend_time_contract_version": (
+        FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+    ),
+    "detrend_time_dataset": FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+    "detrend_time_system": "BTJD",
+    "published_time_system": "BJD",
+    "btjd_to_bjd_offset_d": FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+    "warning_capture_policy": FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+    "rank_warning_publication_policy": (
+        FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+    ),
+    "rank_warning_count": 0,
+    "rank_warning_ledger_json": (
+        FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+    ),
+    "rank_warning_ledger_sha256": (
+        FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+    ),
     "raw_photometry_only": True,
     "compact_adp_photometry_reused": False,
     "compact_adp_flux_reused": False,
@@ -917,7 +942,7 @@ def validate_numeric_native_freshness(
     context: str,
     expected_code_revision: str | None = None,
 ) -> dict[str, Any]:
-    """Require the exact fresh native-v3 effective-quality ADP authority."""
+    """Require the exact fresh native-v3r1 BTJD-detrended ADP authority."""
 
     expected_keys = set(MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS) | {
         "expected_git_sha"
@@ -938,7 +963,7 @@ def validate_numeric_native_freshness(
         )
     ):
         raise ValueError(
-            f"{context} differs from the locked native-v3 "
+            f"{context} differs from the locked native-v3r1 "
             "effective-quality ADP authority"
         )
     return {
@@ -950,7 +975,7 @@ def validate_numeric_native_freshness(
 def numeric_native_freshness(
     expected_code_revision: str,
 ) -> dict[str, Any]:
-    """Return the exact native-v3 freshness record for one deployed SHA."""
+    """Return the exact native-v3r1 freshness record for one deployed SHA."""
 
     return validate_numeric_native_freshness(
         {

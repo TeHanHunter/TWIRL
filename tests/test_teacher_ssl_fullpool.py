@@ -715,6 +715,40 @@ def test_selected_native_verification_requires_actual_v3_group_identity(
             fullpool.FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
         )
         h5.attrs["detrend_quality_source"] = "final_effective_quality"
+        h5.attrs["detrend_time_contract_version"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "detrend_time_contract_version"
+            ]
+        )
+        h5.attrs["detrend_time_dataset"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "detrend_time_dataset"
+            ]
+        )
+        h5.attrs["detrend_time_system"] = "BTJD"
+        h5.attrs["published_time_system"] = "BJD"
+        h5.attrs["btjd_to_bjd_offset_d"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "btjd_to_bjd_offset_d"
+            ]
+        )
+        h5.attrs["warning_capture_policy"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "warning_capture_policy"
+            ]
+        )
+        h5.attrs["rank_warning_publication_policy"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "rank_warning_publication_policy"
+            ]
+        )
+        h5.attrs["rank_warning_count"] = 0
+        h5.attrs["rank_warning_ledger_json"] = "[]"
+        h5.attrs["rank_warning_ledger_sha256"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "rank_warning_ledger_sha256"
+            ]
+        )
         h5.attrs["raw_photometry_only"] = 1
         h5.attrs["compact_adp_photometry_reused"] = 0
         h5.attrs["compact_adp_flux_reused"] = 0
@@ -806,19 +840,21 @@ def test_training_cli_requires_full_authority_chain_and_has_no_hash_bypass() -> 
     assert "--skip-numeric-gate" not in script
 
 
-def test_effective_quality_adp_model_run_uses_fresh_v4_namespace() -> None:
-    assert fullpool.FULLPOOL_SSL_REGISTRY_SCHEMA.endswith("_v2")
-    assert fullpool.FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA.endswith("_v2")
-    assert fullpool.FULLPOOL_SSL_SELECTION_SCHEMA.endswith("_v4")
-    assert fullpool.FULLPOOL_SSL_RUN_CONTRACT_SCHEMA.endswith("_v4")
-    assert fullpool.FULLPOOL_SSL_RESUME_SCHEMA.endswith("_v4")
-    assert fullpool.FULLPOOL_SSL_CHECKPOINT_SCHEMA.endswith("_v4")
-    assert fullpool.FULLPOOL_SSL_SUMMARY_SCHEMA.endswith("_v4")
-    assert fullpool.FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA.endswith("_v4")
-    assert "effective_quality_adp_v1" in fullpool.FULLPOOL_SSL_RUN_ID
-    assert "effective_quality_adp_v1" in fullpool.FULLPOOL_SSL_ENCODER_NAME
+def test_effective_quality_adp_model_run_uses_fresh_v3r1_namespace() -> None:
+    assert fullpool.FULLPOOL_SSL_REGISTRY_SCHEMA.endswith("_v3")
+    assert fullpool.FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA.endswith("_v3")
+    assert fullpool.FULLPOOL_SSL_SELECTION_SCHEMA.endswith("_v5")
+    assert fullpool.FULLPOOL_SSL_RUN_CONTRACT_SCHEMA.endswith("_v5")
+    assert fullpool.FULLPOOL_SSL_RESUME_SCHEMA.endswith("_v5")
+    assert fullpool.FULLPOOL_SSL_CHECKPOINT_SCHEMA.endswith("_v5")
+    assert fullpool.FULLPOOL_SSL_SUMMARY_SCHEMA.endswith("_v5")
+    assert fullpool.FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA.endswith("_v5")
+    assert "effective_quality_adp_btjd_v2" in fullpool.FULLPOOL_SSL_RUN_ID
+    assert "effective_quality_adp_btjd_v2" in (
+        fullpool.FULLPOOL_SSL_ENCODER_NAME
+    )
     assert (
-        "effective_quality_adp_v1"
+        "effective_quality_adp_btjd_v2"
         in fullpool.FULLPOOL_SSL_CHECKPOINT_NAMESPACE
     )
 
@@ -1608,6 +1644,30 @@ def test_completion_validator_real_native_record_path(tmp_path: Path) -> None:
             "detrend_config_sha256"
         ]
         h5.attrs["detrend_quality_source"] = "final_effective_quality"
+        h5.attrs["detrend_time_contract_version"] = freshness[
+            "detrend_time_contract_version"
+        ]
+        h5.attrs["detrend_time_dataset"] = freshness[
+            "detrend_time_dataset"
+        ]
+        h5.attrs["detrend_time_system"] = "BTJD"
+        h5.attrs["published_time_system"] = "BJD"
+        h5.attrs["btjd_to_bjd_offset_d"] = freshness[
+            "btjd_to_bjd_offset_d"
+        ]
+        h5.attrs["warning_capture_policy"] = freshness[
+            "warning_capture_policy"
+        ]
+        h5.attrs["rank_warning_publication_policy"] = freshness[
+            "rank_warning_publication_policy"
+        ]
+        h5.attrs["rank_warning_count"] = 0
+        h5.attrs["rank_warning_ledger_json"] = freshness[
+            "rank_warning_ledger_json"
+        ]
+        h5.attrs["rank_warning_ledger_sha256"] = freshness[
+            "rank_warning_ledger_sha256"
+        ]
         h5.attrs["raw_photometry_only"] = 1
         h5.attrs["compact_adp_photometry_reused"] = 0
         h5.attrs["compact_adp_flux_reused"] = 0
@@ -1639,6 +1699,28 @@ def test_completion_validator_real_native_record_path(tmp_path: Path) -> None:
             "detrend_config_sha256"
         ],
         "native_detrend_quality_source": "final_effective_quality",
+        "native_detrend_time_contract_version": freshness[
+            "detrend_time_contract_version"
+        ],
+        "native_detrend_time_dataset": freshness["detrend_time_dataset"],
+        "native_detrend_time_system": "BTJD",
+        "native_published_time_system": "BJD",
+        "native_btjd_to_bjd_offset_d": freshness[
+            "btjd_to_bjd_offset_d"
+        ],
+        "native_warning_capture_policy": freshness[
+            "warning_capture_policy"
+        ],
+        "native_rank_warning_publication_policy": freshness[
+            "rank_warning_publication_policy"
+        ],
+        "native_rank_warning_count": 0,
+        "native_rank_warning_ledger_json": freshness[
+            "rank_warning_ledger_json"
+        ],
+        "native_rank_warning_ledger_sha256": freshness[
+            "rank_warning_ledger_sha256"
+        ],
         "raw_photometry_only": True,
         "compact_adp_photometry_reused": False,
         "compact_adp_flux_reused": False,

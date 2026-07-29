@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Guarded local controller for the approved Teacher v4-SSL full-pool v3 flow.
+# Guarded local controller for the approved Teacher v4-SSL full-pool v3r1 flow.
 #
 # This is an explicit, non-chained state machine.  It never starts password,
 # Duo, or keyboard-interactive authentication, never resubmits a failed stage,
-# and never admits native-v1/native-v2 products into the fresh v3 release.
+# and never admits native-v1/native-v2/native-v3 products into v3r1.
 set -euo pipefail
 
 DRY_RUN=1
@@ -17,7 +17,7 @@ Actions:
   probe                    Verify the user-opened ORCD control socket.
   deploy                   Create/reuse a clean detached worktree at the exact SHA.
   stage-eligibility        Copy the locked eligibility authority byte-identically
-                           from v2 into the wholly fresh v3 run root.
+                           from v2 into the wholly fresh v3r1 run root.
   submit-native-canaries   Submit S56 shard 3 exclusion and S60 shard 4 ADP canaries.
   submit-native-canary-audit
                            Audit every eligible S60 shard-4 row through the exact
@@ -34,7 +34,7 @@ Actions:
                            independent CPU validation/completion-release freeze.
   verify-completion        Read-only final proof: gate the validation job and
                            revalidate the exact immutable completion release.
-  status                   Show v3 jobs and gate artifacts read-only.
+  status                   Show v3r1 jobs and gate artifacts read-only.
 
 Default mode is dry-run.  Every mutating action requires --run.  A failed job
 is diagnosed separately; this controller does not cancel, retry, resubmit,
@@ -89,12 +89,15 @@ readonly ORCD_HOST="${LOCKED_ORCD_HOST}"
 readonly CONTROL_PATH="${LOCKED_CONTROL_PATH}"
 readonly TWIRL_ROOT="/orcd/data/mki_aryeh/001/twirl"
 readonly REMOTE_SOURCE="${TWIRL_ROOT}/code/TWIRL"
-readonly REMOTE_REPO="${TWIRL_ROOT}/code/TWIRL_teacher_ssl_fullpool_v3_${EXPECTED_SHA:0:12}"
-readonly GIT_BRANCH="codex/teacher-ssl-effective-quality-adp-v3"
+readonly REMOTE_REPO="${TWIRL_ROOT}/code/TWIRL_teacher_ssl_fullpool_v3r1_${EXPECTED_SHA:0:12}"
+readonly GIT_BRANCH="codex/teacher-ssl-effective-quality-adp-btjd-v3r1"
 readonly SOURCE_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp"
 readonly HISTORICAL_V2_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
-readonly RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
-readonly CLAIM_PREFIX="${TWIRL_ROOT}/reports/stage5_validation/.teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+readonly HISTORICAL_V3_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+readonly HISTORICAL_V3_NATIVE_CONTRACT="twirl_teacher_ssl_fullpool_real_native_v3_effective_quality_adp"
+readonly HISTORICAL_V3_RELEASE_BINDING="teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+readonly RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible"
+readonly CLAIM_PREFIX="${TWIRL_ROOT}/reports/stage5_validation/.teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible"
 readonly V2_ELIGIBILITY_DIR="${HISTORICAL_V2_ROOT}/frozen/native_model_eligibility"
 readonly ELIGIBILITY_DIR="${RUN_ROOT}/frozen/native_model_eligibility"
 readonly ELIGIBILITY_EXCLUSIONS="${ELIGIBILITY_DIR}/native_model_exclusions.csv"
@@ -123,15 +126,21 @@ readonly NATIVE_RELEASE_SUMMARY="${NATIVE_REGISTRY_DIR}/native_fullpool_release.
 readonly SSL_REGISTRY_DIR="${RUN_ROOT}/frozen/ssl_registry"
 readonly SSL_REGISTRY="${SSL_REGISTRY_DIR}/teacher_ssl_fullpool_registry.parquet"
 readonly SSL_REGISTRY_SUMMARY="${SSL_REGISTRY_DIR}/teacher_ssl_fullpool_registry.summary.json"
-readonly NUMERIC_GATE_DIR="${RUN_ROOT}/frozen/model_input_numeric_gate_v2"
+readonly NUMERIC_GATE_DIR="${RUN_ROOT}/frozen/model_input_numeric_gate_v3r1"
 readonly NUMERIC_SHARD_DIR="${NUMERIC_GATE_DIR}/shard_reports"
 readonly NUMERIC_AUDIT="${NUMERIC_GATE_DIR}/model_input_numeric_audit.parquet"
 readonly NUMERIC_RELEASE="${NUMERIC_GATE_DIR}/model_input_numeric_gate.release.json"
-readonly MODEL_RUN_ROOT="${RUN_ROOT}/model_runs/effective_quality_adp_v1"
+readonly MODEL_RUN_ROOT="${RUN_ROOT}/model_runs/effective_quality_adp_btjd_v2"
 readonly SMOKE_SUMMARY="${MODEL_RUN_ROOT}/smoke/one_epoch/encoder_pretraining/fold_2/summary.json"
-readonly FOLD_COMPLETION_RELEASE="${RUN_ROOT}/frozen/model/teacher_ssl_fullpool_v3_five_fold.complete.json"
-readonly NATIVE_CONTRACT="twirl_teacher_ssl_fullpool_real_native_v3_effective_quality_adp"
-readonly RELEASE_BINDING="teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+readonly FOLD_COMPLETION_RELEASE="${RUN_ROOT}/frozen/model/teacher_ssl_fullpool_v3r1_five_fold.complete.json"
+readonly NATIVE_CONTRACT="twirl_teacher_ssl_fullpool_real_native_v3r1_effective_quality_adp_btjd"
+readonly RELEASE_BINDING="teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible"
+readonly BUILDER_CONTRACT="twirl_teacher_ssl_fullpool_effective_quality_adp_btjd_builder_v2"
+readonly DETREND_CONTRACT="twirl_fs_adp03q_effective_quality_btjd_v2"
+readonly DETREND_TIME_CONTRACT="twirl_teacher_ssl_fullpool_adp_detrend_time_btjd_v1"
+readonly DETREND_TIME_DATASET="adp_detrend_time_btjd"
+readonly WARNING_CAPTURE_POLICY="twirl_teacher_ssl_fullpool_exact_numpy_rankwarning_capture_v1"
+readonly RANK_WARNING_LEDGER_SHA256="4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
 readonly DETREND_CONFIG_SHA256="2fcded6ae0dc1ada429c37ea1f39f68d71feba143d47925af3e04e38e1ecdec6"
 readonly FULL_IDENTITY_SHA256="8e9e9c12a24d5ebc7be94b03a4e35411cd10066d62a87d921a8443b06cc188d1"
 readonly ELIGIBLE_IDENTITY_SHA256="6ddc8e57bb5fb938ce05389c1629221c73e0e73ac3bf40da47a2019e1a5660e6"
@@ -190,7 +199,7 @@ base_export() {
   printf '%s' \
     "TWIRL_ORCD_REPO=${REMOTE_REPO}" \
     ",TWIRL_SSL_FULLPOOL_V1_RUN_ROOT=${SOURCE_RUN_ROOT}" \
-    ",TWIRL_SSL_FULLPOOL_V3_RUN_ROOT=${RUN_ROOT}" \
+    ",TWIRL_SSL_FULLPOOL_V3R1_RUN_ROOT=${RUN_ROOT}" \
     ",TWIRL_EXPECTED_GIT_SHA=${EXPECTED_SHA}"
 }
 
@@ -267,20 +276,20 @@ case "${ACTION}" in
       mkdir -p '${LAUNCH_DIR}'
       : > '${CANARY_JOBS}.submitting'
       cd '${REMOTE_REPO}'
-      job=\$(sbatch --parsable --job-name=twirl-ssl-v3-canary-s56 \
-        --output='${TWIRL_ROOT}/logs/twirl-ssl-v3-canary-s56-%j.out' \
-        --error='${TWIRL_ROOT}/logs/twirl-ssl-v3-canary-s56-%j.err' \
+      job=\$(sbatch --parsable --job-name=twirl-ssl-v3r1-canary-s56 \
+        --output='${TWIRL_ROOT}/logs/twirl-ssl-v3r1-canary-s56-%j.out' \
+        --error='${TWIRL_ROOT}/logs/twirl-ssl-v3r1-canary-s56-%j.err' \
         --export='$(base_export),TWIRL_FULLPOOL_SECTOR=56,TWIRL_FULLPOOL_NATIVE_SHARDS=${NATIVE_SHARDS},TWIRL_FULLPOOL_SHARD_INDEX=3,TWIRL_FULLPOOL_NATIVE_OUT=${S56_CANARY_H5}' \
         scripts/orcd/slurm_teacher_ssl_fullpool_v3_native_cpu.sbatch)
       job=\${job%%;*}
-      printf '56\\t3\\t%s\\ttwirl-ssl-v3-canary-s56\\n' \"\${job}\" >> '${CANARY_JOBS}.submitting'
-      job=\$(sbatch --parsable --job-name=twirl-ssl-v3-canary-s60 \
-        --output='${TWIRL_ROOT}/logs/twirl-ssl-v3-canary-s60-%j.out' \
-        --error='${TWIRL_ROOT}/logs/twirl-ssl-v3-canary-s60-%j.err' \
+      printf '56\\t3\\t%s\\ttwirl-ssl-v3r1-canary-s56\\n' \"\${job}\" >> '${CANARY_JOBS}.submitting'
+      job=\$(sbatch --parsable --job-name=twirl-ssl-v3r1-canary-s60 \
+        --output='${TWIRL_ROOT}/logs/twirl-ssl-v3r1-canary-s60-%j.out' \
+        --error='${TWIRL_ROOT}/logs/twirl-ssl-v3r1-canary-s60-%j.err' \
         --export='$(base_export),TWIRL_FULLPOOL_SECTOR=60,TWIRL_FULLPOOL_NATIVE_SHARDS=${NATIVE_SHARDS},TWIRL_FULLPOOL_SHARD_INDEX=4,TWIRL_FULLPOOL_NATIVE_OUT=${S60_CANARY_H5}' \
         scripts/orcd/slurm_teacher_ssl_fullpool_v3_native_cpu.sbatch)
       job=\${job%%;*}
-      printf '60\\t4\\t%s\\ttwirl-ssl-v3-canary-s60\\n' \"\${job}\" >> '${CANARY_JOBS}.submitting'
+      printf '60\\t4\\t%s\\ttwirl-ssl-v3r1-canary-s60\\n' \"\${job}\" >> '${CANARY_JOBS}.submitting'
       [[ \$(wc -l < '${CANARY_JOBS}.submitting') -eq 2 ]]
       mv '${CANARY_JOBS}.submitting' '${CANARY_JOBS}'
       cat '${CANARY_JOBS}'
@@ -333,8 +342,8 @@ case "${ACTION}" in
       numeric_job=\$(< '${CANARY_NUMERIC_JOB}')
       state=\$(sacct -X -n -P -j \"\${numeric_job}\" -o JobIDRaw,State,ExitCode | awk -F'|' -v j=\"\${numeric_job}\" '\$1==j {print \$2 \"|\" \$3}')
       [[ \"\${state}\" == 'COMPLETED|0:0' ]]
-      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3-canary-numeric-'\"\${numeric_job}\"'.err'
-      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3-canary-numeric-'\"\${numeric_job}\"'.err'
+      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-canary-numeric-'\"\${numeric_job}\"'.err'
+      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-canary-numeric-'\"\${numeric_job}\"'.err'
       test -s '${S60_CANARY_NUMERIC_REPORT}'
       test -s '${S60_CANARY_NUMERIC_REPORT}.sha256'
       (
@@ -342,7 +351,7 @@ case "${ACTION}" in
         sha256sum -c 'native_4.model_facing_numeric.json.sha256'
       )
       native_sha=\$(sha256sum '${S60_CANARY_H5}' | awk '{print \$1}')
-      '${TWIRL_ROOT}/envs/twirl-s56/bin/python' -c 'import json,sys; d=json.load(open(sys.argv[1])); c=d[\"counts\"]; i=d[\"identities\"]; assert d[\"schema_version\"]==\"twirl_teacher_ssl_fullpool_v3_s60_shard4_model_facing_canary_v1\"; assert d[\"code_revision\"]==sys.argv[2]; assert d[\"sector\"]==60 and d[\"shard_index\"]==4 and d[\"n_shards\"]==16; assert d[\"required_tic\"]==704538814 and d[\"required_tic_passed\"] is True; assert d[\"passed\"] is True and d[\"n_failures\"]==0; assert c[\"eligible_observations\"]==c[\"audited_observations\"]==c[\"passed_observations\"]; assert c[\"failed_observations\"]==0; assert i[\"full_observations_sha256\"]==sys.argv[3]; assert i[\"eligible_observations_sha256\"]==sys.argv[4]; assert d[\"native_h5\"][\"sha256\"]==sys.argv[5]; assert d[\"native_contract_version\"]==sys.argv[6]; assert d[\"native_release_binding\"]==sys.argv[7]; assert d[\"action\"]==\"audit_only_no_clip_no_exclusion\"; assert all(r[\"passed\"] is True and r[\"n_failures\"]==0 and r[\"action\"]==\"audit_only_no_clip_no_exclusion\" for r in d[\"rows\"])' '${S60_CANARY_NUMERIC_REPORT}' '${EXPECTED_SHA}' '${FULL_IDENTITY_SHA256}' '${ELIGIBLE_IDENTITY_SHA256}' \"\${native_sha}\" '${NATIVE_CONTRACT}' '${RELEASE_BINDING}'
+      '${TWIRL_ROOT}/envs/twirl-s56/bin/python' -c 'import json,sys; d=json.load(open(sys.argv[1])); c=d[\"counts\"]; i=d[\"identities\"]; assert d[\"schema_version\"]==\"twirl_teacher_ssl_fullpool_v3r1_s60_shard4_model_facing_canary_v2\"; assert d[\"code_revision\"]==sys.argv[2]; assert d[\"sector\"]==60 and d[\"shard_index\"]==4 and d[\"n_shards\"]==16; assert d[\"required_tic\"]==704538814 and d[\"required_tic_passed\"] is True; assert d[\"passed\"] is True and d[\"n_failures\"]==0; assert c[\"eligible_observations\"]==c[\"audited_observations\"]==c[\"passed_observations\"]; assert c[\"failed_observations\"]==0; assert i[\"full_observations_sha256\"]==sys.argv[3]; assert i[\"eligible_observations_sha256\"]==sys.argv[4]; assert d[\"native_h5\"][\"sha256\"]==sys.argv[5]; assert d[\"native_contract_version\"]==sys.argv[6]; assert d[\"native_release_binding\"]==sys.argv[7]; assert d[\"detrend_time_contract_version\"]==\"${DETREND_TIME_CONTRACT}\"; assert d[\"warning_capture_policy\"]==\"${WARNING_CAPTURE_POLICY}\"; assert int(d[\"rank_warning_count\"])==0; assert d[\"rank_warning_ledger_sha256\"]==\"${RANK_WARNING_LEDGER_SHA256}\"; assert d[\"action\"]==\"audit_only_no_clip_no_exclusion\"; assert all(r[\"passed\"] is True and r[\"n_failures\"]==0 and r[\"action\"]==\"audit_only_no_clip_no_exclusion\" for r in d[\"rows\"])' '${S60_CANARY_NUMERIC_REPORT}' '${EXPECTED_SHA}' '${FULL_IDENTITY_SHA256}' '${ELIGIBLE_IDENTITY_SHA256}' \"\${native_sha}\" '${NATIVE_CONTRACT}' '${RELEASE_BINDING}'
       test -s '${CANARY_JOBS}'
       [[ \$(wc -l < '${CANARY_JOBS}') -eq 2 ]]
       while IFS=\$'\\t' read -r sector shard job name; do
@@ -359,7 +368,7 @@ case "${ACTION}" in
       done
       sha256sum -c '${S56_CANARY_H5}.sha256'
       sha256sum -c '${S60_CANARY_H5}.sha256'
-      PYTHONPATH='${REMOTE_REPO}/src' '${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python' -c 'import h5py,json,sys; s56=json.load(open(sys.argv[1])); s60=json.load(open(sys.argv[2])); assert s56[\"sector\"]==56 and s56[\"shard_index\"]==3 and s56[\"n_shards\"]==16; assert s56[\"native_contract_version\"]==sys.argv[5]; assert s56[\"n_shard_excluded_observations\"]==1; assert s56[\"shard_excluded_observation_identity_sha256\"]==sys.argv[6]; assert s56[\"verification\"][\"passed\"] is True; assert s60[\"sector\"]==60 and s60[\"shard_index\"]==4 and s60[\"n_shards\"]==16; assert s60[\"native_contract_version\"]==sys.argv[5]; assert s60[\"verification\"][\"passed\"] is True; h=h5py.File(sys.argv[3],\"r\"); assert h.attrs[\"contract_version\"]==sys.argv[5]; assert h.attrs[\"release_binding\"]==sys.argv[7]; assert h.attrs[\"builder_contract_version\"]==\"twirl_teacher_ssl_fullpool_effective_quality_adp_builder_v1\"; assert h.attrs[\"detrend_contract_version\"]==\"twirl_fs_adp03q_effective_quality_v1\"; assert h.attrs[\"detrend_config_sha256\"]==sys.argv[8]; assert h.attrs[\"detrend_quality_source\"]==\"final_effective_quality\"; assert int(h.attrs[\"raw_photometry_only\"])==1; assert int(h.attrs[\"compact_adp_photometry_reused\"])==0; assert int(h.attrs[\"compact_adp_flux_reused\"])==0; h.close(); h=h5py.File(sys.argv[4],\"r\"); assert h.attrs[\"contract_version\"]==sys.argv[5]; assert h.attrs[\"release_binding\"]==sys.argv[7]; g=h[\"targets/0000000704538814\"]; assert int(g.attrs[\"raw_compact_internal_quality_agreement\"])==1; assert int(h.attrs[\"raw_photometry_only\"])==1; assert int(h.attrs[\"compact_adp_photometry_reused\"])==0; assert int(h.attrs[\"compact_adp_flux_reused\"])==0; h.close()' '${S56_CANARY_SUMMARY}' '${S60_CANARY_SUMMARY}' '${S56_CANARY_H5}' '${S60_CANARY_H5}' '${NATIVE_CONTRACT}' '${S56_CANARY_EXCLUDED_SHA256}' '${RELEASE_BINDING}' '${DETREND_CONFIG_SHA256}'
+      PYTHONPATH='${REMOTE_REPO}/src' '${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python' -c 'import h5py,json,numpy as np,sys; s56=json.load(open(sys.argv[1])); s60=json.load(open(sys.argv[2])); assert s56[\"sector\"]==56 and s56[\"shard_index\"]==3 and s56[\"n_shards\"]==16; assert s56[\"native_contract_version\"]==sys.argv[5]; assert s56[\"n_shard_excluded_observations\"]==1; assert s56[\"shard_excluded_observation_identity_sha256\"]==sys.argv[6]; assert s56[\"verification\"][\"passed\"] is True; assert s60[\"sector\"]==60 and s60[\"shard_index\"]==4 and s60[\"n_shards\"]==16; assert s60[\"native_contract_version\"]==sys.argv[5]; assert s60[\"verification\"][\"passed\"] is True; assert all(d[\"detrend_time_contract_version\"]==\"${DETREND_TIME_CONTRACT}\" and d[\"detrend_time_dataset\"]==\"${DETREND_TIME_DATASET}\" and d[\"detrend_time_system\"]==\"BTJD\" and d[\"published_time_system\"]==\"BJD\" and d[\"warning_capture_policy\"]==\"${WARNING_CAPTURE_POLICY}\" and d[\"rank_warning_publication_policy\"]==\"require_zero\" and int(d[\"rank_warning_count\"])==0 and d[\"rank_warning_ledger_json\"]==\"[]\" and d[\"rank_warning_ledger_sha256\"]==\"${RANK_WARNING_LEDGER_SHA256}\" for d in (s56,s60)); h=h5py.File(sys.argv[3],\"r\"); assert h.attrs[\"contract_version\"]==sys.argv[5]; assert h.attrs[\"release_binding\"]==sys.argv[7]; assert h.attrs[\"builder_contract_version\"]==\"${BUILDER_CONTRACT}\"; assert h.attrs[\"detrend_contract_version\"]==\"${DETREND_CONTRACT}\"; assert h.attrs[\"detrend_config_sha256\"]==sys.argv[8]; assert h.attrs[\"detrend_time_contract_version\"]==\"${DETREND_TIME_CONTRACT}\"; assert h.attrs[\"warning_capture_policy\"]==\"${WARNING_CAPTURE_POLICY}\"; assert int(h.attrs[\"rank_warning_count\"])==0; assert h.attrs[\"rank_warning_ledger_sha256\"]==\"${RANK_WARNING_LEDGER_SHA256}\"; assert h.attrs[\"detrend_quality_source\"]==\"final_effective_quality\"; assert int(h.attrs[\"raw_photometry_only\"])==1; assert int(h.attrs[\"compact_adp_photometry_reused\"])==0; assert int(h.attrs[\"compact_adp_flux_reused\"])==0; h.close(); h=h5py.File(sys.argv[4],\"r\"); assert h.attrs[\"contract_version\"]==sys.argv[5]; assert h.attrs[\"release_binding\"]==sys.argv[7]; g=h[\"targets/0000000704538814\"]; assert int(g.attrs[\"raw_compact_internal_quality_agreement\"])==1; assert \"${DETREND_TIME_DATASET}\" in g; btjd=np.asarray(g[\"${DETREND_TIME_DATASET}\"],dtype=float); bjd=np.asarray(g[\"time\"],dtype=float); assert np.isfinite(btjd).all() and btjd.min()>=0.0 and btjd.max()<100000.0; assert np.array_equal(bjd,btjd+2457000.0); assert int(g.attrs[\"effective_quality_adp_small_rank_warning_count\"])==0; assert int(g.attrs[\"effective_quality_adp_primary_rank_warning_count\"])==0; assert int(h.attrs[\"raw_photometry_only\"])==1; assert int(h.attrs[\"compact_adp_photometry_reused\"])==0; assert int(h.attrs[\"compact_adp_flux_reused\"])==0; h.close()' '${S56_CANARY_SUMMARY}' '${S60_CANARY_SUMMARY}' '${S56_CANARY_H5}' '${S60_CANARY_H5}' '${NATIVE_CONTRACT}' '${S56_CANARY_EXCLUDED_SHA256}' '${RELEASE_BINDING}' '${DETREND_CONFIG_SHA256}'
       for sector in {56..62}; do
         test ! -e '${RUN_ROOT}/native/s'\${sector}
       done
@@ -368,7 +377,7 @@ case "${ACTION}" in
       : > '${NATIVE_JOBS}.submitting'
       cd '${REMOTE_REPO}'
       for sector in {56..62}; do
-        name='twirl-ssl-v3-native-s'\${sector}
+        name='twirl-ssl-v3r1-native-s'\${sector}
         job=\$(sbatch --parsable --job-name=\"\${name}\" --array=0-15%4 \
           --export='$(base_export),TWIRL_FULLPOOL_NATIVE_SHARDS=${NATIVE_SHARDS},TWIRL_FULLPOOL_SECTOR='\${sector} \
           scripts/orcd/slurm_teacher_ssl_fullpool_v3_native_cpu.sbatch)
@@ -412,7 +421,7 @@ case "${ACTION}" in
         done
       done
       [[ \${products} -eq 112 ]]
-      PYTHONPATH='${REMOTE_REPO}/src' '${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python' -c 'import json,pathlib,sys; root=pathlib.Path(sys.argv[1]); summaries=sorted(root.glob(\"s*/native_*.summary.json\")); assert len(summaries)==112; ds=[json.load(open(p)) for p in summaries]; assert {(int(d[\"sector\"]),int(d[\"shard_index\"])) for d in ds}=={(s,i) for s in range(56,63) for i in range(16)}; assert all(d[\"native_contract_version\"]==sys.argv[2] and d[\"release_binding\"]==sys.argv[3] and d[\"builder_contract_version\"]==\"twirl_teacher_ssl_fullpool_effective_quality_adp_builder_v1\" and d[\"detrend_contract_version\"]==\"twirl_fs_adp03q_effective_quality_v1\" and d[\"detrend_config_sha256\"]==sys.argv[4] and d[\"expected_git_sha\"]==sys.argv[5] and d[\"verification\"][\"passed\"] is True for d in ds); assert sum(int(d[\"n_source_shard_observations\"]) for d in ds)==175366; assert sum(int(d[\"n_shard_observations\"]) for d in ds)==175347; assert sum(int(d[\"n_shard_excluded_observations\"]) for d in ds)==19' '${RUN_ROOT}/native' '${NATIVE_CONTRACT}' '${RELEASE_BINDING}' '${DETREND_CONFIG_SHA256}' '${EXPECTED_SHA}'
+      PYTHONPATH='${REMOTE_REPO}/src' '${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python' -c 'import json,pathlib,sys; root=pathlib.Path(sys.argv[1]); summaries=sorted(root.glob(\"s*/native_*.summary.json\")); assert len(summaries)==112; ds=[json.load(open(p)) for p in summaries]; assert {(int(d[\"sector\"]),int(d[\"shard_index\"])) for d in ds}=={(s,i) for s in range(56,63) for i in range(16)}; assert all(d[\"native_contract_version\"]==sys.argv[2] and d[\"release_binding\"]==sys.argv[3] and d[\"builder_contract_version\"]==\"${BUILDER_CONTRACT}\" and d[\"detrend_contract_version\"]==\"${DETREND_CONTRACT}\" and d[\"detrend_config_sha256\"]==sys.argv[4] and d[\"detrend_time_contract_version\"]==\"${DETREND_TIME_CONTRACT}\" and d[\"detrend_time_dataset\"]==\"${DETREND_TIME_DATASET}\" and d[\"detrend_time_system\"]==\"BTJD\" and d[\"published_time_system\"]==\"BJD\" and d[\"warning_capture_policy\"]==\"${WARNING_CAPTURE_POLICY}\" and d[\"rank_warning_publication_policy\"]==\"require_zero\" and int(d[\"rank_warning_count\"])==0 and d[\"rank_warning_ledger_json\"]==\"[]\" and d[\"rank_warning_ledger_sha256\"]==\"${RANK_WARNING_LEDGER_SHA256}\" and d[\"expected_git_sha\"]==sys.argv[5] and d[\"verification\"][\"passed\"] is True for d in ds); assert sum(int(d[\"n_source_shard_observations\"]) for d in ds)==175366; assert sum(int(d[\"n_shard_observations\"]) for d in ds)==175347; assert sum(int(d[\"n_shard_excluded_observations\"]) for d in ds)==19' '${RUN_ROOT}/native' '${NATIVE_CONTRACT}' '${RELEASE_BINDING}' '${DETREND_CONFIG_SHA256}' '${EXPECTED_SHA}'
       for output in '${NATIVE_REGISTRY}' '${NATIVE_REGISTRY_SUMMARY}' '${NATIVE_RELEASE_SUMMARY}'; do [[ ! -e \"\${output}\" ]]; done
       [[ ! -e '${NATIVE_REGISTRY_JOB}' && ! -e '${NATIVE_REGISTRY_JOB}.tmp' ]]
       mkdir -- '${CLAIM_PREFIX}.submit-native-registry.claim'
@@ -434,8 +443,8 @@ case "${ACTION}" in
       job=\$(< '${NATIVE_REGISTRY_JOB}')
       state=\$(sacct -X -n -P -j \"\${job}\" -o JobIDRaw,State,ExitCode | awk -F'|' -v j=\"\${job}\" '\$1==j {print \$2 \"|\" \$3}')
       [[ \"\${state}\" == 'COMPLETED|0:0' ]]
-      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3-native-registry-'\"\${job}\"'.err'
-      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3-native-registry-'\"\${job}\"'.err'
+      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-native-registry-'\"\${job}\"'.err'
+      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-native-registry-'\"\${job}\"'.err'
       for input in '${NATIVE_REGISTRY}' '${NATIVE_REGISTRY_SUMMARY}' '${NATIVE_RELEASE_SUMMARY}'; do test -s \"\${input}\"; done
       for output in '${SSL_REGISTRY}' '${SSL_REGISTRY_SUMMARY}'; do [[ ! -e \"\${output}\" ]]; done
       [[ ! -e '${SSL_REGISTRY_JOB}' && ! -e '${SSL_REGISTRY_JOB}.tmp' ]]
@@ -460,8 +469,8 @@ case "${ACTION}" in
       job=\$(< '${SSL_REGISTRY_JOB}')
       state=\$(sacct -X -n -P -j \"\${job}\" -o JobIDRaw,State,ExitCode | awk -F'|' -v j=\"\${job}\" '\$1==j {print \$2 \"|\" \$3}')
       [[ \"\${state}\" == 'COMPLETED|0:0' ]]
-      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3-registry-'\"\${job}\"'.err'
-      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3-registry-'\"\${job}\"'.err'
+      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-registry-'\"\${job}\"'.err'
+      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-registry-'\"\${job}\"'.err'
       for input in \
         '${NATIVE_REGISTRY}' '${NATIVE_REGISTRY_SUMMARY}' '${NATIVE_RELEASE_SUMMARY}' \
         '${SSL_REGISTRY}' '${SSL_REGISTRY_SUMMARY}'; do test -s \"\${input}\"; done
@@ -490,7 +499,7 @@ case "${ACTION}" in
       [[ \${#states[@]} -eq 112 ]]
       for state in \"\${states[@]}\"; do [[ \"\${state}\" == 'COMPLETED|0:0' ]]; done
       shopt -s nullglob
-      errs=('${TWIRL_ROOT}/logs/twirl-ssl-v3-numeric-audit-'\"\${job}\"_*.err)
+      errs=('${TWIRL_ROOT}/logs/twirl-ssl-v3r1-numeric-audit-'\"\${job}\"_*.err)
       [[ \${#errs[@]} -eq 112 ]]
       for err in \"\${errs[@]}\"; do test ! -s \"\${err}\"; done
       reports=0
@@ -524,8 +533,8 @@ case "${ACTION}" in
       job=\$(< '${NUMERIC_RELEASE_JOB}')
       state=\$(sacct -X -n -P -j \"\${job}\" -o JobIDRaw,State,ExitCode | awk -F'|' -v j=\"\${job}\" '\$1==j {print \$2 \"|\" \$3}')
       [[ \"\${state}\" == 'COMPLETED|0:0' ]]
-      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3-numeric-release-'\"\${job}\"'.err'
-      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3-numeric-release-'\"\${job}\"'.err'
+      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-numeric-release-'\"\${job}\"'.err'
+      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-numeric-release-'\"\${job}\"'.err'
       test -s '${NUMERIC_RELEASE}'
       test -s '${NUMERIC_RELEASE}.sha256'
       test ! -e '${MODEL_RUN_ROOT}'
@@ -550,8 +559,8 @@ case "${ACTION}" in
       job=\$(< '${SMOKE_JOB}')
       state=\$(sacct -X -n -P -j \"\${job}\" -o JobIDRaw,State,ExitCode | awk -F'|' -v j=\"\${job}\" '\$1==j {print \$2 \"|\" \$3}')
       [[ \"\${state}\" == 'COMPLETED|0:0' ]]
-      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3-smoke-'\"\${job}\"'.err'
-      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3-smoke-'\"\${job}\"'.err'
+      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-smoke-'\"\${job}\"'.err'
+      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-smoke-'\"\${job}\"'.err'
       test -s '${SMOKE_SUMMARY}'
       test ! -e '${MODEL_RUN_ROOT}/training/five_fold'
       [[ ! -e '${FOLDS_JOB}' && ! -e '${FOLDS_JOB}.tmp' ]]
@@ -598,7 +607,7 @@ case "${ACTION}" in
         [[ \"\${fold_states[\${fold}]}\" == 'COMPLETED|0:0' ]]
       done
       shopt -s nullglob
-      errs=('${TWIRL_ROOT}/logs/twirl-ssl-v3-fold-'\"\${job}\"_*.err)
+      errs=('${TWIRL_ROOT}/logs/twirl-ssl-v3r1-fold-'\"\${job}\"_*.err)
       [[ \${#errs[@]} -eq 5 ]]
       for err in \"\${errs[@]}\"; do test ! -s \"\${err}\"; done
       [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]
@@ -626,13 +635,13 @@ case "${ACTION}" in
       job=\$(< '${FOLD_VALIDATION_JOB}')
       state=\$(sacct -X -n -P -j \"\${job}\" -o JobIDRaw,State,ExitCode | awk -F'|' -v j=\"\${job}\" '\$1==j {print \$2 \"|\" \$3}')
       [[ \"\${state}\" == 'COMPLETED|0:0' ]]
-      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3-validate-folds-'\"\${job}\"'.err'
-      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3-validate-folds-'\"\${job}\"'.err'
+      test -e '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-validate-folds-'\"\${job}\"'.err'
+      test ! -s '${TWIRL_ROOT}/logs/twirl-ssl-v3r1-validate-folds-'\"\${job}\"'.err'
       test -s '${FOLD_COMPLETION_RELEASE}'
       test -s '${FOLD_COMPLETION_RELEASE}.sha256'
       (
         cd '${RUN_ROOT}/frozen/model'
-        sha256sum -c 'teacher_ssl_fullpool_v3_five_fold.complete.json.sha256'
+        sha256sum -c 'teacher_ssl_fullpool_v3r1_five_fold.complete.json.sha256'
       )
       [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]
       [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]
@@ -647,9 +656,9 @@ case "${ACTION}" in
       [[ \"\${after}\" == \"\${before}\" ]]
       (
         cd '${RUN_ROOT}/frozen/model'
-        sha256sum -c 'teacher_ssl_fullpool_v3_five_fold.complete.json.sha256'
+        sha256sum -c 'teacher_ssl_fullpool_v3r1_five_fold.complete.json.sha256'
       )
-      '${TWIRL_ROOT}/envs/twirl-s56/bin/python' -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d[\"passed\"] is True; assert d[\"schema_version\"]==\"twirl_teacher_ssl_fullpool_v3_five_fold_completion_release_v1\"; assert d[\"release_binding\"]==\"teacher_ssl_fullpool_v3_effective_quality_adp_five_fold_complete_v1\"; assert d[\"expected_code_revision\"]==sys.argv[2]; assert d[\"model_namespace\"]==\"effective_quality_adp_v1\"; assert d[\"training_hyperparameters\"][\"folds\"]==[0,1,2,3,4]; assert d[\"counts\"]=={\"folds\":5,\"completed_epochs\":100}; assert [f[\"fold\"] for f in d[\"folds\"]]==[0,1,2,3,4]' '${FOLD_COMPLETION_RELEASE}' '${EXPECTED_SHA}'
+      '${TWIRL_ROOT}/envs/twirl-s56/bin/python' -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d[\"passed\"] is True; assert d[\"schema_version\"]==\"twirl_teacher_ssl_fullpool_v3r1_five_fold_completion_release_v2\"; assert d[\"release_binding\"]==\"teacher_ssl_fullpool_v3r1_effective_quality_adp_btjd_five_fold_complete_v2\"; assert d[\"expected_code_revision\"]==sys.argv[2]; assert d[\"model_namespace\"]==\"effective_quality_adp_btjd_v2\"; assert d[\"training_hyperparameters\"][\"folds\"]==[0,1,2,3,4]; assert d[\"counts\"]=={\"folds\":5,\"completed_epochs\":100}; assert [f[\"fold\"] for f in d[\"folds\"]]==[0,1,2,3,4]' '${FOLD_COMPLETION_RELEASE}' '${EXPECTED_SHA}'
       printf 'verified_completion=%s\\n' '${FOLD_COMPLETION_RELEASE}'
     "
     ;;

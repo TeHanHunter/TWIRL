@@ -43,7 +43,7 @@ BASE = importlib.util.module_from_spec(_BASE_SPEC)
 _BASE_SPEC.loader.exec_module(BASE)
 
 
-SMOKE_VALIDATION_SCHEMA = "twirl_teacher_ssl_fullpool_smoke_validation_v3"
+SMOKE_VALIDATION_SCHEMA = "twirl_teacher_ssl_fullpool_smoke_validation_v4"
 AUTHORITY_NAMES = BASE.AUTHORITY_NAMES
 SMOKE_REQUIRED_OBSERVATION_IDS = BASE.SMOKE_REQUIRED_OBSERVATION_IDS
 SMOKE_EPOCHS = BASE.SMOKE_EPOCHS
@@ -196,7 +196,7 @@ def validate_teacher_ssl_fullpool_smoke(
         expected_suffix
     ):
         raise ValueError(
-            "smoke summary is outside the fresh effective_quality_adp_v1 "
+            "smoke summary is outside the fresh effective_quality_adp_btjd_v2 "
             "model namespace"
         )
 

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Merge the exact 112 passed native-v3 numeric reports into one immutable
+# Merge the exact 112 passed native-v3r1 numeric reports into one immutable
 # effective-quality-ADP model-input release.
 #SBATCH -p pg_mki_aryeh
 #SBATCH --exclude=node4900
-#SBATCH --job-name=twirl-ssl-v3-numeric-release
+#SBATCH --job-name=twirl-ssl-v3r1-numeric-release
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 2
@@ -15,18 +15,18 @@
 set -euo pipefail
 
 readonly TWIRL_ROOT="/orcd/data/mki_aryeh/001/twirl"
-readonly EXPECTED_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+readonly EXPECTED_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible"
 : "${TWIRL_ORCD_REPO:?controller must export TWIRL_ORCD_REPO}"
 : "${TWIRL_EXPECTED_GIT_SHA:?controller must export TWIRL_EXPECTED_GIT_SHA}"
-: "${TWIRL_SSL_FULLPOOL_V3_RUN_ROOT:?controller must export the exact fresh v3 run root}"
+: "${TWIRL_SSL_FULLPOOL_V3R1_RUN_ROOT:?controller must export the exact fresh v3r1 run root}"
 
 REPO="$(realpath -m -- "${TWIRL_ORCD_REPO}")"
 EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA}"
-RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V3_RUN_ROOT}")"
+RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V3R1_RUN_ROOT}")"
 PYTHON="${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python"
 
 if [[ "${RUN_ROOT}" != "${EXPECTED_RUN_ROOT}" ]]; then
-  echo "Numeric release-v3 root differs from the exact production contract." >&2
+  echo "Numeric release-v3r1 root differs from the exact production contract." >&2
   exit 2
 fi
 if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
@@ -34,7 +34,7 @@ if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
   exit 2
 fi
 if [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${EXPECTED_SHA}" ]] || [[ -n "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]]; then
-  echo "Numeric release-v3 repository is not the exact clean deployed revision." >&2
+  echo "Numeric release-v3r1 repository is not the exact clean deployed revision." >&2
   exit 2
 fi
 
@@ -45,7 +45,7 @@ NATIVE_RELEASE_SUMMARY="${NATIVE_REGISTRY_DIR}/native_fullpool_release.summary.j
 REGISTRY_DIR="${RUN_ROOT}/frozen/ssl_registry"
 REGISTRY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.parquet"
 REGISTRY_SUMMARY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.summary.json"
-NUMERIC_GATE_DIR="${RUN_ROOT}/frozen/model_input_numeric_gate_v2"
+NUMERIC_GATE_DIR="${RUN_ROOT}/frozen/model_input_numeric_gate_v3r1"
 NUMERIC_SHARD_DIR="${NUMERIC_GATE_DIR}/shard_reports"
 NUMERIC_AUDIT="${NUMERIC_GATE_DIR}/model_input_numeric_audit.parquet"
 NUMERIC_RELEASE="${NUMERIC_GATE_DIR}/model_input_numeric_gate.release.json"
@@ -57,7 +57,7 @@ for input in \
   "${REGISTRY}" \
   "${REGISTRY_SUMMARY}"; do
   if [[ ! -s "${input}" ]]; then
-    echo "Missing numeric release-v3 authority: ${input}" >&2
+    echo "Missing numeric release-v3r1 authority: ${input}" >&2
     exit 3
   fi
 done
@@ -67,7 +67,7 @@ for output in \
   "${NUMERIC_RELEASE}" \
   "${NUMERIC_RELEASE}.sha256"; do
   if [[ -e "${output}" ]]; then
-    echo "Refusing to overwrite or resume an existing numeric release-v3 artifact: ${output}" >&2
+    echo "Refusing to overwrite or resume an existing numeric release-v3r1 artifact: ${output}" >&2
     exit 4
   fi
 done
@@ -77,14 +77,14 @@ for sector in {56..62}; do
   for shard_index in {0..15}; do
     report="${NUMERIC_SHARD_DIR}/s${sector}/native_${shard_index}.numeric.json"
     if [[ ! -s "${report}" || ! -s "${report}.sha256" ]]; then
-      echo "Missing native-v3 numeric shard report: ${report}" >&2
+      echo "Missing native-v3r1 numeric shard report: ${report}" >&2
       exit 3
     fi
     reports+=("${report}")
   done
 done
 if [[ "${#reports[@]}" -ne 112 ]]; then
-  echo "Numeric release-v3 requires exactly 112 shard reports." >&2
+  echo "Numeric release-v3r1 requires exactly 112 shard reports." >&2
   exit 3
 fi
 
@@ -98,7 +98,7 @@ export MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-echo "[teacher-ssl-numeric-release-v3] start=$(date -Is)"
+echo "[teacher-ssl-numeric-release-v3r1] start=$(date -Is)"
 "${PYTHON}" scripts/stage5_validation/merge_teacher_ssl_fullpool_numeric.py \
   --native-registry "${NATIVE_REGISTRY}" \
   --native-registry-summary "${NATIVE_REGISTRY_SUMMARY}" \
@@ -111,11 +111,11 @@ echo "[teacher-ssl-numeric-release-v3] start=$(date -Is)"
 
 for output in "${NUMERIC_AUDIT}" "${NUMERIC_AUDIT}.sha256" "${NUMERIC_RELEASE}" "${NUMERIC_RELEASE}.sha256"; do
   if [[ ! -s "${output}" ]]; then
-    echo "Numeric release-v3 producer did not publish: ${output}" >&2
+    echo "Numeric release-v3r1 producer did not publish: ${output}" >&2
     exit 5
   fi
 done
 "${PYTHON}" -c \
   'from pathlib import Path; import sys; from twirl.vetting.ssl_full_pool_numeric import validate_numeric_gate_release; validate_numeric_gate_release(Path(sys.argv[1]), expected_code_revision=sys.argv[2])' \
   "${NUMERIC_RELEASE}" "${EXPECTED_SHA}"
-echo "[teacher-ssl-numeric-release-v3] complete=$(date -Is) release=${NUMERIC_RELEASE}"
+echo "[teacher-ssl-numeric-release-v3r1] complete=$(date -Is) release=${NUMERIC_RELEASE}"

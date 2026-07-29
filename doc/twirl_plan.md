@@ -67,14 +67,18 @@ Last reconciled: `2026-07-29`.
   passing observations: all nine failures are in S60 and trace to legacy
   compact ADP flux fitted before the final external-quality overlay. The
   quality-aware model mask therefore is not a sufficient correction. The
-  effective-quality-aware ADP contract is now explicitly approved; its fresh
-  v3 implementation passed predeployment review, the full local test/doc/static
-  suite, and an exact ORCD Torch 2.11 embedding/optimizer diagnostic. It is
-  ready for exact-commit deployment and fail-closed canary gating.
-  It rebuilds all `112` native shards uniformly from immutable raw-v1
-  photometry with the final effective quality applied during both ADP03q
-  fits, then repeats the exact numerical gate and bounded one-epoch smoke
-  before relaunching the five independent fold encoders with up to four
+  effective-quality-aware ADP contract is explicitly approved. The first
+  fresh-v3 diagnostic canaries exposed a second fail-closed defect: the ADP
+  spline was conditioned on absolute BJD rather than compact-source BTJD.
+  S56 completed without warnings, but S60 emitted `3,324` exact NumPy
+  `RankWarning`s, so neither diagnostic HDF5 is model eligible and no
+  downstream v3 stage ran. The corrected fresh-v3r1 implementation detrends
+  on bounded compact BTJD, publishes absolute BJD separately, captures only
+  the exact authorized warning signature, and requires a zero-warning ledger
+  before publication. It will rebuild all `112` native shards uniformly from
+  immutable raw-v1 photometry with the final effective quality applied during
+  both ADP03q fits, then repeat the exact numerical gate and bounded one-epoch
+  smoke before relaunching the five independent fold encoders with up to four
   one-H200 jobs concurrently. Labels, injections, fixed-test tensors, and S63
   tensors remain forbidden during pretraining.
   Teacher v3 stays operational until supervised fine-tuning and the matched
@@ -423,14 +427,17 @@ queue does not block the S56--S62 candidate/teacher critical path below.
    frozen `175,366`-observation search pool and validated BLS/raw releases:
    preserve the completed native-v2 products as diagnostic provenance but do
    not admit them to the fresh model release. The effective-quality-aware ADP
-   contract is explicitly approved: rebuild all `112` native shards from
-   immutable raw-v1 photometry for the exact `175,347`-observation model
-   partition while preserving the `19` exclusions in the `175,366`-row audit.
-   Pass the exact full-partition numerical gate and a fresh bounded throughput
-   smoke, then relaunch five fold encoders with at most four one-H200 jobs
-   concurrently. Fine-tune on the existing frozen labels and compare with
-   Teacher v3 on matched development support without opening fixed-test or
-   S63 model tensors. Additional manual labeling is not part of this step.
+   contract is explicitly approved, but the absolute-BJD-conditioned v3
+   diagnostic products are ineligible. Use only the corrected fresh-v3r1
+   BTJD-detrending contract to rebuild all `112` native shards from immutable
+   raw-v1 photometry for the exact `175,347`-observation model partition while
+   preserving the `19` exclusions in the `175,366`-row audit. Require zero
+   authorized RankWarnings, pass the exact full-partition numerical gate and
+   a fresh bounded throughput smoke, then relaunch five fold encoders with at
+   most four one-H200 jobs concurrently. Fine-tune on the existing frozen
+   labels and compare with Teacher v3 on matched development support without
+   opening fixed-test or S63 model tensors. Additional manual labeling is not
+   part of this step.
 2. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
    the hash-bound morphology corpus plus the enrichment-only candidate
    table/TIC index, preserving the raw edit log and all source provenance.

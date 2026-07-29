@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -75,8 +76,11 @@ FULL_POOL_NATIVE_CONTRACT_VERSION_V1 = (
 FULL_POOL_NATIVE_CONTRACT_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_real_native_v2"
 )
-FULL_POOL_NATIVE_CONTRACT_VERSION = (
+FULL_POOL_NATIVE_CONTRACT_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_real_native_v3_effective_quality_adp"
+)
+FULL_POOL_NATIVE_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_real_native_v3r1_effective_quality_adp_btjd"
 )
 FULL_POOL_NATIVE_RELEASE_BINDING_V1 = (
     "teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp_real_only"
@@ -84,33 +88,51 @@ FULL_POOL_NATIVE_RELEASE_BINDING_V1 = (
 FULL_POOL_NATIVE_RELEASE_BINDING_V2 = (
     "teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
 )
-FULL_POOL_NATIVE_RELEASE_BINDING = (
+FULL_POOL_NATIVE_RELEASE_BINDING_V3 = (
     "teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+)
+FULL_POOL_NATIVE_RELEASE_BINDING = (
+    "teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible"
 )
 FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_shard_summary_v2"
 )
-FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_native_shard_summary_v3"
+)
+FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_shard_summary_v4"
 )
 FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_registry_source_v2"
 )
-FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_native_registry_source_v3"
+)
+FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_registry_source_v4"
 )
 FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_registry_release_v2"
 )
-FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_native_registry_release_v3"
 )
-FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION = (
+FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_registry_release_v4"
+)
+FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION_V1 = (
     "twirl_teacher_ssl_fullpool_effective_quality_adp_builder_v1"
 )
+FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_effective_quality_adp_btjd_builder_v2"
+)
 FULL_POOL_NATIVE_PERIODOGRAM_N = int(harmonic_export.DEFAULT_BLS_PERIODS)
-FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION = (
+FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION_V1 = (
     "twirl_fs_adp03q_effective_quality_v1"
+)
+FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION = (
+    "twirl_fs_adp03q_effective_quality_btjd_v2"
 )
 FULL_POOL_NATIVE_DETREND_CONFIG_JSON = json.dumps(
     asdict(adp03q_config()),
@@ -120,6 +142,28 @@ FULL_POOL_NATIVE_DETREND_CONFIG_JSON = json.dumps(
 )
 FULL_POOL_NATIVE_DETREND_CONFIG_SHA256 = hashlib.sha256(
     FULL_POOL_NATIVE_DETREND_CONFIG_JSON.encode("ascii")
+).hexdigest()
+FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_adp_detrend_time_btjd_v1"
+)
+FULL_POOL_NATIVE_DETREND_TIME_DATASET = "adp_detrend_time_btjd"
+FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D = 2_457_000.0
+FULL_POOL_NATIVE_BTJD_MIN = 0.0
+FULL_POOL_NATIVE_BTJD_MAX = 100_000.0
+FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY = (
+    "twirl_teacher_ssl_fullpool_exact_numpy_rankwarning_capture_v1"
+)
+FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY = "require_zero"
+FULL_POOL_NATIVE_RANK_WARNING_MESSAGE = "Polyfit may be poorly conditioned"
+_NUMPY_RANK_WARNING = getattr(np, "RankWarning", None)
+if _NUMPY_RANK_WARNING is None:  # NumPy >= 2.0
+    _NUMPY_RANK_WARNING = np.exceptions.RankWarning
+FULL_POOL_NATIVE_RANK_WARNING_CATEGORY = (
+    f"{_NUMPY_RANK_WARNING.__module__}.{_NUMPY_RANK_WARNING.__qualname__}"
+)
+FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON = "[]"
+FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256 = hashlib.sha256(
+    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON.encode("ascii")
 ).hexdigest()
 FULL_POOL_NATIVE_SECTORS = EXPECTED_SECTORS
 FULL_POOL_NATIVE_SHARDS_PER_SECTOR = 16
@@ -1003,9 +1047,83 @@ def _validate_s62_group_reconciliation(
         )
 
 
+def _validated_btjd_time(
+    values: np.ndarray,
+    *,
+    context: str,
+) -> np.ndarray:
+    """Return a bounded finite BTJD vector suitable for flux detrending."""
+
+    time_btjd = np.asarray(values, dtype=np.float64)
+    if time_btjd.ndim != 1 or time_btjd.size == 0:
+        raise ValueError(f"{context}: detrend time must be a nonempty 1-D array")
+    if not np.isfinite(time_btjd).all():
+        raise ValueError(f"{context}: detrend BTJD contains nonfinite values")
+    if (
+        float(np.min(time_btjd)) < FULL_POOL_NATIVE_BTJD_MIN
+        or float(np.max(time_btjd)) >= FULL_POOL_NATIVE_BTJD_MAX
+    ):
+        raise ValueError(f"{context}: detrend time is outside the BTJD bound")
+    if np.any(np.diff(time_btjd) <= 0.0):
+        raise ValueError(f"{context}: detrend BTJD is not strictly increasing")
+    return time_btjd
+
+
+def _published_bjd_from_btjd(
+    time_btjd: np.ndarray,
+    *,
+    context: str,
+) -> np.ndarray:
+    """Convert validated BTJD to the exact absolute-BJD payload relation."""
+
+    validated = _validated_btjd_time(time_btjd, context=context)
+    published = validated + FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+    if (
+        not np.isfinite(published).all()
+        or not np.array_equal(
+            published,
+            validated + FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+        )
+    ):
+        raise ValueError(f"{context}: published BJD does not exactly encode BTJD")
+    return published
+
+
+def _rank_warning_ledger_json(
+    entries: Sequence[Mapping[str, Any]],
+) -> str:
+    """Canonicalize the exact captured RankWarning audit ledger."""
+
+    normalized = [
+        {
+            "aperture": str(entry["aperture"]),
+            "category": str(entry["category"]),
+            "message": str(entry["message"]),
+            "sector": int(entry["sector"]),
+            "tic": int(entry["tic"]),
+        }
+        for entry in entries
+    ]
+    normalized.sort(
+        key=lambda entry: (
+            entry["sector"],
+            entry["tic"],
+            entry["aperture"],
+            entry["category"],
+            entry["message"],
+        )
+    )
+    return json.dumps(
+        normalized,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
 def _effective_quality_adp03q(
     *,
-    time: np.ndarray,
+    time_btjd: np.ndarray,
     raw_flux: np.ndarray,
     raw_error: np.ndarray,
     quality: np.ndarray,
@@ -1018,20 +1136,43 @@ def _effective_quality_adp03q(
     effective-quality overlay applied to the spline fit.
     """
 
-    time = np.asarray(time, dtype=np.float64)
+    time_btjd = _validated_btjd_time(
+        time_btjd,
+        context="effective-quality ADP",
+    )
     raw_flux = np.asarray(raw_flux, dtype=np.float64)
     raw_error = np.asarray(raw_error, dtype=np.float64)
     quality = np.asarray(quality, dtype=np.int32)
-    lengths = {len(time), len(raw_flux), len(raw_error), len(quality)}
+    lengths = {len(time_btjd), len(raw_flux), len(raw_error), len(quality)}
     if len(lengths) != 1:
         raise ValueError("effective-quality ADP inputs differ in length")
-    result = flux_space_detrend_result(
-        time,
-        raw_flux,
-        quality=quality,
-        flux_err=raw_error,
-        cfg=adp03q_config(),
-    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = flux_space_detrend_result(
+            time_btjd,
+            raw_flux,
+            quality=quality,
+            flux_err=raw_error,
+            cfg=adp03q_config(),
+        )
+    rank_warning_categories: list[str] = []
+    rank_warning_messages: list[str] = []
+    for warning in caught:
+        category = warning.category
+        message = str(warning.message)
+        if (
+            category is not _NUMPY_RANK_WARNING
+            or message != FULL_POOL_NATIVE_RANK_WARNING_MESSAGE
+        ):
+            category_name = (
+                f"{category.__module__}.{category.__qualname__}"
+            )
+            raise RuntimeError(
+                "effective-quality ADP emitted an unauthorized warning: "
+                f"{category_name}: {message}"
+            )
+        rank_warning_categories.append(FULL_POOL_NATIVE_RANK_WARNING_CATEGORY)
+        rank_warning_messages.append(message)
     detrended = np.asarray(result.det_flux, dtype=np.float64)
     effective_good = (quality == 0) & np.isfinite(detrended)
     if not np.any(effective_good):
@@ -1051,6 +1192,25 @@ def _effective_quality_adp03q(
         "recenter_median_before": center,
         "n_effective_good": int(np.count_nonzero(effective_good)),
         "n_finite_output": int(np.count_nonzero(np.isfinite(detrended))),
+        "detrend_time_contract_version": (
+            FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+        ),
+        "detrend_time_system": "BTJD",
+        "detrend_time_min": float(np.min(time_btjd)),
+        "detrend_time_max": float(np.max(time_btjd)),
+        "warning_capture_policy": FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+        "rank_warning_publication_policy": (
+            FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+        ),
+        "rank_warning_count": len(rank_warning_messages),
+        "rank_warning_categories_json": json.dumps(
+            rank_warning_categories,
+            separators=(",", ":"),
+        ),
+        "rank_warning_messages_json": json.dumps(
+            rank_warning_messages,
+            separators=(",", ":"),
+        ),
     }
     return detrended, diagnostics
 
@@ -1199,6 +1359,7 @@ def build_full_pool_native_shard(
     out_h5 = Path(out_h5).expanduser().resolve()
     temporary = _atomic_h5_path(out_h5)
     failures: list[dict[str, Any]] = []
+    rank_warning_ledger: list[dict[str, Any]] = []
     quality_totals = {name: 0 for name in RAW_PAIR_QUALITY_COUNT_NAMES}
     orbitid_stats = harmonic_export._new_orbitid_reconciliation_stats()
     orbitid_summary: dict[str, Any] = {}
@@ -1273,6 +1434,29 @@ def build_full_pool_native_shard(
             )
             output.attrs["detrend_quality_source"] = (
                 "final_effective_quality"
+            )
+            output.attrs["detrend_time_contract_version"] = (
+                FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+            )
+            output.attrs["detrend_time_dataset"] = (
+                FULL_POOL_NATIVE_DETREND_TIME_DATASET
+            )
+            output.attrs["detrend_time_system"] = "BTJD"
+            output.attrs["published_time_system"] = "BJD"
+            output.attrs["btjd_to_bjd_offset_d"] = (
+                FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+            )
+            output.attrs["detrend_btjd_min_inclusive"] = (
+                FULL_POOL_NATIVE_BTJD_MIN
+            )
+            output.attrs["detrend_btjd_max_exclusive"] = (
+                FULL_POOL_NATIVE_BTJD_MAX
+            )
+            output.attrs["warning_capture_policy"] = (
+                FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+            )
+            output.attrs["rank_warning_publication_policy"] = (
+                FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
             )
             output.attrs["raw_photometry_only"] = 1
             output.attrs["compact_adp_photometry_reused"] = 0
@@ -1508,21 +1692,43 @@ def build_full_pool_native_shard(
                     group.attrs["detrend_quality_source"] = (
                         "final_effective_quality"
                     )
+                    group.attrs["detrend_time_contract_version"] = (
+                        FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+                    )
+                    group.attrs["detrend_time_dataset"] = (
+                        FULL_POOL_NATIVE_DETREND_TIME_DATASET
+                    )
+                    group.attrs["detrend_time_system"] = "BTJD"
+                    group.attrs["published_time_system"] = "BJD"
+                    group.attrs["btjd_to_bjd_offset_d"] = (
+                        FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+                    )
                     group.attrs["raw_source_paths"] = raw_group.attrs.get(
                         "source_paths", ""
                     )
                     group.attrs["raw_adp_time_delta_max_s"] = float(
                         np.nanmax(aligned["_time_delta_s"])
                     )
-                    output_time = harmonic_export._absolute_bjd(
-                        np.asarray(compact_group["time"])
+                    compact_time_btjd = _validated_btjd_time(
+                        np.asarray(compact_group["time"]),
+                        context=f"S{sector} TIC {tic}",
+                    )
+                    output_time = _published_bjd_from_btjd(
+                        compact_time_btjd,
+                        context=f"S{sector} TIC {tic}",
+                    )
+                    group.attrs["detrend_time_min"] = float(
+                        np.min(compact_time_btjd)
+                    )
+                    group.attrs["detrend_time_max"] = float(
+                        np.max(compact_time_btjd)
                     )
                     effective_quality = np.asarray(
                         quality_overlay.quality, dtype=np.int32
                     )
                     det_small, small_diagnostics = (
                         _effective_quality_adp03q(
-                            time=output_time,
+                            time_btjd=compact_time_btjd,
                             raw_flux=aligned["raw_flux_small"],
                             raw_error=aligned["raw_flux_err_small"],
                             quality=effective_quality,
@@ -1530,7 +1736,7 @@ def build_full_pool_native_shard(
                     )
                     det_primary, primary_diagnostics = (
                         _effective_quality_adp03q(
-                            time=output_time,
+                            time_btjd=compact_time_btjd,
                             raw_flux=aligned["raw_flux_primary"],
                             raw_error=aligned["raw_flux_err_primary"],
                             quality=effective_quality,
@@ -1546,8 +1752,50 @@ def build_full_pool_native_shard(
                         aperture="primary",
                         diagnostics=primary_diagnostics,
                     )
+                    for aperture, diagnostics in (
+                        ("small", small_diagnostics),
+                        ("primary", primary_diagnostics),
+                    ):
+                        categories = json.loads(
+                            str(
+                                diagnostics[
+                                    "rank_warning_categories_json"
+                                ]
+                            )
+                        )
+                        messages = json.loads(
+                            str(
+                                diagnostics[
+                                    "rank_warning_messages_json"
+                                ]
+                            )
+                        )
+                        if len(categories) != len(messages) or len(
+                            messages
+                        ) != int(diagnostics["rank_warning_count"]):
+                            raise RuntimeError(
+                                "effective-quality ADP warning diagnostics "
+                                "are internally inconsistent"
+                            )
+                        rank_warning_ledger.extend(
+                            {
+                                "sector": sector,
+                                "tic": tic,
+                                "aperture": aperture,
+                                "category": category,
+                                "message": message,
+                            }
+                            for category, message in zip(
+                                categories,
+                                messages,
+                                strict=True,
+                            )
+                        )
                     payload = {
                         "time": output_time,
+                        FULL_POOL_NATIVE_DETREND_TIME_DATASET: (
+                            compact_time_btjd
+                        ),
                         "cadenceno": np.asarray(
                             compact_group["cadenceno"], dtype=np.int64
                         ),
@@ -1606,6 +1854,29 @@ def build_full_pool_native_shard(
             output.attrs[
                 "n_shard_excluded_structurally_validated"
             ] = int(excluded_structurally_validated)
+            rank_warning_ledger_json = _rank_warning_ledger_json(
+                rank_warning_ledger
+            )
+            output.attrs["rank_warning_count"] = int(
+                len(rank_warning_ledger)
+            )
+            output.attrs["rank_warning_ledger_json"] = (
+                rank_warning_ledger_json
+            )
+            output.attrs["rank_warning_ledger_sha256"] = hashlib.sha256(
+                rank_warning_ledger_json.encode("ascii")
+            ).hexdigest()
+            if rank_warning_ledger:
+                failures.append(
+                    {
+                        "sector": sector,
+                        "tic": -1,
+                        "error": (
+                            "native publication requires zero exact "
+                            f"RankWarnings; observed={len(rank_warning_ledger)}"
+                        ),
+                    }
+                )
             for name, value in quality_totals.items():
                 output.attrs[f"quality_overlay_{name}"] = int(value)
             orbitid_summary = _full_pool_reconciliation_summary(
@@ -1739,6 +2010,24 @@ def build_full_pool_native_shard(
         ),
         "detrend_config_json": FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
         "detrend_quality_source": "final_effective_quality",
+        "detrend_time_contract_version": (
+            FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+        ),
+        "detrend_time_dataset": FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+        "detrend_time_system": "BTJD",
+        "published_time_system": "BJD",
+        "btjd_to_bjd_offset_d": FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+        "warning_capture_policy": FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+        "rank_warning_publication_policy": (
+            FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+        ),
+        "rank_warning_count": len(rank_warning_ledger),
+        "rank_warning_ledger_json": _rank_warning_ledger_json(
+            rank_warning_ledger
+        ),
+        "rank_warning_ledger_sha256": hashlib.sha256(
+            _rank_warning_ledger_json(rank_warning_ledger).encode("ascii")
+        ).hexdigest(),
         "raw_photometry_only": True,
         "compact_adp_photometry_reused": False,
         "compact_adp_flux_reused": False,
@@ -1775,14 +2064,20 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
     if contract not in {
         FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
         FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
         FULL_POOL_NATIVE_CONTRACT_VERSION,
     }:
         return ["wrong full-pool native contract"]
     is_eligibility_partitioned = contract in {
         FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
         FULL_POOL_NATIVE_CONTRACT_VERSION,
     }
-    is_v3 = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
+    is_effective_quality_adp = contract in {
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
+        FULL_POOL_NATIVE_CONTRACT_VERSION,
+    }
+    is_v3r1 = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
     required = {
         "real_only",
         "sector",
@@ -1818,7 +2113,7 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
                 "raw_transfer_validation_sha256",
             }
         )
-    if is_v3:
+    if is_effective_quality_adp:
         required.update(
             {
                 "release_binding",
@@ -1842,6 +2137,23 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
                 failures.append("periodogram_n differs from native-v3 contract")
         except (KeyError, TypeError, ValueError):
             failures.append("periodogram_n is invalid")
+    if is_v3r1:
+        required.update(
+            {
+                "detrend_time_contract_version",
+                "detrend_time_dataset",
+                "detrend_time_system",
+                "published_time_system",
+                "btjd_to_bjd_offset_d",
+                "detrend_btjd_min_inclusive",
+                "detrend_btjd_max_exclusive",
+                "warning_capture_policy",
+                "rank_warning_publication_policy",
+                "rank_warning_count",
+                "rank_warning_ledger_json",
+                "rank_warning_ledger_sha256",
+            }
+        )
     missing = sorted(name for name in required if name not in attrs)
     if missing:
         return [f"full-pool native root lacks attrs: {','.join(missing)}"]
@@ -1918,21 +2230,36 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR.get(sector, "")
         ):
             failures.append("raw transfer release differs from production")
-    if is_v3:
+    if is_effective_quality_adp:
         sha_names.extend(
             [
                 "builder_code_sha256",
                 "detrend_config_sha256",
             ]
         )
-        if str(attrs["release_binding"]) != FULL_POOL_NATIVE_RELEASE_BINDING:
+        expected_release_binding = (
+            FULL_POOL_NATIVE_RELEASE_BINDING
+            if is_v3r1
+            else FULL_POOL_NATIVE_RELEASE_BINDING_V3
+        )
+        expected_builder_contract = (
+            FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+            if is_v3r1
+            else FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION_V1
+        )
+        expected_detrend_contract = (
+            FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+            if is_v3r1
+            else FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION_V1
+        )
+        if str(attrs["release_binding"]) != expected_release_binding:
             failures.append("v3 release binding mismatch")
         if str(attrs["builder_contract_version"]) != (
-            FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+            expected_builder_contract
         ):
             failures.append("v3 builder contract mismatch")
         if str(attrs["detrend_contract_version"]) != (
-            FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+            expected_detrend_contract
         ):
             failures.append("v3 detrend contract mismatch")
         if str(attrs["detrend_config_json"]) != (
@@ -1980,6 +2307,45 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             value not in "0123456789abcdef" for value in expected_git_sha
         ):
             failures.append("expected_git_sha is not an exact Git SHA")
+    if is_v3r1:
+        sha_names.append("rank_warning_ledger_sha256")
+        expected_time_attrs: dict[str, Any] = {
+            "detrend_time_contract_version": (
+                FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+            ),
+            "detrend_time_dataset": FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+            "detrend_time_system": "BTJD",
+            "published_time_system": "BJD",
+            "warning_capture_policy": (
+                FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+            ),
+            "rank_warning_publication_policy": (
+                FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+            ),
+            "rank_warning_ledger_json": (
+                FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+            ),
+            "rank_warning_ledger_sha256": (
+                FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+            ),
+        }
+        for name, expected_value in expected_time_attrs.items():
+            if str(attrs[name]) != expected_value:
+                failures.append(f"{name} differs from native-v3r1 contract")
+        try:
+            if (
+                float(attrs["btjd_to_bjd_offset_d"])
+                != FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+                or float(attrs["detrend_btjd_min_inclusive"])
+                != FULL_POOL_NATIVE_BTJD_MIN
+                or float(attrs["detrend_btjd_max_exclusive"])
+                != FULL_POOL_NATIVE_BTJD_MAX
+            ):
+                failures.append("native-v3r1 time bounds differ")
+            if int(attrs["rank_warning_count"]) != 0:
+                failures.append("native-v3r1 publication contains RankWarnings")
+        except (TypeError, ValueError):
+            failures.append("native-v3r1 time/warning metadata is invalid")
     for name in sha_names:
         if not isinstance(attrs[name], (str, bytes)) or not str(
             attrs[name]
@@ -2076,7 +2442,9 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             ),
             "orbitid_reconciliation_release_binding": (
                 FULL_POOL_NATIVE_RELEASE_BINDING
-                if is_v3
+                if is_v3r1
+                else FULL_POOL_NATIVE_RELEASE_BINDING_V3
+                if contract == FULL_POOL_NATIVE_CONTRACT_VERSION_V3
                 else FULL_POOL_NATIVE_RELEASE_BINDING_V2
                 if contract == FULL_POOL_NATIVE_CONTRACT_VERSION_V2
                 else FULL_POOL_NATIVE_RELEASE_BINDING_V1
@@ -2138,7 +2506,11 @@ def full_pool_native_group_failures(
     missing_attrs = [name for name in required_attrs if name not in group.attrs]
     if missing_attrs:
         return [f"{context}:missing attrs {','.join(missing_attrs)}"], 0
-    if root_contract == FULL_POOL_NATIVE_CONTRACT_VERSION:
+    if root_contract in {
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
+        FULL_POOL_NATIVE_CONTRACT_VERSION,
+    }:
+        is_v3r1 = root_contract == FULL_POOL_NATIVE_CONTRACT_VERSION
         v3_required_attrs = {
             "raw_compact_internal_quality_agreement",
             "photometry_source",
@@ -2164,6 +2536,59 @@ def full_pool_native_group_failures(
                     f"effective_quality_adp_{aperture}_n_finite_output",
                 }
             )
+            if is_v3r1:
+                v3_required_attrs.update(
+                    {
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "detrend_time_contract_version"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "detrend_time_system"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "detrend_time_min"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "detrend_time_max"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "warning_capture_policy"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "rank_warning_publication_policy"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "rank_warning_count"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "rank_warning_categories_json"
+                        ),
+                        (
+                            f"effective_quality_adp_{aperture}_"
+                            "rank_warning_messages_json"
+                        ),
+                    }
+                )
+        if is_v3r1:
+            v3_required_attrs.update(
+                {
+                    "detrend_time_contract_version",
+                    "detrend_time_dataset",
+                    "detrend_time_system",
+                    "published_time_system",
+                    "btjd_to_bjd_offset_d",
+                    "detrend_time_min",
+                    "detrend_time_max",
+                }
+            )
         missing_v3 = sorted(
             name for name in v3_required_attrs if name not in group.attrs
         )
@@ -2178,7 +2603,11 @@ def full_pool_native_group_failures(
             or str(group.attrs["photometry_source"])
             != "immutable_raw_v1_effective_quality_adp03q"
             or str(group.attrs["detrend_contract_version"])
-            != FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+            != (
+                FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+                if is_v3r1
+                else FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION_V1
+            )
             or str(group.attrs["detrend_config_sha256"])
             != FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
             or str(group.attrs["detrend_quality_source"])
@@ -2219,6 +2648,99 @@ def full_pool_native_group_failures(
                 failures.append(
                     f"{context}:{aperture} ADP diagnostics are outside bounds"
                 )
+            if is_v3r1:
+                warning_attrs = {
+                    "detrend_time_contract_version": (
+                        FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+                    ),
+                    "detrend_time_system": "BTJD",
+                    "warning_capture_policy": (
+                        FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+                    ),
+                    "rank_warning_publication_policy": (
+                        FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+                    ),
+                    "rank_warning_categories_json": "[]",
+                    "rank_warning_messages_json": "[]",
+                }
+                for suffix, expected in warning_attrs.items():
+                    if str(group.attrs[f"{prefix}_{suffix}"]) != expected:
+                        failures.append(
+                            f"{context}:{aperture} {suffix} mismatch"
+                        )
+                try:
+                    if (
+                        int(group.attrs[f"{prefix}_rank_warning_count"])
+                        != 0
+                        or float(group.attrs[f"{prefix}_detrend_time_min"])
+                        != float(group.attrs["detrend_time_min"])
+                        or float(group.attrs[f"{prefix}_detrend_time_max"])
+                        != float(group.attrs["detrend_time_max"])
+                    ):
+                        failures.append(
+                            f"{context}:{aperture} BTJD/warning audit mismatch"
+                        )
+                except (TypeError, ValueError):
+                    failures.append(
+                        f"{context}:{aperture} BTJD/warning audit is invalid"
+                    )
+        if is_v3r1:
+            if (
+                str(group.attrs["detrend_time_contract_version"])
+                != FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+                or str(group.attrs["detrend_time_dataset"])
+                != FULL_POOL_NATIVE_DETREND_TIME_DATASET
+                or str(group.attrs["detrend_time_system"]) != "BTJD"
+                or str(group.attrs["published_time_system"]) != "BJD"
+            ):
+                failures.append(f"{context}:v3r1 time provenance mismatch")
+            try:
+                if float(group.attrs["btjd_to_bjd_offset_d"]) != (
+                    FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+                ):
+                    failures.append(f"{context}:v3r1 BJD offset mismatch")
+            except (TypeError, ValueError):
+                failures.append(f"{context}:v3r1 BJD offset is invalid")
+            if (
+                FULL_POOL_NATIVE_DETREND_TIME_DATASET not in group
+                or "time" not in group
+            ):
+                failures.append(f"{context}:missing v3r1 BTJD/BJD time arrays")
+            else:
+                time_btjd = np.asarray(
+                    group[FULL_POOL_NATIVE_DETREND_TIME_DATASET],
+                    dtype=np.float64,
+                )
+                published_bjd = np.asarray(group["time"], dtype=np.float64)
+                try:
+                    time_btjd = _validated_btjd_time(
+                        time_btjd,
+                        context=context,
+                    )
+                except ValueError as exc:
+                    failures.append(str(exc))
+                else:
+                    if (
+                        len(published_bjd) != len(time_btjd)
+                        or not np.isfinite(published_bjd).all()
+                        or not np.array_equal(
+                            published_bjd,
+                            time_btjd
+                            + FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+                        )
+                    ):
+                        failures.append(
+                            f"{context}:published BJD differs from BTJD offset"
+                        )
+                    if (
+                        float(group.attrs["detrend_time_min"])
+                        != float(np.min(time_btjd))
+                        or float(group.attrs["detrend_time_max"])
+                        != float(np.max(time_btjd))
+                    ):
+                        failures.append(
+                            f"{context}:BTJD extrema metadata mismatch"
+                        )
         for name in PERIODOGRAM_DATASETS:
             if name not in group:
                 failures.append(f"{context}:missing v3 periodogram {name}")
@@ -2308,6 +2830,7 @@ def verify_full_pool_native_shard(
     path = Path(path)
     failures: list[str] = []
     counts = {"targets": 0, "injections": 0}
+    group_rank_warning_count = 0
     if not path.is_file():
         return {
             "passed": False,
@@ -2403,12 +2926,30 @@ def verify_full_pool_native_shard(
                         failures.append(
                             f"/{group_path}:missing={','.join(missing_periodogram)}"
                         )
+                    for aperture in ("small", "primary"):
+                        group_rank_warning_count += int(
+                            group.attrs.get(
+                                (
+                                    "effective_quality_adp_"
+                                    f"{aperture}_rank_warning_count"
+                                ),
+                                -1,
+                            )
+                        )
                 except Exception as exc:
                     failures.append(f"/{group_path}:{exc}")
         if counts["targets"] != int(
             h5.attrs.get("n_shard_observations", -1)
         ):
             failures.append("target count differs from root declaration")
+        if (
+            group_rank_warning_count
+            != int(h5.attrs.get("rank_warning_count", -1))
+            or group_rank_warning_count != 0
+        ):
+            failures.append(
+                "group/root RankWarning count differs or is nonzero"
+            )
         metadata = {
             "contract_version": str(h5.attrs.get("contract_version", "")),
             "sector": int(h5.attrs.get("sector", -1)),
@@ -2470,6 +3011,36 @@ def verify_full_pool_native_shard(
                 h5.attrs.get("detrend_config_sha256", "")
             ),
             "periodogram_n": int(h5.attrs.get("periodogram_n", -1)),
+            "detrend_time_contract_version": str(
+                h5.attrs.get("detrend_time_contract_version", "")
+            ),
+            "detrend_time_dataset": str(
+                h5.attrs.get("detrend_time_dataset", "")
+            ),
+            "detrend_time_system": str(
+                h5.attrs.get("detrend_time_system", "")
+            ),
+            "published_time_system": str(
+                h5.attrs.get("published_time_system", "")
+            ),
+            "btjd_to_bjd_offset_d": float(
+                h5.attrs.get("btjd_to_bjd_offset_d", np.nan)
+            ),
+            "warning_capture_policy": str(
+                h5.attrs.get("warning_capture_policy", "")
+            ),
+            "rank_warning_publication_policy": str(
+                h5.attrs.get("rank_warning_publication_policy", "")
+            ),
+            "rank_warning_count": int(
+                h5.attrs.get("rank_warning_count", -1)
+            ),
+            "rank_warning_ledger_json": str(
+                h5.attrs.get("rank_warning_ledger_json", "")
+            ),
+            "rank_warning_ledger_sha256": str(
+                h5.attrs.get("rank_warning_ledger_sha256", "")
+            ),
         }
     return {
         "passed": not failures,
@@ -2628,6 +3199,23 @@ def write_full_pool_native_registry(
             != FULL_POOL_NATIVE_DETREND_CONFIG_JSON
             or shard_summary.get("detrend_quality_source")
             != "final_effective_quality"
+            or shard_summary.get("detrend_time_contract_version")
+            != FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+            or shard_summary.get("detrend_time_dataset")
+            != FULL_POOL_NATIVE_DETREND_TIME_DATASET
+            or shard_summary.get("detrend_time_system") != "BTJD"
+            or shard_summary.get("published_time_system") != "BJD"
+            or float(shard_summary.get("btjd_to_bjd_offset_d", np.nan))
+            != FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+            or shard_summary.get("warning_capture_policy")
+            != FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+            or shard_summary.get("rank_warning_publication_policy")
+            != FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+            or int(shard_summary.get("rank_warning_count", -1)) != 0
+            or shard_summary.get("rank_warning_ledger_json")
+            != FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+            or shard_summary.get("rank_warning_ledger_sha256")
+            != FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
             or shard_summary.get("raw_photometry_only") is not True
             or shard_summary.get("compact_adp_photometry_reused") is not False
             or shard_summary.get("compact_adp_flux_reused") is not False
@@ -2844,6 +3432,37 @@ def write_full_pool_native_registry(
                     "detrend_quality_source",
                     "final_effective_quality",
                 ),
+                (
+                    "detrend_time_contract_version",
+                    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION,
+                ),
+                (
+                    "detrend_time_dataset",
+                    FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+                ),
+                ("detrend_time_system", "BTJD"),
+                ("published_time_system", "BJD"),
+                (
+                    "btjd_to_bjd_offset_d",
+                    FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+                ),
+                (
+                    "warning_capture_policy",
+                    FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+                ),
+                (
+                    "rank_warning_publication_policy",
+                    FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY,
+                ),
+                ("rank_warning_count", 0),
+                (
+                    "rank_warning_ledger_json",
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON,
+                ),
+                (
+                    "rank_warning_ledger_sha256",
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256,
+                ),
                 ("raw_photometry_only", 1),
                 ("compact_adp_photometry_reused", 0),
                 ("compact_adp_flux_reused", 0),
@@ -2943,6 +3562,30 @@ def write_full_pool_native_registry(
                     FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
                 ),
                 "detrend_quality_source": "final_effective_quality",
+                "detrend_time_contract_version": (
+                    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+                ),
+                "detrend_time_dataset": (
+                    FULL_POOL_NATIVE_DETREND_TIME_DATASET
+                ),
+                "detrend_time_system": "BTJD",
+                "published_time_system": "BJD",
+                "btjd_to_bjd_offset_d": (
+                    FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+                ),
+                "warning_capture_policy": (
+                    FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+                ),
+                "rank_warning_publication_policy": (
+                    FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+                ),
+                "rank_warning_count": 0,
+                "rank_warning_ledger_json": (
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+                ),
+                "rank_warning_ledger_sha256": (
+                    FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+                ),
                 "raw_photometry_only": True,
                 "compact_adp_photometry_reused": False,
                 "compact_adp_flux_reused": False,
@@ -3006,6 +3649,24 @@ def write_full_pool_native_registry(
             FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
         ),
         "detrend_quality_source": "final_effective_quality",
+        "detrend_time_contract_version": (
+            FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+        ),
+        "detrend_time_dataset": FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+        "detrend_time_system": "BTJD",
+        "published_time_system": "BJD",
+        "btjd_to_bjd_offset_d": FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+        "warning_capture_policy": FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+        "rank_warning_publication_policy": (
+            FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+        ),
+        "rank_warning_count": 0,
+        "rank_warning_ledger_json": (
+            FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+        ),
+        "rank_warning_ledger_sha256": (
+            FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
+        ),
         "raw_photometry_only": True,
         "compact_adp_photometry_reused": False,
         "compact_adp_flux_reused": False,
@@ -3187,6 +3848,23 @@ def load_full_pool_native_registry_release(
         != FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
         or release.get("detrend_quality_source")
         != "final_effective_quality"
+        or release.get("detrend_time_contract_version")
+        != FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
+        or release.get("detrend_time_dataset")
+        != FULL_POOL_NATIVE_DETREND_TIME_DATASET
+        or release.get("detrend_time_system") != "BTJD"
+        or release.get("published_time_system") != "BJD"
+        or float(release.get("btjd_to_bjd_offset_d", np.nan))
+        != FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D
+        or release.get("warning_capture_policy")
+        != FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY
+        or release.get("rank_warning_publication_policy")
+        != FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY
+        or int(release.get("rank_warning_count", -1)) != 0
+        or release.get("rank_warning_ledger_json")
+        != FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON
+        or release.get("rank_warning_ledger_sha256")
+        != FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256
         or release.get("raw_photometry_only") is not True
         or release.get("compact_adp_photometry_reused") is not False
         or release.get("compact_adp_flux_reused") is not False
@@ -3364,6 +4042,37 @@ def load_full_pool_native_registry_release(
                 FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
             ),
             ("detrend_quality_source", "final_effective_quality"),
+            (
+                "detrend_time_contract_version",
+                FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION,
+            ),
+            (
+                "detrend_time_dataset",
+                FULL_POOL_NATIVE_DETREND_TIME_DATASET,
+            ),
+            ("detrend_time_system", "BTJD"),
+            ("published_time_system", "BJD"),
+            (
+                "btjd_to_bjd_offset_d",
+                FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+            ),
+            (
+                "warning_capture_policy",
+                FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY,
+            ),
+            (
+                "rank_warning_publication_policy",
+                FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY,
+            ),
+            ("rank_warning_count", 0),
+            (
+                "rank_warning_ledger_json",
+                FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON,
+            ),
+            (
+                "rank_warning_ledger_sha256",
+                FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256,
+            ),
             ("raw_photometry_only", True),
             ("compact_adp_photometry_reused", False),
             ("compact_adp_flux_reused", False),
@@ -3394,24 +4103,38 @@ def load_full_pool_native_registry_release(
 
 __all__ = [
     "FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION",
+    "FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION_V1",
+    "FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D",
     "FULL_POOL_NATIVE_CONTRACT_VERSION",
     "FULL_POOL_NATIVE_CONTRACT_VERSION_V1",
     "FULL_POOL_NATIVE_CONTRACT_VERSION_V2",
+    "FULL_POOL_NATIVE_CONTRACT_VERSION_V3",
     "FULL_POOL_NATIVE_DETREND_CONFIG_JSON",
     "FULL_POOL_NATIVE_DETREND_CONFIG_SHA256",
+    "FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION_V1",
+    "FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION",
+    "FULL_POOL_NATIVE_DETREND_TIME_DATASET",
     "FULL_POOL_NATIVE_PERIODOGRAM_N",
     "FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION",
+    "FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_JSON",
+    "FULL_POOL_NATIVE_EMPTY_RANK_WARNING_LEDGER_SHA256",
+    "FULL_POOL_NATIVE_RANK_WARNING_PUBLICATION_POLICY",
     "FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION",
     "FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V2",
+    "FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V3",
     "FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION",
     "FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V2",
+    "FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V3",
     "FULL_POOL_NATIVE_RELEASE_BINDING",
     "FULL_POOL_NATIVE_RELEASE_BINDING_V1",
     "FULL_POOL_NATIVE_RELEASE_BINDING_V2",
+    "FULL_POOL_NATIVE_RELEASE_BINDING_V3",
     "FULL_POOL_NATIVE_SECTORS",
     "FULL_POOL_NATIVE_SHARDS_PER_SECTOR",
     "FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION",
     "FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V2",
+    "FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V3",
+    "FULL_POOL_NATIVE_WARNING_CAPTURE_POLICY",
     "FULL_POOL_RAW_EXPORT_CONTROLLER_SCHEMA_VERSION",
     "FULL_POOL_RAW_SHARD_SUMMARY_SCHEMA_VERSION",
     "FULL_POOL_RAW_SOURCE_CONTRACT_VERSION",
