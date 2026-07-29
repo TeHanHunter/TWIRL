@@ -15,6 +15,7 @@ if str(SRC) not in sys.path:
 
 from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
     FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
+    FULLPOOL_SSL_MODEL_NAMESPACE,
     run_fullpool_ssl_fold,
 )
 
@@ -42,11 +43,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--resume",
         action="store_true",
         help="Resume only when the existing fold contract is byte-identical.",
-    )
-    parser.add_argument(
-        "--allow-cpu",
-        action="store_true",
-        help="Testing only; production full-pool folds require CUDA.",
     )
     parser.add_argument(
         "--max-rows",
@@ -94,7 +90,8 @@ def main(argv: list[str] | None = None) -> int:
         "workers": int(args.workers),
         "seed": int(args.seed),
         "resume": bool(args.resume),
-        "require_cuda": not args.allow_cpu,
+        "require_cuda": True,
+        "model_namespace": FULLPOOL_SSL_MODEL_NAMESPACE,
         "verify_native_hashes": True,
         "verify_numeric_gate_release": True,
         "max_rows": args.max_rows,
@@ -122,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         weight_decay=float(args.weight_decay),
         checkpoint_every=int(args.checkpoint_every),
         resume=bool(args.resume),
-        require_cuda=not args.allow_cpu,
+        require_cuda=True,
         max_rows=args.max_rows,
         required_observation_ids=args.required_observation_id,
     )

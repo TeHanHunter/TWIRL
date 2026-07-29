@@ -21,10 +21,12 @@ from twirl.vetting.ssl_full_pool_numeric import (
     MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
     MODEL_INPUT_NUMERIC_AUTHORITY_NAMES,
     MODEL_INPUT_NUMERIC_ENVELOPE_SHA256,
+    MODEL_INPUT_NUMERIC_RELEASE_BINDING,
     MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
     TEACHER_SSL_NUMERIC_ENVELOPE_V1,
     audit_collated_sample,
     audit_model_facing_sample,
+    numeric_native_freshness,
     validate_numeric_gate_release,
 )
 
@@ -469,6 +471,10 @@ def _write_numeric_release(
         )
         report_payload = {
             "schema_version": MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
+            "release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+            "native_freshness": dict(
+                numeric_native_freshness("1" * 40)
+            ),
             "code_revision": "1" * 40,
             "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
             "envelope_contract": TEACHER_SSL_NUMERIC_ENVELOPE_V1,
@@ -505,6 +511,8 @@ def _write_numeric_release(
         )
     payload: dict[str, object] = {
         "schema_version": MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+        "release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+        "native_freshness": numeric_native_freshness("1" * 40),
         "passed": True,
         "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
         "envelope_contract": TEACHER_SSL_NUMERIC_ENVELOPE_V1,
@@ -668,6 +676,25 @@ def test_numeric_release_validator_rejects_failure_or_changed_authority(
     binding = payload["authority_bindings"]["native_registry"]  # type: ignore[index]
     Path(binding["path"]).write_text("changed\n", encoding="utf-8")
     with pytest.raises(ValueError, match="file size differs|file SHA-256 differs"):
+        validate_numeric_gate_release(path)
+
+
+def test_numeric_release_validator_rejects_stale_native_or_release_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path, payload = _write_numeric_release(tmp_path, monkeypatch)
+    payload["release_binding"] = "teacher_ssl_fullpool_stale"
+    _write_json_artifact(path, payload)
+    with pytest.raises(ValueError, match="release_binding mismatch"):
+        validate_numeric_gate_release(path)
+
+    path, payload = _write_numeric_release(tmp_path, monkeypatch)
+    payload["native_freshness"]["native_contract_version"] = (  # type: ignore[index]
+        "twirl_teacher_ssl_fullpool_real_native_v2"
+    )
+    _write_json_artifact(path, payload)
+    with pytest.raises(ValueError, match="native-v3"):
         validate_numeric_gate_release(path)
 
 

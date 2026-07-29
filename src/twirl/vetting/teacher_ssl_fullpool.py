@@ -33,6 +33,7 @@ import math
 import os
 from pathlib import Path
 import random
+import re
 import subprocess
 import tempfile
 from typing import Any, Mapping, Sequence
@@ -44,9 +45,13 @@ from twirl.vetting.harmonic_cnn import (
     MODEL_VERSION,
     HarmonicModelConfig,
     build_harmonic_cnn,
+    profile_branches,
 )
 from twirl.vetting.harmonic_dataset import HarmonicNativeDataset
-from twirl.vetting.harmonic_inputs import MODEL_INPUT_CONTRACT_VERSION
+from twirl.vetting.harmonic_inputs import (
+    MODEL_INPUT_CONTRACT_VERSION,
+    PERIODOGRAM_DATASETS,
+)
 from twirl.vetting.harmonic_ssl import (
     HARMONIC_SSL_CONTRACT_VERSION,
     EventPreservingAugmentationConfig,
@@ -76,12 +81,22 @@ from twirl.vetting.ssl_full_pool_eligibility import (
     load_native_model_eligibility,
 )
 from twirl.vetting.ssl_full_pool_native import (
+    FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
     FULL_POOL_NATIVE_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
+    FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_PERIODOGRAM_N,
+    FULL_POOL_NATIVE_RELEASE_BINDING,
+    full_pool_native_root_failures,
     load_full_pool_native_registry_release,
 )
 from twirl.vetting.ssl_full_pool_numeric import (
+    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+    MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+    MODEL_INPUT_NUMERIC_RELEASE_BINDING,
     MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
     validate_numeric_gate_release,
+    validate_numeric_native_freshness,
 )
 from twirl.vetting.teacher_native_registry import file_sha256, read_table
 from twirl.vetting.teacher_split_registry import validate_tic_split_assignments
@@ -91,31 +106,54 @@ FULLPOOL_SSL_REGISTRY_SCHEMA = "twirl_teacher_ssl_fullpool_registry_v2"
 FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA = (
     "twirl_teacher_ssl_fullpool_registry_summary_v2"
 )
-FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v3"
-FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v3"
-FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v3"
-FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v3"
-FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v3"
+FULLPOOL_SSL_SELECTION_SCHEMA = "twirl_teacher_ssl_fullpool_fold_selection_v4"
+FULLPOOL_SSL_RUN_CONTRACT_SCHEMA = "twirl_teacher_ssl_fullpool_fold_run_v4"
+FULLPOOL_SSL_RESUME_SCHEMA = "twirl_teacher_ssl_fullpool_resume_v4"
+FULLPOOL_SSL_CHECKPOINT_SCHEMA = "twirl_teacher_ssl_fullpool_checkpoint_v4"
+FULLPOOL_SSL_SUMMARY_SCHEMA = "twirl_teacher_ssl_fullpool_fold_summary_v4"
+FULLPOOL_SSL_MODEL_NAMESPACE = "effective_quality_adp_v1"
 FULLPOOL_SSL_RUN_ID = (
-    "teacher_ssl_fullpool_v3_s56_s62_a2v1_current_adp_bls_eligible_"
-    "effective_quality_mask_v1"
+    "teacher_ssl_fullpool_v4_s56_s62_a2v1_effective_quality_adp_"
+    "bls_eligible_effective_quality_adp_v1"
 )
 FULLPOOL_SSL_ENCODER_NAME = (
-    "teacher_ssl_fullpool_v3_effective_quality_mask_v1"
+    "teacher_ssl_fullpool_v4_effective_quality_adp_v1"
 )
 FULLPOOL_SSL_MODEL_FACING_NAME = "Teacher v4-SSL full-pool"
 FULLPOOL_SSL_PROFILE = "shape_plus_periodogram_bls"
 FULLPOOL_SSL_CHECKPOINT_NAMESPACE = (
-    "twirl_teacher_ssl_fullpool_v3_s56_s62_a2v1_current_adp_bls_eligible_"
-    "effective_quality_mask_v1"
+    "twirl_teacher_ssl_fullpool_v4_s56_s62_a2v1_effective_quality_adp_"
+    "bls_eligible_effective_quality_adp_v1"
 )
 FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_training_authority_v3"
+    "twirl_teacher_ssl_fullpool_training_authority_v4"
 )
 FULLPOOL_SSL_SECTORS: tuple[int, ...] = tuple(range(56, 63))
 FULLPOOL_SSL_N_FOLDS = 5
 FULLPOOL_SSL_DEFAULT_TRAINING_SEED = 560064
 FULLPOOL_SSL_ANCHOR_APERTURE = "DET_FLUX_ADP_SML"
+FULLPOOL_SSL_SMOKE_FOLD = 2
+FULLPOOL_SSL_SMOKE_EPOCHS = 1
+FULLPOOL_SSL_SMOKE_MAX_ROWS = 4096
+FULLPOOL_SSL_SMOKE_BATCH_SIZE = 64
+FULLPOOL_SSL_SMOKE_WORKERS = 8
+FULLPOOL_SSL_LEARNING_RATE = 3.0e-4
+FULLPOOL_SSL_WEIGHT_DECAY = 1.0e-4
+FULLPOOL_SSL_OPTIMIZER_CONTRACT_SCHEMA = (
+    "twirl_teacher_ssl_fullpool_adamw_optimizer_v2"
+)
+FULLPOOL_SSL_OPTIMIZER_TYPE = "torch.optim.adamw.AdamW"
+FULLPOOL_SSL_ADAMW_BETAS: tuple[float, float] = (0.9, 0.999)
+FULLPOOL_SSL_ADAMW_EPS = 1.0e-8
+FULLPOOL_SSL_OPTIMIZER_PARAMETER_SCOPE = (
+    "encoder_embedding_path_plus_projection"
+)
+FULLPOOL_SSL_GRADIENT_COVERAGE_SCHEMA = (
+    "twirl_teacher_ssl_fullpool_gradient_coverage_v1"
+)
+FULLPOOL_SSL_SMOKE_REQUIRED_OBSERVATION_ID = (
+    "s0060-tic0000000722078603"
+)
 _SHA256_PATTERN = r"^[0-9a-f]{64}$"
 
 FULLPOOL_SSL_REGISTRY_COLUMNS: tuple[str, ...] = (
@@ -872,7 +910,7 @@ def build_fullpool_ssl_registry(
             FULL_POOL_NATIVE_CONTRACT_VERSION
         ).all():
             raise ValueError(
-                "production full-pool registry requires native-v2 inputs"
+                "production full-pool registry requires native-v3 inputs"
             )
     native_present = merged["_native_join"].eq("both")
     if "is_injected_row" in merged:
@@ -1213,7 +1251,7 @@ def validate_fullpool_ssl_registry(
     if not work.loc[include, "native_contract_version"].eq(
         FULL_POOL_NATIVE_CONTRACT_VERSION
     ).all():
-        raise ValueError("included full-pool rows require native-v2 inputs")
+        raise ValueError("included full-pool rows require native-v3 inputs")
     if not work.loc[include, "native_h5_path"].map(
         lambda value: Path(value).is_absolute()
     ).all():
@@ -1816,6 +1854,17 @@ def _validate_training_authority_chain(
         or numeric_gate_release.get("passed") is not True
     ):
         raise ValueError("model-input numerical gate did not pass")
+    if numeric_gate_release.get("release_binding") != (
+        MODEL_INPUT_NUMERIC_RELEASE_BINDING
+    ):
+        raise ValueError(
+            "model-input numerical gate is not the fresh effective-quality "
+            "ADP release"
+        )
+    if numeric_gate_release.get("schema_version") != (
+        MODEL_INPUT_NUMERIC_RELEASE_SCHEMA
+    ):
+        raise ValueError("model-input numerical gate schema is stale")
     if (
         numeric_gate_release.get("model_input_contract_version")
         != MODEL_INPUT_CONTRACT_VERSION
@@ -1936,7 +1985,14 @@ def _validate_training_authority_chain(
     native_mapping = _normalized_native_mapping(native_registry)
     if final_mapping != native_mapping:
         raise ValueError(
-            "final SSL registry native mapping differs from native-v2 release"
+            "final SSL registry native mapping differs from native-v3 release"
+        )
+    if {
+        str(record["native_contract_version"])
+        for record in native_mapping
+    } != {FULL_POOL_NATIVE_CONTRACT_VERSION}:
+        raise ValueError(
+            "final SSL registry contains a stale native-v1/v2 mapping"
         )
     mapping_frame = pd.DataFrame.from_records(native_mapping)
     mapping_sha256 = _frame_sha256(
@@ -1989,7 +2045,22 @@ def _validate_training_authority_chain(
     if not isinstance(release_counts, Mapping) or not isinstance(
         release_identities, Mapping
     ):
-        raise ValueError("native-v2 release lacks partition metadata")
+        raise ValueError("native-v3 release lacks partition metadata")
+    expected_native_freshness = validate_numeric_native_freshness(
+        numeric_gate_release.get("native_freshness"),
+        context="training numeric native freshness",
+        expected_code_revision=str(
+            numeric_gate_release.get("code_revision", "")
+        ),
+    )
+    observed_native_freshness = {
+        name: native_release.get(name) for name in expected_native_freshness
+    }
+    if observed_native_freshness != expected_native_freshness:
+        raise ValueError(
+            "native-v3 release effective-quality ADP provenance differs "
+            "from the locked contract"
+        )
     if {
         "full": int(release_counts.get("full_observations", -1)),
         "eligible": int(release_counts.get("eligible_observations", -1)),
@@ -2003,7 +2074,7 @@ def _validate_training_authority_chain(
         "excluded": PRODUCTION_EXCLUDED_OBSERVATIONS,
         "native": PRODUCTION_ELIGIBLE_OBSERVATIONS,
     }:
-        raise ValueError("native-v2 release counts differ from production")
+        raise ValueError("native-v3 release counts differ from production")
     if {
         "full": release_identities.get("full_observations_sha256"),
         "eligible": release_identities.get("eligible_observations_sha256"),
@@ -2017,7 +2088,7 @@ def _validate_training_authority_chain(
         "excluded": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
         "native": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
     }:
-        raise ValueError("native-v2 release identities differ from production")
+        raise ValueError("native-v3 release identities differ from production")
 
     provenance = registry_summary.get("source_provenance")
     if not isinstance(provenance, Mapping):
@@ -2147,6 +2218,7 @@ def _validate_training_authority_chain(
         ),
         "numeric_gate_release": {
             "binding": dict(authority_bindings["numeric_gate_release"]),
+            "release_binding": numeric_gate_release.get("release_binding"),
             "schema_version": numeric_gate_release.get("schema_version"),
             "envelope_canonical_sha256": numeric_gate_release.get(
                 "envelope_canonical_sha256"
@@ -2158,6 +2230,7 @@ def _validate_training_authority_chain(
             "code_revision": numeric_gate_release.get("code_revision"),
             "passed": True,
         },
+        "native_freshness": expected_native_freshness,
         "source_provenance_verified": True,
         "authority_bindings": {
             name: dict(metadata)
@@ -2261,11 +2334,16 @@ def _load_training_authority_chain(
 
 def _verify_native_files(
     selected: pd.DataFrame,
+    *,
+    expected_git_sha: str,
 ) -> list[dict[str, Any]]:
-    """Hash selected files and inspect their actual v2 root/group identities."""
+    """Hash selected files and inspect their exact fresh-v3 identities."""
 
     import h5py
 
+    expected_git_sha = str(expected_git_sha).strip()
+    if re.fullmatch(r"[0-9a-f]{40}", expected_git_sha) is None:
+        raise ValueError("native verification expected Git SHA is invalid")
     records: list[dict[str, Any]] = []
     for path_text, group in selected.groupby("native_h5_path", sort=True):
         path = Path(str(path_text))
@@ -2280,7 +2358,52 @@ def _verify_native_files(
             actual_contract = str(h5.attrs.get("contract_version", "")).strip()
             if actual_contract != FULL_POOL_NATIVE_CONTRACT_VERSION:
                 raise ValueError(
-                    f"selected native file is not native-v2: {path}"
+                    f"selected native file is not fresh native-v3: {path}"
+                )
+            expected_root = {
+                "expected_git_sha": expected_git_sha,
+                "release_binding": FULL_POOL_NATIVE_RELEASE_BINDING,
+                "builder_contract_version": (
+                    FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+                ),
+                "detrend_contract_version": (
+                    FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+                ),
+                "detrend_config_sha256": (
+                    FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+                ),
+                "detrend_quality_source": "final_effective_quality",
+                "periodogram_n": str(FULL_POOL_NATIVE_PERIODOGRAM_N),
+            }
+            observed_root = {
+                name: str(h5.attrs.get(name, "")).strip()
+                for name in expected_root
+            }
+            if observed_root != expected_root:
+                raise ValueError(
+                    f"selected native-v3 provenance differs: {path}"
+                )
+            for name, expected in (
+                ("raw_photometry_only", 1),
+                ("compact_adp_photometry_reused", 0),
+                ("compact_adp_flux_reused", 0),
+            ):
+                if int(h5.attrs.get(name, -1)) != expected:
+                    raise ValueError(
+                        f"selected native-v3 {name} differs: {path}"
+                    )
+            builder_code_sha256 = str(
+                h5.attrs.get("builder_code_sha256", "")
+            ).strip()
+            if (
+                re.fullmatch(_SHA256_PATTERN, builder_code_sha256) is None
+                or builder_code_sha256
+                != MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                    "builder_code_sha256"
+                ]
+            ):
+                raise ValueError(
+                    f"selected native-v3 builder code SHA is invalid: {path}"
                 )
             for row in group.itertuples(index=False):
                 if str(row.native_contract_version) != actual_contract:
@@ -2295,6 +2418,16 @@ def _verify_native_files(
                         f"missing selected native group {group_path!r} in {path}"
                     )
                 native_group = h5[group_path]
+                for dataset_name in PERIODOGRAM_DATASETS:
+                    if (
+                        dataset_name not in native_group
+                        or len(native_group[dataset_name])
+                        != FULL_POOL_NATIVE_PERIODOGRAM_N
+                    ):
+                        raise ValueError(
+                            "selected native-v3 periodogram resolution "
+                            f"differs: {path}:{group_path}:{dataset_name}"
+                        )
                 actual_key = (
                     int(native_group.attrs.get("sector", -1)),
                     int(native_group.attrs.get("tic", -1)),
@@ -2309,11 +2442,13 @@ def _verify_native_files(
         if (
             int(before.st_size),
             int(before.st_mtime_ns),
+            int(before.st_ctime_ns),
             int(before.st_dev),
             int(before.st_ino),
         ) != (
             int(after.st_size),
             int(after.st_mtime_ns),
+            int(after.st_ctime_ns),
             int(after.st_dev),
             int(after.st_ino),
         ):
@@ -2324,8 +2459,31 @@ def _verify_native_files(
             {
                 "native_h5_path": str(path),
                 "native_h5_sha256": declared,
-                "native_h5_size_bytes": int(path.stat().st_size),
+                "native_h5_size_bytes": int(after.st_size),
+                "native_h5_mtime_ns": int(after.st_mtime_ns),
+                "native_h5_ctime_ns": int(after.st_ctime_ns),
+                "native_h5_device": int(after.st_dev),
+                "native_h5_inode": int(after.st_ino),
                 "native_contract_version": actual_contract,
+                "native_release_binding": FULL_POOL_NATIVE_RELEASE_BINDING,
+                "native_expected_git_sha": expected_git_sha,
+                "native_builder_contract_version": (
+                    FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+                ),
+                "native_builder_code_sha256": builder_code_sha256,
+                "native_detrend_contract_version": (
+                    FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+                ),
+                "native_detrend_config_sha256": (
+                    FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+                ),
+                "native_detrend_quality_source": (
+                    "final_effective_quality"
+                ),
+                "raw_photometry_only": True,
+                "compact_adp_photometry_reused": False,
+                "compact_adp_flux_reused": False,
+                "periodogram_n": FULL_POOL_NATIVE_PERIODOGRAM_N,
                 "hash_verified_now": True,
                 "root_contract_verified_now": True,
                 "group_identities_verified_now": True,
@@ -2333,6 +2491,65 @@ def _verify_native_files(
             }
         )
     return records
+
+
+def _revalidate_training_inputs(
+    *,
+    authority_bindings: Mapping[str, Mapping[str, Any]],
+    native_files: Sequence[Mapping[str, Any]],
+    expected_git_sha: str,
+    full_native_hash: bool,
+) -> None:
+    """Fail closed on authority/native mutation after training preflight."""
+
+    import h5py
+
+    for name, declared in authority_bindings.items():
+        observed = _artifact_metadata(Path(str(declared.get("path", ""))))
+        if observed != dict(declared):
+            raise RuntimeError(
+                f"training authority changed after preflight: {name}"
+            )
+    for record in native_files:
+        path = Path(str(record.get("native_h5_path", "")))
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        stat = path.stat()
+        observed_stat = {
+            "native_h5_size_bytes": int(stat.st_size),
+            "native_h5_mtime_ns": int(stat.st_mtime_ns),
+            "native_h5_ctime_ns": int(stat.st_ctime_ns),
+            "native_h5_device": int(stat.st_dev),
+            "native_h5_inode": int(stat.st_ino),
+        }
+        expected_stat = {
+            name: int(record.get(name, -1)) for name in observed_stat
+        }
+        if observed_stat != expected_stat:
+            raise RuntimeError(
+                "selected native file changed after preflight: "
+                f"{path}"
+            )
+        if not full_native_hash:
+            continue
+        if file_sha256(path) != record.get("native_h5_sha256"):
+            raise RuntimeError(
+                f"selected native file hash changed after preflight: {path}"
+            )
+        with h5py.File(path, "r") as h5:
+            if full_pool_native_root_failures(h5.attrs):
+                raise RuntimeError(
+                    f"selected native-v3 root failed reinspection: {path}"
+                )
+            if (
+                str(h5.attrs.get("expected_git_sha", ""))
+                != expected_git_sha
+                or int(h5.attrs.get("periodogram_n", -1))
+                != FULL_POOL_NATIVE_PERIODOGRAM_N
+            ):
+                raise RuntimeError(
+                    f"selected native-v3 root changed after preflight: {path}"
+                )
 
 
 def _loss_and_components(result: Any) -> tuple[Any, dict[str, float]]:
@@ -2405,6 +2622,354 @@ def _assert_finite_module_state(
                 )
 
 
+def _locked_optimizer_config() -> dict[str, Any]:
+    return {
+        "schema_version": FULLPOOL_SSL_OPTIMIZER_CONTRACT_SCHEMA,
+        "optimizer_type": FULLPOOL_SSL_OPTIMIZER_TYPE,
+        "parameter_group_count": 1,
+        "defaults": {
+            "lr": FULLPOOL_SSL_LEARNING_RATE,
+            "betas": list(FULLPOOL_SSL_ADAMW_BETAS),
+            "eps": FULLPOOL_SSL_ADAMW_EPS,
+            "weight_decay": FULLPOOL_SSL_WEIGHT_DECAY,
+            "amsgrad": False,
+            "foreach": None,
+            "maximize": False,
+            "capturable": False,
+            "differentiable": False,
+            "fused": None,
+            "decoupled_weight_decay": True,
+        },
+    }
+
+
+def _expected_epoch_coverage(
+    n_selected_observations: int,
+    batch_size: int,
+) -> dict[str, int]:
+    selected = int(n_selected_observations)
+    batch = int(batch_size)
+    if selected < 2 or batch < 2:
+        raise ValueError("epoch coverage requires at least two observations")
+    remainder = selected % batch
+    singleton_skipped = int(remainder == 1)
+    optimizer_steps = selected // batch + int(remainder >= 2)
+    return {
+        "selected_observations": selected,
+        "observations_per_epoch": selected - singleton_skipped,
+        "optimizer_steps_per_epoch": optimizer_steps,
+        "singleton_observations_skipped_per_epoch": singleton_skipped,
+    }
+
+
+def _ssl_embedding_parameter_prefixes(model: Any) -> tuple[str, ...]:
+    """Return the exact encoder modules consumed by the SSL embedding loss."""
+
+    if getattr(model, "profile", None) != FULLPOOL_SSL_PROFILE:
+        raise RuntimeError("full-pool SSL model profile differs")
+    branches = profile_branches(FULLPOOL_SSL_PROFILE)
+    prefixes: list[str] = []
+    if "chronology" in branches:
+        prefixes.extend(
+            ("small_encoder.", "supp_encoder.", "supplement_gate.")
+        )
+    if {"harmonic", "single_fold"} & branches:
+        prefixes.append("harmonic_encoder.")
+    if "local" in branches:
+        prefixes.append("local_encoder.")
+    if "periodogram" in branches:
+        prefixes.append("periodogram_encoder.")
+    if "metadata" in branches and getattr(
+        model, "metadata_encoder", None
+    ) is not None:
+        prefixes.append("metadata_encoder.")
+    # Every profile passes its branch embeddings through the shared gate and
+    # fusion stack before returning ``embedding``.
+    prefixes.extend(("branch_gate.", "fusion."))
+    if len(prefixes) != len(set(prefixes)):
+        raise RuntimeError("duplicate full-pool SSL embedding prefix")
+    return tuple(prefixes)
+
+
+def _optimizer_named_parameters(
+    model: Any,
+    projector: Any,
+) -> list[tuple[str, Any]]:
+    """Select only parameters on the embedding-to-VICReg computation path."""
+
+    prefixes = _ssl_embedding_parameter_prefixes(model)
+    named: list[tuple[str, Any]] = [
+        (f"encoder.{name}", parameter)
+        for name, parameter in model.named_parameters()
+        if name.startswith(prefixes)
+    ]
+    named.extend(
+        (f"projector.{name}", parameter)
+        for name, parameter in projector.named_parameters()
+    )
+    all_named = [
+        (f"{prefix}.{name}", parameter)
+        for prefix, module in (("encoder", model), ("projector", projector))
+        for name, parameter in module.named_parameters()
+    ]
+    selected_ids = {id(parameter) for _, parameter in named}
+    if (
+        not named
+        or len({name for name, _ in named}) != len(named)
+        or len(selected_ids) != len(named)
+        or any(not parameter.requires_grad for _, parameter in named)
+        or any(
+            name.startswith("projector.") and id(parameter) not in selected_ids
+            for name, parameter in all_named
+        )
+    ):
+        raise RuntimeError("locked optimizer parameter selection is invalid")
+    return named
+
+
+def _optimizer_parameter_manifest(
+    model: Any,
+    projector: Any,
+) -> list[dict[str, Any]]:
+    manifest: list[dict[str, Any]] = []
+    for name, parameter in _optimizer_named_parameters(model, projector):
+        manifest.append(
+            {
+                "index": len(manifest),
+                "name": name,
+                "shape": [int(value) for value in parameter.shape],
+                "dtype": str(parameter.dtype),
+                "numel": int(parameter.numel()),
+                "requires_grad": bool(parameter.requires_grad),
+            }
+        )
+    if (
+        not manifest
+        or len({item["name"] for item in manifest}) != len(manifest)
+        or any(not item["requires_grad"] for item in manifest)
+    ):
+        raise RuntimeError("locked optimizer parameter manifest is invalid")
+    return manifest
+
+
+def _gradient_coverage_contract(
+    model: Any,
+    projector: Any,
+    *,
+    verified: bool,
+) -> dict[str, Any]:
+    selected = _optimizer_named_parameters(model, projector)
+    selected_ids = {id(parameter) for _, parameter in selected}
+    excluded_names = [
+        f"{prefix}.{name}"
+        for prefix, module in (("encoder", model), ("projector", projector))
+        for name, parameter in module.named_parameters()
+        if id(parameter) not in selected_ids
+    ]
+    active_names = [name for name, _ in selected]
+    return {
+        "schema_version": FULLPOOL_SSL_GRADIENT_COVERAGE_SCHEMA,
+        "verified_after_real_ssl_backward": bool(verified),
+        "loss_path": "encoder.embedding->projector->vicreg",
+        "active_parameter_count": len(active_names),
+        "active_parameter_names_sha256": _canonical_sha256(active_names),
+        "excluded_parameter_count": len(excluded_names),
+        "excluded_parameter_names_sha256": _canonical_sha256(
+            excluded_names
+        ),
+    }
+
+
+def _assert_ssl_gradient_coverage(
+    model: Any,
+    projector: Any,
+    optimizer: Any,
+    *,
+    fold: int,
+    epoch: int,
+    batch_index: int,
+) -> dict[str, Any]:
+    """Prove a real embedding-only backward covers exactly AdamW's subset."""
+
+    import torch
+
+    selected = _optimizer_named_parameters(model, projector)
+    selected_ids = {id(parameter) for _, parameter in selected}
+    group_parameters = (
+        optimizer.param_groups[0].get("params", [])
+        if len(optimizer.param_groups) == 1
+        else []
+    )
+    if len(group_parameters) != len(selected) or any(
+        observed is not expected
+        for observed, (_, expected) in zip(
+            group_parameters, selected, strict=True
+        )
+    ):
+        raise RuntimeError(
+            "AdamW parameter group differs from the SSL embedding path"
+        )
+    missing = [
+        name for name, parameter in selected if parameter.grad is None
+    ]
+    invalid = [
+        name
+        for name, parameter in selected
+        if parameter.grad is not None
+        and (
+            tuple(parameter.grad.shape) != tuple(parameter.shape)
+            or not bool(torch.isfinite(parameter.grad).all().item())
+        )
+    ]
+    unexpected = [
+        f"{prefix}.{name}"
+        for prefix, module in (("encoder", model), ("projector", projector))
+        for name, parameter in module.named_parameters()
+        if id(parameter) not in selected_ids and parameter.grad is not None
+    ]
+    if missing or invalid or unexpected:
+        raise RuntimeError(
+            "full-pool SSL gradient coverage differs from the locked "
+            "embedding path "
+            f"(fold={fold}, epoch={epoch}, batch={batch_index}, "
+            f"missing={missing}, invalid={invalid}, "
+            f"unexpected={unexpected})"
+        )
+    return _gradient_coverage_contract(
+        model,
+        projector,
+        verified=True,
+    )
+
+
+def _optimizer_checkpoint_contract(
+    model: Any,
+    projector: Any,
+    optimizer: Any,
+    *,
+    gradient_coverage_verified: bool,
+    expected_step: int,
+) -> dict[str, Any]:
+    """Bind AdamW state IDs to the exact embedding-path parameter subset."""
+
+    import torch
+
+    locked = _locked_optimizer_config()
+    optimizer_type = (
+        f"{type(optimizer).__module__}.{type(optimizer).__qualname__}"
+    )
+    if optimizer_type != FULLPOOL_SSL_OPTIMIZER_TYPE:
+        raise RuntimeError(
+            f"unexpected full-pool optimizer type: {optimizer_type}"
+        )
+    if not gradient_coverage_verified:
+        raise RuntimeError(
+            "optimizer checkpoint requires real SSL gradient verification"
+        )
+    if int(expected_step) < 1:
+        raise RuntimeError("optimizer checkpoint step must be positive")
+    manifest = _optimizer_parameter_manifest(model, projector)
+    parameters = [
+        parameter
+        for _, parameter in _optimizer_named_parameters(model, projector)
+    ]
+    group_parameters = (
+        optimizer.param_groups[0].get("params", [])
+        if len(optimizer.param_groups) == 1
+        else []
+    )
+    if len(group_parameters) != len(parameters) or any(
+        observed is not expected
+        for observed, expected in zip(
+            group_parameters, parameters, strict=True
+        )
+    ):
+        raise RuntimeError(
+            "AdamW parameter group does not exactly cover the SSL "
+            "embedding path"
+        )
+    group = optimizer.param_groups[0]
+    defaults = locked["defaults"]
+    expected_group_fields = set(defaults) | {"params"}
+    if set(group) != expected_group_fields:
+        raise RuntimeError(
+            "AdamW parameter group field inventory differs from the "
+            "locked Torch deployment"
+        )
+    for name, expected in defaults.items():
+        observed = group.get(name)
+        if name == "betas":
+            observed = list(observed) if observed is not None else None
+        if observed != expected:
+            raise RuntimeError(
+                f"AdamW parameter group {name} differs from locked default"
+            )
+    if set(optimizer.state) != set(parameters):
+        raise RuntimeError(
+            "AdamW state does not exactly cover the SSL embedding path"
+        )
+    serialized = optimizer.state_dict()
+    serialized_groups = serialized.get("param_groups", [])
+    if (
+        len(serialized_groups) != 1
+        or set(serialized_groups[0]) != expected_group_fields
+    ):
+        raise RuntimeError(
+            "serialized AdamW parameter group field inventory differs "
+            "from the locked Torch deployment"
+        )
+    parameter_ids = serialized["param_groups"][0].get("params")
+    expected_parameter_ids = list(range(len(parameters)))
+    if (
+        parameter_ids != expected_parameter_ids
+        or set(serialized.get("state", {})) != set(expected_parameter_ids)
+    ):
+        raise RuntimeError(
+            "serialized AdamW parameter IDs do not exactly bind manifest order"
+        )
+    for index, parameter in enumerate(parameters):
+        state = optimizer.state[parameter]
+        if set(state) != {"step", "exp_avg", "exp_avg_sq"}:
+            raise RuntimeError(
+                f"AdamW state {index} has an unexpected field inventory"
+            )
+        if (
+            not torch.is_tensor(state["step"])
+            or state["step"].numel() != 1
+            or state["step"].dtype != torch.float32
+            or float(state["step"].item()) != float(expected_step)
+            or not torch.is_tensor(state["exp_avg"])
+            or tuple(state["exp_avg"].shape) != tuple(parameter.shape)
+            or state["exp_avg"].dtype != parameter.dtype
+            or not bool(torch.isfinite(state["exp_avg"]).all().item())
+            or not torch.is_tensor(state["exp_avg_sq"])
+            or tuple(state["exp_avg_sq"].shape) != tuple(parameter.shape)
+            or state["exp_avg_sq"].dtype != parameter.dtype
+            or not bool(torch.isfinite(state["exp_avg_sq"]).all().item())
+        ):
+            raise RuntimeError(
+                f"AdamW state {index} has an invalid tensor contract"
+            )
+    return {
+        **locked,
+        "parameter_scope": FULLPOOL_SSL_OPTIMIZER_PARAMETER_SCOPE,
+        "parameter_manifest": manifest,
+        "parameter_manifest_sha256": _canonical_sha256(manifest),
+        "parameter_count": len(manifest),
+        "parameter_numel": sum(item["numel"] for item in manifest),
+        "parameter_ids": expected_parameter_ids,
+        "state_parameter_count": len(optimizer.state),
+        "state_fields": ["step", "exp_avg", "exp_avg_sq"],
+        "state_step": int(expected_step),
+        "state_step_dtype": "torch.float32",
+        "gradient_coverage": _gradient_coverage_contract(
+            model,
+            projector,
+            verified=True,
+        ),
+    }
+
+
 def _projection_head(input_dim: int) -> Any:
     from torch import nn
 
@@ -2457,6 +3022,7 @@ def _load_resume_checkpoint(
     fold_dir: Path,
     contract_sha256: str,
     device: Any,
+    expected_native_freshness: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     import torch
 
@@ -2482,6 +3048,33 @@ def _load_resume_checkpoint(
     )
     if checkpoint.get("schema_version") != FULLPOOL_SSL_RESUME_SCHEMA:
         raise ValueError("full-pool resume checkpoint has the wrong schema")
+    if (
+        checkpoint.get("run_id") != FULLPOOL_SSL_RUN_ID
+        or checkpoint.get("checkpoint_namespace")
+        != FULLPOOL_SSL_CHECKPOINT_NAMESPACE
+        or checkpoint.get("native_freshness")
+        is None
+        or checkpoint.get("numeric_release_binding")
+        != MODEL_INPUT_NUMERIC_RELEASE_BINDING
+    ):
+        raise ValueError(
+            "full-pool resume checkpoint belongs to a stale native/model "
+            "namespace"
+        )
+    locked_freshness = validate_numeric_native_freshness(
+        expected_native_freshness,
+        context="current training authority native freshness",
+    )
+    observed_freshness = validate_numeric_native_freshness(
+        checkpoint.get("native_freshness"),
+        context="resume checkpoint native freshness",
+        expected_code_revision=locked_freshness["expected_git_sha"],
+    )
+    if observed_freshness != locked_freshness:
+        raise ValueError(
+            "full-pool resume checkpoint native freshness differs from "
+            "the current training authority"
+        )
     if checkpoint.get("run_contract_sha256") != contract_sha256:
         raise ValueError("full-pool resume checkpoint belongs to another contract")
     return checkpoint
@@ -2575,6 +3168,115 @@ def _restore_rng_state(state: Mapping[str, Any]) -> None:
         torch.cuda.set_rng_state_all(cuda_states)
 
 
+def _validate_fresh_model_output_root(
+    out_root: Path,
+    *,
+    bounded_smoke: bool,
+) -> Path:
+    """Reject every historical model namespace and ambiguous output root."""
+
+    resolved = Path(out_root).expanduser().resolve()
+    expected_suffix = (
+        ("model_runs", FULLPOOL_SSL_MODEL_NAMESPACE, "smoke", "one_epoch")
+        if bounded_smoke
+        else (
+            "model_runs",
+            FULLPOOL_SSL_MODEL_NAMESPACE,
+            "training",
+            "five_fold",
+        )
+    )
+    if len(resolved.parts) < len(expected_suffix) or tuple(
+        resolved.parts[-len(expected_suffix) :]
+    ) != expected_suffix:
+        raise ValueError(
+            "full-pool SSL output must use the fresh "
+            f"{'/'.join(expected_suffix)} namespace"
+        )
+    return resolved
+
+
+def _validate_locked_training_shape(
+    *,
+    out_root: Path,
+    fold: int,
+    epochs: int,
+    batch_size: int,
+    workers: int,
+    seed: int,
+    learning_rate: float,
+    weight_decay: float,
+    checkpoint_every: int,
+    require_cuda: bool,
+    max_rows: int | None,
+    required_observation_ids: Sequence[str] | None,
+) -> Path:
+    """Require either the one locked smoke or one full five-fold job."""
+
+    required = list(required_observation_ids or [])
+    if not require_cuda:
+        raise ValueError("full-pool SSL smoke/training requires one H200")
+    if float(learning_rate) != FULLPOOL_SSL_LEARNING_RATE:
+        raise ValueError(
+            "full-pool SSL smoke/training requires learning rate "
+            f"{FULLPOOL_SSL_LEARNING_RATE}"
+        )
+    if float(weight_decay) != FULLPOOL_SSL_WEIGHT_DECAY:
+        raise ValueError(
+            "full-pool SSL smoke/training requires weight decay "
+            f"{FULLPOOL_SSL_WEIGHT_DECAY}"
+        )
+    if max_rows is not None:
+        expected = {
+            "fold": FULLPOOL_SSL_SMOKE_FOLD,
+            "epochs": FULLPOOL_SSL_SMOKE_EPOCHS,
+            "batch_size": FULLPOOL_SSL_SMOKE_BATCH_SIZE,
+            "workers": FULLPOOL_SSL_SMOKE_WORKERS,
+            "seed": FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
+            "checkpoint_every": 1,
+            "max_rows": FULLPOOL_SSL_SMOKE_MAX_ROWS,
+        }
+        observed = {
+            "fold": int(fold),
+            "epochs": int(epochs),
+            "batch_size": int(batch_size),
+            "workers": int(workers),
+            "seed": int(seed),
+            "checkpoint_every": int(checkpoint_every),
+            "max_rows": int(max_rows),
+        }
+        if observed != expected:
+            raise ValueError(
+                "bounded full-pool SSL is restricted to the locked "
+                "fold-2/4096-row/one-epoch H200 smoke"
+            )
+        if required != [FULLPOOL_SSL_SMOKE_REQUIRED_OBSERVATION_ID]:
+            raise ValueError(
+                "locked smoke must require the diagnostic observation "
+                "exactly once"
+            )
+        return _validate_fresh_model_output_root(
+            out_root,
+            bounded_smoke=True,
+        )
+
+    if required:
+        raise ValueError(
+            "production five-fold training forbids required-observation "
+            "selection"
+        )
+    if int(epochs) != 20 or int(batch_size) != 64 or int(workers) != 8:
+        raise ValueError(
+            "production five-fold training requires 20 epochs, batch size "
+            "64, and 8 workers"
+        )
+    if int(seed) != FULLPOOL_SSL_DEFAULT_TRAINING_SEED:
+        raise ValueError("production five-fold training seed differs")
+    if int(checkpoint_every) != 1:
+        raise ValueError("production five-fold checkpoint interval differs")
+    return _validate_fresh_model_output_root(out_root, bounded_smoke=False)
+
+
 def run_fullpool_ssl_fold(
     *,
     eligibility_exclusions_path: Path,
@@ -2591,8 +3293,8 @@ def run_fullpool_ssl_fold(
     batch_size: int = 64,
     workers: int = 8,
     seed: int = FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
-    learning_rate: float = 3.0e-4,
-    weight_decay: float = 1.0e-4,
+    learning_rate: float = FULLPOOL_SSL_LEARNING_RATE,
+    weight_decay: float = FULLPOOL_SSL_WEIGHT_DECAY,
     checkpoint_every: int = 1,
     resume: bool = False,
     require_cuda: bool = True,
@@ -2619,6 +3321,20 @@ def run_fullpool_ssl_fold(
         raise ValueError("learning_rate must be finite and positive")
     if not np.isfinite(weight_decay) or float(weight_decay) < 0:
         raise ValueError("weight_decay must be finite and nonnegative")
+    out_root = _validate_locked_training_shape(
+        out_root=out_root,
+        fold=fold,
+        epochs=int(epochs),
+        batch_size=int(batch_size),
+        workers=int(workers),
+        seed=int(seed),
+        learning_rate=float(learning_rate),
+        weight_decay=float(weight_decay),
+        checkpoint_every=int(checkpoint_every),
+        require_cuda=bool(require_cuda),
+        max_rows=max_rows,
+        required_observation_ids=required_observation_ids,
+    )
 
     code_revision = _code_revision()
     (
@@ -2651,7 +3367,14 @@ def run_fullpool_ssl_fold(
         required_observation_ids=required_observation_ids,
     )
     dataset_rows = fullpool_dataset_rows(selected)
-    native_files = _verify_native_files(selected)
+    native_files = _verify_native_files(
+        selected,
+        expected_git_sha=code_revision,
+    )
+    epoch_coverage = _expected_epoch_coverage(
+        len(selected),
+        int(batch_size),
+    )
     fold_seed = int(seed) + 1000 * fold
     model_config = HarmonicModelConfig(metadata_dim=0)
     augmentation_config = EventPreservingAugmentationConfig()
@@ -2668,7 +3391,9 @@ def run_fullpool_ssl_fold(
         "model_input_numeric_envelope_contract": (
             MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
         ),
+        "numeric_release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
         "numeric_gate_release": authority_audit["numeric_gate_release"],
+        "native_freshness": authority_audit["native_freshness"],
         "profile": FULLPOOL_SSL_PROFILE,
         "fold": fold,
         "registry_path": str(registry_path),
@@ -2688,6 +3413,8 @@ def run_fullpool_ssl_fold(
         "augmentation_config": asdict(augmentation_config),
         "vicreg_config": asdict(vicreg_config),
         "projection_architecture": [2 * model_config.embedding_dim, 128, 64],
+        "optimizer_config": _locked_optimizer_config(),
+        "epoch_coverage": epoch_coverage,
         "epochs": int(epochs),
         "batch_size": int(batch_size),
         "workers": int(workers),
@@ -2708,7 +3435,7 @@ def run_fullpool_ssl_fold(
         "code_revision": code_revision,
     }
     fold_dir = (
-        Path(out_root).expanduser().resolve()
+        out_root
         / "encoder_pretraining"
         / f"fold_{fold}"
     )
@@ -2722,7 +3449,17 @@ def run_fullpool_ssl_fold(
         if not resume:
             raise FileExistsError(summary_path)
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
-        if summary.get("run_contract_sha256") != contract_sha256:
+        if (
+            summary.get("schema_version") != FULLPOOL_SSL_SUMMARY_SCHEMA
+            or summary.get("run_id") != FULLPOOL_SSL_RUN_ID
+            or summary.get("checkpoint_namespace")
+            != FULLPOOL_SSL_CHECKPOINT_NAMESPACE
+            or summary.get("run_contract_sha256") != contract_sha256
+            or summary.get("numeric_gate_release", {}).get(
+                "release_binding"
+            )
+            != MODEL_INPUT_NUMERIC_RELEASE_BINDING
+        ):
             raise ValueError("completed fold summary belongs to another contract")
         checkpoint_path = Path(str(summary.get("checkpoint", "")))
         if not checkpoint_path.is_file():
@@ -2747,19 +3484,41 @@ def run_fullpool_ssl_fold(
         profile=FULLPOOL_SSL_PROFILE,
     ).to(device)
     projector = _projection_head(2 * model_config.embedding_dim).to(device)
+    optimizer_named_parameters = _optimizer_named_parameters(
+        model,
+        projector,
+    )
     optimizer = torch.optim.AdamW(
-        list(model.parameters()) + list(projector.parameters()),
+        [
+            {
+                "params": [
+                    parameter
+                    for _, parameter in optimizer_named_parameters
+                ],
+                "decoupled_weight_decay": True,
+            }
+        ],
         lr=float(learning_rate),
+        betas=FULLPOOL_SSL_ADAMW_BETAS,
+        eps=FULLPOOL_SSL_ADAMW_EPS,
         weight_decay=float(weight_decay),
+        amsgrad=False,
+        foreach=None,
+        maximize=False,
+        capturable=False,
+        differentiable=False,
+        fused=None,
     )
     history: list[dict[str, Any]] = []
     global_step = 0
     start_epoch = 0
+    gradient_coverage_verified = False
     if resume:
         checkpoint = _load_resume_checkpoint(
             fold_dir=fold_dir,
             contract_sha256=contract_sha256,
             device=device,
+            expected_native_freshness=authority_audit["native_freshness"],
         )
         if checkpoint is not None:
             model.load_state_dict(checkpoint["encoder_state_dict"], strict=True)
@@ -2767,9 +3526,23 @@ def run_fullpool_ssl_fold(
                 checkpoint["projection_state_dict"], strict=True
             )
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            if checkpoint.get("optimizer_contract") != (
+                _optimizer_checkpoint_contract(
+                    model,
+                    projector,
+                    optimizer,
+                    gradient_coverage_verified=True,
+                    expected_step=int(checkpoint["global_step"]),
+                )
+            ):
+                raise ValueError(
+                    "resume checkpoint optimizer contract differs from "
+                    "the restored encoder+projector state"
+                )
             start_epoch = int(checkpoint["epoch"])
             global_step = int(checkpoint["global_step"])
             history = list(checkpoint["history"])
+            gradient_coverage_verified = True
             _restore_rng_state(checkpoint["rng_state"])
             if start_epoch > int(epochs):
                 raise ValueError("resume checkpoint is beyond requested epochs")
@@ -2796,6 +3569,7 @@ def run_fullpool_ssl_fold(
             projector.train()
             totals: dict[str, float] = {"loss": 0.0}
             seen = 0
+            epoch_steps = 0
             for batch_index, raw_batch in enumerate(loader):
                 if len(raw_batch["review_id"]) < 2:
                     continue
@@ -2838,6 +3612,16 @@ def run_fullpool_ssl_fold(
                     batch_index=batch_index,
                 )
                 loss.backward()
+                if not gradient_coverage_verified:
+                    _assert_ssl_gradient_coverage(
+                        model,
+                        projector,
+                        optimizer,
+                        fold=fold,
+                        epoch=epoch,
+                        batch_index=batch_index,
+                    )
+                    gradient_coverage_verified = True
                 optimizer.step()
                 count = len(raw_batch["review_id"])
                 totals["loss"] += float(loss.detach()) * count
@@ -2845,9 +3629,16 @@ def run_fullpool_ssl_fold(
                     totals[name] = totals.get(name, 0.0) + float(value) * count
                 seen += count
                 global_step += 1
-            if seen < 2:
+                epoch_steps += 1
+            if (
+                seen != epoch_coverage["observations_per_epoch"]
+                or epoch_steps
+                != epoch_coverage["optimizer_steps_per_epoch"]
+            ):
                 raise RuntimeError(
-                    f"full-pool SSL fold {fold} epoch {epoch} was empty"
+                    "full-pool SSL epoch coverage differs from the locked "
+                    f"selection (fold={fold}, epoch={epoch}, seen={seen}, "
+                    f"steps={epoch_steps}, expected={epoch_coverage})"
                 )
             record = {
                 "epoch": int(epoch),
@@ -2882,6 +3673,16 @@ def run_fullpool_ssl_fold(
             if epoch % int(checkpoint_every) == 0 or epoch == int(epochs):
                 resume_payload = {
                     "schema_version": FULLPOOL_SSL_RESUME_SCHEMA,
+                    "run_id": FULLPOOL_SSL_RUN_ID,
+                    "checkpoint_namespace": (
+                        FULLPOOL_SSL_CHECKPOINT_NAMESPACE
+                    ),
+                    "numeric_release_binding": (
+                        MODEL_INPUT_NUMERIC_RELEASE_BINDING
+                    ),
+                    "native_freshness": authority_audit[
+                        "native_freshness"
+                    ],
                     "run_contract_sha256": contract_sha256,
                     "fold": fold,
                     "epoch": int(epoch),
@@ -2896,6 +3697,15 @@ def run_fullpool_ssl_fold(
                         name: value.detach().cpu()
                         for name, value in projector.state_dict().items()
                     },
+                    "optimizer_contract": _optimizer_checkpoint_contract(
+                        model,
+                        projector,
+                        optimizer,
+                        gradient_coverage_verified=(
+                            gradient_coverage_verified
+                        ),
+                        expected_step=global_step,
+                    ),
                     "optimizer_state_dict": optimizer.state_dict(),
                 }
                 _atomic_write(
@@ -2904,6 +3714,12 @@ def run_fullpool_ssl_fold(
                         index=False,
                         lineterminator="\n",
                     ).encode("utf-8"),
+                )
+                _revalidate_training_inputs(
+                    authority_bindings=authority_audit["authority_bindings"],
+                    native_files=native_files,
+                    expected_git_sha=code_revision,
+                    full_native_hash=False,
                 )
                 _publish_resume_checkpoint(
                     fold_dir=fold_dir,
@@ -2934,7 +3750,9 @@ def run_fullpool_ssl_fold(
         "model_input_numeric_envelope_contract": (
             MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
         ),
+        "numeric_release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
         "numeric_gate_release": authority_audit["numeric_gate_release"],
+        "native_freshness": authority_audit["native_freshness"],
         "profile": FULLPOOL_SSL_PROFILE,
         "fold": fold,
         "run_contract_sha256": contract_sha256,
@@ -2943,6 +3761,15 @@ def run_fullpool_ssl_fold(
         "augmentation_config": asdict(augmentation_config),
         "vicreg_config": asdict(vicreg_config),
         "projection_architecture": [2 * model_config.embedding_dim, 128, 64],
+        "optimizer_config": _locked_optimizer_config(),
+        "optimizer_contract": _optimizer_checkpoint_contract(
+            model,
+            projector,
+            optimizer,
+            gradient_coverage_verified=gradient_coverage_verified,
+            expected_step=global_step,
+        ),
+        "epoch_coverage": epoch_coverage,
         "epochs": int(epochs),
         "history": history,
         "encoder_state_dict": {
@@ -2953,7 +3780,14 @@ def run_fullpool_ssl_fold(
             name: value.detach().cpu()
             for name, value in projector.state_dict().items()
         },
+        "optimizer_state_dict": optimizer.state_dict(),
     }
+    _revalidate_training_inputs(
+        authority_bindings=authority_audit["authority_bindings"],
+        native_files=native_files,
+        expected_git_sha=code_revision,
+        full_native_hash=True,
+    )
     checkpoint_sha256 = _atomic_torch_save(checkpoint, checkpoint_path)
     summary = {
         "schema_version": FULLPOOL_SSL_SUMMARY_SCHEMA,
@@ -2965,7 +3799,9 @@ def run_fullpool_ssl_fold(
         "model_input_numeric_envelope_contract": (
             MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
         ),
+        "numeric_release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
         "numeric_gate_release": authority_audit["numeric_gate_release"],
+        "native_freshness": authority_audit["native_freshness"],
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "fold": fold,
         "run_contract": str(fold_dir / "run_contract.json"),
@@ -2976,12 +3812,19 @@ def run_fullpool_ssl_fold(
         "history_sha256": file_sha256(fold_dir / "history.csv"),
         "completed_epochs": int(epochs),
         "global_step": int(global_step),
+        "epoch_coverage": epoch_coverage,
         "selection_audit": selection_audit,
         "fixed_test_status": "host_excluded_tensors_not_constructed",
         "prospective_status": "host_excluded_tensors_not_constructed",
         "labels_loaded": False,
         "automatic_production_promotion": False,
     }
+    _revalidate_training_inputs(
+        authority_bindings=authority_audit["authority_bindings"],
+        native_files=native_files,
+        expected_git_sha=code_revision,
+        full_native_hash=True,
+    )
     _atomic_write(summary_path, _json_bytes(summary))
     return summary
 
@@ -2990,12 +3833,34 @@ __all__ = [
     "FULLPOOL_SSL_ANCHOR_APERTURE",
     "FULLPOOL_SSL_DEFAULT_TRAINING_SEED",
     "FULLPOOL_SSL_ENCODER_NAME",
+    "FULLPOOL_SSL_GRADIENT_COVERAGE_SCHEMA",
+    "FULLPOOL_SSL_CHECKPOINT_NAMESPACE",
+    "FULLPOOL_SSL_CHECKPOINT_SCHEMA",
+    "FULLPOOL_SSL_MODEL_NAMESPACE",
     "FULLPOOL_SSL_MODEL_FACING_NAME",
+    "FULLPOOL_SSL_ADAMW_BETAS",
+    "FULLPOOL_SSL_ADAMW_EPS",
+    "FULLPOOL_SSL_LEARNING_RATE",
+    "FULLPOOL_SSL_OPTIMIZER_CONTRACT_SCHEMA",
+    "FULLPOOL_SSL_OPTIMIZER_PARAMETER_SCOPE",
+    "FULLPOOL_SSL_OPTIMIZER_TYPE",
+    "FULLPOOL_SSL_PROFILE",
     "FULLPOOL_SSL_REGISTRY_COLUMNS",
     "FULLPOOL_SSL_REGISTRY_SCHEMA",
     "FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA",
     "FULLPOOL_SSL_RUN_ID",
+    "FULLPOOL_SSL_RUN_CONTRACT_SCHEMA",
     "FULLPOOL_SSL_SECTORS",
+    "FULLPOOL_SSL_SELECTION_SCHEMA",
+    "FULLPOOL_SSL_SMOKE_BATCH_SIZE",
+    "FULLPOOL_SSL_SMOKE_EPOCHS",
+    "FULLPOOL_SSL_SMOKE_FOLD",
+    "FULLPOOL_SSL_SMOKE_MAX_ROWS",
+    "FULLPOOL_SSL_SMOKE_REQUIRED_OBSERVATION_ID",
+    "FULLPOOL_SSL_SMOKE_WORKERS",
+    "FULLPOOL_SSL_SUMMARY_SCHEMA",
+    "FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA",
+    "FULLPOOL_SSL_WEIGHT_DECAY",
     "build_fullpool_ssl_registry",
     "fullpool_dataset_rows",
     "load_fullpool_ssl_registry",

@@ -90,7 +90,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--native-release-summary",
         type=Path,
         required=True,
-        help="Full-pool native-v2 eligibility/coverage release summary.",
+        help="Full-pool native-v3 eligibility/coverage release summary.",
     )
     parser.add_argument(
         "--eligibility-exclusions",

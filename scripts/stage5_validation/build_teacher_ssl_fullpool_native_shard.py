@@ -70,6 +70,11 @@ def main() -> int:
     parser.add_argument("--n-shards", type=int, default=1)
     parser.add_argument("--n-periods", type=int, default=4096)
     parser.add_argument(
+        "--expected-code-revision",
+        required=True,
+        help="Exact lowercase 40-hex deployed Git SHA bound into native-v3.",
+    )
+    parser.add_argument(
         "--orbitid-policy",
         choices=("strict", "reference_by_cadence"),
         required=True,
@@ -94,6 +99,7 @@ def main() -> int:
         n_shards=args.n_shards,
         n_periods=args.n_periods,
         orbitid_policy=args.orbitid_policy,
+        expected_git_sha=args.expected_code_revision,
     )
     summary_path = args.out_h5.with_suffix(".summary.json")
     _publish_immutable_json(summary_path, summary)

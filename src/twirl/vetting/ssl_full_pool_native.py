@@ -9,7 +9,7 @@ row-count signature.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -31,6 +31,8 @@ from twirl.lightcurves.external_quality import (
     ORBITID_RECONCILIATION_CONTRACT_VERSION,
     load_external_quality_reference,
 )
+from twirl.lightcurves.detrend_presets import adp03q_config
+from twirl.lightcurves.flux_detrend import flux_space_detrend_result
 from twirl.vetting import harmonic_export
 from twirl.vetting.harmonic_inputs import (
     CHRONOLOGY_SMALL_CHANNELS,
@@ -70,24 +72,55 @@ FULL_POOL_RAW_SOURCE_CONTRACT_VERSION = (
 FULL_POOL_NATIVE_CONTRACT_VERSION_V1 = (
     "twirl_teacher_ssl_fullpool_real_native_v1"
 )
-FULL_POOL_NATIVE_CONTRACT_VERSION = (
+FULL_POOL_NATIVE_CONTRACT_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_real_native_v2"
+)
+FULL_POOL_NATIVE_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_real_native_v3_effective_quality_adp"
 )
 FULL_POOL_NATIVE_RELEASE_BINDING_V1 = (
     "teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp_real_only"
 )
-FULL_POOL_NATIVE_RELEASE_BINDING = (
+FULL_POOL_NATIVE_RELEASE_BINDING_V2 = (
     "teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
 )
-FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_RELEASE_BINDING = (
+    "teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
+)
+FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_shard_summary_v2"
 )
-FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_shard_summary_v3"
+)
+FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_registry_source_v2"
 )
-FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_registry_source_v3"
+)
+FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_registry_release_v2"
 )
+FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_registry_release_v3"
+)
+FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_effective_quality_adp_builder_v1"
+)
+FULL_POOL_NATIVE_PERIODOGRAM_N = int(harmonic_export.DEFAULT_BLS_PERIODS)
+FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION = (
+    "twirl_fs_adp03q_effective_quality_v1"
+)
+FULL_POOL_NATIVE_DETREND_CONFIG_JSON = json.dumps(
+    asdict(adp03q_config()),
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+)
+FULL_POOL_NATIVE_DETREND_CONFIG_SHA256 = hashlib.sha256(
+    FULL_POOL_NATIVE_DETREND_CONFIG_JSON.encode("ascii")
+).hexdigest()
 FULL_POOL_NATIVE_SECTORS = EXPECTED_SECTORS
 FULL_POOL_NATIVE_SHARDS_PER_SECTOR = 16
 FULL_POOL_RAW_EXPORT_CONTROLLER_SCHEMA_VERSION = (
@@ -970,6 +1003,69 @@ def _validate_s62_group_reconciliation(
         )
 
 
+def _effective_quality_adp03q(
+    *,
+    time: np.ndarray,
+    raw_flux: np.ndarray,
+    raw_error: np.ndarray,
+    quality: np.ndarray,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Rebuild and independently recenter one ADP03q aperture.
+
+    The compact input is intentionally absent from this interface: v3 uses it
+    only to select the established cadence inventory.  Every photometric value
+    is derived from the immutable raw-v1 flux/error arrays with the final
+    effective-quality overlay applied to the spline fit.
+    """
+
+    time = np.asarray(time, dtype=np.float64)
+    raw_flux = np.asarray(raw_flux, dtype=np.float64)
+    raw_error = np.asarray(raw_error, dtype=np.float64)
+    quality = np.asarray(quality, dtype=np.int32)
+    lengths = {len(time), len(raw_flux), len(raw_error), len(quality)}
+    if len(lengths) != 1:
+        raise ValueError("effective-quality ADP inputs differ in length")
+    result = flux_space_detrend_result(
+        time,
+        raw_flux,
+        quality=quality,
+        flux_err=raw_error,
+        cfg=adp03q_config(),
+    )
+    detrended = np.asarray(result.det_flux, dtype=np.float64)
+    effective_good = (quality == 0) & np.isfinite(detrended)
+    if not np.any(effective_good):
+        raise ValueError("effective-quality ADP has no finite quality-zero values")
+    center = float(np.median(detrended[effective_good]))
+    if not np.isfinite(center):
+        raise ValueError("effective-quality ADP recenter median is nonfinite")
+    detrended = detrended - center + 1.0
+    if not np.isfinite(detrended[effective_good]).all():
+        raise ValueError("effective-quality ADP produced nonfinite quality-zero values")
+    diagnostics = {
+        "fit_count": int(result.fit_count),
+        "n_segments": int(result.n_segments),
+        "scale": float(result.scale),
+        "scale_source": str(result.scale_source),
+        "cotrend_status": str(result.cotrend_status),
+        "recenter_median_before": center,
+        "n_effective_good": int(np.count_nonzero(effective_good)),
+        "n_finite_output": int(np.count_nonzero(np.isfinite(detrended))),
+    }
+    return detrended, diagnostics
+
+
+def _write_effective_quality_adp_diagnostics(
+    group: Any,
+    *,
+    aperture: str,
+    diagnostics: Mapping[str, Any],
+) -> None:
+    prefix = f"effective_quality_adp_{aperture}"
+    for name, value in diagnostics.items():
+        group.attrs[f"{prefix}_{name}"] = value
+
+
 def build_full_pool_native_shard(
     *,
     sector: int,
@@ -986,6 +1082,7 @@ def build_full_pool_native_shard(
     cadence_reference_table: Path,
     cadence_reference_manifest: Path,
     out_h5: Path,
+    expected_git_sha: str,
     shard_index: int = 0,
     n_shards: int = 1,
     n_periods: int = harmonic_export.DEFAULT_BLS_PERIODS,
@@ -1007,8 +1104,16 @@ def build_full_pool_native_shard(
         raise ValueError("S62 full-pool native preparation requires reference_by_cadence")
     if sector != 62 and orbitid_policy != ORBITID_POLICY_STRICT:
         raise ValueError("S56--S61 full-pool native preparation requires strict")
-    if int(n_periods) < 1:
-        raise ValueError("n_periods must be positive")
+    if int(n_periods) != FULL_POOL_NATIVE_PERIODOGRAM_N:
+        raise ValueError(
+            "native-v3 periodogram resolution must equal "
+            f"{FULL_POOL_NATIVE_PERIODOGRAM_N}"
+        )
+    expected_git_sha = str(expected_git_sha).strip().lower()
+    if len(expected_git_sha) != 40 or any(
+        value not in "0123456789abcdef" for value in expected_git_sha
+    ):
+        raise ValueError("expected_git_sha must be an exact 40-character Git SHA")
 
     authority = load_sector_pool_authority(
         sector=sector,
@@ -1076,6 +1181,7 @@ def build_full_pool_native_shard(
     )
     reference_table_binding = _bind_file(cadence_reference_table)
     reference_manifest_binding = _bind_file(cadence_reference_manifest)
+    builder_binding = _bind_file(Path(__file__))
     quality_reference = load_external_quality_reference(
         table_path=reference_table_binding.path,
         manifest_path=reference_manifest_binding.path,
@@ -1150,6 +1256,27 @@ def build_full_pool_native_shard(
             output.attrs["contract_version"] = (
                 FULL_POOL_NATIVE_CONTRACT_VERSION
             )
+            output.attrs["release_binding"] = FULL_POOL_NATIVE_RELEASE_BINDING
+            output.attrs["builder_contract_version"] = (
+                FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+            )
+            output.attrs["builder_code_sha256"] = builder_binding.sha256
+            output.attrs["expected_git_sha"] = expected_git_sha
+            output.attrs["detrend_contract_version"] = (
+                FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+            )
+            output.attrs["detrend_config_json"] = (
+                FULL_POOL_NATIVE_DETREND_CONFIG_JSON
+            )
+            output.attrs["detrend_config_sha256"] = (
+                FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+            )
+            output.attrs["detrend_quality_source"] = (
+                "final_effective_quality"
+            )
+            output.attrs["raw_photometry_only"] = 1
+            output.attrs["compact_adp_photometry_reused"] = 0
+            output.attrs["compact_adp_flux_reused"] = 0
             output.attrs["created_utc"] = datetime.now(
                 timezone.utc
             ).isoformat()
@@ -1226,6 +1353,9 @@ def build_full_pool_native_shard(
             )
             output.attrs["compact_adp_h5"] = str(compact_binding.path)
             output.attrs["compact_adp_h5_sha256"] = compact_binding.sha256
+            output.attrs["compact_adp_role"] = (
+                "cadence_time_orbit_detector_internal_quality_mapping_only"
+            )
             output.attrs["periodogram_grid"] = "log10_period_d"
             output.attrs["periodogram_n"] = int(n_periods)
             output.attrs["chronology_small_channels"] = json.dumps(
@@ -1244,8 +1374,12 @@ def build_full_pool_native_shard(
                 output, quality_reference
             )
             targets = output.create_group("targets")
-            for count, row in enumerate(rows.itertuples(index=False), start=1):
+            excluded_structurally_validated = 0
+            for count, row in enumerate(
+                source_rows.itertuples(index=False), start=1
+            ):
                 tic = int(row.tic)
+                include_native = (sector, tic) in eligible_keys
                 raw_path = f"targets/{tic:016d}"
                 compact_path = str(row.compact_group_path)
                 try:
@@ -1260,6 +1394,10 @@ def build_full_pool_native_shard(
                         if int(compact_group.attrs.get(name, -1)) != expected:
                             raise ValueError(
                                 f"compact {name} mapping differs from pool"
+                            )
+                        if int(raw_group.attrs.get(name, -1)) != expected:
+                            raise ValueError(
+                                f"raw-source {name} mapping differs from pool"
                             )
                     raw = harmonic_export._raw_source_payload(raw_group)
                     aligned = harmonic_export.align_raw_by_cadence(
@@ -1278,15 +1416,26 @@ def build_full_pool_native_shard(
                             "raw-source and compact orbitid arrays disagree "
                             "before reconciliation"
                         )
+                    raw_internal_quality = np.asarray(
+                        aligned["quality"], dtype=np.int64
+                    )
+                    compact_internal_quality = np.asarray(
+                        compact_group["quality"], dtype=np.int64
+                    )
+                    if not np.array_equal(
+                        raw_internal_quality, compact_internal_quality
+                    ):
+                        raise ValueError(
+                            "raw-source and compact internal quality arrays "
+                            "disagree"
+                        )
                     quality_overlay = quality_reference.apply(
                         sector=sector,
                         camera=int(row.camera),
                         ccd=int(row.ccd),
                         cadenceno=np.asarray(compact_group["cadenceno"]),
                         orbitid=compact_orbitid,
-                        internal_quality=np.asarray(
-                            compact_group["quality"]
-                        ),
+                        internal_quality=compact_internal_quality,
                         context=f"S{sector} TIC {tic}",
                         orbitid_policy=orbitid_policy,
                     )
@@ -1315,6 +1464,10 @@ def build_full_pool_native_shard(
                             "strict orbit-ID policy changed one or more cadences"
                         )
 
+                    if not include_native:
+                        excluded_structurally_validated += 1
+                        continue
+
                     corrected = harmonic_export._record_orbitid_reconciliation(
                         orbitid_stats,
                         camera=int(row.camera),
@@ -1338,16 +1491,63 @@ def build_full_pool_native_shard(
                     group.attrs[
                         "orbitid_reconciliation_source_agreement"
                     ] = 1
+                    group.attrs[
+                        "raw_compact_internal_quality_agreement"
+                    ] = 1
+                    group.attrs["photometry_source"] = (
+                        "immutable_raw_v1_effective_quality_adp03q"
+                    )
+                    group.attrs["compact_adp_photometry_reused"] = 0
+                    group.attrs["compact_adp_flux_reused"] = 0
+                    group.attrs["detrend_contract_version"] = (
+                        FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+                    )
+                    group.attrs["detrend_config_sha256"] = (
+                        FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+                    )
+                    group.attrs["detrend_quality_source"] = (
+                        "final_effective_quality"
+                    )
                     group.attrs["raw_source_paths"] = raw_group.attrs.get(
                         "source_paths", ""
                     )
                     group.attrs["raw_adp_time_delta_max_s"] = float(
                         np.nanmax(aligned["_time_delta_s"])
                     )
+                    output_time = harmonic_export._absolute_bjd(
+                        np.asarray(compact_group["time"])
+                    )
+                    effective_quality = np.asarray(
+                        quality_overlay.quality, dtype=np.int32
+                    )
+                    det_small, small_diagnostics = (
+                        _effective_quality_adp03q(
+                            time=output_time,
+                            raw_flux=aligned["raw_flux_small"],
+                            raw_error=aligned["raw_flux_err_small"],
+                            quality=effective_quality,
+                        )
+                    )
+                    det_primary, primary_diagnostics = (
+                        _effective_quality_adp03q(
+                            time=output_time,
+                            raw_flux=aligned["raw_flux_primary"],
+                            raw_error=aligned["raw_flux_err_primary"],
+                            quality=effective_quality,
+                        )
+                    )
+                    _write_effective_quality_adp_diagnostics(
+                        group,
+                        aperture="small",
+                        diagnostics=small_diagnostics,
+                    )
+                    _write_effective_quality_adp_diagnostics(
+                        group,
+                        aperture="primary",
+                        diagnostics=primary_diagnostics,
+                    )
                     payload = {
-                        "time": harmonic_export._absolute_bjd(
-                            np.asarray(compact_group["time"])
-                        ),
+                        "time": output_time,
                         "cadenceno": np.asarray(
                             compact_group["cadenceno"], dtype=np.int64
                         ),
@@ -1361,9 +1561,7 @@ def build_full_pool_native_shard(
                         ORBITID_RECONCILIATION_MASK_DATASET: correction_mask.astype(
                             np.uint8
                         ),
-                        "quality": np.asarray(
-                            quality_overlay.quality, dtype=np.int32
-                        ),
+                        "quality": effective_quality,
                         "raw_flux_small": aligned["raw_flux_small"],
                         "raw_flux_err_small": aligned[
                             "raw_flux_err_small"
@@ -1372,12 +1570,8 @@ def build_full_pool_native_shard(
                         "raw_flux_err_primary": aligned[
                             "raw_flux_err_primary"
                         ],
-                        "det_flux_adp_sml": np.asarray(
-                            compact_group["DET_FLUX_ADP_SML"]
-                        ),
-                        "det_flux_adp": np.asarray(
-                            compact_group["DET_FLUX_ADP"]
-                        ),
+                        "det_flux_adp_sml": det_small,
+                        "det_flux_adp": det_primary,
                     }
                     payload.update(
                         harmonic_export._periodogram_payload(
@@ -1400,9 +1594,18 @@ def build_full_pool_native_shard(
                 if count % 100 == 0:
                     print(
                         f"[fullpool-native] S{sector} shard "
-                        f"{shard_index}/{n_shards}: {count}/{len(rows)}",
+                        f"{shard_index}/{n_shards}: "
+                        f"{count}/{len(source_rows)}",
                         flush=True,
                     )
+            if excluded_structurally_validated != len(excluded_rows):
+                raise RuntimeError(
+                    "excluded-row structural validation count differs from "
+                    "eligibility partition"
+                )
+            output.attrs[
+                "n_shard_excluded_structurally_validated"
+            ] = int(excluded_structurally_validated)
             for name, value in quality_totals.items():
                 output.attrs[f"quality_overlay_{name}"] = int(value)
             orbitid_summary = _full_pool_reconciliation_summary(
@@ -1417,7 +1620,8 @@ def build_full_pool_native_shard(
                 out_h5.with_suffix(".failures.csv"), index=False
             )
             raise RuntimeError(
-                f"native export failed for {len(failures)} of {len(rows)} TICs"
+                "native export failed for "
+                f"{len(failures)} of {len(source_rows)} TICs"
             )
         for binding in (
             authority.pool,
@@ -1427,6 +1631,7 @@ def build_full_pool_native_shard(
             compact_binding,
             reference_table_binding,
             reference_manifest_binding,
+            builder_binding,
             raw_release.raw_source_summary,
             raw_release.export_complete,
             raw_release.transfer_validation,
@@ -1444,6 +1649,7 @@ def build_full_pool_native_shard(
         quality_reference.assert_unchanged()
         verification = verify_full_pool_native_shard(
             temporary,
+            expected_git_sha=expected_git_sha,
             expected_sector=sector,
             expected_shard_index=int(shard_index),
             expected_n_shards=int(n_shards),
@@ -1490,6 +1696,9 @@ def build_full_pool_native_shard(
         "n_source_shard_observations": int(len(source_rows)),
         "n_shard_observations": int(len(rows)),
         "n_shard_excluded_observations": int(len(excluded_rows)),
+        "n_shard_excluded_structurally_validated": int(
+            len(excluded_rows)
+        ),
         "sector_observation_identity_sha256": (
             authority.observation_identity_sha256
         ),
@@ -1517,6 +1726,23 @@ def build_full_pool_native_shard(
         "cadence_reference_manifest_sha256": (
             reference_manifest_binding.sha256
         ),
+        "expected_git_sha": expected_git_sha,
+        "builder_contract_version": (
+            FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+        ),
+        "builder_code_sha256": builder_binding.sha256,
+        "detrend_contract_version": (
+            FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+        ),
+        "detrend_config_sha256": (
+            FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+        ),
+        "detrend_config_json": FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
+        "detrend_quality_source": "final_effective_quality",
+        "raw_photometry_only": True,
+        "compact_adp_photometry_reused": False,
+        "compact_adp_flux_reused": False,
+        "periodogram_n": FULL_POOL_NATIVE_PERIODOGRAM_N,
         "eligibility_contract_version": eligibility.contract_version,
         "eligibility_exclusions_sha256": (
             eligibility_exclusions_binding.sha256
@@ -1548,10 +1774,15 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
     contract = str(attrs.get("contract_version", ""))
     if contract not in {
         FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
         FULL_POOL_NATIVE_CONTRACT_VERSION,
     }:
         return ["wrong full-pool native contract"]
-    is_v2 = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
+    is_eligibility_partitioned = contract in {
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
+        FULL_POOL_NATIVE_CONTRACT_VERSION,
+    }
+    is_v3 = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
     required = {
         "real_only",
         "sector",
@@ -1568,7 +1799,7 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         "compact_adp_h5_sha256",
         *RAW_PAIR_ORBITID_RECONCILIATION_ATTRS,
     }
-    if is_v2:
+    if is_eligibility_partitioned:
         required.update(
             {
                 "eligibility_contract_version",
@@ -1587,6 +1818,30 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
                 "raw_transfer_validation_sha256",
             }
         )
+    if is_v3:
+        required.update(
+            {
+                "release_binding",
+                "builder_contract_version",
+                "builder_code_sha256",
+                "expected_git_sha",
+                "detrend_contract_version",
+                "detrend_config_json",
+                "detrend_config_sha256",
+                "periodogram_n",
+                "detrend_quality_source",
+                "raw_photometry_only",
+                "compact_adp_photometry_reused",
+                "compact_adp_flux_reused",
+                "compact_adp_role",
+                "n_shard_excluded_structurally_validated",
+            }
+        )
+        try:
+            if int(attrs["periodogram_n"]) != FULL_POOL_NATIVE_PERIODOGRAM_N:
+                failures.append("periodogram_n differs from native-v3 contract")
+        except (KeyError, TypeError, ValueError):
+            failures.append("periodogram_n is invalid")
     missing = sorted(name for name in required if name not in attrs)
     if missing:
         return [f"full-pool native root lacks attrs: {','.join(missing)}"]
@@ -1597,10 +1852,14 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         n_sector = int(attrs["n_sector_observations"])
         n_shard = int(attrs["n_shard_observations"])
         n_source_shard = (
-            int(attrs["n_source_shard_observations"]) if is_v2 else n_shard
+            int(attrs["n_source_shard_observations"])
+            if is_eligibility_partitioned
+            else n_shard
         )
         n_excluded_shard = (
-            int(attrs["n_shard_excluded_observations"]) if is_v2 else 0
+            int(attrs["n_shard_excluded_observations"])
+            if is_eligibility_partitioned
+            else 0
         )
         real_only = int(attrs["real_only"])
     except (TypeError, ValueError):
@@ -1628,7 +1887,7 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         "raw_source_h5_sha256",
         "compact_adp_h5_sha256",
     ]
-    if is_v2:
+    if is_eligibility_partitioned:
         sha_names.extend(
             [
                 "eligibility_exclusions_sha256",
@@ -1659,6 +1918,68 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             PRODUCTION_RAW_TRANSFER_SHA256_BY_SECTOR.get(sector, "")
         ):
             failures.append("raw transfer release differs from production")
+    if is_v3:
+        sha_names.extend(
+            [
+                "builder_code_sha256",
+                "detrend_config_sha256",
+            ]
+        )
+        if str(attrs["release_binding"]) != FULL_POOL_NATIVE_RELEASE_BINDING:
+            failures.append("v3 release binding mismatch")
+        if str(attrs["builder_contract_version"]) != (
+            FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+        ):
+            failures.append("v3 builder contract mismatch")
+        if str(attrs["detrend_contract_version"]) != (
+            FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+        ):
+            failures.append("v3 detrend contract mismatch")
+        if str(attrs["detrend_config_json"]) != (
+            FULL_POOL_NATIVE_DETREND_CONFIG_JSON
+        ):
+            failures.append("v3 detrend config JSON mismatch")
+        if str(attrs["detrend_config_sha256"]) != (
+            FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+        ):
+            failures.append("v3 detrend config SHA-256 mismatch")
+        if str(attrs["detrend_quality_source"]) != "final_effective_quality":
+            failures.append("v3 detrend did not use final effective quality")
+        if str(attrs["compact_adp_role"]) != (
+            "cadence_time_orbit_detector_internal_quality_mapping_only"
+        ):
+            failures.append("v3 compact input role mismatch")
+        try:
+            v3_integers = {
+                name: int(attrs[name])
+                for name in (
+                    "raw_photometry_only",
+                    "compact_adp_photometry_reused",
+                    "compact_adp_flux_reused",
+                    "n_shard_excluded_structurally_validated",
+                )
+            }
+        except (TypeError, ValueError):
+            failures.append("v3 photometry provenance integers are invalid")
+        else:
+            if (
+                v3_integers["raw_photometry_only"] != 1
+                or v3_integers["compact_adp_photometry_reused"] != 0
+                or v3_integers["compact_adp_flux_reused"] != 0
+            ):
+                failures.append("v3 photometry provenance permits compact reuse")
+            if (
+                v3_integers["n_shard_excluded_structurally_validated"]
+                != n_excluded_shard
+            ):
+                failures.append(
+                    "v3 excluded structural validation count mismatch"
+                )
+        expected_git_sha = str(attrs["expected_git_sha"])
+        if len(expected_git_sha) != 40 or any(
+            value not in "0123456789abcdef" for value in expected_git_sha
+        ):
+            failures.append("expected_git_sha is not an exact Git SHA")
     for name in sha_names:
         if not isinstance(attrs[name], (str, bytes)) or not str(
             attrs[name]
@@ -1755,7 +2076,9 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             ),
             "orbitid_reconciliation_release_binding": (
                 FULL_POOL_NATIVE_RELEASE_BINDING
-                if is_v2
+                if is_v3
+                else FULL_POOL_NATIVE_RELEASE_BINDING_V2
+                if contract == FULL_POOL_NATIVE_CONTRACT_VERSION_V2
                 else FULL_POOL_NATIVE_RELEASE_BINDING_V1
             ),
             "orbitid_reconciliation_bounded_sector": 62,
@@ -1800,6 +2123,7 @@ def full_pool_native_group_failures(
     *,
     context: str,
     root_policy: str,
+    root_contract: str,
 ) -> tuple[list[str], int]:
     """Validate one group's auditable pre/post-reconciliation arrays."""
 
@@ -1814,6 +2138,94 @@ def full_pool_native_group_failures(
     missing_attrs = [name for name in required_attrs if name not in group.attrs]
     if missing_attrs:
         return [f"{context}:missing attrs {','.join(missing_attrs)}"], 0
+    if root_contract == FULL_POOL_NATIVE_CONTRACT_VERSION:
+        v3_required_attrs = {
+            "raw_compact_internal_quality_agreement",
+            "photometry_source",
+            "compact_adp_photometry_reused",
+            "compact_adp_flux_reused",
+            "detrend_contract_version",
+            "detrend_config_sha256",
+            "detrend_quality_source",
+        }
+        for aperture in ("small", "primary"):
+            v3_required_attrs.update(
+                {
+                    f"effective_quality_adp_{aperture}_fit_count",
+                    f"effective_quality_adp_{aperture}_n_segments",
+                    f"effective_quality_adp_{aperture}_scale",
+                    f"effective_quality_adp_{aperture}_scale_source",
+                    f"effective_quality_adp_{aperture}_cotrend_status",
+                    (
+                        f"effective_quality_adp_{aperture}_"
+                        "recenter_median_before"
+                    ),
+                    f"effective_quality_adp_{aperture}_n_effective_good",
+                    f"effective_quality_adp_{aperture}_n_finite_output",
+                }
+            )
+        missing_v3 = sorted(
+            name for name in v3_required_attrs if name not in group.attrs
+        )
+        if missing_v3:
+            return [
+                f"{context}:missing v3 attrs {','.join(missing_v3)}"
+            ], 0
+        if (
+            int(group.attrs["raw_compact_internal_quality_agreement"]) != 1
+            or int(group.attrs["compact_adp_photometry_reused"]) != 0
+            or int(group.attrs["compact_adp_flux_reused"]) != 0
+            or str(group.attrs["photometry_source"])
+            != "immutable_raw_v1_effective_quality_adp03q"
+            or str(group.attrs["detrend_contract_version"])
+            != FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+            or str(group.attrs["detrend_config_sha256"])
+            != FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+            or str(group.attrs["detrend_quality_source"])
+            != "final_effective_quality"
+        ):
+            failures.append(f"{context}:v3 photometry provenance mismatch")
+        for aperture in ("small", "primary"):
+            prefix = f"effective_quality_adp_{aperture}"
+            try:
+                fit_count = int(group.attrs[f"{prefix}_fit_count"])
+                n_segments = int(group.attrs[f"{prefix}_n_segments"])
+                n_effective_good = int(
+                    group.attrs[f"{prefix}_n_effective_good"]
+                )
+                n_finite_output = int(
+                    group.attrs[f"{prefix}_n_finite_output"]
+                )
+                scale = float(group.attrs[f"{prefix}_scale"])
+                center = float(
+                    group.attrs[f"{prefix}_recenter_median_before"]
+                )
+            except (TypeError, ValueError):
+                failures.append(
+                    f"{context}:{aperture} ADP diagnostics are invalid"
+                )
+                continue
+            if (
+                fit_count < 1
+                or n_segments < 1
+                or n_effective_good < 1
+                or n_finite_output < n_effective_good
+                or not np.isfinite(scale)
+                or scale <= 0
+                or not np.isfinite(center)
+                or not str(group.attrs[f"{prefix}_scale_source"])
+                or not str(group.attrs[f"{prefix}_cotrend_status"])
+            ):
+                failures.append(
+                    f"{context}:{aperture} ADP diagnostics are outside bounds"
+                )
+        for name in PERIODOGRAM_DATASETS:
+            if name not in group:
+                failures.append(f"{context}:missing v3 periodogram {name}")
+            elif len(group[name]) != FULL_POOL_NATIVE_PERIODOGRAM_N:
+                failures.append(
+                    f"{context}:{name} length differs from native-v3 contract"
+                )
     try:
         corrected = int(group.attrs["n_cad_orbitid_reference_corrected"])
         agreement = int(group.attrs["orbitid_reconciliation_source_agreement"])
@@ -1877,6 +2289,7 @@ def full_pool_native_group_failures(
 def verify_full_pool_native_shard(
     path: Path,
     *,
+    expected_git_sha: str | None = None,
     expected_sector: int | None = None,
     expected_shard_index: int | None = None,
     expected_n_shards: int | None = None,
@@ -1908,6 +2321,14 @@ def verify_full_pool_native_shard(
         ):
             failures.append("wrong full-pool native contract")
         failures.extend(full_pool_native_root_failures(h5.attrs))
+        if str(h5.attrs.get("builder_code_sha256", "")) != file_sha256(
+            Path(__file__)
+        ):
+            failures.append("builder_code_sha256 differs from verifier source")
+        if expected_git_sha is not None and str(
+            h5.attrs.get("expected_git_sha", "")
+        ) != str(expected_git_sha).strip().lower():
+            failures.append("expected_git_sha differs from expected value")
         for name, expected in (
             ("sector", expected_sector),
             ("shard_index", expected_shard_index),
@@ -1916,6 +2337,10 @@ def verify_full_pool_native_shard(
             ("n_source_shard_observations", expected_source_observations),
             (
                 "n_shard_excluded_observations",
+                expected_excluded_observations,
+            ),
+            (
+                "n_shard_excluded_structurally_validated",
                 expected_excluded_observations,
             ),
         ):
@@ -2029,6 +2454,22 @@ def verify_full_pool_native_shard(
             "raw_transfer_validation_sha256": str(
                 h5.attrs.get("raw_transfer_validation_sha256", "")
             ),
+            "expected_git_sha": str(
+                h5.attrs.get("expected_git_sha", "")
+            ),
+            "builder_contract_version": str(
+                h5.attrs.get("builder_contract_version", "")
+            ),
+            "builder_code_sha256": str(
+                h5.attrs.get("builder_code_sha256", "")
+            ),
+            "detrend_contract_version": str(
+                h5.attrs.get("detrend_contract_version", "")
+            ),
+            "detrend_config_sha256": str(
+                h5.attrs.get("detrend_config_sha256", "")
+            ),
+            "periodogram_n": int(h5.attrs.get("periodogram_n", -1)),
         }
     return {
         "passed": not failures,
@@ -2153,6 +2594,8 @@ def write_full_pool_native_registry(
     observed_shards: dict[int, set[int]] = {
         sector: set() for sector in FULL_POOL_NATIVE_SECTORS
     }
+    expected_git_shas: set[str] = set()
+    builder_code_shas: set[str] = set()
     for path, shard_summary_path in sorted(
         zip(paths, shard_summaries, strict=True),
         key=lambda pair: str(pair[0]),
@@ -2175,10 +2618,44 @@ def write_full_pool_native_registry(
             != FULL_POOL_NATIVE_CONTRACT_VERSION
             or shard_summary.get("real_only") is not True
             or shard_summary.get("verification", {}).get("passed") is not True
+            or shard_summary.get("builder_contract_version")
+            != FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+            or shard_summary.get("detrend_contract_version")
+            != FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+            or shard_summary.get("detrend_config_sha256")
+            != FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+            or shard_summary.get("detrend_config_json")
+            != FULL_POOL_NATIVE_DETREND_CONFIG_JSON
+            or shard_summary.get("detrend_quality_source")
+            != "final_effective_quality"
+            or shard_summary.get("raw_photometry_only") is not True
+            or shard_summary.get("compact_adp_photometry_reused") is not False
+            or shard_summary.get("compact_adp_flux_reused") is not False
+            or int(shard_summary.get("periodogram_n", -1))
+            != FULL_POOL_NATIVE_PERIODOGRAM_N
         ):
             raise ValueError(
-                f"native shard summary did not pass v2 contract: {path}"
+                f"native shard summary did not pass v3 contract: {path}"
             )
+        expected_git_sha = str(shard_summary.get("expected_git_sha", ""))
+        builder_code_sha = str(
+            shard_summary.get("builder_code_sha256", "")
+        )
+        if (
+            len(expected_git_sha) != 40
+            or any(
+                value not in "0123456789abcdef"
+                for value in expected_git_sha
+            )
+            or len(builder_code_sha) != 64
+            or any(
+                value not in "0123456789abcdef"
+                for value in builder_code_sha
+            )
+        ):
+            raise ValueError("native shard summary code identity is invalid")
+        expected_git_shas.add(expected_git_sha)
+        builder_code_shas.add(builder_code_sha)
         if Path(str(shard_summary.get("out_h5", ""))).resolve() != path:
             raise ValueError(f"native shard summary binds a different HDF5: {path}")
         if (
@@ -2313,6 +2790,10 @@ def write_full_pool_native_registry(
             ("n_source_shard_observations", len(source_rows)),
             ("n_shard_observations", len(eligible_rows)),
             ("n_shard_excluded_observations", len(excluded_rows)),
+            (
+                "n_shard_excluded_structurally_validated",
+                len(excluded_rows),
+            ),
         ):
             if int(shard_summary.get(name, -1)) != expected:
                 raise ValueError(
@@ -2337,6 +2818,35 @@ def write_full_pool_native_registry(
                     f"native shard binds a different eligibility release: {path}"
                 )
             for name, expected in (
+                (
+                    "release_binding",
+                    FULL_POOL_NATIVE_RELEASE_BINDING,
+                ),
+                (
+                    "builder_contract_version",
+                    FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
+                ),
+                ("builder_code_sha256", builder_code_sha),
+                ("expected_git_sha", expected_git_sha),
+                (
+                    "detrend_contract_version",
+                    FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+                ),
+                (
+                    "detrend_config_sha256",
+                    FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
+                ),
+                (
+                    "detrend_config_json",
+                    FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
+                ),
+                (
+                    "detrend_quality_source",
+                    "final_effective_quality",
+                ),
+                ("raw_photometry_only", 1),
+                ("compact_adp_photometry_reused", 0),
+                ("compact_adp_flux_reused", 0),
                 (
                     "raw_source_release_code_revision",
                     PRODUCTION_RAW_CODE_REVISION,
@@ -2421,12 +2931,35 @@ def write_full_pool_native_registry(
                 "raw_source_release_code_revision": shard_summary.get(
                     "raw_source_release_code_revision"
                 ),
+                "expected_git_sha": expected_git_sha,
+                "builder_contract_version": (
+                    FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+                ),
+                "builder_code_sha256": builder_code_sha,
+                "detrend_contract_version": (
+                    FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+                ),
+                "detrend_config_sha256": (
+                    FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+                ),
+                "detrend_quality_source": "final_effective_quality",
+                "raw_photometry_only": True,
+                "compact_adp_photometry_reused": False,
+                "compact_adp_flux_reused": False,
+                "periodogram_n": FULL_POOL_NATIVE_PERIODOGRAM_N,
+                "n_excluded_structurally_validated": len(excluded_rows),
                 "verification_passed": True,
             }
         )
     for sector, indices in observed_shards.items():
         if indices != set(range(expected_shards_per_sector)):
             raise ValueError(f"S{sector} native shard index coverage is incomplete")
+    if len(expected_git_shas) != 1 or len(builder_code_shas) != 1:
+        raise ValueError("native shards do not share one exact code identity")
+    if builder_code_shas != {file_sha256(Path(__file__))}:
+        raise ValueError("native shard builder SHA differs from registry source")
+    expected_git_sha = next(iter(expected_git_shas))
+    builder_code_sha = next(iter(builder_code_shas))
     source = pd.DataFrame.from_records(records)
     observed_keys = set(
         zip(source["sector"].astype(int), source["tic"].astype(int))
@@ -2460,6 +2993,23 @@ def write_full_pool_native_registry(
         "schema_version": FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION,
         "release_binding": FULL_POOL_NATIVE_RELEASE_BINDING,
         "native_contract_version": FULL_POOL_NATIVE_CONTRACT_VERSION,
+        "expected_git_sha": expected_git_sha,
+        "builder_contract_version": (
+            FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+        ),
+        "builder_code_sha256": builder_code_sha,
+        "detrend_contract_version": (
+            FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+        ),
+        "detrend_config_json": FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
+        "detrend_config_sha256": (
+            FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+        ),
+        "detrend_quality_source": "final_effective_quality",
+        "raw_photometry_only": True,
+        "compact_adp_photometry_reused": False,
+        "compact_adp_flux_reused": False,
+        "periodogram_n": FULL_POOL_NATIVE_PERIODOGRAM_N,
         "eligibility_contract_version": eligibility.contract_version,
         "sectors": list(FULL_POOL_NATIVE_SECTORS),
         "shards_per_sector": expected_shards_per_sector,
@@ -2625,11 +3175,33 @@ def load_full_pool_native_registry_release(
         or release.get("release_binding") != FULL_POOL_NATIVE_RELEASE_BINDING
         or release.get("native_contract_version")
         != FULL_POOL_NATIVE_CONTRACT_VERSION
+        or release.get("builder_contract_version")
+        != FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+        or release.get("builder_code_sha256")
+        != file_sha256(Path(__file__))
+        or release.get("detrend_contract_version")
+        != FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+        or release.get("detrend_config_json")
+        != FULL_POOL_NATIVE_DETREND_CONFIG_JSON
+        or release.get("detrend_config_sha256")
+        != FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+        or release.get("detrend_quality_source")
+        != "final_effective_quality"
+        or release.get("raw_photometry_only") is not True
+        or release.get("compact_adp_photometry_reused") is not False
+        or release.get("compact_adp_flux_reused") is not False
+        or int(release.get("periodogram_n", -1))
+        != FULL_POOL_NATIVE_PERIODOGRAM_N
         or release.get("eligibility_contract_version")
         != NATIVE_MODEL_ELIGIBILITY_CONTRACT_VERSION
         or release.get("sectors") != list(FULL_POOL_NATIVE_SECTORS)
     ):
-        raise ValueError("full-pool native release has the wrong v2 contract")
+        raise ValueError("full-pool native release has the wrong v3 contract")
+    expected_git_sha = str(release.get("expected_git_sha", ""))
+    if len(expected_git_sha) != 40 or any(
+        value not in "0123456789abcdef" for value in expected_git_sha
+    ):
+        raise ValueError("full-pool native release has invalid Git identity")
     outputs = release.get("outputs")
     if not isinstance(outputs, dict):
         raise ValueError("full-pool native release lacks outputs")
@@ -2777,6 +3349,25 @@ def load_full_pool_native_registry_release(
                 "full-pool native release shard group paths are invalid"
             )
         for name, expected in (
+            ("expected_git_sha", expected_git_sha),
+            (
+                "builder_contract_version",
+                FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
+            ),
+            ("builder_code_sha256", file_sha256(Path(__file__))),
+            (
+                "detrend_contract_version",
+                FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+            ),
+            (
+                "detrend_config_sha256",
+                FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
+            ),
+            ("detrend_quality_source", "final_effective_quality"),
+            ("raw_photometry_only", True),
+            ("compact_adp_photometry_reused", False),
+            ("compact_adp_flux_reused", False),
+            ("periodogram_n", FULL_POOL_NATIVE_PERIODOGRAM_N),
             ("raw_source_release_code_revision", PRODUCTION_RAW_CODE_REVISION),
             (
                 "raw_export_complete_sha256",
@@ -2802,15 +3393,25 @@ def load_full_pool_native_registry_release(
 
 
 __all__ = [
+    "FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION",
     "FULL_POOL_NATIVE_CONTRACT_VERSION",
     "FULL_POOL_NATIVE_CONTRACT_VERSION_V1",
+    "FULL_POOL_NATIVE_CONTRACT_VERSION_V2",
+    "FULL_POOL_NATIVE_DETREND_CONFIG_JSON",
+    "FULL_POOL_NATIVE_DETREND_CONFIG_SHA256",
+    "FULL_POOL_NATIVE_PERIODOGRAM_N",
+    "FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION",
     "FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION",
+    "FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V2",
     "FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION",
+    "FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V2",
     "FULL_POOL_NATIVE_RELEASE_BINDING",
     "FULL_POOL_NATIVE_RELEASE_BINDING_V1",
+    "FULL_POOL_NATIVE_RELEASE_BINDING_V2",
     "FULL_POOL_NATIVE_SECTORS",
     "FULL_POOL_NATIVE_SHARDS_PER_SECTOR",
     "FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION",
+    "FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V2",
     "FULL_POOL_RAW_EXPORT_CONTROLLER_SCHEMA_VERSION",
     "FULL_POOL_RAW_SHARD_SUMMARY_SCHEMA_VERSION",
     "FULL_POOL_RAW_SOURCE_CONTRACT_VERSION",

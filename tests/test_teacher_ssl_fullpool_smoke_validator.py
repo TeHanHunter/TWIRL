@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -29,9 +30,14 @@ from twirl.vetting.ssl_full_pool_numeric import (
     MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
     MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
     MODEL_INPUT_NUMERIC_ENVELOPE_SHA256,
+    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+    MODEL_INPUT_NUMERIC_RELEASE_BINDING,
     MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+    numeric_native_freshness,
 )
 from twirl.vetting.teacher_ssl_fullpool import (
+    FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
+    FULLPOOL_SSL_MODEL_NAMESPACE,
     FULLPOOL_SSL_RUN_CONTRACT_SCHEMA,
     FULLPOOL_SSL_RUN_ID,
     FULLPOOL_SSL_SELECTION_SCHEMA,
@@ -47,10 +53,10 @@ SCRIPT = (
     ROOT
     / "scripts"
     / "stage5_validation"
-    / "validate_teacher_ssl_fullpool_v2_smoke.py"
+    / "validate_teacher_ssl_fullpool_v3_smoke.py"
 )
 SPEC = importlib.util.spec_from_file_location(
-    "validate_teacher_ssl_fullpool_v2_smoke_test",
+    "validate_teacher_ssl_fullpool_v3_smoke_test",
     SCRIPT,
 )
 assert SPEC is not None and SPEC.loader is not None
@@ -201,8 +207,11 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         name: _metadata(path) for name, path in authority_paths.items()
     }
     expected_revision = "1" * 40
+    native_freshness = numeric_native_freshness(expected_revision)
     numeric_gate_payload = {
         "schema_version": MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+        "release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+        "native_freshness": native_freshness,
         "passed": True,
         "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
         "envelope_contract": MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
@@ -269,6 +278,10 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         }
         report_payload = {
             "schema_version": MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
+            "release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+            "native_freshness": dict(
+                native_freshness
+            ),
             "code_revision": expected_revision,
             "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
             "envelope_contract": MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT,
@@ -341,6 +354,7 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
     )
     numeric_gate_summary = {
         "binding": authority_metadata["numeric_gate_release"],
+        "release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
         "schema_version": MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
         "envelope_canonical_sha256": (
             MODEL_INPUT_NUMERIC_ENVELOPE_SHA256
@@ -351,7 +365,39 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "passed": True,
     }
     native_path = tmp_path / "native_0.h5"
-    native_path.write_bytes(b"native-v2-smoke")
+    with h5py.File(native_path, "w") as h5:
+        h5.attrs["contract_version"] = FULL_POOL_NATIVE_CONTRACT_VERSION
+        h5.attrs["release_binding"] = (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS["release_binding"]
+        )
+        h5.attrs["expected_git_sha"] = expected_revision
+        h5.attrs["builder_contract_version"] = (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "builder_contract_version"
+            ]
+        )
+        h5.attrs["builder_code_sha256"] = (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "builder_code_sha256"
+            ]
+        )
+        h5.attrs["detrend_contract_version"] = (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "detrend_contract_version"
+            ]
+        )
+        h5.attrs["detrend_config_sha256"] = (
+            MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "detrend_config_sha256"
+            ]
+        )
+        h5.attrs["detrend_quality_source"] = "final_effective_quality"
+        h5.attrs["raw_photometry_only"] = 1
+        h5.attrs["compact_adp_photometry_reused"] = 0
+        h5.attrs["compact_adp_flux_reused"] = 0
+        h5.attrs["periodogram_n"] = MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+            "periodogram_n"
+        ]
     selection = {
         "selection_schema_version": FULLPOOL_SSL_SELECTION_SCHEMA,
         "held_out_fold": VALIDATOR.SMOKE_FOLD,
@@ -385,7 +431,10 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "model_input_numeric_envelope_contract": (
             MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
         ),
+        "numeric_release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+        "native_freshness": dict(native_freshness),
         "numeric_gate_release": numeric_gate_summary,
+        "checkpoint_namespace": FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
         "fold": VALIDATOR.SMOKE_FOLD,
         "registry_path": authority_metadata["registry"]["path"],
         "registry_sha256": authority_metadata["registry"]["sha256"],
@@ -414,6 +463,9 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
                 MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
             ),
             "numeric_gate_release": numeric_gate_summary,
+            "native_freshness": dict(
+                native_freshness
+            ),
             "source_provenance_verified": True,
             "authority_bindings": authority_metadata,
         },
@@ -424,6 +476,37 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
                 "native_h5_sha256": _sha256(native_path),
                 "native_h5_size_bytes": native_path.stat().st_size,
                 "native_contract_version": FULL_POOL_NATIVE_CONTRACT_VERSION,
+                "native_release_binding": (
+                    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS["release_binding"]
+                ),
+                "native_expected_git_sha": expected_revision,
+                "native_builder_contract_version": (
+                    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                        "builder_contract_version"
+                    ]
+                ),
+                "native_builder_code_sha256": (
+                    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                        "builder_code_sha256"
+                    ]
+                ),
+                "native_detrend_contract_version": (
+                    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                        "detrend_contract_version"
+                    ]
+                ),
+                "native_detrend_config_sha256": (
+                    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                        "detrend_config_sha256"
+                    ]
+                ),
+                "native_detrend_quality_source": "final_effective_quality",
+                "raw_photometry_only": True,
+                "compact_adp_photometry_reused": False,
+                "compact_adp_flux_reused": False,
+                "periodogram_n": MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                    "periodogram_n"
+                ],
                 "hash_verified_now": True,
                 "root_contract_verified_now": True,
                 "group_identities_verified_now": True,
@@ -452,10 +535,20 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "neighbor_probe": False,
         "code_revision": expected_revision,
     }
-    contract_path = tmp_path / "run_contract.json"
+    fold_dir = (
+        tmp_path
+        / "model_runs"
+        / FULLPOOL_SSL_MODEL_NAMESPACE
+        / "smoke"
+        / "one_epoch"
+        / "encoder_pretraining"
+        / "fold_2"
+    )
+    fold_dir.mkdir(parents=True)
+    contract_path = fold_dir / "run_contract.json"
     _write_json(contract_path, contract)
-    checkpoint_path = tmp_path / "encoder.pt"
-    history_path = tmp_path / "history.csv"
+    checkpoint_path = fold_dir / "encoder.pt"
+    history_path = fold_dir / "history.csv"
     history_path.write_text(
         "epoch,n_observations,loss\n1,4096,0.5\n",
         encoding="ascii",
@@ -467,7 +560,10 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "model_input_numeric_envelope_contract": (
             MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
         ),
+        "numeric_release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+        "native_freshness": dict(native_freshness),
         "numeric_gate_release": numeric_gate_summary,
+        "checkpoint_namespace": FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
         "fold": VALIDATOR.SMOKE_FOLD,
         "run_contract_sha256": _sha256(contract_path),
         "selection_audit": selection,
@@ -484,7 +580,10 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "model_input_numeric_envelope_contract": (
             MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT
         ),
+        "numeric_release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+        "native_freshness": dict(native_freshness),
         "numeric_gate_release": numeric_gate_summary,
+        "checkpoint_namespace": FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
         "fold": VALIDATOR.SMOKE_FOLD,
         "run_contract": str(contract_path.resolve()),
         "run_contract_sha256": _sha256(contract_path),
@@ -500,13 +599,14 @@ def _fixture(tmp_path: Path) -> dict[str, Any]:
         "labels_loaded": False,
         "automatic_production_promotion": False,
     }
-    summary_path = tmp_path / "summary.json"
+    summary_path = fold_dir / "summary.json"
     _write_json(summary_path, summary)
     return {
         "summary_path": summary_path,
         "contract_path": contract_path,
         "authority_paths": authority_paths,
         "expected_revision": expected_revision,
+        "native_path": native_path,
     }
 
 
@@ -636,6 +736,33 @@ def test_smoke_validator_rejects_numeric_authority_hash_tamper(
     case["authority_paths"]["registry"].write_bytes(b"tampered-registry\n")
 
     with pytest.raises(ValueError, match="authority_bindings.ssl_registry"):
+        _validate(case)
+
+
+def test_smoke_validator_rejects_valid_but_stale_freshness_sha(
+    tmp_path: Path,
+) -> None:
+    case = _fixture(tmp_path)
+    summary = json.loads(case["summary_path"].read_text(encoding="utf-8"))
+    summary["native_freshness"]["expected_git_sha"] = "2" * 40
+    _write_json(case["summary_path"], summary)
+
+    with pytest.raises(
+        ValueError,
+        match="validated numeric-release freshness",
+    ):
+        _validate(case)
+
+
+def test_smoke_validator_rehashes_selected_native_h5(tmp_path: Path) -> None:
+    case = _fixture(tmp_path)
+    with case["native_path"].open("r+b") as handle:
+        handle.seek(-1, 2)
+        original = handle.read(1)
+        handle.seek(-1, 2)
+        handle.write(bytes([original[0] ^ 1]))
+
+    with pytest.raises(ValueError, match="native file 0 hash binding changed"):
         _validate(case)
 
 

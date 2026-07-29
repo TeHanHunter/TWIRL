@@ -457,7 +457,16 @@ sample.
   transformed maximum to at most `6.44`, without clipping, imputation, or a
   new exclusion. No numeric release, smoke, or fold was launched. A wholly
   fresh, uniform effective-quality-aware ADP native rebuild is the recommended
-  next contract and remains pending explicit approval.
+  next contract. The user explicitly approved this fresh v3 contract later on
+  `2026-07-29`. Its implementation and fail-closed canary/controller assets
+  passed two independent final reviews with no remaining P0--P2 findings,
+  `726` local tests with `29` optional-environment skips, documentation/static
+  checks, and an exact ORCD Torch 2.11 real-VICReg diagnostic. The diagnostic
+  proved the locked embedding-only optimizer partition exactly: `146` total
+  encoder/projector parameters = `90` active + `56` excluded, with all `90`
+  active gradients and AdamW states present, no excluded gradients, finite
+  loss, and the deployed `decoupled_weight_decay=true` schema. No v3 remote
+  artifact or job has yet been claimed.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 

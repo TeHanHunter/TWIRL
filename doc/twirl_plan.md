@@ -67,13 +67,16 @@ Last reconciled: `2026-07-29`.
   passing observations: all nine failures are in S60 and trace to legacy
   compact ADP flux fitted before the final external-quality overlay. The
   quality-aware model mask therefore is not a sufficient correction. The
-  proposed next contract, pending explicit approval, rebuilds all `112` native
-  shards uniformly from immutable raw-v1 photometry with the final effective
-  quality applied during both ADP03q fits, then repeats the exact numerical
-  gate and bounded one-epoch smoke before relaunching the five independent
-  fold encoders with up to four one-H200 jobs concurrently. Labels,
-  injections, fixed-test tensors, and S63 tensors remain forbidden during
-  pretraining.
+  effective-quality-aware ADP contract is now explicitly approved; its fresh
+  v3 implementation passed predeployment review, the full local test/doc/static
+  suite, and an exact ORCD Torch 2.11 embedding/optimizer diagnostic. It is
+  ready for exact-commit deployment and fail-closed canary gating.
+  It rebuilds all `112` native shards uniformly from immutable raw-v1
+  photometry with the final effective quality applied during both ADP03q
+  fits, then repeats the exact numerical gate and bounded one-epoch smoke
+  before relaunching the five independent fold encoders with up to four
+  one-H200 jobs concurrently. Labels, injections, fixed-test tensors, and S63
+  tensors remain forbidden during pretraining.
   Teacher v3 stays operational until supervised fine-tuning and the matched
   preregistered comparison pass.
   The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
@@ -419,8 +422,8 @@ queue does not block the S56--S62 candidate/teacher critical path below.
 1. Complete the leakage-safe Teacher v4-SSL full-pool experiment from its
    frozen `175,366`-observation search pool and validated BLS/raw releases:
    preserve the completed native-v2 products as diagnostic provenance but do
-   not admit them to the fresh model release. After explicit approval of the
-   effective-quality-aware ADP contract, rebuild all `112` native shards from
+   not admit them to the fresh model release. The effective-quality-aware ADP
+   contract is explicitly approved: rebuild all `112` native shards from
    immutable raw-v1 photometry for the exact `175,347`-observation model
    partition while preserving the `19` exclusions in the `175,366`-row audit.
    Pass the exact full-partition numerical gate and a fresh bounded throughput

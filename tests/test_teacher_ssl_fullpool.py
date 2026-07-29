@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 import hashlib
 import json
+import os
 import random
 
 import numpy as np
@@ -244,9 +246,22 @@ def _training_authority_inputs(
         ["sector", "tic"], kind="stable"
     ).reset_index(drop=True)
     native_release = {
-        "schema_version": "native-release-test-v2",
-        "release_binding": "native-release-test",
+        **fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+        "expected_git_sha": "1" * 40,
+        "schema_version": (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS["schema_version"]
+        ),
+        "release_binding": fullpool.FULL_POOL_NATIVE_RELEASE_BINDING,
         "native_contract_version": fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION,
+        "builder_contract_version": (
+            fullpool.FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+        ),
+        "detrend_contract_version": (
+            fullpool.FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+        ),
+        "detrend_config_sha256": (
+            fullpool.FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+        ),
         "counts": {
             "full_observations": len(full_keys),
             "eligible_observations": len(eligible_keys),
@@ -340,8 +355,13 @@ def _training_authority_inputs(
         },
     }
     numeric_gate_release = {
-        "schema_version": (
-            "twirl_teacher_ssl_fullpool_model_input_numeric_release_v1"
+        "schema_version": fullpool.MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+        "release_binding": fullpool.MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+        "native_freshness": dict(
+            {
+                **fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+                "expected_git_sha": "1" * 40,
+            }
         ),
         "passed": True,
         "model_input_contract_version": (
@@ -605,6 +625,12 @@ def test_training_authority_chain_is_exact_and_provenance_bound(
     assert audit["numeric_gate_release"]["binding"] == (
         authority_bindings["numeric_gate_release"]
     )
+    assert audit["numeric_gate_release"]["release_binding"] == (
+        fullpool.MODEL_INPUT_NUMERIC_RELEASE_BINDING
+    )
+    assert audit["native_freshness"]["native_contract_version"] == (
+        fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION
+    )
     assert set(audit["authority_bindings"]) == {
         "eligibility_exclusions",
         "eligibility_summary",
@@ -661,7 +687,7 @@ def test_training_authority_chain_is_exact_and_provenance_bound(
         )
 
 
-def test_selected_native_verification_requires_actual_v2_group_identity(
+def test_selected_native_verification_requires_actual_v3_group_identity(
     tmp_path: Path,
 ) -> None:
     h5py = pytest.importorskip("h5py")
@@ -670,9 +696,44 @@ def test_selected_native_verification_requires_actual_v2_group_identity(
         h5.attrs["contract_version"] = (
             fullpool.FULL_POOL_NATIVE_CONTRACT_VERSION
         )
+        h5.attrs["expected_git_sha"] = "1" * 40
+        h5.attrs["release_binding"] = (
+            fullpool.FULL_POOL_NATIVE_RELEASE_BINDING
+        )
+        h5.attrs["builder_contract_version"] = (
+            fullpool.FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
+        )
+        h5.attrs["builder_code_sha256"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                "builder_code_sha256"
+            ]
+        )
+        h5.attrs["detrend_contract_version"] = (
+            fullpool.FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+        )
+        h5.attrs["detrend_config_sha256"] = (
+            fullpool.FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+        )
+        h5.attrs["detrend_quality_source"] = "final_effective_quality"
+        h5.attrs["raw_photometry_only"] = 1
+        h5.attrs["compact_adp_photometry_reused"] = 0
+        h5.attrs["compact_adp_flux_reused"] = 0
+        h5.attrs["periodogram_n"] = (
+            fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS["periodogram_n"]
+        )
         group = h5.create_group("targets/123")
         group.attrs["sector"] = 56
         group.attrs["tic"] = 123
+        for name in fullpool.PERIODOGRAM_DATASETS:
+            group.create_dataset(
+                name,
+                data=np.ones(
+                    fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS[
+                        "periodogram_n"
+                    ],
+                    dtype=np.float32,
+                ),
+            )
     selected = pd.DataFrame(
         {
             "sector": [56],
@@ -687,7 +748,10 @@ def test_selected_native_verification_requires_actual_v2_group_identity(
             ],
         }
     )
-    records = fullpool._verify_native_files(selected)
+    records = fullpool._verify_native_files(
+        selected,
+        expected_git_sha="1" * 40,
+    )
     assert records[0]["hash_verified_now"] is True
     assert records[0]["root_contract_verified_now"] is True
     assert records[0]["group_identities_verified_now"] is True
@@ -697,8 +761,11 @@ def test_selected_native_verification_requires_actual_v2_group_identity(
     selected.loc[0, "native_h5_sha256"] = hashlib.sha256(
         native_path.read_bytes()
     ).hexdigest()
-    with pytest.raises(ValueError, match="not native-v2"):
-        fullpool._verify_native_files(selected)
+    with pytest.raises(ValueError, match="not fresh native-v3"):
+        fullpool._verify_native_files(
+            selected,
+            expected_git_sha="1" * 40,
+        )
 
     with h5py.File(native_path, "r+") as h5:
         h5.attrs["contract_version"] = (
@@ -709,7 +776,10 @@ def test_selected_native_verification_requires_actual_v2_group_identity(
         native_path.read_bytes()
     ).hexdigest()
     with pytest.raises(ValueError, match="group identity differs"):
-        fullpool._verify_native_files(selected)
+        fullpool._verify_native_files(
+            selected,
+            expected_git_sha="1" * 40,
+        )
 
 
 def test_training_cli_requires_full_authority_chain_and_has_no_hash_bypass() -> None:
@@ -736,21 +806,119 @@ def test_training_cli_requires_full_authority_chain_and_has_no_hash_bypass() -> 
     assert "--skip-numeric-gate" not in script
 
 
-def test_quality_mask_model_run_uses_fresh_v3_namespace() -> None:
+def test_effective_quality_adp_model_run_uses_fresh_v4_namespace() -> None:
     assert fullpool.FULLPOOL_SSL_REGISTRY_SCHEMA.endswith("_v2")
     assert fullpool.FULLPOOL_SSL_REGISTRY_SUMMARY_SCHEMA.endswith("_v2")
-    assert fullpool.FULLPOOL_SSL_SELECTION_SCHEMA.endswith("_v3")
-    assert fullpool.FULLPOOL_SSL_RUN_CONTRACT_SCHEMA.endswith("_v3")
-    assert fullpool.FULLPOOL_SSL_RESUME_SCHEMA.endswith("_v3")
-    assert fullpool.FULLPOOL_SSL_CHECKPOINT_SCHEMA.endswith("_v3")
-    assert fullpool.FULLPOOL_SSL_SUMMARY_SCHEMA.endswith("_v3")
-    assert fullpool.FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA.endswith("_v3")
-    assert "effective_quality_mask_v1" in fullpool.FULLPOOL_SSL_RUN_ID
-    assert "effective_quality_mask_v1" in fullpool.FULLPOOL_SSL_ENCODER_NAME
+    assert fullpool.FULLPOOL_SSL_SELECTION_SCHEMA.endswith("_v4")
+    assert fullpool.FULLPOOL_SSL_RUN_CONTRACT_SCHEMA.endswith("_v4")
+    assert fullpool.FULLPOOL_SSL_RESUME_SCHEMA.endswith("_v4")
+    assert fullpool.FULLPOOL_SSL_CHECKPOINT_SCHEMA.endswith("_v4")
+    assert fullpool.FULLPOOL_SSL_SUMMARY_SCHEMA.endswith("_v4")
+    assert fullpool.FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA.endswith("_v4")
+    assert "effective_quality_adp_v1" in fullpool.FULLPOOL_SSL_RUN_ID
+    assert "effective_quality_adp_v1" in fullpool.FULLPOOL_SSL_ENCODER_NAME
     assert (
-        "effective_quality_mask_v1"
+        "effective_quality_adp_v1"
         in fullpool.FULLPOOL_SSL_CHECKPOINT_NAMESPACE
     )
+
+
+def test_locked_smoke_and_fold_roots_reject_stale_namespaces(
+    tmp_path: Path,
+) -> None:
+    smoke_root = (
+        tmp_path
+        / "model_runs"
+        / fullpool.FULLPOOL_SSL_MODEL_NAMESPACE
+        / "smoke"
+        / "one_epoch"
+    )
+    observed = fullpool._validate_locked_training_shape(
+        out_root=smoke_root,
+        fold=2,
+        epochs=1,
+        batch_size=64,
+        workers=8,
+        seed=fullpool.FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
+        learning_rate=fullpool.FULLPOOL_SSL_LEARNING_RATE,
+        weight_decay=fullpool.FULLPOOL_SSL_WEIGHT_DECAY,
+        checkpoint_every=1,
+        require_cuda=True,
+        max_rows=4096,
+        required_observation_ids=[
+            fullpool.FULLPOOL_SSL_SMOKE_REQUIRED_OBSERVATION_ID
+        ],
+    )
+    assert observed == smoke_root.resolve()
+
+    stale_root = (
+        tmp_path
+        / "model_runs"
+        / "effective_quality_mask_v1"
+        / "smoke"
+        / "one_epoch"
+    )
+    with pytest.raises(ValueError, match="fresh"):
+        fullpool._validate_locked_training_shape(
+            out_root=stale_root,
+            fold=2,
+            epochs=1,
+            batch_size=64,
+            workers=8,
+            seed=fullpool.FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
+            learning_rate=fullpool.FULLPOOL_SSL_LEARNING_RATE,
+            weight_decay=fullpool.FULLPOOL_SSL_WEIGHT_DECAY,
+            checkpoint_every=1,
+            require_cuda=True,
+            max_rows=4096,
+            required_observation_ids=[
+                fullpool.FULLPOOL_SSL_SMOKE_REQUIRED_OBSERVATION_ID
+            ],
+        )
+    with pytest.raises(ValueError, match="exactly once"):
+        fullpool._validate_locked_training_shape(
+            out_root=smoke_root,
+            fold=2,
+            epochs=1,
+            batch_size=64,
+            workers=8,
+            seed=fullpool.FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
+            learning_rate=fullpool.FULLPOOL_SSL_LEARNING_RATE,
+            weight_decay=fullpool.FULLPOOL_SSL_WEIGHT_DECAY,
+            checkpoint_every=1,
+            require_cuda=True,
+            max_rows=4096,
+            required_observation_ids=[],
+        )
+
+    production_root = (
+        tmp_path
+        / "model_runs"
+        / fullpool.FULLPOOL_SSL_MODEL_NAMESPACE
+        / "training"
+        / "five_fold"
+    )
+    for field, replacement in (
+        ("learning_rate", fullpool.FULLPOOL_SSL_LEARNING_RATE * 2.0),
+        ("weight_decay", fullpool.FULLPOOL_SSL_WEIGHT_DECAY * 2.0),
+    ):
+        kwargs = {
+            "out_root": production_root,
+            "fold": 0,
+            "epochs": 20,
+            "batch_size": 64,
+            "workers": 8,
+            "seed": fullpool.FULLPOOL_SSL_DEFAULT_TRAINING_SEED,
+            "learning_rate": fullpool.FULLPOOL_SSL_LEARNING_RATE,
+            "weight_decay": fullpool.FULLPOOL_SSL_WEIGHT_DECAY,
+            "checkpoint_every": 1,
+            "require_cuda": True,
+            "max_rows": None,
+            "required_observation_ids": [],
+        }
+        kwargs[field] = replacement
+        with pytest.raises(ValueError, match=field.replace("_", " ")):
+            fullpool._validate_locked_training_shape(**kwargs)
 
 
 def test_fold_run_directory_resumes_only_identical_contract(
@@ -1062,6 +1230,27 @@ def test_training_numerics_gates_reject_nonfinite_loss_and_state() -> None:
         )
 
 
+def test_epoch_coverage_locks_singleton_skip_rule() -> None:
+    assert fullpool._expected_epoch_coverage(64, 64) == {
+        "selected_observations": 64,
+        "observations_per_epoch": 64,
+        "optimizer_steps_per_epoch": 1,
+        "singleton_observations_skipped_per_epoch": 0,
+    }
+    assert fullpool._expected_epoch_coverage(65, 64) == {
+        "selected_observations": 65,
+        "observations_per_epoch": 64,
+        "optimizer_steps_per_epoch": 1,
+        "singleton_observations_skipped_per_epoch": 1,
+    }
+    assert fullpool._expected_epoch_coverage(66, 64) == {
+        "selected_observations": 66,
+        "observations_per_epoch": 66,
+        "optimizer_steps_per_epoch": 2,
+        "singleton_observations_skipped_per_epoch": 0,
+    }
+
+
 def test_resume_pointer_survives_crash_between_checkpoint_and_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1136,3 +1325,350 @@ def test_resume_pointer_survives_crash_between_checkpoint_and_state(
             epoch=2,
             global_step=20,
         )
+
+
+def test_resume_checkpoint_requires_current_exact_native_freshness(
+    tmp_path: Path,
+) -> None:
+    torch = pytest.importorskip("torch")
+    fold_dir = tmp_path / "fold_0"
+    fold_dir.mkdir()
+    contract_sha256 = "a" * 64
+    current_freshness = {
+        **fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+        "expected_git_sha": "1" * 40,
+    }
+    stale_freshness = {
+        **current_freshness,
+        "expected_git_sha": "2" * 40,
+    }
+    checkpoint = {
+        "schema_version": fullpool.FULLPOOL_SSL_RESUME_SCHEMA,
+        "run_id": fullpool.FULLPOOL_SSL_RUN_ID,
+        "checkpoint_namespace": fullpool.FULLPOOL_SSL_CHECKPOINT_NAMESPACE,
+        "numeric_release_binding": fullpool.MODEL_INPUT_NUMERIC_RELEASE_BINDING,
+        "native_freshness": stale_freshness,
+        "run_contract_sha256": contract_sha256,
+        "epoch": 1,
+        "global_step": 10,
+    }
+    fullpool._publish_resume_checkpoint(
+        fold_dir=fold_dir,
+        contract_sha256=contract_sha256,
+        checkpoint=checkpoint,
+        epoch=1,
+        global_step=10,
+    )
+    with pytest.raises(ValueError, match="native freshness"):
+        fullpool._load_resume_checkpoint(
+            fold_dir=fold_dir,
+            contract_sha256=contract_sha256,
+            device=torch.device("cpu"),
+            expected_native_freshness=current_freshness,
+        )
+
+
+def test_optimizer_tracks_exact_real_ssl_embedding_gradient_path() -> None:
+    torch = pytest.importorskip("torch")
+    from twirl.vetting.harmonic_cnn import (
+        HarmonicModelConfig,
+        build_harmonic_cnn,
+    )
+    from twirl.vetting.harmonic_ssl import vicreg_loss
+
+    config = HarmonicModelConfig(metadata_dim=0)
+    model = build_harmonic_cnn(
+        config,
+        profile=fullpool.FULLPOOL_SSL_PROFILE,
+    )
+    projector = fullpool._projection_head(2 * config.embedding_dim)
+    named = fullpool._optimizer_named_parameters(model, projector)
+    optimizer = torch.optim.AdamW(
+        [
+            {
+                "params": [parameter for _, parameter in named],
+                "decoupled_weight_decay": True,
+            }
+        ],
+        lr=fullpool.FULLPOOL_SSL_LEARNING_RATE,
+        betas=fullpool.FULLPOOL_SSL_ADAMW_BETAS,
+        eps=fullpool.FULLPOOL_SSL_ADAMW_EPS,
+        weight_decay=fullpool.FULLPOOL_SSL_WEIGHT_DECAY,
+        amsgrad=False,
+        foreach=None,
+        maximize=False,
+        capturable=False,
+        differentiable=False,
+        fused=None,
+    )
+    batch_size = 4
+
+    def batch() -> dict[str, object]:
+        return {
+            "harmonic_values": torch.randn(batch_size, 7, 7, 37),
+            "harmonic_mask": torch.ones(
+                batch_size, 7, 7, 37, dtype=torch.bool
+            ),
+            "local_values": torch.randn(batch_size, 14, 7, 19),
+            "local_mask": torch.ones(
+                batch_size, 14, 7, 19, dtype=torch.bool
+            ),
+            "periodogram_values": torch.randn(batch_size, 4, 31),
+            "periodogram_mask": torch.ones(
+                batch_size, 4, 31, dtype=torch.bool
+            ),
+            "metadata": torch.empty(batch_size, 0),
+        }
+
+    first = projector(model(batch())["embedding"])
+    second = projector(model(batch())["embedding"])
+    loss = vicreg_loss(first, second)
+    if isinstance(loss, tuple):
+        loss = loss[0]
+    loss.backward()
+    coverage = fullpool._assert_ssl_gradient_coverage(
+        model,
+        projector,
+        optimizer,
+        fold=0,
+        epoch=1,
+        batch_index=0,
+    )
+    optimizer.step()
+    contract = fullpool._optimizer_checkpoint_contract(
+        model,
+        projector,
+        optimizer,
+        gradient_coverage_verified=True,
+        expected_step=1,
+    )
+
+    assert len(list(model.parameters())) + len(
+        list(projector.parameters())
+    ) == 146
+    assert coverage["active_parameter_count"] == 90
+    assert coverage["excluded_parameter_count"] == 56
+    assert contract["parameter_count"] == 90
+    assert contract["state_parameter_count"] == 90
+    assert contract["parameter_scope"] == (
+        fullpool.FULLPOOL_SSL_OPTIMIZER_PARAMETER_SCOPE
+    )
+    assert optimizer.state_dict()["param_groups"][0][
+        "decoupled_weight_decay"
+    ] is True
+    active_names = {
+        item["name"] for item in contract["parameter_manifest"]
+    }
+    assert not any(
+        name.startswith(
+            (
+                "encoder.small_encoder.",
+                "encoder.supp_encoder.",
+                "encoder.supplement_gate.",
+                "encoder.morphology_head.",
+                "encoder.preserve_head.",
+                "encoder.harmonic_head.",
+            )
+        )
+        for name in active_names
+    )
+
+
+def test_optimizer_contract_rejects_inactive_task_head_parameter() -> None:
+    torch = pytest.importorskip("torch")
+    from twirl.vetting.harmonic_cnn import (
+        HarmonicModelConfig,
+        build_harmonic_cnn,
+    )
+
+    config = HarmonicModelConfig(metadata_dim=0)
+    model = build_harmonic_cnn(
+        config,
+        profile=fullpool.FULLPOOL_SSL_PROFILE,
+    )
+    projector = fullpool._projection_head(2 * config.embedding_dim)
+    optimizer = torch.optim.AdamW(
+        [
+            {
+                "params": (
+                    list(model.parameters())
+                    + list(projector.parameters())
+                ),
+                "decoupled_weight_decay": True,
+            }
+        ],
+        lr=fullpool.FULLPOOL_SSL_LEARNING_RATE,
+        betas=fullpool.FULLPOOL_SSL_ADAMW_BETAS,
+        eps=fullpool.FULLPOOL_SSL_ADAMW_EPS,
+        weight_decay=fullpool.FULLPOOL_SSL_WEIGHT_DECAY,
+    )
+    with pytest.raises(RuntimeError, match="embedding path"):
+        fullpool._optimizer_checkpoint_contract(
+            model,
+            projector,
+            optimizer,
+            gradient_coverage_verified=True,
+            expected_step=1,
+        )
+
+
+def test_training_input_revalidation_detects_late_native_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    h5py = pytest.importorskip("h5py")
+    native_path = tmp_path / "native.h5"
+    with h5py.File(native_path, "w") as h5:
+        h5.attrs["expected_git_sha"] = "1" * 40
+        h5.attrs["periodogram_n"] = fullpool.FULL_POOL_NATIVE_PERIODOGRAM_N
+    stat = native_path.stat()
+    record = {
+        "native_h5_path": str(native_path),
+        "native_h5_sha256": hashlib.sha256(
+            native_path.read_bytes()
+        ).hexdigest(),
+        "native_h5_size_bytes": stat.st_size,
+        "native_h5_mtime_ns": stat.st_mtime_ns,
+        "native_h5_ctime_ns": stat.st_ctime_ns,
+        "native_h5_device": stat.st_dev,
+        "native_h5_inode": stat.st_ino,
+    }
+    monkeypatch.setattr(
+        fullpool,
+        "full_pool_native_root_failures",
+        lambda attrs: [],
+    )
+    fullpool._revalidate_training_inputs(
+        authority_bindings={},
+        native_files=[record],
+        expected_git_sha="1" * 40,
+        full_native_hash=False,
+    )
+
+    with native_path.open("r+b") as handle:
+        handle.seek(-1, os.SEEK_END)
+        original = handle.read(1)
+        handle.seek(-1, os.SEEK_END)
+        handle.write(bytes([original[0] ^ 1]))
+    os.utime(
+        native_path,
+        ns=(stat.st_atime_ns, stat.st_mtime_ns),
+    )
+    with pytest.raises(RuntimeError, match="changed after preflight"):
+        fullpool._revalidate_training_inputs(
+            authority_bindings={},
+            native_files=[record],
+            expected_git_sha="1" * 40,
+            full_native_hash=False,
+        )
+
+
+def _load_v3_completion_validator() -> object:
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "stage5_validation"
+        / "validate_teacher_ssl_fullpool_v3_training.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "validate_teacher_ssl_fullpool_v3_training_native_test",
+        script,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_completion_validator_real_native_record_path(tmp_path: Path) -> None:
+    h5py = pytest.importorskip("h5py")
+    validator = _load_v3_completion_validator()
+    revision = "1" * 40
+    freshness = {
+        **fullpool.MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+        "expected_git_sha": revision,
+    }
+    native_path = tmp_path / "native.h5"
+    with h5py.File(native_path, "w") as h5:
+        h5.attrs["contract_version"] = freshness[
+            "native_contract_version"
+        ]
+        h5.attrs["release_binding"] = freshness["release_binding"]
+        h5.attrs["expected_git_sha"] = revision
+        h5.attrs["builder_contract_version"] = freshness[
+            "builder_contract_version"
+        ]
+        h5.attrs["builder_code_sha256"] = freshness[
+            "builder_code_sha256"
+        ]
+        h5.attrs["detrend_contract_version"] = freshness[
+            "detrend_contract_version"
+        ]
+        h5.attrs["detrend_config_sha256"] = freshness[
+            "detrend_config_sha256"
+        ]
+        h5.attrs["detrend_quality_source"] = "final_effective_quality"
+        h5.attrs["raw_photometry_only"] = 1
+        h5.attrs["compact_adp_photometry_reused"] = 0
+        h5.attrs["compact_adp_flux_reused"] = 0
+        h5.attrs["periodogram_n"] = freshness["periodogram_n"]
+    stat = native_path.stat()
+    record = {
+        "native_h5_path": str(native_path.resolve()),
+        "native_h5_sha256": hashlib.sha256(
+            native_path.read_bytes()
+        ).hexdigest(),
+        "native_h5_size_bytes": stat.st_size,
+        "native_h5_mtime_ns": stat.st_mtime_ns,
+        "native_h5_ctime_ns": stat.st_ctime_ns,
+        "native_h5_device": stat.st_dev,
+        "native_h5_inode": stat.st_ino,
+        "native_contract_version": freshness["native_contract_version"],
+        "native_release_binding": freshness["release_binding"],
+        "native_expected_git_sha": revision,
+        "native_builder_contract_version": freshness[
+            "builder_contract_version"
+        ],
+        "native_builder_code_sha256": freshness[
+            "builder_code_sha256"
+        ],
+        "native_detrend_contract_version": freshness[
+            "detrend_contract_version"
+        ],
+        "native_detrend_config_sha256": freshness[
+            "detrend_config_sha256"
+        ],
+        "native_detrend_quality_source": "final_effective_quality",
+        "raw_photometry_only": True,
+        "compact_adp_photometry_reused": False,
+        "compact_adp_flux_reused": False,
+        "periodogram_n": freshness["periodogram_n"],
+        "hash_verified_now": True,
+        "root_contract_verified_now": True,
+        "group_identities_verified_now": True,
+    }
+    observed = validator._validate_native_record(
+        record,
+        expected_code_revision=revision,
+        index=0,
+    )
+    assert observed["sha256"] == record["native_h5_sha256"]
+
+
+def test_completion_metadata_detects_ctime_only_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    validator = _load_v3_completion_validator()
+    artifact = tmp_path / "authority.json"
+    artifact.write_text("{}\n", encoding="ascii")
+    real_sha256 = validator._sha256
+
+    def mutate_after_hash(path: Path) -> str:
+        digest = real_sha256(path)
+        path.chmod(0o600)
+        return digest
+
+    monkeypatch.setattr(validator, "_sha256", mutate_after_hash)
+    with pytest.raises(RuntimeError, match="changed while hashing"):
+        validator._metadata(artifact)

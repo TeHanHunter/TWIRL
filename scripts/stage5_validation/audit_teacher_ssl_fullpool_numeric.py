@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit one native-v2 shard through the exact full-pool model transform."""
+"""Audit one native-v3 shard through the exact full-pool model transform."""
 from __future__ import annotations
 
 import argparse
@@ -43,7 +43,11 @@ from twirl.vetting.ssl_full_pool_numeric import (  # noqa: E402
     FULL_POOL_NUMERIC_ENVELOPE_V1,
     MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
     MODEL_INPUT_NUMERIC_ENVELOPE_SHA256,
+    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+    MODEL_INPUT_NUMERIC_RELEASE_BINDING,
     audit_collated_sample,
+    numeric_native_freshness,
+    validate_numeric_native_freshness,
 )
 from twirl.vetting.teacher_native_registry import file_sha256  # noqa: E402
 from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
@@ -276,6 +280,18 @@ def audit_numeric_shard(
         ),
         verify_shard_files=False,
     )
+    validate_numeric_native_freshness(
+        {
+            name: native_release.get(name)
+            for name in (
+                *MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+                "expected_git_sha",
+            )
+        },
+        context="numeric audit native release",
+        expected_code_revision=expected_code_revision,
+    )
+    native_freshness = numeric_native_freshness(expected_code_revision)
     registry, _registry_summary = load_fullpool_ssl_registry(
         registry_path=Path(authority_bindings["ssl_registry"]["path"]),
         summary_path=Path(authority_bindings["ssl_registry_summary"]["path"]),
@@ -460,6 +476,7 @@ def audit_numeric_shard(
     failed = ~report_frame["passed"].astype(bool)
     report = {
         "schema_version": MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
+        "release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
         "code_revision": expected_code_revision,
         "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
         "envelope_contract": FULL_POOL_NUMERIC_ENVELOPE_V1.contract_version,
@@ -477,6 +494,7 @@ def audit_numeric_shard(
         "observation_identity_sha256": observation_identity_sha256(report_frame),
         "native_h5": native_binding,
         "native_contract_version": FULL_POOL_NATIVE_CONTRACT_VERSION,
+        "native_freshness": native_freshness,
         "authority_bindings": authority_bindings,
         "channel_statistics": channel_statistics,
         "rows": row_reports,

@@ -42,11 +42,15 @@ from twirl.vetting.ssl_full_pool_numeric import (  # noqa: E402
     FULL_POOL_NUMERIC_ENVELOPE_V1,
     MODEL_INPUT_NUMERIC_AUDIT_SCHEMA,
     MODEL_INPUT_NUMERIC_ENVELOPE_SHA256,
+    MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+    MODEL_INPUT_NUMERIC_RELEASE_BINDING,
     MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
     normalize_numeric_audit_frame,
+    numeric_native_freshness,
     numeric_audit_parquet_bytes,
     read_numeric_audit_parquet,
     validate_numeric_gate_release,
+    validate_numeric_native_freshness,
 )
 from twirl.vetting.teacher_native_registry import file_sha256  # noqa: E402
 from twirl.vetting.teacher_ssl_fullpool import (  # noqa: E402
@@ -416,7 +420,7 @@ def merge_numeric_release(
         name: _artifact_metadata(path)
         for name, path in authority_paths.items()
     }
-    native_registry, _native_release = load_full_pool_native_registry_release(
+    native_registry, native_release = load_full_pool_native_registry_release(
         registry_path=Path(authority_bindings["native_registry"]["path"]),
         registry_summary_path=Path(
             authority_bindings["native_registry_summary"]["path"]
@@ -426,6 +430,18 @@ def merge_numeric_release(
         ),
         verify_shard_files=False,
     )
+    validate_numeric_native_freshness(
+        {
+            name: native_release.get(name)
+            for name in (
+                *MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+                "expected_git_sha",
+            )
+        },
+        context="numeric merge native release",
+        expected_code_revision=expected_code_revision,
+    )
+    native_freshness = numeric_native_freshness(expected_code_revision)
     registry, _registry_summary = load_fullpool_ssl_registry(
         registry_path=Path(authority_bindings["ssl_registry"]["path"]),
         summary_path=Path(authority_bindings["ssl_registry_summary"]["path"]),
@@ -466,6 +482,8 @@ def merge_numeric_release(
         observed_inventory.add(key)
         if (
             report.get("schema_version") != MODEL_INPUT_NUMERIC_AUDIT_SCHEMA
+            or report.get("release_binding")
+            != MODEL_INPUT_NUMERIC_RELEASE_BINDING
             or report.get("code_revision") != expected_code_revision
             or report.get("model_input_contract_version")
             != MODEL_INPUT_CONTRACT_VERSION
@@ -481,6 +499,11 @@ def merge_numeric_release(
             or int(report.get("counts", {}).get("failed_observations", -1)) != 0
         ):
             raise ValueError(f"numeric shard report did not pass: {path}")
+        validate_numeric_native_freshness(
+            report.get("native_freshness"),
+            context=f"{path.name}.native_freshness",
+            expected_code_revision=expected_code_revision,
+        )
         declared_authorities = report.get("authority_bindings")
         if not isinstance(declared_authorities, Mapping) or set(
             declared_authorities
@@ -669,6 +692,7 @@ def merge_numeric_release(
         )
     release = {
         "schema_version": MODEL_INPUT_NUMERIC_RELEASE_SCHEMA,
+        "release_binding": MODEL_INPUT_NUMERIC_RELEASE_BINDING,
         "code_revision": expected_code_revision,
         "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
         "envelope_contract": FULL_POOL_NUMERIC_ENVELOPE_V1.contract_version,
@@ -688,6 +712,7 @@ def merge_numeric_release(
             "eligible": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
             "excluded": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
         },
+        "native_freshness": native_freshness,
         "authority_bindings": authority_bindings,
         "outputs": {
             "numeric_audit": {

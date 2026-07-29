@@ -1309,12 +1309,14 @@ def read_native_light_curve_from_h5(
         from twirl.vetting.ssl_full_pool_native import (
             FULL_POOL_NATIVE_CONTRACT_VERSION,
             FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
+            FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
             full_pool_native_group_failures,
             full_pool_native_root_failures,
         )
 
         full_pool_contract = contract in {
             FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
+            FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
             FULL_POOL_NATIVE_CONTRACT_VERSION,
         }
     if contract != RAW_PAIR_CONTRACT_VERSION and not full_pool_contract:
@@ -1354,6 +1356,7 @@ def read_native_light_curve_from_h5(
             group,
             context=f"/{group_path}",
             root_policy=orbitid_policy,
+            root_contract=contract,
         )
     else:
         group_orbitid_failures, _ = _orbitid_reconciliation_group_failures(

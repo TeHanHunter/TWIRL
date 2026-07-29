@@ -555,6 +555,57 @@ Acceptance checks:
 - source and export TIC/Gaia IDs match
 - cadence counts match for representative targets
 
+## Teacher v4-SSL full-pool v3
+
+The effective-quality-aware ADP rebuild is controlled by
+`scripts/orcd/run_teacher_ssl_fullpool_v3_orcd.sh`. The controller is a
+fail-closed, one-stage-at-a-time state machine: dry-run is the default, every
+remote mutation requires `--run`, and every mutating stage takes a persistent
+atomic claim before its first copy, temporary file, or `sbatch`. A failed or
+partially submitted stage is therefore diagnostic evidence and is not retried
+automatically.
+
+The controller accepts only `tehan@orcd-login.mit.edu` through the exact
+user-opened control socket
+`/Users/tehan/.ssh/cm/%r@%h:%p`. Password, keyboard-interactive, public-key,
+hostbased, and GSSAPI fallback authentication are disabled. Set
+`TWIRL_EXPECTED_GIT_SHA` to the reviewed 40-character commit and use the
+following gated action order:
+
+```text
+probe
+deploy
+stage-eligibility
+submit-native-canaries
+submit-native-canary-audit
+submit-native
+submit-native-registry
+submit-ssl-registry
+submit-numeric-audit
+submit-numeric-release
+submit-smoke
+submit-folds
+validate-folds
+verify-completion
+```
+
+The two native canaries are S56 shard 3 and S60 shard 4. The separate canary
+audit re-derives S60 shard-4 eligibility from the primary frozen-pool and BLS
+authorities and runs every eligible row through the production
+dataset/collator/numerical-envelope path before the seven `0-15%4` native
+arrays can launch. Production then requires exactly 112 fresh v3 HDF5 files,
+summaries, and SHA sidecars; exact `175,347` native coverage; the exact
+19-observation complement in the 175,366-row audit; the 4,096-period
+periodogram contract; and the full numerical release before the H200 smoke.
+
+For this explicitly approved full-pool run only, the five independent
+one-H200 folds launch as `0-4%4`, so no task requests more than one H200 and no
+more than four run concurrently. This is not a general increase to the
+routine H200 allowance. Final completion requires the independent CPU
+validator and the immutable release
+`frozen/model/teacher_ssl_fullpool_v3_five_fold.complete.json`; Slurm exit
+codes alone are insufficient.
+
 Current helper scripts:
 
 - `scripts/orcd/stage_s56_orcd_inputs.sh` stages compact PDO S56 products into

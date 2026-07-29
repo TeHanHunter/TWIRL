@@ -37,16 +37,30 @@ from twirl.vetting.ssl_full_pool_eligibility import (
     PRODUCTION_FULL_OBSERVATIONS,
     observation_identity_sha256,
 )
+from twirl.vetting.ssl_full_pool_native import (
+    FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
+    FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
+    FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_PERIODOGRAM_N,
+    FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION,
+    FULL_POOL_NATIVE_RELEASE_BINDING,
+)
+import twirl.vetting.ssl_full_pool_native as _native_module
 
 
 TEACHER_SSL_NUMERIC_ENVELOPE_V1 = (
     "twirl_teacher_ssl_fullpool_numeric_envelope_v1"
 )
 MODEL_INPUT_NUMERIC_AUDIT_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_model_input_numeric_audit_v1"
+    "twirl_teacher_ssl_fullpool_model_input_numeric_audit_v2"
 )
 MODEL_INPUT_NUMERIC_RELEASE_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_model_input_numeric_release_v1"
+    "twirl_teacher_ssl_fullpool_model_input_numeric_release_v2"
+)
+MODEL_INPUT_NUMERIC_RELEASE_BINDING = (
+    "teacher_ssl_fullpool_v3_effective_quality_adp_numeric_v2"
 )
 MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT = TEACHER_SSL_NUMERIC_ENVELOPE_V1
 MODEL_INPUT_NUMERIC_AUTHORITY_NAMES: tuple[str, ...] = (
@@ -56,6 +70,23 @@ MODEL_INPUT_NUMERIC_AUTHORITY_NAMES: tuple[str, ...] = (
     "native_registry_summary",
     "native_release_summary",
 )
+MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS: dict[str, Any] = {
+    "schema_version": FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION,
+    "release_binding": FULL_POOL_NATIVE_RELEASE_BINDING,
+    "native_contract_version": FULL_POOL_NATIVE_CONTRACT_VERSION,
+    "builder_contract_version": FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION,
+    "builder_code_sha256": hashlib.sha256(
+        Path(str(_native_module.__file__)).read_bytes()
+    ).hexdigest(),
+    "detrend_contract_version": FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+    "detrend_config_json": FULL_POOL_NATIVE_DETREND_CONFIG_JSON,
+    "detrend_config_sha256": FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
+    "detrend_quality_source": "final_effective_quality",
+    "raw_photometry_only": True,
+    "compact_adp_photometry_reused": False,
+    "compact_adp_flux_reused": False,
+    "periodogram_n": FULL_POOL_NATIVE_PERIODOGRAM_N,
+}
 _MODEL_INPUT_NUMERIC_AUDIT_COLUMNS: tuple[str, ...] = (
     "ssl_observation_id",
     "sector",
@@ -880,6 +911,57 @@ def _strict_json_object(path: Path, *, context: str) -> dict[str, Any]:
     return payload
 
 
+def validate_numeric_native_freshness(
+    value: Any,
+    *,
+    context: str,
+    expected_code_revision: str | None = None,
+) -> dict[str, Any]:
+    """Require the exact fresh native-v3 effective-quality ADP authority."""
+
+    expected_keys = set(MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS) | {
+        "expected_git_sha"
+    }
+    if not isinstance(value, Mapping) or set(value) != expected_keys:
+        raise ValueError(f"{context} has an invalid exact field inventory")
+    observed_base = {
+        name: value.get(name) for name in MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS
+    }
+    expected_git_sha = value.get("expected_git_sha")
+    if (
+        observed_base != MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS
+        or not isinstance(expected_git_sha, str)
+        or re.fullmatch(r"[0-9a-f]{40}", expected_git_sha) is None
+        or (
+            expected_code_revision is not None
+            and expected_git_sha != expected_code_revision
+        )
+    ):
+        raise ValueError(
+            f"{context} differs from the locked native-v3 "
+            "effective-quality ADP authority"
+        )
+    return {
+        **MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+        "expected_git_sha": expected_git_sha,
+    }
+
+
+def numeric_native_freshness(
+    expected_code_revision: str,
+) -> dict[str, Any]:
+    """Return the exact native-v3 freshness record for one deployed SHA."""
+
+    return validate_numeric_native_freshness(
+        {
+            **MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS,
+            "expected_git_sha": expected_code_revision,
+        },
+        context="numeric native freshness",
+        expected_code_revision=expected_code_revision,
+    )
+
+
 def _validate_numeric_audit(path: Path) -> pd.DataFrame:
     frame = read_numeric_audit_parquet(path)
     if (
@@ -1135,6 +1217,8 @@ def _validate_numeric_evidence(
         counts = report.get("counts")
         if (
             report.get("schema_version") != MODEL_INPUT_NUMERIC_AUDIT_SCHEMA
+            or report.get("release_binding")
+            != MODEL_INPUT_NUMERIC_RELEASE_BINDING
             or report.get("code_revision") != code_revision
             or report.get("model_input_contract_version")
             != MODEL_INPUT_CONTRACT_VERSION
@@ -1163,6 +1247,11 @@ def _validate_numeric_evidence(
             }
         ):
             raise ValueError(f"{context} report header differs from release")
+        validate_numeric_native_freshness(
+            report.get("native_freshness"),
+            context=f"{context} report native_freshness",
+            expected_code_revision=code_revision,
+        )
         report_counts = {
             name: counts.get(name)
             for name in (
@@ -1281,6 +1370,8 @@ def validate_numeric_gate_release(
     )
     if payload.get("schema_version") != MODEL_INPUT_NUMERIC_RELEASE_SCHEMA:
         raise ValueError("numeric-gate release schema_version mismatch")
+    if payload.get("release_binding") != MODEL_INPUT_NUMERIC_RELEASE_BINDING:
+        raise ValueError("numeric-gate release_binding mismatch")
     if payload.get("passed") is not True:
         raise ValueError("numeric-gate release did not pass")
     if (
@@ -1343,6 +1434,11 @@ def validate_numeric_gate_release(
         and code_revision != str(expected_code_revision).strip()
     ):
         raise ValueError("numeric-gate code_revision differs from expected")
+    validate_numeric_native_freshness(
+        payload.get("native_freshness"),
+        context="numeric-gate native_freshness",
+        expected_code_revision=code_revision,
+    )
 
     bindings = payload.get("authority_bindings")
     if not isinstance(bindings, Mapping) or set(bindings) != set(
@@ -1396,12 +1492,16 @@ __all__ = [
     "MODEL_INPUT_NUMERIC_AUTHORITY_NAMES",
     "MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT",
     "MODEL_INPUT_NUMERIC_ENVELOPE_SHA256",
+    "MODEL_INPUT_NUMERIC_NATIVE_FRESHNESS",
+    "MODEL_INPUT_NUMERIC_RELEASE_BINDING",
     "MODEL_INPUT_NUMERIC_RELEASE_SCHEMA",
     "TEACHER_SSL_NUMERIC_ENVELOPE_V1",
     "audit_collated_sample",
     "audit_model_facing_sample",
     "normalize_numeric_audit_frame",
+    "numeric_native_freshness",
     "numeric_audit_parquet_bytes",
     "read_numeric_audit_parquet",
     "validate_numeric_gate_release",
+    "validate_numeric_native_freshness",
 ]
