@@ -72,10 +72,10 @@ PRODUCTION_FROZEN_POOL_SUMMARY_SHA256 = (
     "f9bb5afa6672db0d74f4a7de6c0c6064295e4e0bfae420bf78777ec101b303c4"
 )
 PRODUCTION_GLOBAL_BLS_SHA256 = (
-    "308c7e5966d60b19a400aa67a6dc809a2584b377cc2e2004b15f4f248d5c5a78"
+    "160bc2b9c9a17b05b3607ef26d77981ec67163565affeb4b5f9cf1f10cd322e1"
 )
 PRODUCTION_GLOBAL_BLS_SUMMARY_SHA256 = (
-    "4efced245b292bbdadcbae501382038f66fa6ea1090ef13e00be118a11ee395d"
+    "e31ddd76eaa4946a48901fe76b1e4f28ab79d417e3c684e996d1c9bcb355fe38"
 )
 # The frozen full-pool BLS job supplied the approved parameters explicitly,
 # so its immutable summary records the search-contract label as ``custom``.
