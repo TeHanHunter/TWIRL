@@ -322,6 +322,55 @@ def test_raw_v4_rebuilds_adp_and_proves_exact_cadence_inventory(
     assert np.flatnonzero(light_curve.quality).tolist() == [3, 10, 11]
 
 
+def test_raw_v4_preserves_unsearchable_aperture_as_status_row(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    compact_path = tmp_path / "compact.h5"
+    tic, cadences = _write_compact(compact_path)
+    raw_path = tmp_path / "raw.h5"
+    _write_raw_v1(
+        raw_path,
+        tic=tic,
+        cadences=cadences,
+        compact_path=compact_path,
+    )
+    with h5py.File(raw_path, "r+") as h5:
+        h5[f"targets/{tic:016d}/raw_flux_err_small"][:] = np.nan
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path, _reference_frame(cadences)
+    )
+    reference, provenance = module.load_external_quality_reference(
+        table_path=table_path, manifest_path=manifest_path, sector=56
+    )
+    module._initialize_external_quality_worker(
+        module._reference_worker_payload(reference), provenance
+    )
+
+    light_curve, audit = module._raw_v4_light_curve(
+        raw_source_h5=raw_path,
+        tic=tic,
+        sector=56,
+        camera=1,
+        ccd=1,
+        tessmag=17.5,
+        compact_lc=compact_path,
+        expected_n_cadences=len(cadences),
+    )
+    result = module.run_bls_on_lc(
+        light_curve,
+        module.BLSConfig(n_periods=50, n_peaks=2),
+        aperture="DET_FLUX_ADP_SML",
+    )
+
+    assert np.isnan(light_curve.flux["DET_FLUX_ADP_SML"]).all()
+    assert np.isfinite(light_curve.flux["DET_FLUX_ADP"]).any()
+    assert result.status == "too_few_cadences"
+    assert result.n_cad_kept == 0
+    assert result.peaks == []
+    assert audit["raw_compact_cadence_inventory_match"] == 1
+
+
 def test_raw_v4_rejects_any_cadence_inventory_difference(tmp_path: Path) -> None:
     module = _load_module()
     compact_path = tmp_path / "compact.h5"

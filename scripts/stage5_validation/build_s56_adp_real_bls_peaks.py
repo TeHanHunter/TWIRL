@@ -987,17 +987,38 @@ def _raw_v4_light_curve(
             "raw_compact_time_delta_max_s": float(np.max(time_delta_s)),
         }
     )
-    small, _ = _effective_quality_adp03q(
-        time_btjd=time_btjd,
-        raw_flux=np.asarray(arrays["raw_flux_small"], dtype=np.float64),
-        raw_error=np.asarray(arrays["raw_flux_err_small"], dtype=np.float64),
-        quality=np.asarray(lc.quality, dtype=np.int32),
+    effective_quality = np.asarray(lc.quality, dtype=np.int32)
+
+    def rebuild_or_mark_unsearchable(
+        raw_flux: np.ndarray,
+        raw_error: np.ndarray,
+    ) -> np.ndarray:
+        flux = np.asarray(raw_flux, dtype=np.float64)
+        error = np.asarray(raw_error, dtype=np.float64)
+        finite_good = (
+            (effective_quality == 0)
+            & np.isfinite(flux)
+            & np.isfinite(error)
+            & (error > 0)
+        )
+        if not finite_good.any():
+            # Preserve the observation in the BLS authority.  The downstream
+            # search emits its locked rank-0 too_few_cadences status row; no
+            # uncertainty or flux value is invented for this aperture.
+            return np.full(len(flux), np.nan, dtype=np.float64)
+        rebuilt, _ = _effective_quality_adp03q(
+            time_btjd=time_btjd,
+            raw_flux=flux,
+            raw_error=error,
+            quality=effective_quality,
+        )
+        return rebuilt
+
+    small = rebuild_or_mark_unsearchable(
+        arrays["raw_flux_small"], arrays["raw_flux_err_small"]
     )
-    primary, _ = _effective_quality_adp03q(
-        time_btjd=time_btjd,
-        raw_flux=np.asarray(arrays["raw_flux_primary"], dtype=np.float64),
-        raw_error=np.asarray(arrays["raw_flux_err_primary"], dtype=np.float64),
-        quality=np.asarray(lc.quality, dtype=np.int32),
+    primary = rebuild_or_mark_unsearchable(
+        arrays["raw_flux_primary"], arrays["raw_flux_err_primary"]
     )
     lc.flux = {
         "DET_FLUX_ADP_SML": small,
