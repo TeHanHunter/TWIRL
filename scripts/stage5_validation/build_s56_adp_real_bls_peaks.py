@@ -1563,7 +1563,7 @@ def build_peak_table(
         "compact_lc": str(compact_lc),
         "compact_lc_sha256": input_sha256["compact_lc"],
         "compact_lc_role": (
-            "frozen_pool_lineage_only_not_read"
+            "cadence_time_inventory_reference_only"
             if raw_mode
             else "photometry_and_cadence_input"
         ),

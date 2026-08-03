@@ -26,6 +26,13 @@ def test_v4_bls_rebuilds_uniformly_from_all_112_raw_v1_shards() -> None:
     assert "A2v1-fullpool-v1" in text
     assert "TWIRL_SSL_FULLPOOL_EXECUTION_ALLOWLIST_ROOT" in text
     assert "--execution-allowlist" in text
+    builder = (
+        ROOT
+        / "scripts"
+        / "stage5_validation"
+        / "build_s56_adp_real_bls_peaks.py"
+    ).read_text(encoding="utf-8")
+    assert '"cadence_time_inventory_reference_only"' in builder
 
 
 def test_v4_bls_merges_exactly_16_shards_per_sector() -> None:
