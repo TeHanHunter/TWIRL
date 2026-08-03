@@ -61,13 +61,14 @@ TEACHER_SSL_NUMERIC_ENVELOPE_V1 = (
     "twirl_teacher_ssl_fullpool_numeric_envelope_v1"
 )
 MODEL_INPUT_NUMERIC_AUDIT_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_model_input_numeric_audit_v3"
+    "twirl_teacher_ssl_fullpool_model_input_numeric_audit_v4"
 )
 MODEL_INPUT_NUMERIC_RELEASE_SCHEMA = (
-    "twirl_teacher_ssl_fullpool_model_input_numeric_release_v3"
+    "twirl_teacher_ssl_fullpool_model_input_numeric_release_v4"
 )
 MODEL_INPUT_NUMERIC_RELEASE_BINDING = (
-    "teacher_ssl_fullpool_v3r1_effective_quality_adp_btjd_numeric_v3"
+    "teacher_ssl_fullpool_v4_detector_consistent_raw_v1_"
+    "effective_quality_adp_btjd_numeric_v4"
 )
 MODEL_INPUT_NUMERIC_ENVELOPE_CONTRACT = TEACHER_SSL_NUMERIC_ENVELOPE_V1
 MODEL_INPUT_NUMERIC_AUTHORITY_NAMES: tuple[str, ...] = (

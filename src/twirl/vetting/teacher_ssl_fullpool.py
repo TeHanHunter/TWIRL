@@ -1853,6 +1853,7 @@ def _validate_training_authority_chain(
     registry_summary: Mapping[str, Any],
     numeric_gate_release: Mapping[str, Any],
     authority_bindings: Mapping[str, Mapping[str, Any]],
+    eligibility_production_lock: bool = True,
 ) -> dict[str, Any]:
     """Fail closed unless every production training authority agrees exactly."""
 
@@ -1886,7 +1887,7 @@ def _validate_training_authority_chain(
         raise ValueError(
             "model-input numerical gate binds the wrong envelope contract"
         )
-    expected_partition = {
+    locked_partition = {
         "full": {
             "count": PRODUCTION_FULL_OBSERVATIONS,
             "identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
@@ -1920,6 +1921,17 @@ def _validate_training_authority_chain(
             ),
         },
     }
+    if not eligibility_production_lock and observed_partition["full"] != (
+        locked_partition["full"]
+    ):
+        raise ValueError(
+            "corrected eligibility changed the frozen full-pool authority"
+        )
+    expected_partition = (
+        locked_partition
+        if eligibility_production_lock
+        else observed_partition
+    )
     if observed_partition != expected_partition:
         raise ValueError(
             "training eligibility differs from the locked production partition"
@@ -2015,18 +2027,22 @@ def _validate_training_authority_chain(
     )
 
     expected_summary_values = {
-        "n_anchor_observations": PRODUCTION_FULL_OBSERVATIONS,
-        "n_ssl_pool_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
-        "n_bls_unsearchable_observations": PRODUCTION_EXCLUDED_OBSERVATIONS,
-        "native_model_full_identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+        "n_anchor_observations": expected_partition["full"]["count"],
+        "n_ssl_pool_observations": expected_partition["eligible"]["count"],
+        "n_bls_unsearchable_observations": expected_partition["excluded"]["count"],
+        "native_model_full_identity_sha256": expected_partition["full"][
+            "identity_sha256"
+        ],
         "native_model_eligible_identity_sha256": (
-            PRODUCTION_ELIGIBLE_IDENTITY_SHA256
+            expected_partition["eligible"]["identity_sha256"]
         ),
         "native_model_excluded_identity_sha256": (
-            PRODUCTION_EXCLUDED_IDENTITY_SHA256
+            expected_partition["excluded"]["identity_sha256"]
         ),
         "canonical_native_registry_sha256": mapping_sha256,
-        "frozen_pool_identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+        "frozen_pool_identity_sha256": expected_partition["full"][
+            "identity_sha256"
+        ],
     }
     for name, expected in expected_summary_values.items():
         if registry_summary.get(name) != expected:
@@ -2076,10 +2092,10 @@ def _validate_training_authority_chain(
             release_counts.get("native_registry_observations", -1)
         ),
     } != {
-        "full": PRODUCTION_FULL_OBSERVATIONS,
-        "eligible": PRODUCTION_ELIGIBLE_OBSERVATIONS,
-        "excluded": PRODUCTION_EXCLUDED_OBSERVATIONS,
-        "native": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+        "full": expected_partition["full"]["count"],
+        "eligible": expected_partition["eligible"]["count"],
+        "excluded": expected_partition["excluded"]["count"],
+        "native": expected_partition["eligible"]["count"],
     }:
         raise ValueError("native-v3 release counts differ from production")
     if {
@@ -2090,10 +2106,10 @@ def _validate_training_authority_chain(
             "native_registry_observations_sha256"
         ),
     } != {
-        "full": PRODUCTION_FULL_IDENTITY_SHA256,
-        "eligible": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
-        "excluded": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
-        "native": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+        "full": expected_partition["full"]["identity_sha256"],
+        "eligible": expected_partition["eligible"]["identity_sha256"],
+        "excluded": expected_partition["excluded"]["identity_sha256"],
+        "native": expected_partition["eligible"]["identity_sha256"],
     }:
         raise ValueError("native-v3 release identities differ from production")
 
@@ -2186,15 +2202,17 @@ def _validate_training_authority_chain(
     expected_eligibility_binding = {
         "contract_version": eligibility.contract_version,
         "release_binding": eligibility.release_binding,
-        "full_observations": PRODUCTION_FULL_OBSERVATIONS,
-        "eligible_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
-        "excluded_observations": PRODUCTION_EXCLUDED_OBSERVATIONS,
-        "full_observation_identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+        "full_observations": expected_partition["full"]["count"],
+        "eligible_observations": expected_partition["eligible"]["count"],
+        "excluded_observations": expected_partition["excluded"]["count"],
+        "full_observation_identity_sha256": expected_partition["full"][
+            "identity_sha256"
+        ],
         "eligible_observation_identity_sha256": (
-            PRODUCTION_ELIGIBLE_IDENTITY_SHA256
+            expected_partition["eligible"]["identity_sha256"]
         ),
         "excluded_observation_identity_sha256": (
-            PRODUCTION_EXCLUDED_IDENTITY_SHA256
+            expected_partition["excluded"]["identity_sha256"]
         ),
     }
     if eligibility_binding != expected_eligibility_binding:
@@ -2216,7 +2234,8 @@ def _validate_training_authority_chain(
 
     return {
         "schema_version": FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA,
-        "production_lock_passed": True,
+        "production_lock_passed": bool(eligibility_production_lock),
+        "corrected_eligibility_contract_verified": True,
         "partition": expected_partition,
         "native_mapping_sha256": mapping_sha256,
         "model_input_contract_version": MODEL_INPUT_CONTRACT_VERSION,
@@ -2257,6 +2276,7 @@ def _load_training_authority_chain(
     registry_summary_path: Path,
     numeric_gate_release_path: Path,
     expected_code_revision: str,
+    eligibility_production_lock: bool = True,
 ) -> tuple[
     pd.DataFrame,
     dict[str, Any],
@@ -2280,7 +2300,7 @@ def _load_training_authority_chain(
     eligibility = load_native_model_eligibility(
         authority_bindings["eligibility_exclusions"]["path"],
         authority_bindings["eligibility_summary"]["path"],
-        production_lock=True,
+        production_lock=bool(eligibility_production_lock),
         rederive_from_bls=False,
     )
     native_registry, native_release = (
@@ -2329,6 +2349,7 @@ def _load_training_authority_chain(
         registry_summary=registry_summary,
         numeric_gate_release=numeric_gate_release,
         authority_bindings=authority_bindings,
+        eligibility_production_lock=eligibility_production_lock,
     )
     return (
         registry,
@@ -3358,6 +3379,7 @@ def run_fullpool_ssl_fold(
     require_cuda: bool = True,
     max_rows: int | None = None,
     required_observation_ids: Sequence[str] | None = None,
+    eligibility_production_lock: bool = True,
 ) -> dict[str, Any]:
     """Train or resume one broad-pool fold-local VICReg encoder."""
 
@@ -3411,6 +3433,7 @@ def run_fullpool_ssl_fold(
         registry_summary_path=registry_summary_path,
         numeric_gate_release_path=numeric_gate_release_path,
         expected_code_revision=code_revision,
+        eligibility_production_lock=eligibility_production_lock,
     )
     registry_binding = authority_audit["authority_bindings"]["registry"]
     registry_summary_binding = authority_audit["authority_bindings"][

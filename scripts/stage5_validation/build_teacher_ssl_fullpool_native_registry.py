@@ -34,6 +34,14 @@ def main() -> int:
     parser.add_argument("--registry-out", type=Path, required=True)
     parser.add_argument("--summary-out", type=Path, required=True)
     parser.add_argument("--release-summary-out", type=Path, required=True)
+    parser.add_argument(
+        "--allow-rederived-eligibility",
+        action="store_true",
+        help=(
+            "Accept a hash-bound corrected BLS-derived eligibility summary "
+            "without imposing the superseded v2 19-row production lock."
+        ),
+    )
     args = parser.parse_args()
     result = write_full_pool_native_registry(
         pool_path=args.frozen_pool,
@@ -46,6 +54,7 @@ def main() -> int:
         registry_path=args.registry_out,
         summary_path=args.summary_out,
         release_summary_path=args.release_summary_out,
+        eligibility_production_lock=not args.allow_rederived_eligibility,
     )
     print(json.dumps(result, indent=2, sort_keys=True, allow_nan=False))
     return 0

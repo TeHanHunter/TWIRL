@@ -130,6 +130,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--anchor-aperture",
         default=FULLPOOL_SSL_ANCHOR_APERTURE,
     )
+    parser.add_argument(
+        "--allow-rederived-eligibility",
+        action="store_true",
+        help=(
+            "Accept the checksum-bound eligibility partition derived from "
+            "the supplied corrected global BLS authority. The frozen full "
+            "pool remains mandatory and unchanged."
+        ),
+    )
     return parser
 
 
@@ -205,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
         pool_summary_path=inputs["frozen_pool_summary"],
         bls_path=bls_path,
         bls_summary_path=inputs["bls_summary"],
-        production_lock=True,
+        production_lock=not args.allow_rederived_eligibility,
     )
     native_registry, native_release = (
         load_full_pool_native_registry_release(
@@ -262,6 +271,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
         "excluded_observation_identity_sha256": (
             eligibility.excluded_observation_identity_sha256
+        ),
+        "legacy_partition_lock_required": bool(
+            not args.allow_rederived_eligibility
+        ),
+        "corrected_global_bls_partition_accepted": bool(
+            args.allow_rederived_eligibility
         ),
     }
     source_provenance["native_release_binding"] = {

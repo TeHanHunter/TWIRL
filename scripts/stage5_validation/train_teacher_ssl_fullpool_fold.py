@@ -58,6 +58,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "repeat the option for multiple IDs. Intended for bounded smokes."
         ),
     )
+    parser.add_argument(
+        "--allow-rederived-eligibility",
+        action="store_true",
+        help="Accept the corrected v4 BLS-derived eligibility authority.",
+    )
     return parser
 
 
@@ -122,6 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         require_cuda=True,
         max_rows=args.max_rows,
         required_observation_ids=args.required_observation_id,
+        eligibility_production_lock=not args.allow_rederived_eligibility,
     )
     print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))
     return 0

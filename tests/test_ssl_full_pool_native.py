@@ -1230,7 +1230,13 @@ def test_s61_strict_native_contract_preserves_orbit_ids(
         )
         assert np.allclose(group["det_flux_adp_sml"][:], expected_small)
         assert np.allclose(group["det_flux_adp"][:], expected_primary)
-        assert group.attrs["raw_compact_internal_quality_agreement"] == 1
+        assert group.attrs["raw_detector_mapping_authority"] == 1
+        assert group.attrs["raw_orbitid_authority"] == 1
+        assert group.attrs["raw_internal_quality_authority"] == 1
+        assert group.attrs["compact_cadence_time_inventory_match"] == 1
+        assert group.attrs["compact_cadence_time_inventory_role"] == (
+            "reference_only"
+        )
         assert group.attrs["compact_adp_photometry_reused"] == 0
         assert group.attrs["compact_adp_flux_reused"] == 0
         assert group.attrs["detrend_config_sha256"] == (
@@ -1453,7 +1459,7 @@ def test_excluded_observation_is_structurally_validated_but_not_published(
         assert f"{excluded_tic:016d}" not in h5["targets"]
 
 
-def test_s62_native_build_rejects_raw_compact_pre_correction_disagreement(
+def test_s62_native_build_uses_raw_orbitid_not_compact_orbitid(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     inputs = _frozen_pool_fixture(tmp_path)
@@ -1473,30 +1479,31 @@ def test_s62_native_build_rejects_raw_compact_pre_correction_disagreement(
     eligibility_exclusions, eligibility_summary = _patch_all_eligible(
         tmp_path, inputs, monkeypatch
     )
-    with pytest.raises(RuntimeError, match="native export failed"):
-        native.build_full_pool_native_shard(
-            sector=62,
-            pool_path=Path(inputs["pool"]),
-            pool_summary_path=Path(inputs["summary"]),
-            eligibility_exclusions_path=eligibility_exclusions,
-            eligibility_summary_path=eligibility_summary,
-            allowlist_path=Path(inputs["allowlist"]),
-            raw_source_h5=raw_source,
-            compact_adp_h5=Path(inputs["compact"]),
-            cadence_reference_table=reference.table_path,
-            cadence_reference_manifest=reference.manifest_path,
-            out_h5=tmp_path / "bad_native.h5",
-            expected_git_sha="d" * 40,
-            orbitid_policy="reference_by_cadence",
-            n_periods=native.FULL_POOL_NATIVE_PERIODOGRAM_N,
-        )
-    failures = pd.read_csv((tmp_path / "bad_native.h5").with_suffix(".failures.csv"))
-    assert "raw-source and compact orbitid arrays disagree" in failures.loc[
-        0, "error"
-    ]
+    output = tmp_path / "raw_orbit_authority.h5"
+    result = native.build_full_pool_native_shard(
+        sector=62,
+        pool_path=Path(inputs["pool"]),
+        pool_summary_path=Path(inputs["summary"]),
+        eligibility_exclusions_path=eligibility_exclusions,
+        eligibility_summary_path=eligibility_summary,
+        allowlist_path=Path(inputs["allowlist"]),
+        raw_source_h5=raw_source,
+        compact_adp_h5=Path(inputs["compact"]),
+        cadence_reference_table=reference.table_path,
+        cadence_reference_manifest=reference.manifest_path,
+        out_h5=output,
+        expected_git_sha="d" * 40,
+        orbitid_policy="reference_by_cadence",
+        n_periods=native.FULL_POOL_NATIVE_PERIODOGRAM_N,
+    )
+    assert result["verification"]["passed"] is True
+    with h5py.File(output, "r") as h5:
+        group = h5[f"targets/{int(inputs['tic']):016d}"]
+        assert int(group["orbitid_pre_reference"][1]) == 131
+        assert int(group.attrs["raw_orbitid_authority"]) == 1
 
 
-def test_native_build_rejects_raw_compact_quality_mismatch_without_publication(
+def test_native_build_uses_raw_internal_quality_not_compact_quality(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     inputs = _frozen_pool_fixture(
@@ -1524,27 +1531,27 @@ def test_native_build_rejects_raw_compact_quality_mismatch_without_publication(
         tmp_path, inputs, monkeypatch
     )
     output = tmp_path / "quality_mismatch.h5"
-    with pytest.raises(RuntimeError, match="native export failed"):
-        native.build_full_pool_native_shard(
-            sector=61,
-            pool_path=Path(inputs["pool"]),
-            pool_summary_path=Path(inputs["summary"]),
-            eligibility_exclusions_path=eligibility_exclusions,
-            eligibility_summary_path=eligibility_summary,
-            allowlist_path=Path(inputs["allowlist"]),
-            raw_source_h5=raw_source,
-            compact_adp_h5=Path(inputs["compact"]),
-            cadence_reference_table=reference.table_path,
-            cadence_reference_manifest=reference.manifest_path,
-            out_h5=output,
-            expected_git_sha="d" * 40,
-            orbitid_policy="strict",
-            n_periods=native.FULL_POOL_NATIVE_PERIODOGRAM_N,
-        )
-    assert not output.exists()
-    assert not list(tmp_path.glob(".quality_mismatch.h5.*.tmp"))
-    failures = pd.read_csv(output.with_suffix(".failures.csv"))
-    assert "internal quality arrays disagree" in failures.loc[0, "error"]
+    result = native.build_full_pool_native_shard(
+        sector=61,
+        pool_path=Path(inputs["pool"]),
+        pool_summary_path=Path(inputs["summary"]),
+        eligibility_exclusions_path=eligibility_exclusions,
+        eligibility_summary_path=eligibility_summary,
+        allowlist_path=Path(inputs["allowlist"]),
+        raw_source_h5=raw_source,
+        compact_adp_h5=Path(inputs["compact"]),
+        cadence_reference_table=reference.table_path,
+        cadence_reference_manifest=reference.manifest_path,
+        out_h5=output,
+        expected_git_sha="d" * 40,
+        orbitid_policy="strict",
+        n_periods=native.FULL_POOL_NATIVE_PERIODOGRAM_N,
+    )
+    assert result["verification"]["passed"] is True
+    with h5py.File(output, "r") as h5:
+        group = h5[f"targets/{int(inputs['tic']):016d}"]
+        assert int(group["quality"][1]) == 1
+        assert int(group.attrs["raw_internal_quality_authority"]) == 1
 
 
 def test_registry_freeze_requires_exact_observation_coverage(

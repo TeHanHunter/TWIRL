@@ -79,8 +79,12 @@ FULL_POOL_NATIVE_CONTRACT_VERSION_V2 = (
 FULL_POOL_NATIVE_CONTRACT_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_real_native_v3_effective_quality_adp"
 )
-FULL_POOL_NATIVE_CONTRACT_VERSION = (
+FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1 = (
     "twirl_teacher_ssl_fullpool_real_native_v3r1_effective_quality_adp_btjd"
+)
+FULL_POOL_NATIVE_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_real_native_v4_detector_consistent_raw_v1_"
+    "effective_quality_adp_btjd"
 )
 FULL_POOL_NATIVE_RELEASE_BINDING_V1 = (
     "teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp_real_only"
@@ -91,8 +95,12 @@ FULL_POOL_NATIVE_RELEASE_BINDING_V2 = (
 FULL_POOL_NATIVE_RELEASE_BINDING_V3 = (
     "teacher_ssl_fullpool_v3_s56_s62_a2v1_effective_quality_adp_bls_eligible"
 )
-FULL_POOL_NATIVE_RELEASE_BINDING = (
+FULL_POOL_NATIVE_RELEASE_BINDING_V3R1 = (
     "teacher_ssl_fullpool_v3r1_s56_s62_a2v1_effective_quality_adp_btjd_bls_eligible"
+)
+FULL_POOL_NATIVE_RELEASE_BINDING = (
+    "teacher_ssl_fullpool_v4_s56_s62_a2v1_raw_v1_detector_consistent_"
+    "effective_quality_adp_btjd_bls_eligible"
 )
 FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_shard_summary_v2"
@@ -100,8 +108,11 @@ FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V2 = (
 FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_native_shard_summary_v3"
 )
-FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION_V4 = (
     "twirl_teacher_ssl_fullpool_native_shard_summary_v4"
+)
+FULL_POOL_NATIVE_SUMMARY_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_shard_summary_v5"
 )
 FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_registry_source_v2"
@@ -109,8 +120,11 @@ FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V2 = (
 FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_native_registry_source_v3"
 )
-FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION_V4 = (
     "twirl_teacher_ssl_fullpool_native_registry_source_v4"
+)
+FULL_POOL_NATIVE_REGISTRY_SOURCE_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_registry_source_v5"
 )
 FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_native_registry_release_v2"
@@ -118,14 +132,21 @@ FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V2 = (
 FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V3 = (
     "twirl_teacher_ssl_fullpool_native_registry_release_v3"
 )
-FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION = (
+FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION_V4 = (
     "twirl_teacher_ssl_fullpool_native_registry_release_v4"
+)
+FULL_POOL_NATIVE_REGISTRY_RELEASE_SCHEMA_VERSION = (
+    "twirl_teacher_ssl_fullpool_native_registry_release_v5"
 )
 FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION_V1 = (
     "twirl_teacher_ssl_fullpool_effective_quality_adp_builder_v1"
 )
-FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION = (
+FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION_V2 = (
     "twirl_teacher_ssl_fullpool_effective_quality_adp_btjd_builder_v2"
+)
+FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_detector_consistent_raw_v1_"
+    "effective_quality_adp_btjd_builder_v3"
 )
 FULL_POOL_NATIVE_PERIODOGRAM_N = int(harmonic_export.DEFAULT_BLS_PERIODS)
 FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION_V1 = (
@@ -993,31 +1014,24 @@ def _validate_s62_group_reconciliation(
     *,
     tic: int,
     cadenceno: np.ndarray,
-    compact_orbitid: np.ndarray,
     raw_orbitid: np.ndarray,
     resolved_orbitid: np.ndarray,
     correction_mask: np.ndarray,
 ) -> None:
-    """Validate generic S62 reconciliation without a release row-count bind."""
+    """Validate S62 reconciliation from the raw-v1 orbit authority."""
 
     cadences = np.asarray(cadenceno, dtype=np.int64)
-    compact = np.asarray(compact_orbitid, dtype=np.int64)
     raw = np.asarray(raw_orbitid, dtype=np.int64)
     resolved = np.asarray(resolved_orbitid, dtype=np.int64)
     corrected = np.asarray(correction_mask, dtype=bool)
-    if len({len(cadences), len(compact), len(raw), len(resolved), len(corrected)}) != 1:
+    if len({len(cadences), len(raw), len(resolved), len(corrected)}) != 1:
         raise ValueError(f"TIC {tic}: orbit-ID reconciliation lengths differ")
-    if not np.array_equal(raw, compact):
-        raise ValueError(
-            f"TIC {tic}: raw-source and compact orbitid arrays disagree "
-            "before reconciliation"
-        )
-    mismatch = compact != resolved
+    mismatch = raw != resolved
     if not np.array_equal(mismatch, corrected):
         raise ValueError(
             f"TIC {tic}: not all and only authority mismatches were corrected"
         )
-    if np.any(compact[corrected] != S62_CORRECTION_INPUT_ORBIT) or np.any(
+    if np.any(raw[corrected] != S62_CORRECTION_INPUT_ORBIT) or np.any(
         resolved[corrected] != S62_CORRECTION_REFERENCE_ORBIT
     ):
         raise ValueError(f"TIC {tic}: correction is not the bounded 132->131 map")
@@ -1286,6 +1300,9 @@ def build_full_pool_native_shard(
         eligibility_summary_path,
         pool_path=pool_path,
         pool_summary_path=pool_summary_path,
+        # The preceding v4 eligibility stage independently rederives the
+        # corrected BLS complement, then publishes this final authority only
+        # when it satisfies the preregistered production partition.
         production_lock=True,
         rederive_from_bls=False,
     )
@@ -1538,8 +1555,11 @@ def build_full_pool_native_shard(
             output.attrs["compact_adp_h5"] = str(compact_binding.path)
             output.attrs["compact_adp_h5_sha256"] = compact_binding.sha256
             output.attrs["compact_adp_role"] = (
-                "cadence_time_orbit_detector_internal_quality_mapping_only"
+                "cadence_time_inventory_reference_only"
             )
+            output.attrs["raw_detector_mapping_authority"] = 1
+            output.attrs["raw_orbitid_authority"] = 1
+            output.attrs["raw_internal_quality_authority"] = 1
             output.attrs["periodogram_grid"] = "log10_period_d"
             output.attrs["periodogram_n"] = int(n_periods)
             output.attrs["chronology_small_channels"] = json.dumps(
@@ -1575,51 +1595,91 @@ def build_full_pool_native_shard(
                         ("camera", int(row.camera)),
                         ("ccd", int(row.ccd)),
                     ):
-                        if int(compact_group.attrs.get(name, -1)) != expected:
-                            raise ValueError(
-                                f"compact {name} mapping differs from pool"
-                            )
                         if int(raw_group.attrs.get(name, -1)) != expected:
                             raise ValueError(
                                 f"raw-source {name} mapping differs from pool"
                             )
                     raw = harmonic_export._raw_source_payload(raw_group)
-                    aligned = harmonic_export.align_raw_by_cadence(
-                        raw,
-                        cadenceno=np.asarray(compact_group["cadenceno"]),
-                        time=np.asarray(compact_group["time"]),
-                    )
-                    compact_orbitid = np.asarray(
-                        compact_group["orbitid"], dtype=np.int64
-                    )
-                    raw_orbitid = np.asarray(
-                        aligned["orbitid"], dtype=np.int64
-                    )
-                    if not np.array_equal(raw_orbitid, compact_orbitid):
+                    required_raw = {
+                        "time",
+                        "cadenceno",
+                        "orbitid",
+                        "quality",
+                        "raw_flux_small",
+                        "raw_flux_err_small",
+                        "raw_flux_primary",
+                        "raw_flux_err_primary",
+                    }
+                    missing_raw = sorted(required_raw - set(raw))
+                    if missing_raw:
                         raise ValueError(
-                            "raw-source and compact orbitid arrays disagree "
-                            "before reconciliation"
+                            f"raw-source group lacks arrays: {missing_raw}"
                         )
-                    raw_internal_quality = np.asarray(
-                        aligned["quality"], dtype=np.int64
-                    )
-                    compact_internal_quality = np.asarray(
-                        compact_group["quality"], dtype=np.int64
-                    )
-                    if not np.array_equal(
-                        raw_internal_quality, compact_internal_quality
+                    lengths = {name: len(raw[name]) for name in required_raw}
+                    if len(set(lengths.values())) != 1 or next(
+                        iter(lengths.values()), 0
+                    ) < 1:
+                        raise ValueError(
+                            f"raw-source arrays differ in length: {lengths}"
+                        )
+                    raw_cadenceno = np.asarray(raw["cadenceno"], dtype=np.int64)
+                    if (
+                        len(np.unique(raw_cadenceno)) != len(raw_cadenceno)
+                        or np.any(np.diff(raw_cadenceno) <= 0)
                     ):
                         raise ValueError(
-                            "raw-source and compact internal quality arrays "
-                            "disagree"
+                            "raw-source cadences are not unique and strictly sorted"
                         )
+                    compact_cadenceno = np.asarray(
+                        compact_group["cadenceno"], dtype=np.int64
+                    )
+                    if not np.array_equal(raw_cadenceno, compact_cadenceno):
+                        raise ValueError(
+                            "raw-source cadence inventory differs from frozen compact"
+                        )
+                    raw_time_bjd = np.asarray(raw["time"], dtype=np.float64)
+                    if (
+                        not np.isfinite(raw_time_bjd).all()
+                        or np.any(raw_time_bjd < 2_000_000.0)
+                    ):
+                        raise ValueError(
+                            "raw-source time is not finite absolute BJD"
+                        )
+                    raw_time_btjd = _validated_btjd_time(
+                        raw_time_bjd - FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+                        context=f"S{sector} TIC {tic}",
+                    )
+                    compact_time = np.asarray(
+                        compact_group["time"], dtype=np.float64
+                    )
+                    if len(compact_time) != len(raw_time_bjd):
+                        raise ValueError("frozen compact time length differs")
+                    compact_time_bjd = np.where(
+                        compact_time < 100_000.0,
+                        compact_time + FULL_POOL_NATIVE_BTJD_TO_BJD_OFFSET_D,
+                        compact_time,
+                    )
+                    raw_compact_time_delta_s = np.abs(
+                        raw_time_bjd - compact_time_bjd
+                    ) * 86_400.0
+                    if (
+                        not np.isfinite(raw_compact_time_delta_s).all()
+                        or float(np.max(raw_compact_time_delta_s)) > 2.0
+                    ):
+                        raise ValueError(
+                            "raw-source/frozen-compact times differ by more than 2 s"
+                        )
+                    raw_orbitid = np.asarray(raw["orbitid"], dtype=np.int64)
+                    raw_internal_quality = np.asarray(
+                        raw["quality"], dtype=np.int64
+                    )
                     quality_overlay = quality_reference.apply(
                         sector=sector,
                         camera=int(row.camera),
                         ccd=int(row.ccd),
-                        cadenceno=np.asarray(compact_group["cadenceno"]),
-                        orbitid=compact_orbitid,
-                        internal_quality=compact_internal_quality,
+                        cadenceno=raw_cadenceno,
+                        orbitid=raw_orbitid,
+                        internal_quality=raw_internal_quality,
                         context=f"S{sector} TIC {tic}",
                         orbitid_policy=orbitid_policy,
                     )
@@ -1633,16 +1693,13 @@ def build_full_pool_native_shard(
                     if orbitid_policy == ORBITID_POLICY_REFERENCE:
                         _validate_s62_group_reconciliation(
                             tic=tic,
-                            cadenceno=np.asarray(
-                                compact_group["cadenceno"]
-                            ),
-                            compact_orbitid=compact_orbitid,
+                            cadenceno=raw_cadenceno,
                             raw_orbitid=raw_orbitid,
                             resolved_orbitid=resolved_orbitid,
                             correction_mask=correction_mask,
                         )
                     elif correction_mask.any() or not np.array_equal(
-                        resolved_orbitid, compact_orbitid
+                        resolved_orbitid, raw_orbitid
                     ):
                         raise ValueError(
                             "strict orbit-ID policy changed one or more cadences"
@@ -1656,13 +1713,13 @@ def build_full_pool_native_shard(
                         orbitid_stats,
                         camera=int(row.camera),
                         ccd=int(row.ccd),
-                        cadenceno=np.asarray(compact_group["cadenceno"]),
-                        input_orbitid=compact_orbitid,
+                        cadenceno=raw_cadenceno,
+                        input_orbitid=raw_orbitid,
                         resolved_orbitid=resolved_orbitid,
                         correction_mask=correction_mask,
                     )
                     group = targets.create_group(f"{tic:016d}")
-                    harmonic_export._copy_attrs(compact_group, group)
+                    harmonic_export._copy_attrs(raw_group, group)
                     harmonic_export._write_quality_counts(
                         group, quality_overlay.counts
                     )
@@ -1675,9 +1732,13 @@ def build_full_pool_native_shard(
                     group.attrs[
                         "orbitid_reconciliation_source_agreement"
                     ] = 1
-                    group.attrs[
-                        "raw_compact_internal_quality_agreement"
-                    ] = 1
+                    group.attrs["raw_detector_mapping_authority"] = 1
+                    group.attrs["raw_orbitid_authority"] = 1
+                    group.attrs["raw_internal_quality_authority"] = 1
+                    group.attrs["compact_cadence_time_inventory_match"] = 1
+                    group.attrs["compact_cadence_time_inventory_role"] = (
+                        "reference_only"
+                    )
                     group.attrs["photometry_source"] = (
                         "immutable_raw_v1_effective_quality_adp03q"
                     )
@@ -1706,39 +1767,35 @@ def build_full_pool_native_shard(
                     group.attrs["raw_source_paths"] = raw_group.attrs.get(
                         "source_paths", ""
                     )
-                    group.attrs["raw_adp_time_delta_max_s"] = float(
-                        np.nanmax(aligned["_time_delta_s"])
-                    )
-                    compact_time_btjd = _validated_btjd_time(
-                        np.asarray(compact_group["time"]),
-                        context=f"S{sector} TIC {tic}",
+                    group.attrs["raw_compact_time_delta_max_s"] = float(
+                        np.max(raw_compact_time_delta_s)
                     )
                     output_time = _published_bjd_from_btjd(
-                        compact_time_btjd,
+                        raw_time_btjd,
                         context=f"S{sector} TIC {tic}",
                     )
                     group.attrs["detrend_time_min"] = float(
-                        np.min(compact_time_btjd)
+                        np.min(raw_time_btjd)
                     )
                     group.attrs["detrend_time_max"] = float(
-                        np.max(compact_time_btjd)
+                        np.max(raw_time_btjd)
                     )
                     effective_quality = np.asarray(
                         quality_overlay.quality, dtype=np.int32
                     )
                     det_small, small_diagnostics = (
                         _effective_quality_adp03q(
-                            time_btjd=compact_time_btjd,
-                            raw_flux=aligned["raw_flux_small"],
-                            raw_error=aligned["raw_flux_err_small"],
+                            time_btjd=raw_time_btjd,
+                            raw_flux=raw["raw_flux_small"],
+                            raw_error=raw["raw_flux_err_small"],
                             quality=effective_quality,
                         )
                     )
                     det_primary, primary_diagnostics = (
                         _effective_quality_adp03q(
-                            time_btjd=compact_time_btjd,
-                            raw_flux=aligned["raw_flux_primary"],
-                            raw_error=aligned["raw_flux_err_primary"],
+                            time_btjd=raw_time_btjd,
+                            raw_flux=raw["raw_flux_primary"],
+                            raw_error=raw["raw_flux_err_primary"],
                             quality=effective_quality,
                         )
                     )
@@ -1794,13 +1851,11 @@ def build_full_pool_native_shard(
                     payload = {
                         "time": output_time,
                         FULL_POOL_NATIVE_DETREND_TIME_DATASET: (
-                            compact_time_btjd
+                            raw_time_btjd
                         ),
-                        "cadenceno": np.asarray(
-                            compact_group["cadenceno"], dtype=np.int64
-                        ),
+                        "cadenceno": raw_cadenceno,
                         "orbitid": resolved_orbitid.astype(np.int32),
-                        "orbitid_pre_reference": compact_orbitid.astype(
+                        "orbitid_pre_reference": raw_orbitid.astype(
                             np.int32
                         ),
                         "raw_orbitid_pre_reference": raw_orbitid.astype(
@@ -1810,12 +1865,10 @@ def build_full_pool_native_shard(
                             np.uint8
                         ),
                         "quality": effective_quality,
-                        "raw_flux_small": aligned["raw_flux_small"],
-                        "raw_flux_err_small": aligned[
-                            "raw_flux_err_small"
-                        ],
-                        "raw_flux_primary": aligned["raw_flux_primary"],
-                        "raw_flux_err_primary": aligned[
+                        "raw_flux_small": raw["raw_flux_small"],
+                        "raw_flux_err_small": raw["raw_flux_err_small"],
+                        "raw_flux_primary": raw["raw_flux_primary"],
+                        "raw_flux_err_primary": raw[
                             "raw_flux_err_primary"
                         ],
                         "det_flux_adp_sml": det_small,
@@ -1993,6 +2046,10 @@ def build_full_pool_native_shard(
             raw_release.transfer_validation.sha256
         ),
         "compact_adp_h5_sha256": compact_binding.sha256,
+        "compact_adp_role": "cadence_time_inventory_reference_only",
+        "raw_detector_mapping_authority": True,
+        "raw_orbitid_authority": True,
+        "raw_internal_quality_authority": True,
         "cadence_reference_table_sha256": reference_table_binding.sha256,
         "cadence_reference_manifest_sha256": (
             reference_manifest_binding.sha256
@@ -2065,19 +2122,26 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         FULL_POOL_NATIVE_CONTRACT_VERSION_V1,
         FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
         FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1,
         FULL_POOL_NATIVE_CONTRACT_VERSION,
     }:
         return ["wrong full-pool native contract"]
     is_eligibility_partitioned = contract in {
         FULL_POOL_NATIVE_CONTRACT_VERSION_V2,
         FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1,
         FULL_POOL_NATIVE_CONTRACT_VERSION,
     }
     is_effective_quality_adp = contract in {
         FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1,
         FULL_POOL_NATIVE_CONTRACT_VERSION,
     }
-    is_v3r1 = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
+    is_btjd = contract in {
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1,
+        FULL_POOL_NATIVE_CONTRACT_VERSION,
+    }
+    is_detector_consistent_v4 = contract == FULL_POOL_NATIVE_CONTRACT_VERSION
     required = {
         "real_only",
         "sector",
@@ -2137,7 +2201,7 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
                 failures.append("periodogram_n differs from native-v3 contract")
         except (KeyError, TypeError, ValueError):
             failures.append("periodogram_n is invalid")
-    if is_v3r1:
+    if is_btjd:
         required.update(
             {
                 "detrend_time_contract_version",
@@ -2152,6 +2216,14 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
                 "rank_warning_count",
                 "rank_warning_ledger_json",
                 "rank_warning_ledger_sha256",
+            }
+        )
+    if is_detector_consistent_v4:
+        required.update(
+            {
+                "raw_detector_mapping_authority",
+                "raw_orbitid_authority",
+                "raw_internal_quality_authority",
             }
         )
     missing = sorted(name for name in required if name not in attrs)
@@ -2239,17 +2311,21 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
         )
         expected_release_binding = (
             FULL_POOL_NATIVE_RELEASE_BINDING
-            if is_v3r1
+            if is_detector_consistent_v4
+            else FULL_POOL_NATIVE_RELEASE_BINDING_V3R1
+            if contract == FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1
             else FULL_POOL_NATIVE_RELEASE_BINDING_V3
         )
         expected_builder_contract = (
             FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION
-            if is_v3r1
+            if is_detector_consistent_v4
+            else FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION_V2
+            if contract == FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1
             else FULL_POOL_NATIVE_BUILDER_CONTRACT_VERSION_V1
         )
         expected_detrend_contract = (
             FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
-            if is_v3r1
+            if is_btjd
             else FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION_V1
         )
         if str(attrs["release_binding"]) != expected_release_binding:
@@ -2272,10 +2348,28 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             failures.append("v3 detrend config SHA-256 mismatch")
         if str(attrs["detrend_quality_source"]) != "final_effective_quality":
             failures.append("v3 detrend did not use final effective quality")
-        if str(attrs["compact_adp_role"]) != (
-            "cadence_time_orbit_detector_internal_quality_mapping_only"
-        ):
+        expected_compact_role = (
+            "cadence_time_inventory_reference_only"
+            if is_detector_consistent_v4
+            else "cadence_time_orbit_detector_internal_quality_mapping_only"
+        )
+        if str(attrs["compact_adp_role"]) != expected_compact_role:
             failures.append("v3 compact input role mismatch")
+        if is_detector_consistent_v4:
+            try:
+                authority_flags = {
+                    name: int(attrs[name])
+                    for name in (
+                        "raw_detector_mapping_authority",
+                        "raw_orbitid_authority",
+                        "raw_internal_quality_authority",
+                    )
+                }
+            except (KeyError, TypeError, ValueError):
+                failures.append("native-v4 raw authority flags are invalid")
+            else:
+                if any(value != 1 for value in authority_flags.values()):
+                    failures.append("native-v4 raw authority flags differ")
         try:
             v3_integers = {
                 name: int(attrs[name])
@@ -2307,7 +2401,7 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             value not in "0123456789abcdef" for value in expected_git_sha
         ):
             failures.append("expected_git_sha is not an exact Git SHA")
-    if is_v3r1:
+    if is_btjd:
         sha_names.append("rank_warning_ledger_sha256")
         expected_time_attrs: dict[str, Any] = {
             "detrend_time_contract_version": (
@@ -2442,7 +2536,9 @@ def full_pool_native_root_failures(attrs: Mapping[str, Any]) -> list[str]:
             ),
             "orbitid_reconciliation_release_binding": (
                 FULL_POOL_NATIVE_RELEASE_BINDING
-                if is_v3r1
+                if is_detector_consistent_v4
+                else FULL_POOL_NATIVE_RELEASE_BINDING_V3R1
+                if contract == FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1
                 else FULL_POOL_NATIVE_RELEASE_BINDING_V3
                 if contract == FULL_POOL_NATIVE_CONTRACT_VERSION_V3
                 else FULL_POOL_NATIVE_RELEASE_BINDING_V2
@@ -2508,11 +2604,17 @@ def full_pool_native_group_failures(
         return [f"{context}:missing attrs {','.join(missing_attrs)}"], 0
     if root_contract in {
         FULL_POOL_NATIVE_CONTRACT_VERSION_V3,
+        FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1,
         FULL_POOL_NATIVE_CONTRACT_VERSION,
     }:
-        is_v3r1 = root_contract == FULL_POOL_NATIVE_CONTRACT_VERSION
+        is_btjd = root_contract in {
+            FULL_POOL_NATIVE_CONTRACT_VERSION_V3R1,
+            FULL_POOL_NATIVE_CONTRACT_VERSION,
+        }
+        is_detector_consistent_v4 = (
+            root_contract == FULL_POOL_NATIVE_CONTRACT_VERSION
+        )
         v3_required_attrs = {
-            "raw_compact_internal_quality_agreement",
             "photometry_source",
             "compact_adp_photometry_reused",
             "compact_adp_flux_reused",
@@ -2520,6 +2622,21 @@ def full_pool_native_group_failures(
             "detrend_config_sha256",
             "detrend_quality_source",
         }
+        if is_detector_consistent_v4:
+            v3_required_attrs.update(
+                {
+                    "raw_detector_mapping_authority",
+                    "raw_orbitid_authority",
+                    "raw_internal_quality_authority",
+                    "compact_cadence_time_inventory_match",
+                    "compact_cadence_time_inventory_role",
+                    "raw_compact_time_delta_max_s",
+                }
+            )
+        else:
+            v3_required_attrs.add(
+                "raw_compact_internal_quality_agreement"
+            )
         for aperture in ("small", "primary"):
             v3_required_attrs.update(
                 {
@@ -2536,7 +2653,7 @@ def full_pool_native_group_failures(
                     f"effective_quality_adp_{aperture}_n_finite_output",
                 }
             )
-            if is_v3r1:
+            if is_btjd:
                 v3_required_attrs.update(
                     {
                         (
@@ -2577,7 +2694,7 @@ def full_pool_native_group_failures(
                         ),
                     }
                 )
-        if is_v3r1:
+        if is_btjd:
             v3_required_attrs.update(
                 {
                     "detrend_time_contract_version",
@@ -2596,8 +2713,37 @@ def full_pool_native_group_failures(
             return [
                 f"{context}:missing v3 attrs {','.join(missing_v3)}"
             ], 0
+        authority_mismatch = False
+        if is_detector_consistent_v4:
+            try:
+                authority_mismatch = (
+                    any(
+                        int(group.attrs[name]) != 1
+                        for name in (
+                            "raw_detector_mapping_authority",
+                            "raw_orbitid_authority",
+                            "raw_internal_quality_authority",
+                            "compact_cadence_time_inventory_match",
+                        )
+                    )
+                    or str(
+                        group.attrs["compact_cadence_time_inventory_role"]
+                    )
+                    != "reference_only"
+                    or not np.isfinite(
+                        float(group.attrs["raw_compact_time_delta_max_s"])
+                    )
+                    or float(group.attrs["raw_compact_time_delta_max_s"]) > 2.0
+                )
+            except (KeyError, TypeError, ValueError):
+                authority_mismatch = True
+        else:
+            authority_mismatch = (
+                int(group.attrs["raw_compact_internal_quality_agreement"])
+                != 1
+            )
         if (
-            int(group.attrs["raw_compact_internal_quality_agreement"]) != 1
+            authority_mismatch
             or int(group.attrs["compact_adp_photometry_reused"]) != 0
             or int(group.attrs["compact_adp_flux_reused"]) != 0
             or str(group.attrs["photometry_source"])
@@ -2605,7 +2751,7 @@ def full_pool_native_group_failures(
             or str(group.attrs["detrend_contract_version"])
             != (
                 FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
-                if is_v3r1
+                if is_btjd
                 else FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION_V1
             )
             or str(group.attrs["detrend_config_sha256"])
@@ -2648,7 +2794,7 @@ def full_pool_native_group_failures(
                 failures.append(
                     f"{context}:{aperture} ADP diagnostics are outside bounds"
                 )
-            if is_v3r1:
+            if is_btjd:
                 warning_attrs = {
                     "detrend_time_contract_version": (
                         FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
@@ -2684,7 +2830,7 @@ def full_pool_native_group_failures(
                     failures.append(
                         f"{context}:{aperture} BTJD/warning audit is invalid"
                     )
-        if is_v3r1:
+        if is_btjd:
             if (
                 str(group.attrs["detrend_time_contract_version"])
                 != FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION
@@ -2771,11 +2917,11 @@ def full_pool_native_group_failures(
         return failures + [f"{context}:missing={','.join(missing)}"], corrected
     cadences = np.asarray(group["cadenceno"], dtype=np.int64)
     stored = np.asarray(group["orbitid"], dtype=np.int64)
-    compact_pre = np.asarray(group["orbitid_pre_reference"], dtype=np.int64)
+    input_pre = np.asarray(group["orbitid_pre_reference"], dtype=np.int64)
     raw_pre = np.asarray(group["raw_orbitid_pre_reference"], dtype=np.int64)
     raw_mask = np.asarray(group[ORBITID_RECONCILIATION_MASK_DATASET])
     if (
-        len({len(cadences), len(stored), len(compact_pre), len(raw_pre), len(raw_mask)})
+        len({len(cadences), len(stored), len(input_pre), len(raw_pre), len(raw_mask)})
         != 1
     ):
         return failures + [f"{context}:orbit-ID arrays differ in length"], corrected
@@ -2784,10 +2930,10 @@ def full_pool_native_group_failures(
     mask = raw_mask.astype(bool)
     if int(np.count_nonzero(mask)) != corrected:
         failures.append(f"{context}:correction count differs from mask")
-    if not np.array_equal(raw_pre, compact_pre):
-        failures.append(f"{context}:raw/compact pre-correction orbitids differ")
+    if not np.array_equal(raw_pre, input_pre):
+        failures.append(f"{context}:raw pre-correction orbitids differ")
     if root_policy == ORBITID_POLICY_STRICT:
-        if corrected or mask.any() or not np.array_equal(compact_pre, stored):
+        if corrected or mask.any() or not np.array_equal(input_pre, stored):
             failures.append(f"{context}:strict policy changed orbit IDs")
     elif root_policy == ORBITID_POLICY_REFERENCE:
         if sector != 62:
@@ -2796,7 +2942,6 @@ def full_pool_native_group_failures(
             _validate_s62_group_reconciliation(
                 tic=tic,
                 cadenceno=cadences,
-                compact_orbitid=compact_pre,
                 raw_orbitid=raw_pre,
                 resolved_orbitid=stored,
                 correction_mask=mask,
@@ -3066,6 +3211,7 @@ def write_full_pool_native_registry(
     summary_path: Path,
     release_summary_path: Path,
     expected_shards_per_sector: int = FULL_POOL_NATIVE_SHARDS_PER_SECTOR,
+    eligibility_production_lock: bool = True,
 ) -> dict[str, Any]:
     """Freeze the exact eligible native coverage and its full-pool audit."""
 
@@ -3122,7 +3268,7 @@ def write_full_pool_native_registry(
         eligibility_summary_path,
         pool_path=pool_binding.path,
         pool_summary_path=summary_binding.path,
-        production_lock=True,
+        production_lock=bool(eligibility_production_lock),
         rederive_from_bls=False,
     )
     expected_keys = set(eligibility.eligible_keys)
