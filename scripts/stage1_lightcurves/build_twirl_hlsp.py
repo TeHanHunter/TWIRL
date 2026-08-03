@@ -88,11 +88,17 @@ def _branch_flux_columns(
 def discover_orbit_hdf5(orbit_root: Path) -> dict[int, Path]:
     """Walk a per-orbit ``ffi/cam*/ccd*/LC/*.h5`` tree → {tic: path}."""
     out: dict[int, Path] = {}
-    for h5 in orbit_root.rglob("LC/*.h5"):
+    for h5 in sorted(orbit_root.rglob("LC/*.h5")):
         try:
             tic = int(h5.stem)
         except ValueError:
             continue
+        previous = out.get(tic)
+        if previous is not None and previous != h5:
+            raise ValueError(
+                f"duplicate TIC {tic} in orbit tree {orbit_root}: "
+                f"{previous} and {h5}; detector selection must be explicit"
+            )
         out[tic] = h5
     return out
 
@@ -108,6 +114,13 @@ def merge_orbits(lcs: list[TGLCLightCurve]) -> TGLCLightCurve | None:
         return None
     lcs.sort(key=lambda lc: lc.orbit)
     head = lcs[0]
+    for lc in lcs[1:]:
+        for name in ("tic", "sector", "cam", "ccd"):
+            if getattr(lc, name) != getattr(head, name):
+                raise ValueError(
+                    f"cannot merge orbit light curves with different {name}: "
+                    f"{getattr(head, name)} != {getattr(lc, name)}"
+                )
     time_arr = np.concatenate([lc.time for lc in lcs])
     cad = np.concatenate([lc.cadence for lc in lcs])
     qual = np.concatenate([lc.quality for lc in lcs])

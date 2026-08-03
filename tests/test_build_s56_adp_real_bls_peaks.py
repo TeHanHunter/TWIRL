@@ -78,6 +78,34 @@ def _copy_compact_target(path: Path, *, source_tic: int, target_tic: int) -> Non
         targets[f"{target_tic:016d}"].attrs["tic"] = int(target_tic)
 
 
+def _write_raw_v1(
+    path: Path,
+    *,
+    tic: int,
+    cadences: np.ndarray,
+    compact_path: Path,
+) -> None:
+    with h5py.File(compact_path, "r") as compact:
+        source = compact[f"targets/{tic:016d}"]
+        time_bjd = np.asarray(source["time"], dtype=float) + 2_457_000.0
+        orbitid = np.asarray(source["orbitid"], dtype=np.int32)
+        quality = np.asarray(source["quality"], dtype=np.int32)
+    phase = np.linspace(0.0, 4.0 * np.pi, len(cadences))
+    with h5py.File(path, "w") as h5:
+        group = h5.create_group("targets").create_group(f"{tic:016d}")
+        group.attrs.update(
+            {"tic": tic, "sector": 56, "camera": 1, "ccd": 1}
+        )
+        group.create_dataset("time", data=time_bjd)
+        group.create_dataset("cadenceno", data=np.asarray(cadences, dtype=np.int64))
+        group.create_dataset("orbitid", data=orbitid)
+        group.create_dataset("quality", data=quality)
+        group.create_dataset("raw_flux_small", data=1000.0 + np.sin(phase))
+        group.create_dataset("raw_flux_err_small", data=np.ones(len(cadences)))
+        group.create_dataset("raw_flux_primary", data=2000.0 + np.sin(phase))
+        group.create_dataset("raw_flux_err_primary", data=np.ones(len(cadences)))
+
+
 def _reference_frame(cadences: np.ndarray) -> pd.DataFrame:
     n = len(cadences)
     orbitid = np.where(np.arange(n) < n // 2, 119, 120)
@@ -251,6 +279,83 @@ def test_external_bad_cadences_are_combined_before_bls(
     assert {row["external_quality_policy_contract"] for row in rows} == {
         module.EXTERNAL_QUALITY_POLICY_CONTRACT
     }
+
+
+def test_raw_v4_rebuilds_adp_and_proves_exact_cadence_inventory(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    compact_path = tmp_path / "compact.h5"
+    tic, cadences = _write_compact(compact_path)
+    raw_path = tmp_path / "raw.h5"
+    _write_raw_v1(
+        raw_path,
+        tic=tic,
+        cadences=cadences,
+        compact_path=compact_path,
+    )
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path, _reference_frame(cadences)
+    )
+    reference, provenance = module.load_external_quality_reference(
+        table_path=table_path, manifest_path=manifest_path, sector=56
+    )
+    module._initialize_external_quality_worker(
+        module._reference_worker_payload(reference), provenance
+    )
+
+    light_curve, audit = module._raw_v4_light_curve(
+        raw_source_h5=raw_path,
+        tic=tic,
+        sector=56,
+        camera=1,
+        ccd=1,
+        tessmag=17.5,
+        compact_lc=compact_path,
+        expected_n_cadences=len(cadences),
+    )
+
+    assert light_curve.time[0] == pytest.approx(0.0)
+    assert set(light_curve.flux) == {"DET_FLUX_ADP_SML", "DET_FLUX_ADP"}
+    assert audit["raw_compact_cadence_inventory_match"] == 1
+    assert audit["raw_compact_time_delta_max_s"] < 1.0e-6
+    assert np.flatnonzero(light_curve.quality).tolist() == [3, 10, 11]
+
+
+def test_raw_v4_rejects_any_cadence_inventory_difference(tmp_path: Path) -> None:
+    module = _load_module()
+    compact_path = tmp_path / "compact.h5"
+    tic, cadences = _write_compact(compact_path)
+    raw_path = tmp_path / "raw.h5"
+    altered = cadences.copy()
+    altered[-1] += 1
+    _write_raw_v1(
+        raw_path,
+        tic=tic,
+        cadences=altered,
+        compact_path=compact_path,
+    )
+    table_path, manifest_path = _write_reference_pair(
+        tmp_path, _reference_frame(cadences)
+    )
+    reference, provenance = module.load_external_quality_reference(
+        table_path=table_path, manifest_path=manifest_path, sector=56
+    )
+    module._initialize_external_quality_worker(
+        module._reference_worker_payload(reference), provenance
+    )
+
+    with pytest.raises(ValueError, match="cadence inventory differs"):
+        module._raw_v4_light_curve(
+            raw_source_h5=raw_path,
+            tic=tic,
+            sector=56,
+            camera=1,
+            ccd=1,
+            tessmag=17.5,
+            compact_lc=compact_path,
+            expected_n_cadences=len(cadences),
+        )
 
 
 def test_exact_declared_authority_exclusion_is_masked_before_bls(

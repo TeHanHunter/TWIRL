@@ -23,6 +23,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from twirl.io.compact_export import read_compact_lc_export  # noqa: E402
+from twirl.io.hlsp import BJDREFI, HLSPLightCurve  # noqa: E402
 from twirl.lightcurves.a2v1_cadence_reference import (  # noqa: E402
     AUTHORITY_EXCLUSION_POLICY,
     CADENCE_REFERENCE_BUILDER_VERSION,
@@ -44,6 +45,15 @@ from twirl.vetting.adp_only import (  # noqa: E402
     validate_adp_only_apertures,
 )
 from twirl.vetting.recovery50_teacher import json_default, write_table  # noqa: E402
+from twirl.vetting.ssl_full_pool_native import (  # noqa: E402
+    FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
+    FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
+    FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION,
+    _effective_quality_adp03q,
+    load_production_raw_source_release,
+    load_sector_pool_authority,
+    select_sector_shard,
+)
 
 
 DEFAULT_COMPACT_LC = (
@@ -76,6 +86,9 @@ EXPECTED_QUALITY_COMPOSITION = {
 ORBITID_POLICIES = ("strict", "reference_by_cadence")
 ORBITID_RECONCILIATION_CONTRACT_VERSION = "a2v1_compact_orbitid_reconciliation_v1"
 TARGET_SELECTION_CONTRACT_VERSION = "a2v1_bls_target_allowlist_v1"
+RAW_V4_INPUT_CONTRACT_VERSION = (
+    "twirl_teacher_ssl_fullpool_raw_v1_detector_consistent_bls_v4"
+)
 
 # Populated once per worker by ``_initialize_external_quality_worker``.  The
 # authoritative cadence map is deliberately not repeated in every task
@@ -866,8 +879,139 @@ def _result_rows(result: Any) -> list[dict[str, Any]]:
     return [{**base, **asdict(peak)} for peak in result.peaks]
 
 
-def _process_target(payload: tuple[int, str, dict[str, Any]]) -> list[dict[str, Any]]:
-    tic, compact_lc_s, cfg_payload = payload
+def _raw_v4_light_curve(
+    *,
+    raw_source_h5: Path,
+    tic: int,
+    sector: int,
+    camera: int,
+    ccd: int,
+    tessmag: float,
+    compact_lc: Path,
+    expected_n_cadences: int,
+) -> tuple[HLSPLightCurve, dict[str, Any]]:
+    """Build detector-consistent ADP channels from one immutable raw-v1 group."""
+
+    key = f"{int(tic):016d}"
+    with h5py.File(raw_source_h5, "r") as h5:
+        if "targets" not in h5 or key not in h5["targets"]:
+            raise KeyError(f"raw-v1 source lacks targets/{key}")
+        group = h5["targets"][key]
+        for name, expected in (
+            ("sector", int(sector)),
+            ("tic", int(tic)),
+            ("camera", int(camera)),
+            ("ccd", int(ccd)),
+        ):
+            if int(group.attrs.get(name, -1)) != expected:
+                raise ValueError(
+                    f"TIC {tic}: raw-v1 {name} mapping differs from the "
+                    "frozen pool"
+                )
+        required = (
+            "time",
+            "cadenceno",
+            "orbitid",
+            "quality",
+            "raw_flux_small",
+            "raw_flux_err_small",
+            "raw_flux_primary",
+            "raw_flux_err_primary",
+        )
+        missing = [name for name in required if name not in group]
+        if missing:
+            raise KeyError(f"TIC {tic}: raw-v1 group lacks {missing}")
+        arrays = {name: np.asarray(group[name]) for name in required}
+
+    lengths = {name: len(values) for name, values in arrays.items()}
+    if len(set(lengths.values())) != 1 or not lengths or next(iter(lengths.values())) < 1:
+        raise ValueError(f"TIC {tic}: raw-v1 arrays differ in length: {lengths}")
+    if next(iter(lengths.values())) != int(expected_n_cadences):
+        raise ValueError(
+            f"TIC {tic}: raw-v1 cadence count differs from the frozen pool: "
+            f"{next(iter(lengths.values()))} != {expected_n_cadences}"
+        )
+    cadenceno = np.asarray(arrays["cadenceno"], dtype=np.int64)
+    if len(np.unique(cadenceno)) != len(cadenceno):
+        raise ValueError(f"TIC {tic}: raw-v1 cadences are not unique")
+    if np.any(np.diff(cadenceno) <= 0):
+        raise ValueError(f"TIC {tic}: raw-v1 cadences are not strictly sorted")
+    time_bjd = np.asarray(arrays["time"], dtype=np.float64)
+    if not np.isfinite(time_bjd).all():
+        raise ValueError(f"TIC {tic}: raw-v1 time contains nonfinite values")
+    time_btjd = time_bjd - float(BJDREFI)
+    if np.any(time_btjd < 0.0) or np.any(time_btjd >= 100_000.0):
+        raise ValueError(f"TIC {tic}: raw-v1 time is not absolute BJD")
+    with h5py.File(compact_lc, "r") as compact_file:
+        compact_path = f"targets/{int(tic):016d}"
+        if compact_path not in compact_file:
+            raise KeyError(f"TIC {tic}: frozen compact cadence authority is absent")
+        compact_group = compact_file[compact_path]
+        compact_cadence = np.asarray(compact_group["cadenceno"], dtype=np.int64)
+        compact_time = np.asarray(compact_group["time"], dtype=np.float64)
+    if not np.array_equal(cadenceno, compact_cadence):
+        raise ValueError(
+            f"TIC {tic}: raw-v1 cadence inventory differs from frozen compact"
+        )
+    if len(compact_time) != len(time_btjd):
+        raise ValueError(f"TIC {tic}: frozen compact time length differs")
+    compact_time_bjd = np.where(
+        compact_time < 100_000.0,
+        compact_time + float(BJDREFI),
+        compact_time,
+    )
+    time_delta_s = np.abs(time_bjd - compact_time_bjd) * 86_400.0
+    if not np.isfinite(time_delta_s).all() or float(np.max(time_delta_s)) > 2.0:
+        raise ValueError(
+            f"TIC {tic}: raw-v1/frozen-compact times differ by more than 2 s"
+        )
+    lc = HLSPLightCurve(
+        tic=int(tic),
+        tmag=float(tessmag),
+        sector=int(sector),
+        cam=int(camera),
+        ccd=int(ccd),
+        ra=float("nan"),
+        dec=float("nan"),
+        time=time_btjd,
+        cadenceno=cadenceno,
+        orbitid=np.asarray(arrays["orbitid"], dtype=np.int32),
+        quality=np.asarray(arrays["quality"], dtype=np.int32),
+        flux={},
+        path=Path(f"{raw_source_h5}:targets/{key}"),
+    )
+    quality_counts = _apply_external_quality(lc)
+    quality_counts.update(
+        {
+            "raw_compact_cadence_inventory_match": 1,
+            "raw_compact_time_delta_max_s": float(np.max(time_delta_s)),
+        }
+    )
+    small, _ = _effective_quality_adp03q(
+        time_btjd=time_btjd,
+        raw_flux=np.asarray(arrays["raw_flux_small"], dtype=np.float64),
+        raw_error=np.asarray(arrays["raw_flux_err_small"], dtype=np.float64),
+        quality=np.asarray(lc.quality, dtype=np.int32),
+    )
+    primary, _ = _effective_quality_adp03q(
+        time_btjd=time_btjd,
+        raw_flux=np.asarray(arrays["raw_flux_primary"], dtype=np.float64),
+        raw_error=np.asarray(arrays["raw_flux_err_primary"], dtype=np.float64),
+        quality=np.asarray(lc.quality, dtype=np.int32),
+    )
+    lc.flux = {
+        "DET_FLUX_ADP_SML": small,
+        "DET_FLUX_ADP": primary,
+    }
+    return lc, quality_counts
+
+
+def _process_target(payload: tuple[Any, ...]) -> list[dict[str, Any]]:
+    if len(payload) == 3:
+        tic, compact_lc_s, cfg_payload = payload
+        raw_payload = None
+    else:
+        tic, compact_lc_s, cfg_payload, raw_payload = payload
     compact_lc = Path(compact_lc_s)
     cfg = BLSConfig(
         apertures=tuple(cfg_payload.get("apertures", ADP_ONLY_APERTURES)),
@@ -910,12 +1054,27 @@ def _process_target(payload: tuple[int, str, dict[str, Any]]) -> list[dict[str, 
         "bls_sigma_clip": float(cfg.sigma_clip),
         "bls_orbit_edge_trim_d": float(cfg.orbit_edge_trim_d),
     }
-    lc = read_compact_lc_export(compact_lc, tic=tic, columns=ADP_ONLY_APERTURES)
+    if raw_payload is None:
+        lc = read_compact_lc_export(
+            compact_lc, tic=tic, columns=ADP_ONLY_APERTURES
+        )
+    else:
+        lc, quality_counts = _raw_v4_light_curve(
+            raw_source_h5=Path(raw_payload["path"]),
+            tic=int(tic),
+            sector=int(raw_payload["sector"]),
+            camera=int(raw_payload["camera"]),
+            ccd=int(raw_payload["ccd"]),
+            tessmag=float(raw_payload["tessmag"]),
+            compact_lc=compact_lc,
+            expected_n_cadences=int(raw_payload["n_cadences"]),
+        )
     if lc is None:
         raise RuntimeError(
             f"TIC {tic}: compact product could not supply the locked ADP pair"
         )
-    quality_counts = _apply_external_quality(lc)
+    if raw_payload is None:
+        quality_counts = _apply_external_quality(lc)
     if _EXTERNAL_QUALITY_PROVENANCE is None:
         raise RuntimeError("external-quality provenance was not initialized")
     rows: list[dict[str, Any]] = []
@@ -951,6 +1110,19 @@ def _process_target(payload: tuple[int, str, dict[str, Any]]) -> list[dict[str, 
             row["orbitid_reconciliation_contract_version"] = (
                 ORBITID_RECONCILIATION_CONTRACT_VERSION
             )
+            row["photometry_source_contract_version"] = (
+                RAW_V4_INPUT_CONTRACT_VERSION if raw_payload is not None else "compact"
+            )
+            row["detrend_contract_version"] = (
+                FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION
+                if raw_payload is not None
+                else "precomputed_compact"
+            )
+            row["detrend_config_sha256"] = (
+                FULL_POOL_NATIVE_DETREND_CONFIG_SHA256
+                if raw_payload is not None
+                else ""
+            )
         rows.extend(current)
     return rows
 
@@ -975,6 +1147,13 @@ def build_peak_table(
     orbitid_policy: str = "strict",
     expected_compact_lc_sha256: str | None = None,
     expected_target_allowlist_sha256: str | None = None,
+    raw_source_h5: Path | None = None,
+    raw_source_summary: Path | None = None,
+    raw_export_complete: Path | None = None,
+    raw_transfer_validation: Path | None = None,
+    frozen_pool: Path | None = None,
+    frozen_pool_summary: Path | None = None,
+    execution_allowlist: Path | None = None,
 ) -> dict[str, Any]:
     validate_adp_only_apertures(ADP_ONLY_APERTURES)
     orbitid_policy = _validate_orbitid_policy(orbitid_policy)
@@ -989,11 +1168,68 @@ def build_peak_table(
     compact_lc = Path(compact_lc)
     cadence_reference = Path(cadence_reference)
     cadence_reference_manifest = Path(cadence_reference_manifest)
+    raw_mode = raw_source_h5 is not None
+    if raw_mode:
+        required_raw_inputs = {
+            "raw_source_summary": raw_source_summary,
+            "raw_export_complete": raw_export_complete,
+            "raw_transfer_validation": raw_transfer_validation,
+            "frozen_pool": frozen_pool,
+            "frozen_pool_summary": frozen_pool_summary,
+            "target_allowlist": target_allowlist,
+        }
+        missing_raw = [name for name, value in required_raw_inputs.items() if value is None]
+        if missing_raw:
+            raise ValueError(f"raw-v4 mode requires inputs: {missing_raw}")
+        if max_targets is not None:
+            raise ValueError("raw-v4 mode cannot use max_targets")
+        authority = load_sector_pool_authority(
+            sector=int(sector),
+            pool_path=Path(frozen_pool),
+            pool_summary_path=Path(frozen_pool_summary),
+            allowlist_path=Path(target_allowlist),
+        )
+        source_rows = select_sector_shard(
+            authority,
+            shard_index=int(shard_index),
+            n_shards=int(n_shards),
+        )
+        raw_release = load_production_raw_source_release(
+            authority=authority,
+            source_rows=source_rows,
+            sector=int(sector),
+            shard_index=int(shard_index),
+            n_shards=int(n_shards),
+            raw_source_h5=Path(raw_source_h5),
+            raw_source_summary_path=Path(raw_source_summary),
+            raw_export_complete_path=Path(raw_export_complete),
+            raw_transfer_validation_path=Path(raw_transfer_validation),
+        )
+        if expected_compact_lc_sha256 != authority.compact_h5_sha256:
+            raise ValueError(
+                "raw-v4 compact lineage digest differs from the frozen pool"
+            )
+        raw_source_h5 = raw_release.raw_source.path
+        compact_sha256 = authority.compact_h5_sha256
+    else:
+        authority = None
+        source_rows = None
+        raw_release = None
+        compact_sha256 = _sha256(compact_lc)
     input_sha256 = {
-        "compact_lc": _sha256(compact_lc),
+        "compact_lc": compact_sha256,
         "cadence_reference": _sha256(cadence_reference),
         "cadence_reference_manifest": _sha256(cadence_reference_manifest),
     }
+    if raw_mode and raw_release is not None:
+        input_sha256.update(
+            {
+                "raw_source_h5": raw_release.raw_source.sha256,
+                "raw_source_summary": raw_release.raw_source_summary.sha256,
+                "raw_export_complete": raw_release.export_complete.sha256,
+                "raw_transfer_validation": raw_release.transfer_validation.sha256,
+            }
+        )
     if (
         expected_compact_lc_sha256 is not None
         and input_sha256["compact_lc"] != expected_compact_lc_sha256
@@ -1025,6 +1261,11 @@ def build_peak_table(
             raise ValueError(
                 "expected_target_allowlist_sha256 requires target_allowlist"
             )
+    if execution_allowlist is not None:
+        if not raw_mode:
+            raise ValueError("execution_allowlist is bounded to raw-v4 mode")
+        execution_allowlist = Path(execution_allowlist)
+        input_sha256["execution_allowlist"] = _sha256(execution_allowlist)
     reference, reference_provenance = load_external_quality_reference(
         table_path=cadence_reference,
         manifest_path=cadence_reference_manifest,
@@ -1039,7 +1280,9 @@ def build_peak_table(
         raise RuntimeError("cadence-reference manifest changed while it was validated")
     reference_payload = _reference_worker_payload(reference)
     out_dir.mkdir(parents=True, exist_ok=True)
-    compact_tics = _target_tics(compact_lc)
+    compact_tics = (
+        _target_tics(Path(raw_source_h5)) if raw_mode else _target_tics(compact_lc)
+    )
     if allowlist_tics is None:
         tics = compact_tics
         if max_targets is not None:
@@ -1051,6 +1294,32 @@ def build_peak_table(
             "target_allowlist_count": len(tics),
             "target_allowlist_tics_sha256": _tic_inventory_sha256(tics),
         }
+    elif raw_mode:
+        assert source_rows is not None
+        expected_shard_tics = source_rows["tic"].astype(np.int64).tolist()
+        if compact_tics != expected_shard_tics:
+            raise ValueError(
+                "raw-v4 target inventory differs from the authenticated raw shard"
+            )
+        tics = compact_tics
+        n_targets_total = int(len(authority.rows))
+        if execution_allowlist is not None:
+            execution_tics, execution_selection = load_target_allowlist(
+                Path(execution_allowlist)
+            )
+            outside_sector = sorted(set(execution_tics) - set(allowlist_tics))
+            if outside_sector:
+                raise ValueError(
+                    "raw-v4 execution allowlist lies outside the sector pool; "
+                    f"first={outside_sector[:10]}"
+                )
+            tics = sorted(set(tics) & set(execution_tics))
+            if not tics:
+                raise ValueError(
+                    "raw-v4 execution allowlist has no targets in this raw shard"
+                )
+            target_selection = execution_selection
+            n_targets_total = len(execution_tics)
     else:
         compact_set = set(compact_tics)
         missing_allowlist = sorted(set(allowlist_tics) - compact_set)
@@ -1063,8 +1332,9 @@ def build_peak_table(
         tics = allowlist_tics
     if n_shards < 1 or shard_index < 0 or shard_index >= n_shards:
         raise ValueError("shard_index must satisfy 0 <= shard_index < n_shards")
-    n_targets_total = len(tics)
-    tics = tics[int(shard_index) :: int(n_shards)]
+    if not raw_mode:
+        n_targets_total = len(tics)
+        tics = tics[int(shard_index) :: int(n_shards)]
     suffix = f"_{int(shard_index):03d}" if int(n_shards) > 1 else ""
     output_path = out_dir / f"real_adp_bls_peaks{suffix}.parquet"
     summary_path = out_dir / f"summary{suffix}.json"
@@ -1133,11 +1403,34 @@ def build_peak_table(
             and summary.get("orbitid_policy") == orbitid_policy
             and summary.get("orbitid_reconciliation_contract_version")
             == ORBITID_RECONCILIATION_CONTRACT_VERSION
+            and summary.get("input_mode")
+            == ("immutable_raw_v1_detector_consistent" if raw_mode else "compact")
+            and summary.get("raw_source_h5_sha256")
+            == input_sha256.get("raw_source_h5")
+            and summary.get("execution_allowlist_sha256")
+            == input_sha256.get("execution_allowlist")
             and summary.get("peak_table_sha256") == _sha256(output_path)
         ):
             print(json.dumps(summary, indent=2, sort_keys=True))
             return summary
-    payloads = [(tic, str(compact_lc), cfg_payload) for tic in tics]
+    if raw_mode:
+        assert source_rows is not None and raw_source_h5 is not None
+        metadata = {
+            int(row.tic): {
+                "path": str(raw_source_h5),
+                "sector": int(row.sector),
+                "camera": int(row.camera),
+                "ccd": int(row.ccd),
+                "tessmag": float(row.tessmag),
+                "n_cadences": int(row.n_cadences),
+            }
+            for row in source_rows.itertuples(index=False)
+        }
+        payloads = [
+            (tic, str(compact_lc), cfg_payload, metadata[int(tic)]) for tic in tics
+        ]
+    else:
+        payloads = [(tic, str(compact_lc), cfg_payload) for tic in tics]
     rows: list[dict[str, Any]] = []
     workers = max(1, int(workers))
     if workers == 1:
@@ -1167,12 +1460,32 @@ def build_peak_table(
             executor.shutdown(wait=True)
 
     final_input_sha256 = {
-        "compact_lc": _sha256(compact_lc),
+        "compact_lc": (
+            compact_sha256 if raw_mode else _sha256(compact_lc)
+        ),
         "cadence_reference": _sha256(cadence_reference),
         "cadence_reference_manifest": _sha256(cadence_reference_manifest),
     }
+    if raw_mode and raw_release is not None:
+        for binding in (
+            raw_release.raw_source,
+            raw_release.raw_source_summary,
+            raw_release.export_complete,
+            raw_release.transfer_validation,
+        ):
+            binding.assert_unchanged()
+        final_input_sha256.update(
+            {
+                "raw_source_h5": raw_release.raw_source.sha256,
+                "raw_source_summary": raw_release.raw_source_summary.sha256,
+                "raw_export_complete": raw_release.export_complete.sha256,
+                "raw_transfer_validation": raw_release.transfer_validation.sha256,
+            }
+        )
     if target_allowlist is not None:
         final_input_sha256["target_allowlist"] = _sha256(target_allowlist)
+    if execution_allowlist is not None:
+        final_input_sha256["execution_allowlist"] = _sha256(execution_allowlist)
     if final_input_sha256 != input_sha256:
         raise RuntimeError(
             "BLS input source changed during the run; refusing to publish peaks"
@@ -1211,6 +1524,31 @@ def build_peak_table(
             column: int(pd.to_numeric(target_quality[column], errors="raise").sum())
             for column in quality_count_columns
         }
+    raw_cadence_audit: dict[str, Any] = {}
+    if raw_mode:
+        required_audit = {
+            "raw_compact_cadence_inventory_match",
+            "raw_compact_time_delta_max_s",
+        }
+        missing_audit = sorted(required_audit - set(peaks.columns))
+        if missing_audit:
+            raise ValueError(f"raw-v4 BLS rows lack cadence audit: {missing_audit}")
+        target_audit = peaks.drop_duplicates("tic", keep="first")
+        inventory_match = pd.to_numeric(
+            target_audit["raw_compact_cadence_inventory_match"], errors="raise"
+        )
+        if not inventory_match.eq(1).all():
+            raise ValueError("raw-v4 cadence inventory audit did not pass")
+        delta = pd.to_numeric(
+            target_audit["raw_compact_time_delta_max_s"], errors="raise"
+        )
+        if not np.isfinite(delta.to_numpy(dtype=float)).all() or delta.gt(2.0).any():
+            raise ValueError("raw-v4 cadence time audit exceeded 2 seconds")
+        raw_cadence_audit = {
+            "raw_compact_cadence_inventory_passed": True,
+            "n_raw_compact_cadence_inventories_verified": int(len(target_audit)),
+            "raw_compact_time_delta_max_s": float(delta.max()),
+        }
     orbitid_summary = _orbitid_summary_from_rows(
         peaks,
         orbitid_policy=orbitid_policy,
@@ -1224,6 +1562,40 @@ def build_peak_table(
         "external_quality_policy_contract": EXTERNAL_QUALITY_POLICY_CONTRACT,
         "compact_lc": str(compact_lc),
         "compact_lc_sha256": input_sha256["compact_lc"],
+        "compact_lc_role": (
+            "frozen_pool_lineage_only_not_read"
+            if raw_mode
+            else "photometry_and_cadence_input"
+        ),
+        "input_mode": "immutable_raw_v1_detector_consistent" if raw_mode else "compact",
+        "raw_v4_input_contract_version": (
+            RAW_V4_INPUT_CONTRACT_VERSION if raw_mode else None
+        ),
+        "raw_source_h5": str(raw_source_h5) if raw_mode else None,
+        "raw_source_h5_sha256": input_sha256.get("raw_source_h5"),
+        "raw_source_summary": str(raw_source_summary) if raw_mode else None,
+        "raw_source_summary_sha256": input_sha256.get("raw_source_summary"),
+        "raw_export_complete": str(raw_export_complete) if raw_mode else None,
+        "raw_export_complete_sha256": input_sha256.get("raw_export_complete"),
+        "raw_transfer_validation": (
+            str(raw_transfer_validation) if raw_mode else None
+        ),
+        "raw_transfer_validation_sha256": input_sha256.get(
+            "raw_transfer_validation"
+        ),
+        "execution_allowlist": (
+            str(execution_allowlist) if execution_allowlist is not None else None
+        ),
+        "execution_allowlist_sha256": input_sha256.get("execution_allowlist"),
+        "detrend_contract_version": (
+            FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION if raw_mode else None
+        ),
+        "detrend_config_sha256": (
+            FULL_POOL_NATIVE_DETREND_CONFIG_SHA256 if raw_mode else None
+        ),
+        "detrend_time_contract_version": (
+            FULL_POOL_NATIVE_DETREND_TIME_CONTRACT_VERSION if raw_mode else None
+        ),
         "cadence_reference": str(cadence_reference),
         "cadence_reference_sha256": input_sha256["cadence_reference"],
         "cadence_reference_manifest": str(cadence_reference_manifest),
@@ -1282,6 +1654,7 @@ def build_peak_table(
             .items()
         },
         "quality_counts_over_unique_targets": (quality_counts_over_unique_targets),
+        **raw_cadence_audit,
         "outputs": {
             "peak_table": str(output_path),
             "summary": str(summary_path),
@@ -1343,6 +1716,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="",
         help="Set to A2v1 when the compact export came from the production A2v1 FITS tree.",
     )
+    parser.add_argument("--raw-source-h5", type=Path, default=None)
+    parser.add_argument("--raw-source-summary", type=Path, default=None)
+    parser.add_argument("--raw-export-complete", type=Path, default=None)
+    parser.add_argument("--raw-transfer-validation", type=Path, default=None)
+    parser.add_argument("--frozen-pool", type=Path, default=None)
+    parser.add_argument("--frozen-pool-summary", type=Path, default=None)
+    parser.add_argument("--execution-allowlist", type=Path, default=None)
     return parser
 
 
@@ -1369,6 +1749,13 @@ def main(argv: list[str] | None = None) -> int:
         expected_target_allowlist_sha256=(
             args.expected_target_allowlist_sha256
         ),
+        raw_source_h5=args.raw_source_h5,
+        raw_source_summary=args.raw_source_summary,
+        raw_export_complete=args.raw_export_complete,
+        raw_transfer_validation=args.raw_transfer_validation,
+        frozen_pool=args.frozen_pool,
+        frozen_pool_summary=args.frozen_pool_summary,
+        execution_allowlist=args.execution_allowlist,
     )
     return 0
 

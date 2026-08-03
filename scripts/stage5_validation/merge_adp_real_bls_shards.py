@@ -57,6 +57,25 @@ _ORBITID_INVARIANT_FIELDS = (
 _ORBITID_POLICIES = ("strict", "reference_by_cadence")
 _ORBITID_RECONCILIATION_CONTRACT_VERSION = "a2v1_compact_orbitid_reconciliation_v1"
 _TARGET_SELECTION_CONTRACT_VERSION = "a2v1_bls_target_allowlist_v1"
+_RAW_V4_INPUT_MODE = "immutable_raw_v1_detector_consistent"
+_RAW_V4_INVARIANT_FIELDS = (
+    "input_mode",
+    "raw_v4_input_contract_version",
+    "compact_lc_role",
+    "raw_export_complete",
+    "raw_export_complete_sha256",
+    "raw_transfer_validation",
+    "raw_transfer_validation_sha256",
+    "detrend_contract_version",
+    "detrend_config_sha256",
+    "detrend_time_contract_version",
+)
+_RAW_V4_SHARD_FIELDS = (
+    "raw_source_h5",
+    "raw_source_h5_sha256",
+    "raw_source_summary",
+    "raw_source_summary_sha256",
+)
 
 
 def _sha256(path: Path) -> str:
@@ -267,6 +286,17 @@ def merge_shards(
             )
         if all(present):
             invariant_fields.extend(group)
+    raw_v4 = baseline.get("input_mode") == _RAW_V4_INPUT_MODE
+    if raw_v4:
+        missing_raw = sorted(
+            set((*_RAW_V4_INVARIANT_FIELDS, *_RAW_V4_SHARD_FIELDS))
+            - set(baseline)
+        )
+        if missing_raw:
+            raise ValueError(
+                f"raw-v4 BLS shard summary lacks fields: {missing_raw}"
+            )
+        invariant_fields.extend(_RAW_V4_INVARIANT_FIELDS)
     for field in invariant_fields:
         if field not in baseline:
             raise ValueError(f"real-BLS shard summary is missing {field}")
@@ -291,6 +321,36 @@ def merge_shards(
             if payload.get(field) != baseline[field]:
                 raise ValueError(
                     f"real-BLS shard {index} disagrees on provenance field {field}"
+                )
+        if raw_v4:
+            for field in _RAW_V4_SHARD_FIELDS:
+                if field not in payload:
+                    raise ValueError(
+                        f"raw-v4 BLS shard {index} lacks {field}"
+                    )
+            for path_field, digest_field in (
+                ("raw_source_h5", "raw_source_h5_sha256"),
+                ("raw_source_summary", "raw_source_summary_sha256"),
+            ):
+                source_path = Path(str(payload[path_field])).resolve()
+                if _sha256(source_path) != str(payload[digest_field]):
+                    raise ValueError(
+                        f"raw-v4 BLS shard {index} {path_field} SHA256 mismatch"
+                    )
+            if payload.get("raw_compact_cadence_inventory_passed") is not True:
+                raise ValueError(
+                    f"raw-v4 BLS shard {index} cadence inventory audit failed"
+                )
+            if int(
+                payload.get("n_raw_compact_cadence_inventories_verified", -1)
+            ) != int(payload.get("n_targets", -2)):
+                raise ValueError(
+                    f"raw-v4 BLS shard {index} cadence audit count mismatch"
+                )
+            time_delta = float(payload.get("raw_compact_time_delta_max_s", float("inf")))
+            if not np.isfinite(time_delta) or time_delta > 2.0:
+                raise ValueError(
+                    f"raw-v4 BLS shard {index} cadence time audit failed"
                 )
         if payload.get("peak_table_sha256") != initial_hashes[str(path.resolve())]:
             raise ValueError(f"real-BLS shard {index} peak-table SHA256 mismatch")
@@ -506,6 +566,25 @@ def merge_shards(
                 .items()
             },
             "quality_counts_over_unique_targets": (quality_counts_over_unique_targets),
+            **(
+                {
+                    "raw_compact_cadence_inventory_passed": True,
+                    "n_raw_compact_cadence_inventories_verified": int(
+                        sum(
+                            int(payload["n_raw_compact_cadence_inventories_verified"])
+                            for payload in summary_payloads
+                        )
+                    ),
+                    "raw_compact_time_delta_max_s": float(
+                        max(
+                            float(payload["raw_compact_time_delta_max_s"])
+                            for payload in summary_payloads
+                        )
+                    ),
+                }
+                if raw_v4
+                else {}
+            ),
             **merged_orbitid_summary,
             "source_shards": [
                 {
@@ -516,6 +595,14 @@ def merge_shards(
                     "summary_sha256": initial_hashes[str(summary_path.resolve())],
                     "n_targets": int(payload["n_targets"]),
                     "n_rows": int(payload["n_rows"]),
+                    **(
+                        {
+                            field: payload[field]
+                            for field in _RAW_V4_SHARD_FIELDS
+                        }
+                        if raw_v4
+                        else {}
+                    ),
                 }
                 for index, (path, summary_path, payload) in enumerate(
                     zip(paths, summaries, summary_payloads, strict=True)
