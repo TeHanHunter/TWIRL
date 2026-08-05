@@ -1,0 +1,267 @@
+{
+  "created_utc": "2026-07-27T17:55:19.061562+00:00",
+  "outputs": {
+    "01_TIC267574918_benchmark_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/01_TIC267574918_benchmark_current_adp.png",
+      "sha256": "ee33d17d8f3ab99ec05b79f08bbc9fb6c3f3f7a443316283ebe97c8fbe812205",
+      "size_bytes": 1237633
+    },
+    "02_TIC1400704733_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/02_TIC1400704733_a_current_adp.png",
+      "sha256": "c6bb95e2d5734d59abf1d42e04857169349861fa9641fc82581f3626602c79d3",
+      "size_bytes": 1933775
+    },
+    "03_TIC160520962_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/03_TIC160520962_a_current_adp.png",
+      "sha256": "7ff4d59361af8db6f411a3348e665422c39740f58b0b595e153a5f33ff8b3a07",
+      "size_bytes": 1537159
+    },
+    "04_TIC2025450802_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/04_TIC2025450802_a_current_adp.png",
+      "sha256": "1a9b4c2004e9b18d29eb199dbab35f14562cbbb542fed1300963eb683609f8f9",
+      "size_bytes": 2055615
+    },
+    "05_TIC1961800465_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/05_TIC1961800465_a_current_adp.png",
+      "sha256": "be6e2dd456479b7e1d31437284e7646d683a5c4105edc336f7eb84737d397ce5",
+      "size_bytes": 2041927
+    },
+    "06_TIC1201294971_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/06_TIC1201294971_a_current_adp.png",
+      "sha256": "0daa7ec58f69073143672ed841e434a1afa9afbb6345c8c36c8ce22d009d5c3e",
+      "size_bytes": 1921252
+    },
+    "07_TIC1400855795_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/07_TIC1400855795_a_current_adp.png",
+      "sha256": "7d381135b655098f8c4ea2df7c3bca24ce176d7ad34d46f08b6d5c517732ec23",
+      "size_bytes": 2126070
+    },
+    "08_TIC1400739415_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/08_TIC1400739415_a_current_adp.png",
+      "sha256": "e74271d2b0af65517e20f4bbdd70c8ad3cfdc5db6261f39762f513f30c246902",
+      "size_bytes": 1955706
+    },
+    "09_TIC2025618479_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/09_TIC2025618479_a_current_adp.png",
+      "sha256": "f23867f0bd36baf0a0f0105314a9efcbc49c6db949beb14f5ea05f62ec94e321",
+      "size_bytes": 1911092
+    },
+    "10_TIC2002732115_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/10_TIC2002732115_a_current_adp.png",
+      "sha256": "220d71b8b5bb552372339695875175f3fc82e1cd6dd0101ee781d13f67d9ab6d",
+      "size_bytes": 1974277
+    },
+    "11_TIC1883349930_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/11_TIC1883349930_a_current_adp.png",
+      "sha256": "27ea95b52529cfd2c512ca58ef8323b012f836cfb2b319ca80541e35da79e270",
+      "size_bytes": 2060002
+    },
+    "12_TIC1979515854_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/12_TIC1979515854_a_current_adp.png",
+      "sha256": "e730bf409fb5c6f4aa9ef870c2872d4564607c88f7d81534ae9fead4cdec7a7e",
+      "size_bytes": 2289852
+    },
+    "13_TIC2040364939_a_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/13_TIC2040364939_a_current_adp.png",
+      "sha256": "e9c08eb077facba11e64ecd5671b662cec03efef9486d052d98a57428c258dee",
+      "size_bytes": 1701165
+    },
+    "14_TIC2003242089_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/14_TIC2003242089_b_current_adp.png",
+      "sha256": "18a383fc9d91b7874af14fb0b1d01397c4a23e0957b24660a38e4da9386661c8",
+      "size_bytes": 1813122
+    },
+    "15_TIC2040434684_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/15_TIC2040434684_b_current_adp.png",
+      "sha256": "3bab257a542d1164c5c4a30e9f674633ed50714e5799229164cc7c7c3381f35b",
+      "size_bytes": 1653213
+    },
+    "16_TIC1884114805_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/16_TIC1884114805_b_current_adp.png",
+      "sha256": "53871b12e4edd0b4b906806d7e84f24454f7296e6eb14fb2148dcd15fd6dbe3c",
+      "size_bytes": 1964594
+    },
+    "17_TIC2013972572_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/17_TIC2013972572_b_current_adp.png",
+      "sha256": "3534ba466ec32d3a12b75a7733f846a2471c4f4b8b62eb899c8a4d5892632265",
+      "size_bytes": 1527645
+    },
+    "18_TIC1882050598_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/18_TIC1882050598_b_current_adp.png",
+      "sha256": "17150ac3fad6c5edce743d2c8930372dc2700b01869299072de4fa584cbda470",
+      "size_bytes": 1902383
+    },
+    "19_TIC2001273871_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/19_TIC2001273871_b_current_adp.png",
+      "sha256": "283520a9d5be90a3d21febe78233906fd443d32acbbdc301d7b57c2b668baeaf",
+      "size_bytes": 1886462
+    },
+    "20_TIC2040459567_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/20_TIC2040459567_b_current_adp.png",
+      "sha256": "4fb417550770693f62e57f936fd780944c1652adf0f7d569292ddf3a1766c6eb",
+      "size_bytes": 1662658
+    },
+    "21_TIC2040712491_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/21_TIC2040712491_b_current_adp.png",
+      "sha256": "c4a677e81c3475bd369538f992c28b41505352eac0cecfdab8a4ff2607ba18a7",
+      "size_bytes": 1804095
+    },
+    "22_TIC2040327472_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/22_TIC2040327472_b_current_adp.png",
+      "sha256": "92cb236fee7caa1a8ec3c4ca13ed836cb5cb9c54ae4e2aba50b12914007404d0",
+      "size_bytes": 1701845
+    },
+    "23_TIC2011415393_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/23_TIC2011415393_b_current_adp.png",
+      "sha256": "d369783be2667fd1b4dbbad43d667625da663e8e31c267f496056a40db5a618c",
+      "size_bytes": 1637039
+    },
+    "24_TIC1979188354_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/24_TIC1979188354_b_current_adp.png",
+      "sha256": "9693c663c103da30c2e5fc6a6d37de808be925ceed080495027374fea7624180",
+      "size_bytes": 2019472
+    },
+    "25_TIC2003515304_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/25_TIC2003515304_b_current_adp.png",
+      "sha256": "eed01b1358cc52c0918ecbcfd76551a44688f37ade7109dbaed30b3a0ed432ff",
+      "size_bytes": 1888716
+    },
+    "26_TIC1978545466_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/26_TIC1978545466_b_current_adp.png",
+      "sha256": "d9209b12e43042cdf6c483b2e4281dd32701a3f39a72df1dc6fd5ecad4ab59e0",
+      "size_bytes": 1783933
+    },
+    "27_TIC2040583203_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/27_TIC2040583203_b_current_adp.png",
+      "sha256": "b593fa17f95553f256cc59fad4ebef4fc22f3d3e43540603370986e90083f3ab",
+      "size_bytes": 1546718
+    },
+    "28_TIC2003344337_b_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/28_TIC2003344337_b_current_adp.png",
+      "sha256": "953b8421b0a1d8ce3b5cf2e72c2e9f93a2d57ce663594e4ef01d0c8653e920e7",
+      "size_bytes": 1859693
+    },
+    "29_TIC2001332736_c_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/29_TIC2001332736_c_current_adp.png",
+      "sha256": "dd1753bec366ca68f2a1470b37fbb27706fb930d220882a1acd9f728e530e759",
+      "size_bytes": 1551258
+    },
+    "30_TIC1971892020_c_current_adp.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/30_TIC1971892020_c_current_adp.png",
+      "sha256": "60ef9980768584fb34c71818ed7256abef30fc8205b5bf10000f0f6adf312f3f",
+      "size_bytes": 1383862
+    },
+    "README.md": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/README.md",
+      "sha256": "60ef6363dc7975c81eeb79f033ec261750acbe6ad48ad5414d8efdc6d5d02728",
+      "size_bytes": 2233
+    },
+    "s56_planet_like_candidates.csv": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/s56_planet_like_candidates.csv",
+      "sha256": "222b67c37686ea0f9e23f1a75a2b72a4db0018b2fd9519ae974ded779ea7b3de",
+      "size_bytes": 31061
+    },
+    "s56_planet_like_candidates.json": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/s56_planet_like_candidates.json",
+      "sha256": "e926f18aa12dd39ddfe56596123869b33481c0d88e7477fc8bd8c44ab34f4585",
+      "size_bytes": 69302
+    },
+    "s56_planet_like_candidates_summary.pdf": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/s56_planet_like_candidates_summary.pdf",
+      "sha256": "6bfd8fd016cf1484ec03235e0ee19377f916265bfafb2256617c60e817a22410",
+      "size_bytes": 43036
+    },
+    "s56_planet_like_candidates_summary.png": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/s56_planet_like_candidates_summary.png",
+      "sha256": "086802e93f3773d1c00b4c0b169d0717b69e576cbee0dd0d33546effa9dd87ef",
+      "size_bytes": 583974
+    },
+    "s56_planet_like_candidates.xlsx": {
+      "path": "reports/stage5_validation/s56_planet_like_candidates_current_20260727/s56_planet_like_candidates.xlsx",
+      "sha256": "70a71ca8df91f00690ec040c50a929d265399ed7d829f945c4bac11420541baa",
+      "size_bytes": 22186
+    }
+  },
+  "qa_contact_pages": [
+    "/private/tmp/twirl_s56_planet_like_candidate_qa/s56_planet_like_contact_page_01.png",
+    "/private/tmp/twirl_s56_planet_like_candidate_qa/s56_planet_like_contact_page_02.png",
+    "/private/tmp/twirl_s56_planet_like_candidate_qa/s56_planet_like_contact_page_03.png",
+    "/private/tmp/twirl_s56_planet_like_candidate_qa/s56_planet_like_contact_page_04.png",
+    "/private/tmp/twirl_s56_planet_like_candidate_qa/s56_planet_like_contact_page_05.png"
+  ],
+  "selection": {
+    "discovery_route_counts": {
+      "human-adjudicated": 12,
+      "model-enriched, human-confirmed": 18
+    },
+    "final_morphology_label": "planet_like",
+    "n_aperture_period_matches": 13,
+    "n_candidates": 30,
+    "n_tier1_searchable": 30,
+    "n_unique_tics": 30,
+    "priority_group_counts": {
+      "A": 12,
+      "B": 15,
+      "Benchmark": 1,
+      "C": 2
+    },
+    "ranking_contract": "benchmark first; aligned-current-ADP periods before disagreement; within aligned rows sort by min cross-aperture SDE; within disagreement rows sort by small-aperture SDE; odd/even review flags sort after unflagged rows; no model probability used",
+    "sector": 56
+  },
+  "sheet_set": {
+    "apertures": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_ADP"
+    ],
+    "app": "twirl.vetting.lightcurve_label_app.LightCurveVettingApp",
+    "branch_name": "current_adp",
+    "exact_sheet_names_only": true,
+    "harmonic_factors": [
+      0.25,
+      0.5,
+      1,
+      2,
+      4
+    ],
+    "lc_export_h5_by_sector": {
+      "56": "/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1/inputs/s56_A2v1_adp_pair.h5",
+      "57": "/pdo/users/tehan/twirl_stage5/s57_A2v1_teacher_search_v1/inputs/s57_A2v1_adp_pair.h5",
+      "58": "/pdo/users/tehan/twirl_stage5/franklin_s56_s59_20260717/sector_0058/inputs/s58_A2v1_adp_pair.h5",
+      "59": "/pdo/users/tehan/twirl_stage5/franklin_s56_s59_20260717/sector_0059/inputs/s59_A2v1_adp_pair.h5",
+      "60": "/pdo/users/tehan/twirl_stage5/s60_A2v1_teacher_search_v1/inputs/s60_A2v1_adp_pair.h5",
+      "61": "/pdo/users/tehan/twirl_stage5/s61_A2v1_teacher_search_v1/inputs/s61_A2v1_adp_pair.h5",
+      "62": "/pdo/users/tehan/twirl_stage5/s62_A2v1_teacher_search_v1/inputs/s62_A2v1_adp_pair.h5"
+    },
+    "n_peaks": 10,
+    "n_periods": 20000,
+    "render_provenance_root": "render_provenance_s56_s62_a2v1_current_adp_v1",
+    "renderer_version": "S56-ADP-HV2",
+    "require_render_provenance": true,
+    "sheet_root": "vet_sheets_s56_s62_a2v1_current_adp_v1",
+    "sheet_set_version": "s56_s62_a2v1_current_adp_v1",
+    "use_row_ephemeris": true,
+    "write_pdf": false
+  },
+  "sources": {
+    "accepted_morphology": {
+      "path": "reports/stage5_validation/s56_s62_morphology_corpus_teacher_v3_v1/accepted_signal_rereview.csv",
+      "sha256": "0cbd9a3a293ab085f19f1a3510e526ba72ee6ac7bc95d0b98aa717e96e493e33"
+    },
+    "current_render_metrics": {
+      "path": "data_local/label_reviews/s56_s62_signal_rereview/render_provenance_s56_s62_a2v1_current_adp_v1/s0056_metrics.csv",
+      "sha256": "b0a7054897ac4fa185a29ea5d3da686641be7fb066e4b35d9407d1e3711b9e23"
+    },
+    "rendered_sheet_manifest": {
+      "path": "data_local/label_reviews/s56_s62_signal_rereview/rendered_sheet_manifest.csv",
+      "sha256": "55f2e18ed409dd7d60e5b0a2257dd996313639d81b6f56c5edee6251dc95c2cc"
+    },
+    "sheet_set": {
+      "path": "data_local/label_reviews/s56_s62_signal_rereview/sheet_set.json",
+      "sha256": "a9d0d9da2ba1aef59d087c7e209f7b9b5fdeba0763e634f0c59dcc57601f9773"
+    },
+    "tier1_target_eligibility": {
+      "path": "reports/stage1_lightcurves/s56_A2v1_tier1_active_search_pair_v1_20260723/target_eligibility.csv",
+      "sha256": "eb6dacefd8624c612f6c3b44fe6852f584ff05844cb4e9123ffcbead4968448b"
+    }
+  }
+}

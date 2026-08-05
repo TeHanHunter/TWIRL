@@ -55,6 +55,13 @@ The operational source-pickle reuse, HDF5, FITS, and validation sequence is in
 on MIT PDO; compact exports support downstream work on ORCD. Raw TGLC/TICA
 trees are not moved to ORCD.
 
+## Teacher v3 data handoff
+
+For an independent model experiment on the frozen S56--S62 morphology release,
+use [Franklin's handoff guide](doc/franklin_teacher_v3_handoff.md). The minimum
+input is one split/label table plus seven model-ready native HDF5 files; FITS
+and raw TGLC products are not required.
+
 ## Pipeline status
 
 1. **Stage 1 — catalogs, extraction, A2v1 products, indexing, and photometric

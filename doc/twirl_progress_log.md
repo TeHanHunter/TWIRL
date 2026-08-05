@@ -165,6 +165,24 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   one has neither channel. None is a negative label. The complete
   `628,955`-row BLS binding and all published output hashes validate, and the
   local suite passes `420` tests with `3` skips plus detection and docs checks.
+- `2026-07-27`: Completed the isolated
+  [TIC 298666530 multi-sector quick-look](../reports/stage5_validation/tic298666530_multisector_quicklook_20260727/).
+  The target has `16` delivered sectors through S86 plus five forecast-only
+  S117--S121 visits. The PDO run reused the prepared source pickles only
+  through read-only symlinks and wrote every overlay, ePSF, HDF5, FITS, and log
+  under its TIC-specific user directory. Aggregate validation passed `22`
+  target ePSFs, `21` HDF5s, and `11` new A2v1 sector FITS; edge-flagged S79
+  retains orbit 166 after orbit 165 failed to emit a persistent target HDF5.
+  Combined with existing S56--S60 products, the prior-anchored apertures agree
+  on `P = 0.5732804--0.5732805 d` and `12 min`, with a nearby depth-S/N >= 5
+  signal in `14/16` sectors in 1x1 ADP and `13/16` in 3x3 ADP. The pipeline
+  audit also found an unseeded S57 enrichment recovery at `0.573296787 d`; it
+  never entered the frozen human-label corpus. Strong sector/aperture depth
+  changes and S78/S83/S84/S86 inconsistencies keep this an exploratory
+  recurrence diagnostic, not an astrophysical confirmation. On `2026-07-29`,
+  S56-schema TIC-ID CSV/TXT indexes were added beside all `11` target-only
+  sector products, with a combined manifest and HDF5/FITS-union validation;
+  their one-TIC scope is explicit and does not imply full-sector production.
 
 **Next:** Keep the gated S64-S69 source-only production queue active in
 parallel. Apply the v4 paired-input mask when the S56--S62 label corpus is
@@ -405,6 +423,17 @@ sample.
   [PNG, PDF, metrics, and short report](../reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/performance/).
   Final local validation passes `488` tests with `3` skips plus the
   documentation checker.
+- `2026-07-27`: Curated the final human-accepted Sector 56 Planet-like
+  morphology subset into a single
+  [candidate bundle](../reports/stage5_validation/s56_planet_like_candidates_current_20260727/README.md)
+  with `30` unique TICs, their uniform current-ADP `S56-ADP-HV2` vetting
+  sheets, a sortable workbook, machine-readable tables, and a visual index.
+  The set contains `12` original human-adjudicated candidates and `18`
+  model-enriched candidates subsequently accepted by human review. All `30`
+  pass the Tier-1 searchability gate; `13` have aligned current periods in both
+  ADP apertures, while `17` retain an aperture-period disagreement. The
+  benchmark/A/B/C ordering is transparent follow-up triage, not an
+  astrophysical confirmation claim.
 - `2026-07-27`: Froze the
   [Teacher SSL v1 preregistration](../reports/stage5_validation/teacher_ssl_v1_s56_s62_a2v1_current_adp/)
   and deployed the corrected exact Git object `634e865f` to a new detached

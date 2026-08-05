@@ -1,0 +1,54 @@
+{
+  "period_center_d": 0.5733,
+  "period_window_d": 0.0005,
+  "n_periods": 20001,
+  "duration_grid_min": [8, 10, 12, 14, 16, 18, 20],
+  "all_sectors": {
+    "small": {
+      "period_d": 0.5732805,
+      "duration_min": 12.0,
+      "depth": 0.02810968,
+      "depth_snr": 19.665
+    },
+    "primary": {
+      "period_d": 0.57328035,
+      "duration_min": 12.0,
+      "depth": 0.01373391,
+      "depth_snr": 14.932
+    }
+  },
+  "excluding_sector_78": {
+    "small": {
+      "period_d": 0.5732801,
+      "duration_min": 12.0,
+      "depth": 0.02798378,
+      "depth_snr": 19.594
+    },
+    "primary": {
+      "period_d": 0.57328035,
+      "duration_min": 12.0,
+      "depth": 0.01356303,
+      "depth_snr": 14.736
+    }
+  },
+  "sector_local_consensus": {
+    "criterion": "local depth S/N >= 5 and |period - 0.5733 d| <= 0.0005 d",
+    "small": {
+      "n_sectors": 14,
+      "median_period_d": 0.57329175,
+      "period_mad_d": 0.000042995,
+      "sectors": [56, 57, 58, 59, 60, 73, 75, 77, 79, 80, 82, 84, 85, 86]
+    },
+    "primary": {
+      "n_sectors": 13,
+      "median_period_d": 0.5732845,
+      "period_mad_d": 0.000028911,
+      "sectors": [56, 57, 58, 59, 60, 73, 75, 77, 79, 80, 82, 83, 85]
+    },
+    "both_apertures": {
+      "n_sectors": 12,
+      "sectors": [56, 57, 58, 59, 60, 73, 75, 77, 79, 80, 82, 85]
+    }
+  },
+  "interpretation": "The narrow prior-anchored refinement agrees between apertures and is stable to excluding S78. The wider 0.5703-0.5763 d primary-aperture scan is dominated by a different systematic peak and is not used as the consensus ephemeris."
+}

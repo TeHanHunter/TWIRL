@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-28`.
+Last reconciled: `2026-08-03`.
 
 ## Current status
 
@@ -131,6 +131,16 @@ The operational contract is defined in the
 - compact exports and derived indices retain Gaia/TIC IDs, sector/orbit/
   detector provenance, cadence/quality information, product/schema version,
   and source checksums.
+- **Later-sector timing audit:** before producing any sector containing data on
+  or after `2026-01-31`, verify that the TGLC barycentric-correction ephemeris
+  brackets every cadence in each orbit/camera/CCD job and fails closed rather
+  than edge-clamping an out-of-range interpolation. Record the ephemeris
+  source/retrieval and coverage in the run provenance, and compare corrected
+  times at the beginning, middle, and end of each orbit with an independent
+  SPOC or TESSCut reference where available. This is required because a
+  static-ephemeris TGLC path reportedly produced source-dependent, minute-scale
+  timing errors after `2026-01-31`; the completed S56--S63 products predate
+  that interval.
 
 ### Candidate and label provenance
 
