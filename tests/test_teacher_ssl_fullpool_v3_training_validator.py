@@ -570,6 +570,30 @@ def _rewrite_contract(
     _write_json(summary_path, summary)
 
 
+def _rewrite_contract_and_checkpoint(
+    case: dict[str, Any],
+    fold: int,
+    mutate: Callable[[dict[str, Any]], None],
+) -> None:
+    """Alter a synthetic contract while retaining its checkpoint binding."""
+
+    _rewrite_contract(case, fold, mutate)
+    fold_dir = (
+        case["model_root"] / "encoder_pretraining" / f"fold_{fold}"
+    )
+    contract_path = fold_dir / "run_contract.json"
+    checkpoint_path = fold_dir / "encoder.pt"
+    checkpoint = torch.load(
+        checkpoint_path, map_location="cpu", weights_only=False
+    )
+    checkpoint["run_contract_sha256"] = _sha256(contract_path)
+    torch.save(checkpoint, checkpoint_path)
+    summary_path = fold_dir / "summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["checkpoint_sha256"] = _sha256(checkpoint_path)
+    _write_json(summary_path, summary)
+
+
 def test_training_validator_accepts_and_revalidates_immutable_release(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -579,18 +603,68 @@ def test_training_validator_accepts_and_revalidates_immutable_release(
     first = VALIDATOR.write_teacher_ssl_fullpool_completion_release(
         model_root=case["model_root"],
         expected_code_revision=case["revision"],
+        validator_code_revision="2" * 40,
         output_path=release,
     )
     second = VALIDATOR.write_teacher_ssl_fullpool_completion_release(
         model_root=case["model_root"],
         expected_code_revision=case["revision"],
+        validator_code_revision="2" * 40,
         output_path=release,
     )
     assert first["passed"] is True
     assert first["counts"] == {"folds": 5, "completed_epochs": 100}
+    assert first["validator_code_revision"] == "2" * 40
     assert first["completion_release"]["sha256"] == second[
         "completion_release"
     ]["sha256"]
+
+
+def test_training_validator_accepts_cross_node_native_device_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = _fixture(tmp_path, monkeypatch)
+    for fold in range(5):
+        _rewrite_contract_and_checkpoint(
+            case,
+            fold,
+            lambda contract: contract["native_files"][0].update(
+                {
+                    "native_h5_device": contract["native_files"][0][
+                        "native_h5_device"
+                    ]
+                    + 1
+                }
+            ),
+        )
+
+    result = VALIDATOR.validate_teacher_ssl_fullpool_training(
+        model_root=case["model_root"],
+        expected_code_revision=case["revision"],
+    )
+
+    assert result["passed"] is True
+
+
+def test_training_validator_rejects_cross_node_native_content_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = _fixture(tmp_path, monkeypatch)
+    _rewrite_contract_and_checkpoint(
+        case,
+        0,
+        lambda contract: contract["native_files"][0].update(
+            {"native_h5_sha256": "f" * 64}
+        ),
+    )
+
+    with pytest.raises(ValueError, match="native files differ"):
+        VALIDATOR.validate_teacher_ssl_fullpool_training(
+            model_root=case["model_root"],
+            expected_code_revision=case["revision"],
+        )
 
 
 @pytest.mark.parametrize(

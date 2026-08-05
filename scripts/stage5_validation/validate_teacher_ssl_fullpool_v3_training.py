@@ -82,6 +82,7 @@ PRODUCTION_BATCH_SIZE = 64
 PRODUCTION_WORKERS = 8
 PRODUCTION_CHECKPOINT_EVERY = 1
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
+_NATIVE_RECORD_CROSS_NODE_VOLATILE_FIELDS = frozenset({"native_h5_device"})
 _TIC_DISJOINT_KEYS = {
     "held_fold_tics",
     "fixed_test_tics",
@@ -639,7 +640,6 @@ def _validate_native_record(
         "native_h5_size_bytes": int(stat.st_size),
         "native_h5_mtime_ns": int(stat.st_mtime_ns),
         "native_h5_ctime_ns": int(stat.st_ctime_ns),
-        "native_h5_device": int(stat.st_dev),
         "native_h5_inode": int(stat.st_ino),
     }
     expected_stat = {
@@ -723,6 +723,24 @@ def _validate_native_record(
     return _metadata(path)
 
 
+def _cross_node_native_record(value: Any, *, index: int) -> dict[str, Any]:
+    """Project a run-contract native record onto cross-node-stable fields.
+
+    ``st_dev`` identifies a mounted filesystem on the node performing the
+    check, rather than the immutable native HDF5 object. It remains part of
+    the in-process preflight/revalidation TOCTOU check, but cannot bind a
+    completed H200 run contract to a later CPU-node validation mount.
+    """
+
+    if not isinstance(value, Mapping):
+        raise ValueError(f"native record {index} is not a mapping")
+    return {
+        str(name): item
+        for name, item in value.items()
+        if name not in _NATIVE_RECORD_CROSS_NODE_VOLATILE_FIELDS
+    }
+
+
 def _validate_checkpoint(
     path: Path,
     *,
@@ -798,11 +816,17 @@ def validate_teacher_ssl_fullpool_training(
     *,
     model_root: Path,
     expected_code_revision: str,
+    validator_code_revision: str | None = None,
 ) -> dict[str, Any]:
     """Validate exact fold 0--4 completion without trusting job exit codes."""
 
     if _SHA40.fullmatch(str(expected_code_revision)) is None:
         raise ValueError("expected code revision must be a lowercase 40-hex SHA")
+    if (
+        validator_code_revision is not None
+        and _SHA40.fullmatch(str(validator_code_revision)) is None
+    ):
+        raise ValueError("validator code revision must be a lowercase 40-hex SHA")
     root = Path(model_root).expanduser().resolve(strict=True)
     expected_suffix = (
         "model_runs",
@@ -1156,7 +1180,13 @@ def validate_teacher_ssl_fullpool_training(
             selected,
             expected_git_sha=expected_code_revision,
         )
-        if native_records != expected_native_records:
+        if [
+            _cross_node_native_record(value, index=index)
+            for index, value in enumerate(native_records)
+        ] != [
+            _cross_node_native_record(value, index=index)
+            for index, value in enumerate(expected_native_records)
+        ]:
             raise ValueError(
                 f"fold {fold} native files differ from registry selection"
             )
@@ -1238,7 +1268,7 @@ def validate_teacher_ssl_fullpool_training(
             }
         )
     assert common is not None
-    return {
+    result = {
         "passed": True,
         "schema_version": COMPLETION_RELEASE_SCHEMA,
         "release_binding": COMPLETION_RELEASE_BINDING,
@@ -1271,6 +1301,9 @@ def validate_teacher_ssl_fullpool_training(
         },
         "folds": fold_records,
     }
+    if validator_code_revision is not None:
+        result["validator_code_revision"] = str(validator_code_revision)
+    return result
 
 
 def _fsync_directory(path: Path) -> None:
@@ -1329,6 +1362,7 @@ def write_teacher_ssl_fullpool_completion_release(
     *,
     model_root: Path,
     expected_code_revision: str,
+    validator_code_revision: str | None = None,
     output_path: Path,
 ) -> dict[str, Any]:
     """Publish one deterministic immutable completion release."""
@@ -1336,6 +1370,7 @@ def write_teacher_ssl_fullpool_completion_release(
     release = validate_teacher_ssl_fullpool_training(
         model_root=model_root,
         expected_code_revision=expected_code_revision,
+        validator_code_revision=validator_code_revision,
     )
     payload = (
         json.dumps(release, indent=2, sort_keys=True, allow_nan=False) + "\n"
@@ -1363,6 +1398,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-root", type=Path, required=True)
     parser.add_argument("--expected-code-revision", required=True)
+    parser.add_argument("--validator-code-revision")
     parser.add_argument("--output-release", type=Path, required=True)
     return parser
 
@@ -1372,6 +1408,7 @@ def main(argv: list[str] | None = None) -> int:
     result = write_teacher_ssl_fullpool_completion_release(
         model_root=args.model_root,
         expected_code_revision=args.expected_code_revision,
+        validator_code_revision=args.validator_code_revision,
         output_path=args.output_release,
     )
     print(json.dumps(result, indent=2, sort_keys=True, allow_nan=False))

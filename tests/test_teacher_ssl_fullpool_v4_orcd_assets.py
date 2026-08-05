@@ -136,4 +136,7 @@ def test_v4_completion_release_requires_all_five_folds() -> None:
 
     assert "for fold in {0..4}" in text
     assert "validate_teacher_ssl_fullpool_v4_training.py" in text
+    assert "TWIRL_VALIDATOR_GIT_SHA" in text
+    assert "TWIRL_EXPECTED_TRAINING_GIT_SHA" in text
+    assert "--validator-code-revision" in text
     assert '"completed_epochs":100' in text

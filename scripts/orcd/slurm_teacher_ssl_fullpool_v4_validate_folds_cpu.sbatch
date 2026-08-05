@@ -16,11 +16,13 @@ set -euo pipefail
 readonly TWIRL_ROOT="/orcd/data/mki_aryeh/001/twirl"
 readonly EXPECTED_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v4r2_s56_s62_a2v1_raw_v1_detector_consistent_adp_bls_eligible"
 : "${TWIRL_ORCD_REPO:?controller must export TWIRL_ORCD_REPO}"
-: "${TWIRL_EXPECTED_GIT_SHA:?controller must export TWIRL_EXPECTED_GIT_SHA}"
+: "${TWIRL_VALIDATOR_GIT_SHA:?controller must export TWIRL_VALIDATOR_GIT_SHA}"
+: "${TWIRL_EXPECTED_TRAINING_GIT_SHA:?controller must export TWIRL_EXPECTED_TRAINING_GIT_SHA}"
 : "${TWIRL_SSL_FULLPOOL_V4_RUN_ROOT:?controller must export the exact fresh v4 run root}"
 
 REPO="$(realpath -m -- "${TWIRL_ORCD_REPO}")"
-EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA}"
+VALIDATOR_SHA="${TWIRL_VALIDATOR_GIT_SHA}"
+TRAINING_SHA="${TWIRL_EXPECTED_TRAINING_GIT_SHA}"
 RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V4_RUN_ROOT}")"
 PYTHON="${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python"
 MODEL_ROOT="${RUN_ROOT}/model_runs/effective_quality_adp_btjd_v2/training/five_fold"
@@ -30,7 +32,7 @@ if [[ "${RUN_ROOT}" != "${EXPECTED_RUN_ROOT}" ]]; then
   echo "Native-v4 fold-validation root differs from the exact contract." >&2
   exit 2
 fi
-if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${EXPECTED_SHA}" ]] || [[ -n "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]]; then
+if [[ ! "${VALIDATOR_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ ! "${TRAINING_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${VALIDATOR_SHA}" ]] || [[ -n "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]]; then
   echo "Native-v4 fold-validation repository is not the exact clean revision." >&2
   exit 2
 fi
@@ -59,7 +61,8 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 echo "[teacher-ssl-fullpool-v4-fold-validation] start=$(date -Is)"
 "${PYTHON}" scripts/stage5_validation/validate_teacher_ssl_fullpool_v4_training.py \
   --model-root "${MODEL_ROOT}" \
-  --expected-code-revision "${EXPECTED_SHA}" \
+  --expected-code-revision "${TRAINING_SHA}" \
+  --validator-code-revision "${VALIDATOR_SHA}" \
   --output-release "${OUTPUT_RELEASE}"
 
 test -s "${OUTPUT_RELEASE}"
@@ -68,5 +71,5 @@ test -s "${OUTPUT_RELEASE}.sha256"
   cd "$(dirname "${OUTPUT_RELEASE}")"
   sha256sum -c "$(basename "${OUTPUT_RELEASE}").sha256"
 )
-"${PYTHON}" -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["passed"] is True; assert d["schema_version"]=="twirl_teacher_ssl_fullpool_v4_five_fold_completion_release_v1"; assert d["release_binding"]=="teacher_ssl_fullpool_v4_detector_consistent_raw_v1_effective_quality_adp_btjd_five_fold_complete_v1"; assert d["expected_code_revision"]==sys.argv[2]; assert d["training_hyperparameters"]["folds"]==[0,1,2,3,4]; assert d["training_hyperparameters"]["epochs_per_fold"]==20; assert d["counts"]=={"folds":5,"completed_epochs":100}' "${OUTPUT_RELEASE}" "${EXPECTED_SHA}"
+"${PYTHON}" -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["passed"] is True; assert d["schema_version"]=="twirl_teacher_ssl_fullpool_v4_five_fold_completion_release_v1"; assert d["release_binding"]=="teacher_ssl_fullpool_v4_detector_consistent_raw_v1_effective_quality_adp_btjd_five_fold_complete_v1"; assert d["expected_code_revision"]==sys.argv[2]; assert d["validator_code_revision"]==sys.argv[3]; assert d["training_hyperparameters"]["folds"]==[0,1,2,3,4]; assert d["training_hyperparameters"]["epochs_per_fold"]==20; assert d["counts"]=={"folds":5,"completed_epochs":100}' "${OUTPUT_RELEASE}" "${TRAINING_SHA}" "${VALIDATOR_SHA}"
 echo "[teacher-ssl-fullpool-v4-fold-validation] complete=$(date -Is) release=${OUTPUT_RELEASE}"
