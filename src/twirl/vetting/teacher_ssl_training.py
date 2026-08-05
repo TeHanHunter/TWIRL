@@ -800,10 +800,37 @@ def _run_finetune_fold(
     workers: int,
     seed: int,
     require_cuda: bool,
+    artifact_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Fine-tune one fresh metadata/head model on uncertain-masked labels."""
 
     import torch
+
+    context = {
+        "checkpoint_schema": TEACHER_SSL_CHECKPOINT_SCHEMA,
+        "run_id": TEACHER_SSL_RUN_ID,
+        "model_facing_name": TEACHER_SSL_MODEL_FACING_NAME,
+        "checkpoint_namespace": TEACHER_SSL_CHECKPOINT_NAMESPACE,
+        "label_policy": "uncertain_masked",
+        "log_name": "teacher_v4_ssl",
+    }
+    if artifact_context is not None:
+        context.update(dict(artifact_context))
+    required_context = {
+        "checkpoint_schema",
+        "run_id",
+        "model_facing_name",
+        "checkpoint_namespace",
+        "label_policy",
+        "log_name",
+    }
+    missing_context = sorted(required_context - set(context))
+    if missing_context:
+        raise KeyError(
+            "fine-tuning artifact context lacks keys: "
+            f"{missing_context}"
+        )
+    log_name = str(context["log_name"])
 
     _assert_development_only(
         rows,
@@ -949,7 +976,7 @@ def _run_finetune_fold(
         else:
             stale += 1
         print(
-            f"[teacher_v4_ssl fold={fold}] epoch={epoch} "
+            f"[{log_name} fold={fold}] epoch={epoch} "
             f"loss={record['train_loss']:.6f} "
             f"val_macro_f1={macro_f1:.4f} stale={stale}",
             flush=True,
@@ -1000,12 +1027,14 @@ def _run_finetune_fold(
     fold_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = fold_dir / "teacher.pt"
     checkpoint = {
-        "schema_version": TEACHER_SSL_CHECKPOINT_SCHEMA,
-        "run_id": TEACHER_SSL_RUN_ID,
-        "model_facing_name": TEACHER_SSL_MODEL_FACING_NAME,
+        "schema_version": str(context["checkpoint_schema"]),
+        "run_id": str(context["run_id"]),
+        "model_facing_name": str(context["model_facing_name"]),
         "model_version": MODEL_VERSION,
         "ssl_contract_version": HARMONIC_SSL_CONTRACT_VERSION,
-        "checkpoint_namespace": TEACHER_SSL_CHECKPOINT_NAMESPACE,
+        "checkpoint_namespace": str(context["checkpoint_namespace"]),
+        "label_policy": str(context["label_policy"]),
+        "evaluation_context": _json_safe(dict(context)),
         "profile": TEACHER_SSL_PROFILE,
         "fold": int(fold),
         "model_config": asdict(model_config),
@@ -1102,10 +1131,19 @@ def _pool_development_oof(
     fold_results: list[dict[str, Any]],
     out_dir: Path,
     input_provenance: Mapping[str, str],
+    artifact_context: Mapping[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Pool five inductive folds, fit one temperature, and update checkpoints."""
 
     import torch
+
+    context = {
+        "oof_schema": TEACHER_SSL_OOF_SCHEMA,
+        "scope": "five_fold_uncertain_masked_development_oof",
+        "label_policy": "uncertain_masked",
+    }
+    if artifact_context is not None:
+        context.update(dict(artifact_context))
 
     parts = [pd.read_csv(result["predictions"]) for result in fold_results]
     oof = pd.concat(parts, ignore_index=True)
@@ -1143,8 +1181,9 @@ def _pool_development_oof(
         oof["review_id"].astype(str)
     ].reset_index(drop=True)
     metrics = {
-        "schema_version": TEACHER_SSL_OOF_SCHEMA,
-        "scope": "five_fold_uncertain_masked_development_oof",
+        "schema_version": str(context["oof_schema"]),
+        "scope": str(context["scope"]),
+        "label_policy": str(context["label_policy"]),
         "temperature": float(temperature),
         "morphology_by_source": _subset_metrics(
             aligned_rows,
