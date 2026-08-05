@@ -122,17 +122,39 @@ def read_hlsp(
         return None
 
 
+def quality_mask_from_arrays(
+    time: np.ndarray,
+    flux: np.ndarray,
+    quality: np.ndarray,
+) -> np.ndarray:
+    """Return the exact finite, quality-zero mask used by the BLS search."""
+
+    time_array = np.asarray(time)
+    flux_array = np.asarray(flux)
+    quality_array = np.asarray(quality)
+    if not (
+        time_array.shape == flux_array.shape == quality_array.shape
+    ):
+        raise ValueError("time, flux, and quality arrays must have identical shapes")
+    return (
+        (quality_array == 0)
+        & np.isfinite(flux_array)
+        & np.isfinite(time_array)
+    )
+
+
 def quality_mask(lc: HLSPLightCurve, aperture: str = "DET_FLUX") -> np.ndarray:
     """Boolean mask: QUALITY==0 AND finite flux for the named aperture.
 
-    QUALITY bit semantics (from `qlp.lctools.bin.hlsp:424`): SPOC bits 0..15,
-    TGLC bit 29, QLP bit 30. We require QUALITY==0 (any flagged cadence is
-    excluded), matching the convention in the Stage 1 QA scripts.
+    In legacy QLP HLSPs, QUALITY combines SPOC bits 0..15, TGLC bit 29, and
+    QLP bit 30. Custom TWIRL/A2v1 products preserve the internal TGLC value
+    only; Tier-1 search/model workflows must first apply the authoritative
+    SPOC+QLP detector/cadence overlay. This helper masks the value currently
+    attached to ``lc`` and cannot infer absent external flags.
     """
     if aperture not in lc.flux:
         return np.zeros(len(lc.time), dtype=bool)
-    f = lc.flux[aperture]
-    return (lc.quality == 0) & np.isfinite(f) & np.isfinite(lc.time)
+    return quality_mask_from_arrays(lc.time, lc.flux[aperture], lc.quality)
 
 
 def tglc_mad_error(

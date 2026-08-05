@@ -1,0 +1,362 @@
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+from typing import Any, Callable
+
+import pytest
+
+torch = pytest.importorskip("torch")
+
+from twirl.vetting.ssl_full_pool_eligibility import (
+    PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+    PRODUCTION_ELIGIBLE_OBSERVATIONS,
+    PRODUCTION_EXCLUDED_IDENTITY_SHA256,
+    PRODUCTION_EXCLUDED_OBSERVATIONS,
+    PRODUCTION_FULL_IDENTITY_SHA256,
+    PRODUCTION_FULL_OBSERVATIONS,
+)
+from twirl.vetting.ssl_full_pool_native import (
+    FULL_POOL_NATIVE_CONTRACT_VERSION,
+)
+from twirl.vetting.teacher_ssl_fullpool import (
+    FULLPOOL_SSL_RUN_CONTRACT_SCHEMA,
+    FULLPOOL_SSL_RUN_ID,
+    FULLPOOL_SSL_SELECTION_SCHEMA,
+    FULLPOOL_SSL_SUMMARY_SCHEMA,
+    FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA,
+)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = (
+    ROOT
+    / "scripts"
+    / "stage5_validation"
+    / "validate_teacher_ssl_fullpool_v2_smoke.py"
+)
+SPEC = importlib.util.spec_from_file_location(
+    "validate_teacher_ssl_fullpool_v2_smoke_test",
+    SCRIPT,
+)
+assert SPEC is not None and SPEC.loader is not None
+VALIDATOR = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(VALIDATOR)
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _metadata(path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path.resolve()),
+        "size_bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+    }
+
+
+def _write_json(path: Path, value: dict[str, Any]) -> None:
+    path.write_text(
+        json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _fixture(tmp_path: Path) -> dict[str, Any]:
+    authority_paths: dict[str, Path] = {}
+    for name in VALIDATOR.AUTHORITY_NAMES:
+        path = tmp_path / f"{name}.dat"
+        path.write_bytes(f"{name}\n".encode("ascii"))
+        authority_paths[name] = path
+    authority_metadata = {
+        name: _metadata(path) for name, path in authority_paths.items()
+    }
+    expected_revision = "1" * 40
+    native_path = tmp_path / "native_0.h5"
+    native_path.write_bytes(b"native-v2-smoke")
+    selection = {
+        "selection_schema_version": FULLPOOL_SSL_SELECTION_SCHEMA,
+        "held_out_fold": 0,
+        "n_registry_observations": PRODUCTION_FULL_OBSERVATIONS,
+        "n_eligible_observations": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+        "n_eligible_tics": 125_620,
+        "n_held_observations": 0,
+        "n_held_tics": 0,
+        "n_selected_observations": VALIDATOR.SMOKE_MAX_ROWS,
+        "n_selected_tics": VALIDATOR.SMOKE_MAX_ROWS,
+        "max_rows": VALIDATOR.SMOKE_MAX_ROWS,
+        "selected_rows_sha256": "2" * 64,
+        "selected_tics_sha256": "3" * 64,
+        "tic_disjoint": {
+            "held_fold_tics": True,
+            "fixed_test_tics": True,
+            "reserved_prospective_tics": True,
+        },
+    }
+    contract = {
+        "schema_version": FULLPOOL_SSL_RUN_CONTRACT_SCHEMA,
+        "run_id": FULLPOOL_SSL_RUN_ID,
+        "fold": 0,
+        "registry_path": authority_metadata["registry"]["path"],
+        "registry_sha256": authority_metadata["registry"]["sha256"],
+        "registry_summary_path": authority_metadata["registry_summary"]["path"],
+        "registry_summary_sha256": authority_metadata["registry_summary"]["sha256"],
+        "training_authority": {
+            "schema_version": FULLPOOL_SSL_TRAINING_AUTHORITY_SCHEMA,
+            "production_lock_passed": True,
+            "partition": {
+                "full": {
+                    "count": PRODUCTION_FULL_OBSERVATIONS,
+                    "identity_sha256": PRODUCTION_FULL_IDENTITY_SHA256,
+                },
+                "eligible": {
+                    "count": PRODUCTION_ELIGIBLE_OBSERVATIONS,
+                    "identity_sha256": PRODUCTION_ELIGIBLE_IDENTITY_SHA256,
+                },
+                "excluded": {
+                    "count": PRODUCTION_EXCLUDED_OBSERVATIONS,
+                    "identity_sha256": PRODUCTION_EXCLUDED_IDENTITY_SHA256,
+                },
+            },
+            "native_mapping_sha256": "4" * 64,
+            "source_provenance_verified": True,
+            "authority_bindings": authority_metadata,
+        },
+        "selection_audit": selection,
+        "native_files": [
+            {
+                "native_h5_path": str(native_path.resolve()),
+                "native_h5_sha256": _sha256(native_path),
+                "native_h5_size_bytes": native_path.stat().st_size,
+                "native_contract_version": FULL_POOL_NATIVE_CONTRACT_VERSION,
+                "hash_verified_now": True,
+                "root_contract_verified_now": True,
+                "group_identities_verified_now": True,
+                "n_selected_observations": VALIDATOR.SMOKE_MAX_ROWS,
+            }
+        ],
+        "native_hashes_verified_now": True,
+        "native_root_contracts_verified_now": True,
+        "native_group_identities_verified_now": True,
+        "epochs": 1,
+        "batch_size": VALIDATOR.SMOKE_BATCH_SIZE,
+        "workers": VALIDATOR.SMOKE_WORKERS,
+        "seed": VALIDATOR.SMOKE_SEED,
+        "learning_rate": VALIDATOR.SMOKE_LEARNING_RATE,
+        "weight_decay": VALIDATOR.SMOKE_WEIGHT_DECAY,
+        "checkpoint_every": 1,
+        "require_cuda": True,
+        "max_rows": VALIDATOR.SMOKE_MAX_ROWS,
+        "labels_loaded": False,
+        "fixed_test_tensors_constructed": False,
+        "prospective_sector_tensors_constructed": False,
+        "embedding_export": False,
+        "neighbor_probe": False,
+        "code_revision": expected_revision,
+    }
+    contract_path = tmp_path / "run_contract.json"
+    _write_json(contract_path, contract)
+    checkpoint_path = tmp_path / "encoder.pt"
+    history_path = tmp_path / "history.csv"
+    history_path.write_text(
+        "epoch,n_observations,loss\n1,4096,0.5\n",
+        encoding="ascii",
+    )
+    checkpoint = {
+        "schema_version": VALIDATOR.FULLPOOL_SSL_CHECKPOINT_SCHEMA,
+        "run_id": FULLPOOL_SSL_RUN_ID,
+        "fold": 0,
+        "run_contract_sha256": _sha256(contract_path),
+        "selection_audit": selection,
+        "epochs": 1,
+        "history": [{"epoch": 1, "n_observations": 4096, "loss": 0.5}],
+        "encoder_state_dict": {"weight": torch.ones(2, 2)},
+        "projection_state_dict": {"weight": torch.ones(2, 2)},
+    }
+    torch.save(checkpoint, checkpoint_path)
+    summary = {
+        "schema_version": FULLPOOL_SSL_SUMMARY_SCHEMA,
+        "run_id": FULLPOOL_SSL_RUN_ID,
+        "fold": 0,
+        "run_contract": str(contract_path.resolve()),
+        "run_contract_sha256": _sha256(contract_path),
+        "checkpoint": str(checkpoint_path.resolve()),
+        "checkpoint_sha256": _sha256(checkpoint_path),
+        "history": str(history_path.resolve()),
+        "history_sha256": _sha256(history_path),
+        "completed_epochs": 1,
+        "global_step": VALIDATOR.SMOKE_GLOBAL_STEPS,
+        "selection_audit": selection,
+        "fixed_test_status": "host_excluded_tensors_not_constructed",
+        "prospective_status": "host_excluded_tensors_not_constructed",
+        "labels_loaded": False,
+        "automatic_production_promotion": False,
+    }
+    summary_path = tmp_path / "summary.json"
+    _write_json(summary_path, summary)
+    return {
+        "summary_path": summary_path,
+        "contract_path": contract_path,
+        "authority_paths": authority_paths,
+        "expected_revision": expected_revision,
+    }
+
+
+def _validate(case: dict[str, Any]) -> dict[str, Any]:
+    paths = case["authority_paths"]
+    return VALIDATOR.validate_teacher_ssl_fullpool_smoke(
+        summary_path=case["summary_path"],
+        expected_code_revision=case["expected_revision"],
+        eligibility_exclusions_path=paths["eligibility_exclusions"],
+        eligibility_summary_path=paths["eligibility_summary"],
+        native_registry_path=paths["native_registry"],
+        native_registry_summary_path=paths["native_registry_summary"],
+        native_release_summary_path=paths["native_release_summary"],
+        registry_path=paths["registry"],
+        registry_summary_path=paths["registry_summary"],
+    )
+
+
+def _rewrite_contract(
+    case: dict[str, Any],
+    mutate: Callable[[dict[str, Any]], None],
+    *,
+    rebind_summary: bool,
+) -> None:
+    contract = json.loads(case["contract_path"].read_text(encoding="utf-8"))
+    mutate(contract)
+    _write_json(case["contract_path"], contract)
+    if rebind_summary:
+        summary = json.loads(case["summary_path"].read_text(encoding="utf-8"))
+        summary["run_contract_sha256"] = _sha256(case["contract_path"])
+        _write_json(case["summary_path"], summary)
+
+
+def test_smoke_validator_accepts_exact_production_result(tmp_path: Path) -> None:
+    case = _fixture(tmp_path)
+
+    audit = _validate(case)
+
+    assert audit["passed"] is True
+    assert audit["max_rows"] == 4096
+    assert set(audit["authority_bindings"]) == set(VALIDATOR.AUTHORITY_NAMES)
+
+
+def test_smoke_validator_recomputes_run_contract_hash(tmp_path: Path) -> None:
+    case = _fixture(tmp_path)
+    _rewrite_contract(
+        case,
+        lambda contract: contract.update({"workers": 99}),
+        rebind_summary=False,
+    )
+
+    with pytest.raises(ValueError, match="run-contract SHA-256"):
+        _validate(case)
+
+
+def test_smoke_validator_rehashes_all_authority_artifacts(
+    tmp_path: Path,
+) -> None:
+    case = _fixture(tmp_path)
+    case["authority_paths"]["native_release_summary"].write_bytes(b"changed\n")
+
+    with pytest.raises(
+        ValueError,
+        match="native_release_summary metadata differs",
+    ):
+        _validate(case)
+
+
+def test_smoke_validator_rejects_nonfinite_history(tmp_path: Path) -> None:
+    case = _fixture(tmp_path)
+    summary = json.loads(case["summary_path"].read_text(encoding="utf-8"))
+    history_path = Path(summary["history"])
+    history_path.write_text(
+        "epoch,n_observations,loss\n1,4096,nan\n",
+        encoding="ascii",
+    )
+    summary["history_sha256"] = _sha256(history_path)
+    _write_json(case["summary_path"], summary)
+
+    with pytest.raises(ValueError, match="history loss is non-finite"):
+        _validate(case)
+
+
+def test_smoke_validator_rejects_nonfinite_checkpoint_state(
+    tmp_path: Path,
+) -> None:
+    case = _fixture(tmp_path)
+    summary = json.loads(case["summary_path"].read_text(encoding="utf-8"))
+    checkpoint_path = Path(summary["checkpoint"])
+    checkpoint = torch.load(
+        checkpoint_path,
+        map_location="cpu",
+        weights_only=False,
+    )
+    checkpoint["encoder_state_dict"]["weight"][0, 0] = float("inf")
+    torch.save(checkpoint, checkpoint_path)
+    summary["checkpoint_sha256"] = _sha256(checkpoint_path)
+    _write_json(case["summary_path"], summary)
+
+    with pytest.raises(ValueError, match="encoder_state_dict.weight is non-finite"):
+        _validate(case)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda contract: contract["training_authority"].update(
+                {"production_lock_passed": False}
+            ),
+            "production lock failed",
+        ),
+        (
+            lambda contract: contract["training_authority"].update(
+                {"source_provenance_verified": False}
+            ),
+            "source provenance failed",
+        ),
+        (
+            lambda contract: contract.update(
+                {"native_group_identities_verified_now": False}
+            ),
+            "all three native verification gates",
+        ),
+        (
+            lambda contract: contract["training_authority"]["partition"][
+                "eligible"
+            ].update({"count": PRODUCTION_ELIGIBLE_OBSERVATIONS - 1}),
+            "production partition eligible count",
+        ),
+        (
+            lambda contract: contract.update({"labels_loaded": True}),
+            "isolation failed",
+        ),
+        (
+            lambda contract: contract.update({"max_rows": 4095}),
+            "smoke max rows must equal 4096",
+        ),
+        (
+            lambda contract: contract.update({"batch_size": 32}),
+            "smoke batch size must equal 64",
+        ),
+        (
+            lambda contract: contract.update({"seed": 1}),
+            "smoke seed must equal 560064",
+        ),
+    ],
+)
+def test_smoke_validator_rejects_relaxed_gates(
+    tmp_path: Path,
+    mutate: Callable[[dict[str, Any]], None],
+    message: str,
+) -> None:
+    case = _fixture(tmp_path)
+    _rewrite_contract(case, mutate, rebind_summary=True)
+
+    with pytest.raises(ValueError, match=message):
+        _validate(case)

@@ -709,6 +709,8 @@ def plot_publication_period_radius_recovery_map(
     sigma_radius_dex: float = DEFAULT_PUBLICATION_KERNEL_SIGMA_DEX,
     recovered_col: str = "any_exact_or_harmonic_recovered",
     colorbar_label: str = "Kernel-smoothed BLS recovery fraction",
+    panel_indices: tuple[int, ...] = (0, 1, 2, 3),
+    output_stem: str = "period_radius_empirical_recovery_publication",
 ) -> dict[str, str]:
     """Write a compact empirical period-radius map for publication drafts.
 
@@ -731,13 +733,53 @@ def plot_publication_period_radius_recovery_map(
         ("18 <= Tmag < 19", (df["tmag"] >= 18.0) & (df["tmag"] < 19.0)),
         ("Tmag >= 19", df["tmag"] >= 19.0),
     ]
+    if len(panel_indices) not in {2, 4}:
+        raise ValueError("publication recovery maps require either two or four panels")
+    if len(set(panel_indices)) != len(panel_indices) or any(
+        index < 0 or index >= len(tmag_bins) for index in panel_indices
+    ):
+        raise ValueError("panel_indices must contain unique indices from 0 through 3")
+    selected_tmag_bins = [
+        (bin_index, *tmag_bins[bin_index]) for bin_index in panel_indices
+    ]
     period_edges = np.geomspace(0.12, 13.0, 92)
     radius_edges = np.geomspace(0.18, 18.0, 86)
     period_centers = np.sqrt(period_edges[:-1] * period_edges[1:])
     radius_centers = np.sqrt(radius_edges[:-1] * radius_edges[1:])
     cmap = plt.get_cmap("magma").copy()
     cmap.set_bad("#e8ebef")
-    fig, axes = plt.subplots(2, 2, figsize=(9.9, 8.1), sharex=True, sharey=True)
+    if len(selected_tmag_bins) == 2:
+        nrows, ncols = 1, 2
+        figsize = (9.9, 4.35)
+        figure_margins = {
+            "left": 0.09,
+            "right": 0.855,
+            "top": 0.89,
+            "bottom": 0.16,
+            "wspace": 0.08,
+            "hspace": 0.0,
+        }
+        colorbar_bounds = [0.885, 0.16, 0.022, 0.73]
+    else:
+        nrows, ncols = 2, 2
+        figsize = (9.9, 8.1)
+        figure_margins = {
+            "left": 0.09,
+            "right": 0.855,
+            "top": 0.92,
+            "bottom": 0.10,
+            "wspace": 0.08,
+            "hspace": 0.20,
+        }
+        colorbar_bounds = [0.885, 0.10, 0.022, 0.82]
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=figsize,
+        sharex=True,
+        sharey=True,
+        squeeze=False,
+    )
     mesh = None
     rows: list[dict[str, Any]] = []
     roche_radius = np.geomspace(radius_edges[0], radius_edges[-1], 320)
@@ -752,8 +794,8 @@ def plot_publication_period_radius_recovery_map(
         2: [(0.72, 2.85)],
         3: [(1.35, 11.0)],
     }
-    for idx, (label, mask) in enumerate(tmag_bins):
-        ax = axes.ravel()[idx]
+    for panel_index, (bin_index, label, mask) in enumerate(selected_tmag_bins):
+        ax = axes.ravel()[panel_index]
         sub = df[mask].copy()
         min_effective_n = max(2.0, min(8.0, 0.004 * len(sub)))
         if recovered_col not in sub:
@@ -819,8 +861,8 @@ def plot_publication_period_radius_recovery_map(
                 "inline_spacing": 5,
                 "colors": ["black"],
             }
-            if idx in fifty_label_positions:
-                contour_label_kwargs["manual"] = fifty_label_positions[idx]
+            if bin_index in fifty_label_positions:
+                contour_label_kwargs["manual"] = fifty_label_positions[bin_index]
             contour_labels = ax.clabel(contour, **contour_label_kwargs)
             for text in contour_labels:
                 text.set_fontweight("bold")
@@ -842,7 +884,7 @@ def plot_publication_period_radius_recovery_map(
             100.0: (1.2, 0.66),
             300.0: (0.18, 0.48),
         }
-        if idx == 0:
+        if bin_index == 0:
             duration_label_positions = {
                 30.0: (3.1, 0.62),
                 100.0: (0.72, 0.44),
@@ -923,15 +965,15 @@ def plot_publication_period_radius_recovery_map(
         _raise_panel_ticks(ax, bottom_x_color="white")
         _draw_bottom_tick_overlays(ax, color="white")
     if mesh is not None:
-        cax = fig.add_axes([0.885, 0.10, 0.022, 0.82])
+        cax = fig.add_axes(colorbar_bounds)
         cbar = fig.colorbar(mesh, cax=cax)
         cbar.set_label(colorbar_label, fontsize=label_fs)
         cbar.ax.tick_params(direction="in", which="both", labelsize=8.5)
-    fig.subplots_adjust(left=0.09, right=0.855, top=0.92, bottom=0.10, wspace=0.08, hspace=0.20)
+    fig.subplots_adjust(**figure_margins)
     out_dir.mkdir(parents=True, exist_ok=True)
-    png = out_dir / "period_radius_empirical_recovery_publication.png"
-    pdf = out_dir / "period_radius_empirical_recovery_publication.pdf"
-    csv = out_dir / "period_radius_empirical_recovery_publication_grid.csv"
+    png = out_dir / f"{output_stem}.png"
+    pdf = out_dir / f"{output_stem}.pdf"
+    csv = out_dir / f"{output_stem}_grid.csv"
     pd.DataFrame(rows).to_csv(csv, index=False)
     fig.savefig(png, dpi=260, bbox_inches="tight")
     fig.savefig(pdf, bbox_inches="tight")

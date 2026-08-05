@@ -78,13 +78,14 @@ def _write_launcher(out_dir: Path, *, queue_name: str, port: int) -> None:
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         "cd \"$(dirname \"$0\")\"\n"
+        f"PORT=\"${{FRANKLIN_PORT:-{int(port)}}}\"\n"
         "exec python3 franklin_vetting_app.py \\\n"
         f"  --queue {queue_name} \\\n"
         "  --labels-out franklin_labels_vetted.csv \\\n"
         "  --sheet-root vet_sheets \\\n"
         "  --labeler franklin \\\n"
         "  --host 127.0.0.1 \\\n"
-        f"  --port {int(port)}\n"
+        "  --port \"${PORT}\"\n"
     )
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
@@ -100,7 +101,7 @@ def _write_readme(
     counts = ", ".join(
         f"S{sector}: {count:,}" for sector, count in sorted(sector_counts.items())
     )
-    text = f"""# TWIRL S56-S59 Enriched Vetting Handoff
+    text = f"""# TWIRL S57-S59 Enriched Vetting Handoff
 
 This package contains {n_rows:,} real candidates selected for human review.
 Sector allocation: {counts}.
@@ -126,6 +127,32 @@ Open `http://127.0.0.1:{int(port)}/`.
 
 Every click is saved immediately to `franklin_labels_vetted.csv`. Return that
 CSV; the PNGs do not need to be returned.
+
+## Run On PDO
+
+The app binds only to PDO's loopback interface. On your own computer, open an
+SSH tunnel and leave it running:
+
+```bash
+ssh -N -L {int(port)}:127.0.0.1:{int(port)} pdogpu1.mit.edu
+```
+
+In a second terminal, log in to PDO, `cd` into this package directory, and run:
+
+```bash
+./run_franklin_vetting.sh
+```
+
+Then open `http://127.0.0.1:{int(port)}/` on your own computer. If that port is
+already occupied, use the same replacement port on both sides, for example:
+
+```bash
+# On PDO
+FRANKLIN_PORT=5013 ./run_franklin_vetting.sh
+
+# On your own computer
+ssh -N -L 5013:127.0.0.1:5013 pdogpu1.mit.edu
+```
 
 ## Six Labels
 
@@ -217,6 +244,10 @@ def build_handoff(
             f"expected={expected_sector_counts}"
         )
 
+    if out_dir.exists() and any(out_dir.iterdir()):
+        raise FileExistsError(
+            f"handoff destination must be absent or empty: {out_dir}"
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     destination_sheets = out_dir / "vet_sheets"
     destination_sheets.mkdir(parents=True, exist_ok=True)
@@ -252,8 +283,6 @@ def build_handoff(
     n_reference_pngs = 0
     if reference_root is not None:
         reference_destination = out_dir / "reference_examples"
-        if reference_destination.exists():
-            shutil.rmtree(reference_destination)
         shutil.copytree(reference_root, reference_destination)
         n_reference_pngs = len(list(reference_destination.rglob("*.png")))
     if reference_csv is not None:

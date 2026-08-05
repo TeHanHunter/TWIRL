@@ -45,7 +45,7 @@ reports/stage5_validation/**/*.zip
 # selected publication figures visible to Git; ignore only regenerable bulk.
 reports/stage5_validation/s56_A2v1_teacher_v1_recovery/**/injection_recovery_outcomes.parquet
 reports/stage5_validation/s56_A2v1_teacher_v1_recovery/**/teacher_v1_strict_planet_truth_matches.parquet
-reports/stage5_validation/s56_A2v1_teacher_v1_recovery/**/*_publication_grid.csv
+reports/stage5_validation/s56_A2v1_teacher_v1_recovery/**/*_publication*_grid.csv
 reports/stage5_validation/s56_A2v1_teacher_v2/**/_deps/
 reports/stage5_validation/s56_A2v1_teacher_v2/**/workload_inputs/
 reports/stage5_validation/s56_A2v1_teacher_v2/**/shards/
@@ -94,6 +94,9 @@ reports/stage3_injections/**/*.npy
 reports/stage1_lightcurves/tglc_vs_qlp_s94plus/
 reports/stage1_lightcurves/qc_pdf/
 reports/stage1_lightcurves/qc_precision/
+# Regenerable detector-level pixel-mask diagnostic renders. The plotting code
+# and compact numerical coverage summary are the versioned authorities.
+reports/stage1_lightcurves/a2v1_pixel_mask_maps/
 
 # Local presentation editing buffers and Keynote recovery copies. Final talk
 # deliverables are archived under reports/exploratory/talks/ when needed.

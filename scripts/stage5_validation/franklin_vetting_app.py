@@ -35,9 +35,11 @@ LABEL_BUTTONS: tuple[tuple[str, str, str], ...] = (
 
 PERIOD_FACTOR_OPTIONS: tuple[tuple[str, str], ...] = (
     ("0.25", "P/4"),
+    ("0.3333333333333333", "P/3"),
     ("0.5", "P/2"),
     ("1", "P"),
     ("2", "2P"),
+    ("3", "3P"),
     ("4", "4P"),
     ("unresolved", "Unresolved"),
 )
@@ -45,6 +47,11 @@ PERIOD_FACTOR_OPTIONS: tuple[tuple[str, str], ...] = (
 DISPLAY_COLUMNS: tuple[str, ...] = (
     "tic",
     "sector",
+    "source_batch_id",
+    "prior_label",
+    "prior_labeler",
+    "factor_review_status",
+    "same_sector_tic_count",
     "cam",
     "ccd",
     "tmag",
@@ -96,11 +103,17 @@ def _candidate_key(row: dict[str, Any]) -> str:
     return "|".join(str(row.get(col, "") or "") for col in ("review_id", "tic", "sector", "period_d", "t0_bjd"))
 
 
-def _safe_sheet_names(row: dict[str, Any]) -> list[str]:
+def _safe_sheet_names(
+    row: dict[str, Any],
+    *,
+    allow_fallback: bool = True,
+) -> list[str]:
     names: list[str] = []
     value = str(row.get("twirl_vet_sheet_name", "") or "")
     if value:
         names.append(value)
+    if not allow_fallback:
+        return names
     review_id = str(row.get("review_id", "") or "")
     if review_id:
         safe = review_id.replace("/", "_").replace(":", "_")
@@ -113,11 +126,27 @@ def _safe_sheet_names(row: dict[str, Any]) -> list[str]:
 
 
 class Store:
-    def __init__(self, queue: Path, labels_out: Path, sheet_root: Path, labeler: str) -> None:
+    def __init__(
+        self,
+        queue: Path,
+        labels_out: Path,
+        sheet_root: Path | list[Path] | tuple[Path, ...],
+        labeler: str,
+        allow_sheet_fallback: bool = True,
+    ) -> None:
         self.queue = Path(queue)
         self.labels_out = Path(labels_out)
-        self.sheet_root = Path(sheet_root)
+        if isinstance(sheet_root, (str, Path)):
+            sheet_roots = (Path(sheet_root),)
+        else:
+            sheet_roots = tuple(Path(value) for value in sheet_root)
+        if not sheet_roots:
+            raise ValueError("at least one sheet root is required")
+        self.sheet_roots = sheet_roots
+        # Keep the singular attribute for compatibility with existing handoffs.
+        self.sheet_root = sheet_roots[0]
         self.labeler = labeler
+        self.allow_sheet_fallback = bool(allow_sheet_fallback)
         self.rows = _read_csv(self.queue)
         for idx, row in enumerate(self.rows):
             row["row_id"] = str(idx)
@@ -150,14 +179,29 @@ class Store:
         by_id = {str(row.get("row_id", "")): row for row in self.labels}
         for row in self.rows:
             label = by_id.get(str(row["row_id"]))
-            row["label"] = str(label.get("label", "") if label else "")
-            row["labeler"] = str(label.get("labeler", self.labeler) if label else self.labeler)
-            row["notes"] = str(label.get("notes", "") if label else "")
+            row["reviewed"] = label is not None
+            row["label"] = str(
+                label.get("label", "")
+                if label
+                else row.get("initial_label", "")
+            )
+            row["labeler"] = str(
+                label.get("labeler", self.labeler) if label else self.labeler
+            )
+            row["notes"] = str(
+                label.get("notes", "")
+                if label
+                else row.get("initial_notes", "")
+            )
             row["period_factor"] = str(
-                label.get("period_factor", "1") if label else "1"
+                label.get("period_factor", "1")
+                if label
+                else row.get("initial_period_factor", "1")
             ) or "1"
             row["period_status"] = str(
-                label.get("period_status", "") if label else ""
+                label.get("period_status", "")
+                if label
+                else row.get("initial_period_status", "")
             )
             row["updated_utc"] = str(label.get("updated_utc", "") if label else "")
 
@@ -172,15 +216,19 @@ class Store:
 
     def sheet_path(self, index: int) -> Path | None:
         row = self.row(index)
-        for name in _safe_sheet_names(row):
-            if "*" in name:
-                matches = sorted(self.sheet_root.glob(name))
-                if matches:
-                    return matches[0]
-            else:
-                path = self.sheet_root / name
-                if path.exists():
-                    return path
+        for name in _safe_sheet_names(
+            row,
+            allow_fallback=self.allow_sheet_fallback,
+        ):
+            for root in self.sheet_roots:
+                if "*" in name:
+                    matches = sorted(root.glob(name))
+                    if matches:
+                        return matches[0]
+                else:
+                    path = root / name
+                    if path.exists():
+                        return path
         return None
 
     def payload(self, index: int) -> dict[str, Any]:
@@ -194,6 +242,7 @@ class Store:
             "candidate_key": row["candidate_key"],
             "display": display,
             "label": row.get("label", ""),
+            "reviewed": bool(row.get("reviewed", False)),
             "labeler": row.get("labeler", self.labeler) or self.labeler,
             "notes": row.get("notes", ""),
             "period_factor": row.get("period_factor", "1") or "1",
@@ -245,19 +294,25 @@ class Store:
     def summary(self) -> dict[str, Any]:
         counts: dict[str, int] = {}
         factor_counts: dict[str, int] = {}
+        reviewed = 0
         for row in self.rows:
             label = row.get("label", "")
             if label:
                 counts[label] = counts.get(label, 0) + 1
                 factor = str(row.get("period_factor", "1") or "1")
                 factor_counts[factor] = factor_counts.get(factor, 0) + 1
+            reviewed += int(bool(row.get("reviewed", False)))
         return {
             "queue": str(self.queue),
             "labels_out": str(self.labels_out),
             "sheet_root": str(self.sheet_root),
+            "sheet_roots": [str(value) for value in self.sheet_roots],
+            "allow_sheet_fallback": self.allow_sheet_fallback,
             "count": self.count,
             "labeled": sum(counts.values()),
             "unlabeled": self.count - sum(counts.values()),
+            "reviewed": reviewed,
+            "pending_review": self.count - reviewed,
             "label_counts": counts,
             "period_factor_counts": factor_counts,
         }
@@ -330,7 +385,9 @@ async function load(i) {{
   document.getElementById("counter").textContent = `${{index + 1}} / ${{current.count}}`;
   document.getElementById("jump").value = index + 1;
   document.getElementById("notes").value = current.notes || "";
-  document.getElementById("saved").textContent = current.label ? `saved: ${{current.label}}` : "";
+  document.getElementById("saved").textContent = current.reviewed
+    ? `reviewed: ${{current.label}}`
+    : (current.label ? `prior: ${{current.label}}` : "");
   document.querySelectorAll(".label-btn").forEach(b => b.classList.toggle("active", b.dataset.label === current.label));
   periodFactor = current.period_factor || "1";
   document.querySelectorAll(".period-btn").forEach(b => b.classList.toggle("active", b.dataset.factor === periodFactor));
@@ -440,7 +497,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--queue", type=Path, default=Path("franklin_review_queue_5k_real.csv"))
     parser.add_argument("--labels-out", type=Path, default=Path("franklin_labels_vetted.csv"))
-    parser.add_argument("--sheet-root", type=Path, default=Path("vet_sheets"))
+    parser.add_argument(
+        "--sheet-root",
+        type=Path,
+        action="append",
+        default=None,
+        help="Root containing vet sheets; repeat for a combined local review.",
+    )
+    parser.add_argument(
+        "--exact-sheets-only",
+        action="store_true",
+        help=(
+            "Require each queue row's exact twirl_vet_sheet_name; disable "
+            "review-id and TIC wildcard fallbacks."
+        ),
+    )
     parser.add_argument("--labeler", default="franklin")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5003)
@@ -450,7 +521,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
-    store = Store(args.queue, args.labels_out, args.sheet_root, args.labeler)
+    sheet_roots = args.sheet_root or [Path("vet_sheets")]
+    store = Store(
+        args.queue,
+        args.labels_out,
+        sheet_roots,
+        args.labeler,
+        allow_sheet_fallback=not args.exact_sheets_only,
+    )
     missing = [idx for idx in range(store.count) if store.sheet_path(idx) is None]
     print(json.dumps({**store.summary(), "missing_sheets": len(missing)}, indent=2))
     if args.check_only:

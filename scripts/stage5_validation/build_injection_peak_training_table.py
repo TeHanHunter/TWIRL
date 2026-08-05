@@ -26,6 +26,9 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from twirl.io.hlsp import BJDREFI, HLSPLightCurve  # noqa: E402
+from twirl.injections.a2v1_recovery import (  # noqa: E402
+    EPOCH_QUALITY_POLICY_CONTRACT,
+)
 from twirl.search.bls import BLSConfig, run_bls_on_lc  # noqa: E402
 from twirl.search.candidates import result_to_rows  # noqa: E402
 
@@ -44,6 +47,7 @@ DEFAULT_APERTURES = ("DET_FLUX_ADP_SML", "DET_FLUX_SML")
 DEFAULT_HARMONIC_FACTORS = (0.25, 1.0 / 3.0, 0.5, 1.0, 2.0, 3.0, 4.0)
 PERIOD_RECOVERY_TOL = 0.02
 MIN_WINDOW_OVERLAP_FRACTION = 0.50
+FRESH_INJECTION_PAIR_V2_SUFFIX = "_a2v1_fresh_injection_pair_v2"
 
 
 def _json_default(value: Any) -> Any:
@@ -256,7 +260,39 @@ def _injection_lc_from_group(h5_path: Path, group_path: str, aperture: str) -> H
     with h5py.File(h5_path, "r") as h5:
         group = h5[group_path]
         time = np.asarray(group["time"], dtype=np.float64)
-        quality = np.asarray(group["quality"], dtype=np.int32)
+        internal_quality = np.asarray(group["quality"], dtype=np.int32)
+        root_contract = str(h5.attrs.get("contract_version", ""))
+        group_contract = str(group.attrs.get("contract_version", root_contract))
+        if root_contract.endswith(FRESH_INJECTION_PAIR_V2_SUFFIX):
+            if group_contract != root_contract:
+                raise ValueError(
+                    f"injection contract mismatch in {h5_path}:{group_path}"
+                )
+            if (
+                str(group.attrs.get("epoch_quality_policy_contract", ""))
+                != EPOCH_QUALITY_POLICY_CONTRACT
+            ):
+                raise ValueError(
+                    f"missing v2 epoch-quality provenance in {h5_path}:{group_path}"
+                )
+            if "external_quality" not in group or "effective_quality" not in group:
+                raise KeyError(
+                    f"missing v2 quality overlay datasets in {h5_path}:{group_path}"
+                )
+            external_quality = np.asarray(group["external_quality"], dtype=np.int64)
+            quality = np.asarray(group["effective_quality"], dtype=np.int32)
+            expected_quality = (
+                (internal_quality != 0) | (external_quality != 0)
+            ).astype(np.int32)
+            if not (
+                len(internal_quality) == len(external_quality) == len(quality)
+                and np.array_equal(quality, expected_quality)
+            ):
+                raise ValueError(
+                    f"invalid v2 effective-quality overlay in {h5_path}:{group_path}"
+                )
+        else:
+            quality = internal_quality
         orbitid = np.asarray(group["orbitid"], dtype=np.int16)
         injected_name = f"{aperture}_injected"
         if injected_name in group:

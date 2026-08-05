@@ -1,0 +1,88 @@
+schema_version: twirl_teacher_ssl_training_config_v1
+run_name: teacher_ssl_v1
+run_id: teacher_ssl_v1_s56_s62_a2v1_current_adp
+model_facing_name: Teacher v4-SSL
+encoder_name: teacher_ssl_v1
+architecture_version: s56_harmonic_cnn_v1
+
+scope:
+  sectors: [56, 57, 58, 59, 60, 61, 62]
+  native_only: true
+  real_only: true
+  development_only: true
+  held_cv_fold_excluded: true
+  fixed_test_model_use_forbidden: true
+  prospective_sector_63_model_use_forbidden: true
+  injections_forbidden_from_ssl: true
+  automatic_production_promotion: false
+
+inputs:
+  split_bound_training_table: reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native_preparation/training_table_with_splits.csv
+  real_native_registry: reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/native_input_registry.csv
+  real_native_registry_summary: reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/native/native_input_registry.summary.json
+  baseline_teacher_v3_root: results/models/teacher_v3_s56_s62_a2v1_current_adp/full
+
+baseline:
+  run_id: teacher_v3_s56_s62_a2v1_current_adp
+  summary_filename: summary.json
+  expected_summary_sha256: 0bdcb064a7e67f2304ba58b1e79c462daa7cc8aad5ad64d2f57a86c4dae46e99
+  require_frozen_release: true
+
+unlabeled_pool:
+  labels_ignored_during_ssl: true
+  uncertain_included: true
+  wide_transit_like_included: true
+  scalar_metadata: absent
+  group_column: tic
+
+ssl:
+  profile: shape_plus_periodogram_bls
+  objective: vicreg
+  augmentation_contract: event_preserving_v1
+  event_window_protected: true
+  invariant_views:
+    - event_protected_mask_dropout
+    - small_valid_flux_noise
+  augmentation_parameters:
+    harmonic_cadence_dropout_probability: 0.02
+    periodogram_bin_dropout_probability: 0.02
+    local_masks_preserved: true
+    scalar_metadata_zeroed: true
+    invalid_samples_never_unmasked: true
+  prohibited_augmentations:
+    - crop
+    - phase_warp
+    - time_warp
+    - reversal
+    - smoothing
+    - flux_inversion
+    - depth_scaling
+    - aperture_swap
+    - harmonic_reassignment
+    - event_insertion
+    - event_removal
+  vicreg:
+    invariance_weight: 25.0
+    variance_weight: 25.0
+    covariance_weight: 1.0
+
+optimization:
+  ssl_epochs: 20
+  fine_tune_epochs: 100
+  batch_size: 32
+  workers: 8
+  seed: 560064
+
+fine_tuning:
+  label_policy: uncertain_masked
+  grouped_development_oof_only: true
+  held_fold_used_for_early_stopping: true
+  estimate_status: matched_development_not_untouched
+  fixed_test_evaluation_forbidden: true
+
+compute:
+  system: orcd
+  partition: pg_mki_aryeh
+  h200_gpus: 1
+  approved_ssl_ceiling_h200_gpus: 4
+  scaling_policy: one_for_native_pilot_then_parallel_folds_or_seeds

@@ -1,9 +1,12 @@
 name: a2v1_tier1_active_search_pair_v1
-contract_version: a2v1_tier1_science_qa_v1
+contract_version: a2v1_tier1_science_qa_v4
 sector: 56
 scope: active_search_pair
 promotion_enabled: false
 expected_tier0_contract: a2v1_tier0_integrity_qa_v2
+# Reviewed replacement Tier-0 report and its full quality-aware S56 BLS table.
+expected_tier0_summary_sha256: 1f7865b9368095ae7b0dcee52f7ed3d6caeb7c5406caea18d9613ade3cf432ca
+expected_tier0_bls_peaks_sha256: c3a7bd9f4953263950c27092d14962145eebaef714e6a60ce4fb178577410692
 apertures:
   - DET_FLUX_ADP_SML
   - DET_FLUX_ADP
@@ -17,10 +20,10 @@ min_population_targets: 512
 min_targets_per_magnitude_bin: 30
 min_supported_magnitude_bins: 3
 expected_compact_sha256: 703193afd1dad78db71411859c69d2724cb40aad1419915ccb5c62495ce10d40
-# Deliberate fail-closed placeholders. Replace both only after building and
-# reviewing the authoritative S56 QLP-quaternion/SPOC cadence artifact.
-expected_cadence_reference_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-expected_cadence_reference_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+# Reviewed v3 authority pair. The table is unchanged from v2; the manifest
+# additionally binds the four exact cam3 cadence-699957 exclusions.
+expected_cadence_reference_sha256: 6da30db4feff76b52575f83b6acedd39173e29b8f7328c364f2927329a167f4a
+expected_cadence_reference_manifest_sha256: a55bd499b46305eaa55ab6be03979d7c15253cd1a1b6d1e928782a2d23db5b62
 
 scatter_pass_finite_fraction: 0.98
 scatter_review_finite_fraction: 0.95
@@ -53,6 +56,11 @@ usable_pass_median: 0.80
 usable_review_median: 0.50
 usable_pass_p05: 0.50
 usable_review_p05: 0.30
+# Usable fractions above remain population/window-function diagnostics. Target
+# searchability is the simple hard floor used by the locked BLS search; review
+# targets remain eligible and only structurally invalid or sub-floor targets
+# are excluded.
+min_searchable_cadences: 200
 
 aperture_pass_valid_fraction: 0.98
 aperture_review_valid_fraction: 0.95
@@ -72,19 +80,21 @@ aperture_negative_correlation_threshold: -0.20
 aperture_pass_negative_correlation_fraction: 0.05
 aperture_review_negative_correlation_fraction: 0.10
 
-injection_contract_template: "s{sector}_a2v1_fresh_injection_pair_v1"
+injection_contract_template: "s{sector}_a2v1_fresh_injection_pair_v2"
 injection_selection_mode: full_shard
 injection_required_shard_indices: [0, 13, 26, 39]
-# Deliberate fail-closed placeholders until the exact four source HDF5 shards
-# are rehashed at their accepted evidence location.
+# Ordered v2 hashes regenerated on ORCD from producer commit
+# f1b8b53c7f2b2c62912e9d240b595458cbbd5d14: shard indices 00, 13, 26, and 39.
 expected_injection_shard_sha256:
-  - "0000000000000000000000000000000000000000000000000000000000000000"
-  - "0000000000000000000000000000000000000000000000000000000000000000"
-  - "0000000000000000000000000000000000000000000000000000000000000000"
-  - "0000000000000000000000000000000000000000000000000000000000000000"
+  - fe9996515fca53a8b3efd29a523ce88ac1016f905b02bb4326406df881b36525
+  - 7b166ddfbeb305c37b40e3853b0dd600a91b92af2e241f04d041b64f231bfa07
+  - 4d6f8f1154b396024c858c2da87df249bb960be4a4bfebfc88c6476199cace9b
+  - 9e309d6b02d7bf7bfcb10682eee416b3c0e236b802a10aa83869cc2b1b47e5a4
 injection_expected_ids: 2000
 expected_injection_selection_sha256: 8ee40ea7e450d5c19027f2e6c0c02279a78102caa246aeac80e032278ede6c5a
-expected_injection_metadata_sha256: 549968899c236387d65700aa1e6d0d84a45ccff63cdf97d0b647f4d19cef1910
+# V2 realization digest: the frozen schedule/hosts are unchanged, while
+# effective-quality epoch sampling changes cadence-sampled model_depth.
+expected_injection_metadata_sha256: b56a0b841343e26a6e980d57a525ab01ab2c6d9ab039384d65479fcb06aaf0b0
 expected_injection_source_adp_sha256: 03f041bc66f09158d7740eaf9116b081d2184b7844720778d74f7ec0cf3b4505
 expected_injection_parity_report_sha256: f5e98f0e900beda0275d2a1d34ce592e799f5b0690db1490482c34c0f92360f9
 min_faint_injection_ids: 32
@@ -106,23 +116,22 @@ injection_review_inband_fraction: 0.90
 
 # One truly independent WD 1856 reduction is enough for the enrichment scope.
 # A full-product promotion config must raise detector coverage to all 16 cells.
-independent_contract_template: "s{sector}_a2v1_independent_extraction_v1"
-# Deliberate fail-closed placeholders. Replace only after building and
-# reviewing the real external WD 1856 product and its emitted evidence pair.
-expected_independent_metrics_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-expected_independent_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-expected_independent_reference_product_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+independent_contract_template: "s{sector}_a2v1_independent_extraction_v2"
+# Reviewed official-MAST TESSCut reduction under the v2 external-quality
+# policy. Both active apertures independently recover the WD 1856 ephemeris.
+expected_independent_metrics_sha256: 6b3116f719a13d47c5c037d2e9e3035068aa3c80942e49ba020925e03e518975
+expected_independent_manifest_sha256: 50632bab106b19e59109b54c6f4ceb48df21c402c334b3d1455135ef7db32900
+expected_independent_reference_product_sha256: 4644df96e7d09d96fc22c97ca8dd2c59ea36feb688555116da9e5f7eabafe032
 min_independent_targets: 1
 min_independent_detectors: 1
+# Gate only on independent signal presence and ephemeris timing. Raw TESSCut
+# and decontaminated TGLC do not share a dilution or scatter transfer function.
+independent_comparison_mode: "signal_timing_only"
+# Official TESSCut and A2v1 timestamps differ by up to roughly one cadence.
+independent_max_time_delta_seconds: 60.0
 independent_pass_common_fraction: 0.90
 independent_review_common_fraction: 0.80
-independent_pass_abs_log_scatter_ratio: 0.30
-independent_review_abs_log_scatter_ratio: 0.48
 wd1856_pass_period_relative_error: 0.0001
 wd1856_review_period_relative_error: 0.0005
 wd1856_pass_epoch_residual_min: 5.0
 wd1856_review_epoch_residual_min: 15.0
-wd1856_pass_depth_ratio_low: 0.50
-wd1856_pass_depth_ratio_high: 2.0
-wd1856_review_depth_ratio_low: 0.25
-wd1856_review_depth_ratio_high: 4.0

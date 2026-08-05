@@ -20,6 +20,8 @@ INPUT_ROOT="${TWIRL_A2V1_INPUT_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/s
 OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/${SECTOR_TAG}_A2v1_teacher_v1_recovery}"
 CONFIG="${TWIRL_RECOVERY_CONFIG:-${REPO}/configs/injections/${SECTOR_TAG}_a2v1_teacher_v1_recovery_v1.yaml}"
 ADP_H5="${TWIRL_A2V1_ADP_H5:-${INPUT_ROOT}/${SECTOR_TAG}_A2v1_adp_pair_rebuilt.h5}"
+CADENCE_REFERENCE="${TWIRL_A2V1_CADENCE_REFERENCE:?set TWIRL_A2V1_CADENCE_REFERENCE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST:?set TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST}"
 MODE="${TWIRL_RECOVERY_MODE:-full}"
 SHARD="${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID is required}"
 SHARD_TAG="$(printf '%02d' "${SHARD}")"
@@ -51,6 +53,8 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HDF5_USE_FILE_LOCKING=FALS
   --config "${CONFIG}" \
   --raw-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_tglc_raw_sources.h5" \
   --adp-h5 "${ADP_H5}" \
+  --cadence-reference-table "${CADENCE_REFERENCE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
   --schedule "${OUT_ROOT}/schedule/injection_schedule.parquet" \
   --shard-index "${SHARD}" \
   --out-h5 "${PAIR_H5}" \
@@ -88,6 +92,9 @@ if [[ "${MODE}" == "smoke" ]]; then
     --pair-h5 "${PAIR_H5}" \
     --raw-h5 "${INPUT_ROOT}/${SECTOR_TAG}_A2v1_tglc_raw_sources.h5" \
     --adp-h5 "${ADP_H5}" \
+    --cadence-reference-table "${CADENCE_REFERENCE}" \
+    --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
+    --sector "${SECTOR}" \
     --out-candidates "${STAGE_ROOT}/teacher_inputs/candidates_00.csv" \
     --out-native-h5 "${STAGE_ROOT}/teacher_inputs/native_00.h5" \
     --overwrite

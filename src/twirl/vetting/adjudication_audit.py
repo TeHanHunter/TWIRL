@@ -156,7 +156,10 @@ def add_harmonic_cnn_targets(frame: pd.DataFrame) -> pd.DataFrame:
 
     The returned target and audit columns are never candidate observables. A
     parseable reviewer note overrides the period-factor button only in these
-    derived fields; the raw browser decision remains unchanged.
+    derived fields; the raw browser decision remains unchanged. When an input
+    table supplies ``harmonic_supervision_verified``, real rows that are not
+    explicitly verified retain their morphology/preserve targets but receive
+    no harmonic target. Injection truth remains authoritative.
     """
 
     out = frame.copy()
@@ -207,7 +210,9 @@ def add_harmonic_cnn_targets(frame: pd.DataFrame) -> pd.DataFrame:
     injection_unresolved = injection_transit & ~injection_resolved
     effective_factor.loc[injection_unresolved] = np.nan
     factor_source.loc[injection_unresolved] = "injection_truth_unresolved"
-    note_ok = np.isfinite(note_factor) & note_factor.gt(0)
+    # Reviewer notes are useful for real rows but must never override the
+    # authoritative injected truth-period ratio.
+    note_ok = np.isfinite(note_factor) & note_factor.gt(0) & ~injected
     effective_factor.loc[note_ok] = note_factor.loc[note_ok]
     factor_source.loc[note_ok] = "note"
 
@@ -229,6 +234,17 @@ def add_harmonic_cnn_targets(frame: pd.DataFrame) -> pd.DataFrame:
         "injection_truth_harmonic",
     }
     harmonic_include = transit_rows & harmonic_target.ne("") & factor_source.isin(resolved_sources)
+    if "harmonic_supervision_verified" in out:
+        raw_supervision = out["harmonic_supervision_verified"]
+        supervision_declared = (
+            raw_supervision.notna()
+            & raw_supervision.fillna("").astype(str).str.strip().ne("")
+        )
+        supervision_verified = _as_bool(raw_supervision)
+        supervision_allowed = ~supervision_declared | supervision_verified | injected
+        unverified = transit_rows & ~supervision_allowed
+        harmonic_target.loc[unverified] = ""
+        harmonic_include &= supervision_allowed
 
     effective_period = review_period * effective_factor
     effective_period.loc[~np.isfinite(effective_factor)] = np.nan

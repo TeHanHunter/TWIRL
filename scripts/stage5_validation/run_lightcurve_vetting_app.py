@@ -52,6 +52,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Directory containing pre-rendered TWIRL two-aperture PNG vet sheets. May be repeated.",
     )
+    ap.add_argument(
+        "--exact-twirl-vet-sheets",
+        action="store_true",
+        help=(
+            "Use only each queue row's exact twirl_vet_sheet_name; disable "
+            "review-ID, legacy-name, and TIC-glob fallbacks."
+        ),
+    )
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=5000)
     ap.add_argument(
@@ -103,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         shuffle_order=args.shuffle_order,
         random_seed=args.shuffle_seed,
         unlabeled_first=not args.no_unlabeled_first,
+        exact_twirl_vet_sheets=args.exact_twirl_vet_sheets,
     )
 
     if args.smoke_plot is not None:

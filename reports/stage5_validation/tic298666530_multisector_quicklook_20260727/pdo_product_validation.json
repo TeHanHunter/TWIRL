@@ -1,0 +1,296 @@
+{
+  "epsf_count": 22,
+  "expected_edge_omissions": [
+    {
+      "orbit": 165,
+      "reason": "target detector-edge warning; no persistent target HDF5",
+      "sector": 79
+    }
+  ],
+  "h5": [
+    {
+      "bytes": 870808,
+      "camera": 4,
+      "ccd": 4,
+      "n_cadences": 5588,
+      "orbit": 153,
+      "sector": 73
+    },
+    {
+      "bytes": 746472,
+      "camera": 4,
+      "ccd": 4,
+      "n_cadences": 4770,
+      "orbit": 154,
+      "sector": 73
+    },
+    {
+      "bytes": 912152,
+      "camera": 3,
+      "ccd": 3,
+      "n_cadences": 5860,
+      "orbit": 157,
+      "sector": 75
+    },
+    {
+      "bytes": 908200,
+      "camera": 3,
+      "ccd": 3,
+      "n_cadences": 5834,
+      "orbit": 158,
+      "sector": 75
+    },
+    {
+      "bytes": 772008,
+      "camera": 3,
+      "ccd": 2,
+      "n_cadences": 4938,
+      "orbit": 161,
+      "sector": 77
+    },
+    {
+      "bytes": 442016,
+      "camera": 3,
+      "ccd": 2,
+      "n_cadences": 2767,
+      "orbit": 162,
+      "sector": 77
+    },
+    {
+      "bytes": 244416,
+      "camera": 3,
+      "ccd": 2,
+      "n_cadences": 1467,
+      "orbit": 163,
+      "sector": 78
+    },
+    {
+      "bytes": 772008,
+      "camera": 3,
+      "ccd": 2,
+      "n_cadences": 4938,
+      "orbit": 164,
+      "sector": 78
+    },
+    {
+      "bytes": 918080,
+      "camera": 2,
+      "ccd": 1,
+      "n_cadences": 5899,
+      "orbit": 166,
+      "sector": 79
+    },
+    {
+      "bytes": 891480,
+      "camera": 4,
+      "ccd": 2,
+      "n_cadences": 5724,
+      "orbit": 167,
+      "sector": 80
+    },
+    {
+      "bytes": 847248,
+      "camera": 4,
+      "ccd": 2,
+      "n_cadences": 5433,
+      "orbit": 168,
+      "sector": 80
+    },
+    {
+      "bytes": 800432,
+      "camera": 4,
+      "ccd": 1,
+      "n_cadences": 5125,
+      "orbit": 171,
+      "sector": 82
+    },
+    {
+      "bytes": 862448,
+      "camera": 4,
+      "ccd": 1,
+      "n_cadences": 5533,
+      "orbit": 172,
+      "sector": 82
+    },
+    {
+      "bytes": 813960,
+      "camera": 4,
+      "ccd": 1,
+      "n_cadences": 5214,
+      "orbit": 173,
+      "sector": 83
+    },
+    {
+      "bytes": 825664,
+      "camera": 4,
+      "ccd": 1,
+      "n_cadences": 5291,
+      "orbit": 174,
+      "sector": 83
+    },
+    {
+      "bytes": 840408,
+      "camera": 4,
+      "ccd": 1,
+      "n_cadences": 5388,
+      "orbit": 175,
+      "sector": 84
+    },
+    {
+      "bytes": 850288,
+      "camera": 4,
+      "ccd": 1,
+      "n_cadences": 5453,
+      "orbit": 176,
+      "sector": 84
+    },
+    {
+      "bytes": 840408,
+      "camera": 4,
+      "ccd": 4,
+      "n_cadences": 5388,
+      "orbit": 177,
+      "sector": 85
+    },
+    {
+      "bytes": 835088,
+      "camera": 4,
+      "ccd": 4,
+      "n_cadences": 5353,
+      "orbit": 178,
+      "sector": 85
+    },
+    {
+      "bytes": 884336,
+      "camera": 4,
+      "ccd": 4,
+      "n_cadences": 5677,
+      "orbit": 179,
+      "sector": 86
+    },
+    {
+      "bytes": 861992,
+      "camera": 4,
+      "ccd": 4,
+      "n_cadences": 5530,
+      "orbit": 180,
+      "sector": 86
+    }
+  ],
+  "h5_count": 21,
+  "isolated_root": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727",
+  "sector_fits": [
+    {
+      "bytes": 757440,
+      "n_cadences": 10358,
+      "orbitids": [
+        153,
+        154
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0073_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0073-0000000298666530_tess_v01_llc.fits",
+      "sector": 73
+    },
+    {
+      "bytes": 855360,
+      "n_cadences": 11694,
+      "orbitids": [
+        157,
+        158
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0075_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0075-0000000298666530_tess_v01_llc.fits",
+      "sector": 75
+    },
+    {
+      "bytes": 567360,
+      "n_cadences": 7705,
+      "orbitids": [
+        161,
+        162
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0077_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0077-0000000298666530_tess_v01_llc.fits",
+      "sector": 77
+    },
+    {
+      "bytes": 475200,
+      "n_cadences": 6405,
+      "orbitids": [
+        163,
+        164
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0078_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0078-0000000298666530_tess_v01_llc.fits",
+      "sector": 78
+    },
+    {
+      "bytes": 437760,
+      "n_cadences": 5899,
+      "orbitids": [
+        166
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0079_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0079-0000000298666530_tess_v01_llc.fits",
+      "sector": 79
+    },
+    {
+      "bytes": 815040,
+      "n_cadences": 11157,
+      "orbitids": [
+        167,
+        168
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0080_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0080-0000000298666530_tess_v01_llc.fits",
+      "sector": 80
+    },
+    {
+      "bytes": 780480,
+      "n_cadences": 10658,
+      "orbitids": [
+        171,
+        172
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0082_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0082-0000000298666530_tess_v01_llc.fits",
+      "sector": 82
+    },
+    {
+      "bytes": 768960,
+      "n_cadences": 10505,
+      "orbitids": [
+        173,
+        174
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0083_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0083-0000000298666530_tess_v01_llc.fits",
+      "sector": 83
+    },
+    {
+      "bytes": 794880,
+      "n_cadences": 10841,
+      "orbitids": [
+        175,
+        176
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0084_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0084-0000000298666530_tess_v01_llc.fits",
+      "sector": 84
+    },
+    {
+      "bytes": 786240,
+      "n_cadences": 10741,
+      "orbitids": [
+        177,
+        178
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0085_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0085-0000000298666530_tess_v01_llc.fits",
+      "sector": 85
+    },
+    {
+      "bytes": 820800,
+      "n_cadences": 11207,
+      "orbitids": [
+        179,
+        180
+      ],
+      "path": "/pdo/users/tehan/tglc-tic298666530-quicklook-20260727/hlsp_s0086_A2v1/0000/0002/9866/6530/hlsp_twirlfs_tess_ffi_s0086-0000000298666530_tess_v01_llc.fits",
+      "sector": 86
+    }
+  ],
+  "sector_fits_count": 11,
+  "status": "pass",
+  "tic": 298666530
+}

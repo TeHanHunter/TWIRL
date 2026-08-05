@@ -260,7 +260,7 @@ def test_injected_harmonic_target_uses_truth_ratio_without_changing_morphology()
     frame = pd.DataFrame(
         {
             "human_label": ["planet_like", "planet_like"],
-            "human_notes": ["", ""],
+            "human_notes": ["Refold at 4P", ""],
             "source_kind": ["injection_recovery", "injection_recovery"],
             "is_injected_row": [True, True],
             "period_d": [1.0, 1.0],
@@ -269,6 +269,7 @@ def test_injected_harmonic_target_uses_truth_ratio_without_changing_morphology()
             "adjudicated_period_factor": [np.nan, np.nan],
             "adjudicated_period_status": ["", ""],
             "refold_factor": [np.nan, np.nan],
+            "harmonic_supervision_verified": [False, False],
         }
     )
 
@@ -282,6 +283,58 @@ def test_injected_harmonic_target_uses_truth_ratio_without_changing_morphology()
     assert out.loc[1, "morphology_target_v1"] == "planet_like"
     assert not bool(out.loc[1, "harmonic_include_v1"])
     assert out.loc[1, "period_factor_source"] == "injection_truth_unresolved"
+
+
+def test_unverified_real_factor_is_masked_without_losing_morphology() -> None:
+    frame = pd.DataFrame(
+        {
+            "human_label": ["planet_like", "eclipsing_binary_or_pceb"],
+            "human_notes": ["", "Refold at 2P"],
+            "source_kind": ["real_candidate", "real_candidate"],
+            "is_injected_row": [False, False],
+            "period_d": [1.0, 2.0],
+            "adjudication_final": [True, False],
+            "adjudicated_period_factor": ["1", np.nan],
+            "adjudicated_period_status": ["review_period", ""],
+            "refold_factor": [np.nan, np.nan],
+            "harmonic_supervision_verified": [False, False],
+        }
+    )
+
+    out = add_harmonic_cnn_targets(frame)
+
+    assert out["morphology_target_v1"].tolist() == [
+        "planet_like",
+        "eclipse_contact",
+    ]
+    assert out["morphology_include_v1"].astype(bool).all()
+    assert out["preserve_include_v1"].astype(bool).all()
+    assert out["harmonic_target_v1"].tolist() == ["", ""]
+    assert not out["harmonic_include_v1"].astype(bool).any()
+    assert out.loc[1, "period_factor_source"] == "note"
+    assert out.loc[1, "effective_period_factor"] == 2.0
+
+
+def test_mixed_legacy_and_explicitly_unverified_harmonics_are_tri_state() -> None:
+    frame = pd.DataFrame(
+        {
+            "human_label": ["planet_like", "planet_like"],
+            "human_notes": ["", ""],
+            "source_kind": ["real_candidate", "real_candidate"],
+            "is_injected_row": [False, False],
+            "period_d": [1.0, 1.0],
+            "adjudication_final": [True, True],
+            "adjudicated_period_factor": ["2", "2"],
+            "adjudicated_period_status": ["refolded", "refolded"],
+            "refold_factor": [np.nan, np.nan],
+            "harmonic_supervision_verified": [np.nan, False],
+        }
+    )
+
+    out = add_harmonic_cnn_targets(frame)
+
+    assert out["harmonic_target_v1"].tolist() == ["2p", ""]
+    assert out["harmonic_include_v1"].astype(bool).tolist() == [True, False]
 
 
 def test_review_join_computes_corrected_period_and_unresolved(tmp_path: Path) -> None:

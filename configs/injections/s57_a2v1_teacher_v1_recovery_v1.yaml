@@ -1,3 +1,6 @@
+# Retired historical S57-only recovery plan. It is retained for provenance,
+# not as an active runner config; the seven-sector path requires a new
+# observation-keyed, per-sector quality-aware contract.
 name: s57_a2v1_teacher_v1_recovery_v1
 sector: 57
 seed: 570201

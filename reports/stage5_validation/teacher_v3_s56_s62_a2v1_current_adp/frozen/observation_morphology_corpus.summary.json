@@ -1,0 +1,87 @@
+{
+  "corpus_contract_version": "teacher_v3_s56_s62_morphology_corpus_v1",
+  "human_label_counts": {
+    "eclipsing_binary_or_pceb": 420,
+    "instrumental_or_systematic": 1030,
+    "planet_like": 377,
+    "skip": 18,
+    "stellar_variability": 1161,
+    "uncertain": 4830,
+    "wide_transit_like": 345
+  },
+  "inputs": {
+    "s56_training": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_label_adjudication_real343/adjudicated_training_table/human_vetting_training_table_adjudicated.csv",
+      "sha256": "7b5d71d788c97059ceeccdbc724af2a05bf3643bdcd8f5301b0c467c88f92adc"
+    },
+    "s57_s59_labels": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/franklin_s57_s59_label_return_20260721/accepted_morphology_labels.csv",
+      "sha256": "443085c69bd7eb72a0b2616caa68fc16105b7e2f7d175f328f726123aa2a7dc9"
+    },
+    "s60_s62_labels": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/franklin_s60_s62_label_return_20260724/accepted_morphology_labels.csv",
+      "sha256": "3a5ddbb428ca59855bd7de76afd2540e7800b090f80c7d72ec726ea052e88fad"
+    },
+    "signal_freeze": {
+      "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/s56_s62_morphology_corpus_teacher_v3_v1/accepted_signal_rereview.csv",
+      "sha256": "0cbd9a3a293ab085f19f1a3510e526ba72ee6ac7bc95d0b98aa717e96e493e33"
+    }
+  },
+  "n_active_training_rows": 8163,
+  "n_injected_rows": 457,
+  "n_real_rows": 7724,
+  "n_real_unique_tics": 7587,
+  "n_rows": 8181,
+  "n_signal_review_additional_s56": 22,
+  "n_signal_review_matched_existing": 487,
+  "n_signal_review_rows": 509,
+  "n_unique_tics": 7903,
+  "output_corpus": {
+    "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/frozen/observation_morphology_corpus.csv",
+    "sha256": "7f05bd9e8b7c7b04c7cf6ec0b45df6300fb0cb08623acbfbec65fb85cd66ebd7"
+  },
+  "real_human_label_counts": {
+    "eclipsing_binary_or_pceb": 419,
+    "instrumental_or_systematic": 989,
+    "planet_like": 70,
+    "skip": 17,
+    "stellar_variability": 1160,
+    "uncertain": 4724,
+    "wide_transit_like": 345
+  },
+  "real_unique_tics_by_label": {
+    "eclipsing_binary_or_pceb": 408,
+    "instrumental_or_systematic": 989,
+    "planet_like": 65,
+    "skip": 17,
+    "stellar_variability": 1131,
+    "uncertain": 4678,
+    "wide_transit_like": 342
+  },
+  "sector_counts": {
+    "56": 2181,
+    "57": 1000,
+    "58": 1000,
+    "59": 1000,
+    "60": 1000,
+    "61": 1000,
+    "62": 1000
+  },
+  "split_group": "tic",
+  "split_identity_columns": [
+    "sector",
+    "tic",
+    "teacher_v3_observation_id"
+  ],
+  "split_seed": 560062,
+  "split_stratum_counts": {
+    "auxiliary": 18,
+    "broad_preserve": 345,
+    "eclipse_contact": 420,
+    "other": 5860,
+    "planet_like": 377,
+    "smooth_variable": 1161
+  },
+  "teacher_architecture_version": "s56_harmonic_cnn_v1",
+  "teacher_run_name": "teacher_v3"
+}

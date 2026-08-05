@@ -12,6 +12,11 @@
 
 set -euo pipefail
 
+if [[ "${TWIRL_ALLOW_EXPLORATORY_UNGATED_SECTOR_CHAIN:-0}" != "1" ]]; then
+  echo "Blocked: generic sector native inputs are not bound to an accepted Tier-1 candidate summary." >&2
+  exit 64
+fi
+
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
 SECTOR="${TWIRL_ENRICH_SECTOR:?set TWIRL_ENRICH_SECTOR}"
@@ -20,6 +25,8 @@ RAW_H5="${TWIRL_ENRICH_RAW_H5:-${DATA_ROOT}/s${SECTOR}_A2v1_tglc_raw_sources.h5}
 COMPACT="${TWIRL_ENRICH_COMPACT_H5:-${DATA_ROOT}/s${SECTOR}_A2v1_adp_pair_rebuilt.h5}"
 WORK_ROOT="${TWIRL_ENRICH_WORK_ROOT:?set TWIRL_ENRICH_WORK_ROOT}"
 N_SHARDS="${TWIRL_ENRICH_NATIVE_SHARDS:-32}"
+CADENCE_REFERENCE_TABLE="${TWIRL_ENRICH_CADENCE_REFERENCE_TABLE:?set TWIRL_ENRICH_CADENCE_REFERENCE_TABLE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_ENRICH_CADENCE_REFERENCE_MANIFEST:?set TWIRL_ENRICH_CADENCE_REFERENCE_MANIFEST}"
 
 mkdir -p "${WORK_ROOT}/real_native/shards"
 cd "${REPO}"
@@ -32,6 +39,9 @@ export HDF5_USE_FILE_LOCKING=FALSE
   --training-table "${WORK_ROOT}/candidates/real_candidates_top5.parquet" \
   --raw-source-h5 "${RAW_H5}" \
   --compact-adp-h5 "${COMPACT}" \
+  --cadence-reference-table "${CADENCE_REFERENCE_TABLE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
+  --sector "${SECTOR}" \
   --out-h5 "${WORK_ROOT}/real_native/shards/native_${SLURM_ARRAY_TASK_ID}.h5" \
   --repo-root "${REPO}" \
   --n-periods 4096 \

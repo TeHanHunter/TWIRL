@@ -291,10 +291,16 @@ ORCD should consume compact downstream products:
 - vetting feature tables
 - compact manifests with input paths, checksums, code versions, and sample cuts
 
-Operational boundary as of `2026-07-13`: use PDO only for Stage 1/TGLC/HLSP
-production and for building compact exports from the PDO-resident light-curve
-tree. Run downstream testing, vetting, injection-recovery, BLS branch audits,
-and model-training experiments on ORCD after those compact products are staged.
+Operational boundary: PDO reads the shared QLP/SPOC authorities and owns Stage
+1 TGLC/HLSP production, compact export, and construction of the authoritative
+cadence-reference evidence. Stage the compact HDF5, cadence CSV/manifest,
+Tier-0/BLS evidence, fixed-injection shards, and independent-extraction
+evidence into user-owned ORCD project storage. Run downstream population QA,
+vetting, injection-recovery, BLS branch audits, native-input construction, and
+model-training experiments on ORCD after those compact products are staged.
+PDO downstream runners remain compatibility or smoke exceptions, not the
+preferred full-run route. ORCD must not reconstruct cadence authority from, or
+write into, shared PDO trees.
 This includes two classes of CPU-bound Astropy-BLS work: production-level
 raw-flux detrending-strength audits, and post-ADP vetting diagnostics such as
 ADP+/two-aperture sheets. Run these on ORCD CPU nodes first, not on the H200

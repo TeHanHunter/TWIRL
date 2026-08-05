@@ -82,8 +82,18 @@ prepared_count() {
   local count=0
   local directory
   local n
-  local directories=("$root"/cam*/ccd*/"$kind")
+  local directories=()
 
+  shopt -s nullglob
+  directories=("$root"/cam*/ccd*/"$kind")
+  shopt -u nullglob
+
+  # Source-only prepared sectors legitimately have no legacy ePSF directories.
+  # A partial legacy tree remains unsafe because it silently changes reuse mode.
+  if [ "$kind" = "epsf" ] && [ "${#directories[@]}" -eq 0 ]; then
+    printf '0\n'
+    return
+  fi
   if [ "${#directories[@]}" -ne 16 ]; then
     die "orbit-$orbit has ${#directories[@]} $kind directories; expected 16"
   fi
@@ -99,11 +109,18 @@ preflight_orbit() {
   local orbit=$1
   local source_count
   local epsf_count
+  local epsf_mode
   source_count=$(prepared_count "$orbit" source 'source_*.pkl')
   epsf_count=$(prepared_count "$orbit" epsf 'epsf_*.npy')
-  log "preflight orbit-$orbit source=$source_count epsf=$epsf_count"
   [ "$source_count" -eq 3136 ] || die "orbit-$orbit has incomplete source preparation"
-  [ "$epsf_count" -eq 3136 ] || die "orbit-$orbit has incomplete old-ePSF preparation"
+  if [ "$epsf_count" -eq 3136 ]; then
+    epsf_mode=full-reuse-candidate
+  elif [ "$epsf_count" -eq 0 ]; then
+    epsf_mode=refit-all
+  else
+    die "orbit-$orbit has partial old-ePSF preparation ($epsf_count/3136)"
+  fi
+  log "preflight orbit-$orbit source=$source_count epsf=$epsf_count epsf_mode=$epsf_mode"
 }
 
 validate_h5() {

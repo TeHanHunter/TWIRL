@@ -1,0 +1,144 @@
+#!/bin/bash
+# One-fold, one-epoch throughput smoke for the verified v2 full-pool registry.
+# This job is deliberately isolated from the five-fold production namespace.
+#SBATCH -p pg_mki_aryeh
+#SBATCH --job-name=twirl-ssl-v2-smoke
+#SBATCH -N 1
+#SBATCH -n 1
+#SBATCH -c 16
+#SBATCH --mem=192G
+#SBATCH --gres=gpu:h200:1
+#SBATCH -t 08:00:00
+#SBATCH -o /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.out
+#SBATCH -e /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.err
+
+set -euo pipefail
+
+TWIRL_ROOT="/orcd/data/mki_aryeh/001/twirl"
+: "${TWIRL_ORCD_REPO:?controller must export TWIRL_ORCD_REPO}"
+: "${TWIRL_EXPECTED_GIT_SHA:?controller must export TWIRL_EXPECTED_GIT_SHA}"
+REPO="$(realpath -m -- "${TWIRL_ORCD_REPO}")"
+EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA}"
+PYTHON="${TWIRL_ROOT}/envs/twirl-s56-torch/bin/python"
+EXPECTED_SOURCE_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp"
+EXPECTED_RUN_ROOT="${TWIRL_ROOT}/reports/stage5_validation/teacher_ssl_fullpool_v2_s56_s62_a2v1_current_adp_bls_eligible"
+SOURCE_RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V1_RUN_ROOT:-${EXPECTED_SOURCE_RUN_ROOT}}")"
+RUN_ROOT="$(realpath -m -- "${TWIRL_SSL_FULLPOOL_V2_RUN_ROOT:-${EXPECTED_RUN_ROOT}}")"
+ELIGIBILITY_DIR="${RUN_ROOT}/frozen/native_model_eligibility"
+ELIGIBILITY_EXCLUSIONS="${ELIGIBILITY_DIR}/native_model_exclusions.csv"
+ELIGIBILITY_SUMMARY="${ELIGIBILITY_DIR}/native_model_eligibility.summary.json"
+NATIVE_REGISTRY_DIR="${RUN_ROOT}/frozen/native_registry"
+NATIVE_REGISTRY="${NATIVE_REGISTRY_DIR}/native_input_registry.parquet"
+NATIVE_REGISTRY_SUMMARY="${NATIVE_REGISTRY_DIR}/native_input_registry.summary.json"
+NATIVE_RELEASE_SUMMARY="${NATIVE_REGISTRY_DIR}/native_fullpool_release.summary.json"
+REGISTRY_DIR="${RUN_ROOT}/frozen/ssl_registry"
+REGISTRY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.parquet"
+REGISTRY_SUMMARY="${REGISTRY_DIR}/teacher_ssl_fullpool_registry.summary.json"
+OUT_ROOT="${RUN_ROOT}/smoke/one_epoch"
+PRODUCTION_OUT_ROOT="${RUN_ROOT}/training/five_fold"
+FOLD="${TWIRL_SSL_FULLPOOL_SMOKE_FOLD:-0}"
+readonly EPOCHS=1
+readonly MAX_ROWS=4096
+readonly BATCH_SIZE=64
+readonly WORKERS=8
+readonly SEED=560064
+
+for forbidden_var in \
+  TWIRL_SSL_FULLPOOL_SMOKE_EPOCHS \
+  TWIRL_SSL_FULLPOOL_SMOKE_MAX_ROWS \
+  TWIRL_SSL_FULLPOOL_SMOKE_BATCH_SIZE \
+  TWIRL_SSL_FULLPOOL_SMOKE_WORKERS \
+  TWIRL_SSL_FULLPOOL_SMOKE_OUT_ROOT \
+  TWIRL_SSL_FULLPOOL_EPOCHS \
+  TWIRL_SSL_FULLPOOL_BATCH_SIZE \
+  TWIRL_SSL_FULLPOOL_WORKERS \
+  TWIRL_SSL_FULLPOOL_SEED \
+  TWIRL_SSL_FULLPOOL_MAX_ROWS; do
+  if [[ -n "${!forbidden_var+x}" ]]; then
+    echo "Smoke contract forbids environment override ${forbidden_var}." >&2
+    exit 2
+  fi
+done
+if [[ "${SOURCE_RUN_ROOT}" != "${EXPECTED_SOURCE_RUN_ROOT}" || "${RUN_ROOT}" != "${EXPECTED_RUN_ROOT}" ]]; then
+  echo "Smoke roots differ from the exact Teacher v4-SSL v2 contract." >&2
+  exit 2
+fi
+if [[ "${OUT_ROOT}" == "${PRODUCTION_OUT_ROOT}" ]]; then
+  echo "Smoke and production output roots must be distinct." >&2
+  exit 2
+fi
+if [[ ! "${FOLD}" =~ ^[0-4]$ ]]; then
+  echo "TWIRL_SSL_FULLPOOL_SMOKE_FOLD must be in [0,4]." >&2
+  exit 2
+fi
+if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "TWIRL_EXPECTED_GIT_SHA must be a full lowercase Git SHA." >&2
+  exit 2
+fi
+if [[ "$(git -C "${REPO}" rev-parse HEAD)" != "${EXPECTED_SHA}" ]] || [[ -n "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]]; then
+  echo "Smoke repository is not the clean expected deployed revision." >&2
+  exit 2
+fi
+
+for input in \
+  "${ELIGIBILITY_EXCLUSIONS}" \
+  "${ELIGIBILITY_SUMMARY}" \
+  "${NATIVE_REGISTRY}" \
+  "${NATIVE_REGISTRY_SUMMARY}" \
+  "${NATIVE_RELEASE_SUMMARY}" \
+  "${REGISTRY}" \
+  "${REGISTRY_SUMMARY}"; do
+  if [[ ! -s "${input}" ]]; then
+    echo "Missing verified v2 smoke authority: ${input}" >&2
+    exit 3
+  fi
+done
+if [[ -e "${OUT_ROOT}/encoder_pretraining/fold_${FOLD}/summary.json" ]]; then
+  echo "Refusing to overwrite an existing completed smoke." >&2
+  exit 4
+fi
+
+mkdir -p "${TWIRL_ROOT}/logs" "${OUT_ROOT}"
+cd "${REPO}"
+export PYTHONPATH="${REPO}/src"
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export HDF5_USE_FILE_LOCKING=FALSE
+
+module load cuda/13.1.0 || module load cuda/12.9.1 || true
+nvidia-smi
+
+echo "[teacher-ssl-fullpool-v2-smoke] start=$(date -Is) fold=${FOLD} rows=${MAX_ROWS}"
+"${PYTHON}" scripts/stage5_validation/train_teacher_ssl_fullpool_fold.py \
+  --eligibility-exclusions "${ELIGIBILITY_EXCLUSIONS}" \
+  --eligibility-summary "${ELIGIBILITY_SUMMARY}" \
+  --native-registry "${NATIVE_REGISTRY}" \
+  --native-registry-summary "${NATIVE_REGISTRY_SUMMARY}" \
+  --native-release-summary "${NATIVE_RELEASE_SUMMARY}" \
+  --registry "${REGISTRY}" \
+  --registry-summary "${REGISTRY_SUMMARY}" \
+  --out-root "${OUT_ROOT}" \
+  --fold "${FOLD}" \
+  --epochs "${EPOCHS}" \
+  --batch-size "${BATCH_SIZE}" \
+  --workers "${WORKERS}" \
+  --seed "${SEED}" \
+  --max-rows "${MAX_ROWS}"
+
+SMOKE_SUMMARY="${OUT_ROOT}/encoder_pretraining/fold_${FOLD}/summary.json"
+"${PYTHON}" \
+  scripts/stage5_validation/validate_teacher_ssl_fullpool_v2_smoke.py \
+  --summary "${SMOKE_SUMMARY}" \
+  --expected-code-revision "${EXPECTED_SHA}" \
+  --eligibility-exclusions "${ELIGIBILITY_EXCLUSIONS}" \
+  --eligibility-summary "${ELIGIBILITY_SUMMARY}" \
+  --native-registry "${NATIVE_REGISTRY}" \
+  --native-registry-summary "${NATIVE_REGISTRY_SUMMARY}" \
+  --native-release-summary "${NATIVE_RELEASE_SUMMARY}" \
+  --registry "${REGISTRY}" \
+  --registry-summary "${REGISTRY_SUMMARY}" \
+  --expected-fold "${FOLD}"
+echo "[teacher-ssl-fullpool-v2-smoke] complete=$(date -Is) summary=${SMOKE_SUMMARY}"

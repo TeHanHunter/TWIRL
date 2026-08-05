@@ -1,0 +1,56 @@
+{
+  "development_fold_observation_counts": {
+    "0": 1308,
+    "1": 1311,
+    "2": 1310,
+    "3": 1312,
+    "4": 1308
+  },
+  "development_fold_tic_counts": {
+    "0": 1265,
+    "1": 1265,
+    "2": 1264,
+    "3": 1264,
+    "4": 1264
+  },
+  "group_column": "tic",
+  "group_leakage_count": 0,
+  "identity_columns": [
+    "sector",
+    "tic",
+    "teacher_v3_observation_id"
+  ],
+  "input_corpus": {
+    "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/frozen/observation_morphology_corpus.csv",
+    "sha256": "7f05bd9e8b7c7b04c7cf6ec0b45df6300fb0cb08623acbfbec65fb85cd66ebd7"
+  },
+  "n_development_folds": 5,
+  "n_observations": 8181,
+  "n_test_observations": 1632,
+  "n_test_tics": 1581,
+  "n_unique_tics": 7903,
+  "observation_identity_content_sha256": "0fa29c87b61d0b996acaa192bd1fd353bc1050fd8428f1b2798e0cf25063a9f6",
+  "output_registry": {
+    "path": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/frozen/tic_split_registry.csv",
+    "sha256": "551747a18175ecc3c4dbcc9d464e2f521f0550cb9e045c28c6a7580455922f7c"
+  },
+  "passed": true,
+  "registry_content_sha256": "8ecb619cff9b1685d9378e70208adc61d075f4f695cc60c82e34169a1f190ddc",
+  "schema_version": "twirl_teacher_v1_tic_split_registry_v1",
+  "seed": 560062,
+  "split_policy_version": "tic_grouped_stratified_test20_dev5_v1",
+  "stratum_column": "split_stratum",
+  "stratum_observation_counts": {
+    "auxiliary": 18,
+    "broad_preserve": 345,
+    "eclipse_contact": 420,
+    "other": 5860,
+    "planet_like": 377,
+    "smooth_variable": 1161
+  },
+  "target_test_fraction": 0.2,
+  "target_test_tic_count": 1581,
+  "test_fraction_unit": "unique_tics",
+  "test_observation_fraction": 0.19948661532819947,
+  "test_tic_fraction": 0.2000506136910034
+}

@@ -1,0 +1,18 @@
+{
+  "created_utc": "2026-07-28T02:07:50.784055+00:00",
+  "identity_only": true,
+  "light_curves_opened": false,
+  "n_reserved_tics": 53512,
+  "n_selected_observation_rows": 107104,
+  "observations": "/Users/tehan/PycharmProjects/TWIRL/data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits",
+  "observations_sha256": "2f42698420a5e2d945a3fd60d3ddc057c06f3fd19c2b9882829ea0c26e5280d9",
+  "orbits": [
+    133,
+    134
+  ],
+  "reserved_tics": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_ssl_fullpool_v1_s56_s62_a2v1_current_adp/preregistered/s63_reserved_tics.txt",
+  "reserved_tics_sha256": "0560961c44e73d24f4466f6873c6308b89b9c3ac1d32df5cee7ee87141f6c98b",
+  "schema_version": "twirl_teacher_ssl_reserved_sector_tics_v1",
+  "sector": 63,
+  "selection": "sector == 63; orbit in {133,134}; tic_id > 0; unique TIC"
+}

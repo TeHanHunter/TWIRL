@@ -1,13 +1,15 @@
 """Build the S56 WD 1856 independent-extraction evidence for Tier-1 QA.
 
-The builder compares the locked A2v1 ADP pair with one cadence-level light
-curve made by an explicitly declared external extraction.  It does not fetch,
-invent, or bless a reference product: callers must supply the external table,
-its source product, and enough provenance to audit the independence claim.
+The builder compares each member of the locked A2v1 ADP pair with an
+explicitly mapped flux column from one cadence-level light curve made by an
+external extraction.  It does not fetch, invent, or bless a reference product:
+callers must supply the external table, its source product, and enough
+provenance to audit the independence claim.
 
 All photometric comparisons use the exact common ``CADENCENO`` intersection,
-joint quality-zero finite cadences, and the fixed WD 1856 ephemeris.  The
-output CSV and JSON manifest implement the input contract consumed by
+joint effective-quality-zero finite cadences, and the fixed WD 1856 ephemeris.
+Effective quality is the native product mask OR the authoritative external
+SPOC/QLP overlay.  The output CSV and JSON manifest implement the input contract consumed by
 ``evaluate_independent_extraction`` in :mod:`twirl.lightcurves.a2v1_tier1_qa`.
 """
 from __future__ import annotations
@@ -17,7 +19,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 import h5py
 import numpy as np
@@ -30,13 +32,15 @@ from twirl.lightcurves.a2v1_qa import (
     file_sha256,
 )
 from twirl.lightcurves.a2v1_tier1_qa import _dataframe_content_sha256
+from twirl.lightcurves.external_quality import load_external_quality_reference
 from twirl.vetting.adp_only import ADP_ONLY_APERTURES
 
 
 SECTOR = 56
 CURRENT_TIME_OFFSET_BJD = 2_457_000.0
 CURRENT_EXTRACTOR_FAMILY = "MIT TGLC A2v1"
-INDEPENDENT_CONTRACT_VERSION = "s56_a2v1_independent_extraction_v1"
+INDEPENDENT_CONTRACT_VERSION = "s56_a2v1_independent_extraction_v2"
+INDEPENDENT_COMPARISON_MODE = "signal_timing_only"
 EXPECTED_DETECTOR = (4, 1)
 
 
@@ -79,6 +83,72 @@ class IndependentExtractionProvenance:
             raise ValueError(
                 f"reference_target_id must identify WD 1856 as TIC {WD1856_TIC}"
             )
+
+
+def _normalize_reference_flux_columns(
+    mapping: Mapping[str, str],
+) -> dict[str, str]:
+    """Validate an exact current-aperture to reference-column mapping."""
+
+    if not isinstance(mapping, Mapping):
+        raise TypeError("reference_flux_columns must be a mapping")
+    normalized: dict[str, str] = {}
+    for current, reference in mapping.items():
+        if not isinstance(current, str) or not isinstance(reference, str):
+            raise ValueError("reference flux mapping names must be strings")
+        current_name = current.strip()
+        reference_name = reference.strip()
+        if not current_name or not reference_name:
+            raise ValueError("reference flux mapping names must be nonempty")
+        if current_name in normalized:
+            raise ValueError(
+                f"duplicate reference flux mapping for current aperture {current_name!r}"
+            )
+        normalized[current_name] = reference_name
+
+    expected = set(ADP_ONLY_APERTURES)
+    observed = set(normalized)
+    if observed != expected:
+        missing = sorted(expected - observed)
+        extra = sorted(observed - expected)
+        raise ValueError(
+            "reference flux mappings must exactly cover the active current "
+            f"apertures; missing={missing}, extra={extra}"
+        )
+    if len(set(normalized.values())) != len(normalized):
+        raise ValueError(
+            "reference flux mappings must use a distinct external column for "
+            "each active current aperture"
+        )
+    return {aperture: normalized[aperture] for aperture in ADP_ONLY_APERTURES}
+
+
+def parse_reference_flux_column_mappings(
+    specifications: Sequence[str],
+) -> dict[str, str]:
+    """Parse repeated ``CURRENT=REFERENCE`` command-line specifications."""
+
+    if isinstance(specifications, (str, bytes)):
+        raise ValueError(
+            "reference flux mappings must be repeated CURRENT=REFERENCE values"
+        )
+    mapping: dict[str, str] = {}
+    for specification in specifications:
+        if not isinstance(specification, str) or specification.count("=") != 1:
+            raise ValueError(
+                "each reference flux mapping must have the form CURRENT=REFERENCE"
+            )
+        current, reference = (part.strip() for part in specification.split("=", 1))
+        if not current or not reference:
+            raise ValueError(
+                "each reference flux mapping must have the form CURRENT=REFERENCE"
+            )
+        if current in mapping:
+            raise ValueError(
+                f"duplicate reference flux mapping for current aperture {current!r}"
+            )
+        mapping[current] = reference
+    return _normalize_reference_flux_columns(mapping)
 
 
 def _robust_mad(values: np.ndarray) -> float:
@@ -361,15 +431,23 @@ def _current_arrays(compact_lc: Path) -> dict[str, Any]:
             raise ValueError(
                 "WD 1856 S56 must be on the locked cam4/ccd1 benchmark detector"
             )
-        required = ("time", "cadenceno", "quality", *ADP_ONLY_APERTURES)
+        required = (
+            "time",
+            "cadenceno",
+            "quality",
+            "orbitid",
+            *ADP_ONLY_APERTURES,
+        )
         missing = [name for name in required if name not in group]
         if missing:
             raise KeyError(f"WD 1856 compact group lacks datasets: {missing}")
         time = np.asarray(group["time"], dtype=float)
         cadence_raw = np.asarray(group["cadenceno"])
         quality_raw = np.asarray(group["quality"])
+        orbit_raw = np.asarray(group["orbitid"])
         cadence_float = np.asarray(cadence_raw, dtype=float)
         quality_float = np.asarray(quality_raw, dtype=float)
+        orbit_float = np.asarray(orbit_raw, dtype=float)
         if (
             not np.isfinite(cadence_float).all()
             or not np.equal(cadence_float, np.floor(cadence_float)).all()
@@ -380,13 +458,25 @@ def _current_arrays(compact_lc: Path) -> dict[str, Any]:
             or not np.equal(quality_float, np.floor(quality_float)).all()
         ):
             raise ValueError("current WD 1856 QUALITY must contain finite integers")
+        if (
+            not np.isfinite(orbit_float).all()
+            or not np.equal(orbit_float, np.floor(orbit_float)).all()
+        ):
+            raise ValueError("current WD 1856 ORBITID must contain finite integers")
         cadence = cadence_float.astype(np.int64)
         quality = quality_float.astype(np.int64)
+        orbitid = orbit_float.astype(np.int64)
         flux = {
             aperture: np.asarray(group[aperture], dtype=float)
             for aperture in ADP_ONLY_APERTURES
         }
-    lengths = {len(time), len(cadence), len(quality), *(len(values) for values in flux.values())}
+    lengths = {
+        len(time),
+        len(cadence),
+        len(quality),
+        len(orbitid),
+        *(len(values) for values in flux.values()),
+    }
     if len(lengths) != 1 or not lengths or next(iter(lengths)) == 0:
         raise ValueError("current WD 1856 compact datasets have inconsistent lengths")
     if not np.isfinite(time).all():
@@ -402,6 +492,8 @@ def _current_arrays(compact_lc: Path) -> dict[str, Any]:
         "cadence": cadence,
         "time_bjd": time_bjd,
         "quality": quality,
+        "native_quality": quality.copy(),
+        "orbitid": orbitid,
         "flux": flux,
         "camera": camera,
         "ccd": ccd,
@@ -505,6 +597,7 @@ def _measure_one_aperture(
         "tic": WD1856_TIC,
         "sector": SECTOR,
         "aperture": aperture,
+        "reference_flux_column": str(reference["flux_column"]),
         "detector": f"cam{current['camera']}_ccd{current['ccd']}",
         "n_current_cadences": int(len(current["cadence"])),
         "n_reference_cadences": int(len(reference["cadence"])),
@@ -568,11 +661,13 @@ def build_wd1856_independent_metrics(
     compact_lc: Path,
     reference_table: Path,
     reference_product: Path,
+    cadence_reference_table: Path,
+    cadence_reference_manifest: Path,
     metrics_csv: Path,
     manifest_json: Path,
     provenance: IndependentExtractionProvenance,
     reference_time_system: str,
-    reference_flux_column: str,
+    reference_flux_columns: Mapping[str, str],
     reference_cadence_column: str = "CADENCENO",
     reference_time_column: str = "TIME",
     reference_quality_column: str = "QUALITY",
@@ -593,16 +688,31 @@ def build_wd1856_independent_metrics(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Write hash-bound WD 1856 metrics and the Tier-1 provenance manifest."""
 
+    flux_column_mapping = _normalize_reference_flux_columns(reference_flux_columns)
     compact_lc = Path(compact_lc)
     reference_table = Path(reference_table)
     reference_product = Path(reference_product)
-    for path in (compact_lc, reference_table, reference_product):
+    cadence_reference_table = Path(cadence_reference_table)
+    cadence_reference_manifest = Path(cadence_reference_manifest)
+    for path in (
+        compact_lc,
+        reference_table,
+        reference_product,
+        cadence_reference_table,
+        cadence_reference_manifest,
+    ):
         if not path.is_file():
             raise FileNotFoundError(path)
     input_paths = tuple(
         dict.fromkeys(
             path.resolve()
-            for path in (compact_lc, reference_table, reference_product)
+            for path in (
+                compact_lc,
+                reference_table,
+                reference_product,
+                cadence_reference_table,
+                cadence_reference_manifest,
+            )
         )
     )
     initial_input_sha256 = {
@@ -655,7 +765,13 @@ def build_wd1856_independent_metrics(
     if bls_oversample < 5:
         raise ValueError("bounded BLS oversample must be at least 5")
     metrics_csv, manifest_json = _output_preflight(
-        inputs=(compact_lc, reference_table, reference_product),
+        inputs=(
+            compact_lc,
+            reference_table,
+            reference_product,
+            cadence_reference_table,
+            cadence_reference_manifest,
+        ),
         metrics_csv=metrics_csv,
         manifest_json=manifest_json,
         overwrite=overwrite,
@@ -669,6 +785,23 @@ def build_wd1856_independent_metrics(
     if compact_sha256 == reference_product_sha256:
         raise ValueError("current compact and external reference products have the same hash")
     current = _current_arrays(compact_lc)
+    quality_reference = load_external_quality_reference(
+        table_path=cadence_reference_table,
+        manifest_path=cadence_reference_manifest,
+        sector=SECTOR,
+        expected_orbits=(119, 120),
+    )
+    current_full_overlay = quality_reference.apply(
+        sector=SECTOR,
+        camera=current["camera"],
+        ccd=current["ccd"],
+        cadenceno=current["cadence"],
+        orbitid=current["orbitid"],
+        internal_quality=current["native_quality"],
+        context="WD 1856 current compact",
+    )
+    current["quality"] = current_full_overlay.quality
+    current["external_quality"] = current_full_overlay.external_quality
     table, header, table_format = _read_reference_table(reference_table)
     table_identity = _validate_reference_identity(
         table,
@@ -692,46 +825,103 @@ def build_wd1856_independent_metrics(
             sector_column=reference_sector_column,
             source_label="external source product",
         )
-    reference = _reference_arrays(
-        table,
-        cadence_column=reference_cadence_column,
-        time_column=reference_time_column,
-        quality_column=reference_quality_column,
-        flux_column=reference_flux_column,
-        time_system=reference_time_system,
-    )
-    common, current_index, reference_index = np.intersect1d(
-        np.asarray(current["cadence"]),
-        np.asarray(reference["cadence"]),
-        assume_unique=True,
-        return_indices=True,
-    )
-    if len(common) < min_common_cadences:
-        raise ValueError(
-            f"only {len(common)} exact common CADENCENO values; need {min_common_cadences}"
+    reference_contexts: dict[str, dict[str, Any]] = {}
+    for aperture in ADP_ONLY_APERTURES:
+        aperture_reference = _reference_arrays(
+            table,
+            cadence_column=reference_cadence_column,
+            time_column=reference_time_column,
+            quality_column=reference_quality_column,
+            flux_column=flux_column_mapping[aperture],
+            time_system=reference_time_system,
         )
+        common, current_index, reference_index = np.intersect1d(
+            np.asarray(current["cadence"]),
+            np.asarray(aperture_reference["cadence"]),
+            assume_unique=True,
+            return_indices=True,
+        )
+        if len(common) < min_common_cadences:
+            raise ValueError(
+                f"{aperture} has only {len(common)} exact common CADENCENO values; "
+                f"need {min_common_cadences}"
+            )
+        current_common_overlay = quality_reference.apply(
+            sector=SECTOR,
+            camera=current["camera"],
+            ccd=current["ccd"],
+            cadenceno=current["cadence"][current_index],
+            orbitid=current["orbitid"][current_index],
+            internal_quality=current["native_quality"][current_index],
+            context=f"WD 1856 current common {aperture}",
+        )
+        reference_common_overlay = quality_reference.apply(
+            sector=SECTOR,
+            camera=current["camera"],
+            ccd=current["ccd"],
+            cadenceno=aperture_reference["cadence"][reference_index],
+            orbitid=current["orbitid"][current_index],
+            internal_quality=aperture_reference["quality"][reference_index],
+            context=f"WD 1856 reference common {aperture}",
+        )
+        effective_reference_quality = np.asarray(
+            aperture_reference["quality"], dtype=np.int64
+        ).copy()
+        effective_reference_quality[reference_index] = (
+            reference_common_overlay.quality
+        )
+        aperture_reference["quality"] = effective_reference_quality
+        reference_contexts[aperture] = {
+            "reference": aperture_reference,
+            "common": common,
+            "current_index": current_index,
+            "reference_index": reference_index,
+            "current_overlay_counts": dict(current_common_overlay.counts),
+            "reference_overlay_counts": dict(reference_common_overlay.counts),
+        }
 
-    rows = [
-        _measure_one_aperture(
-            aperture=aperture,
-            current=current,
-            reference=reference,
-            current_index=current_index,
-            reference_index=reference_index,
-            transit_duration_min=transit_duration_min,
-            oot_exclusion_min=oot_exclusion_min,
-            max_time_delta_seconds=max_time_delta_seconds,
-            min_in_event_cadences=min_in_event_cadences,
-            min_out_of_event_cadences=min_out_of_event_cadences,
-            bls_period_relative_half_width=bls_period_relative_half_width,
-            bls_n_periods=bls_n_periods,
-            bls_durations_min=bls_durations_min,
-            bls_oversample=bls_oversample,
-            min_bls_depth_snr=min_bls_depth_snr,
+    rows = []
+    for aperture in ADP_ONLY_APERTURES:
+        context = reference_contexts[aperture]
+        rows.append(
+            _measure_one_aperture(
+                aperture=aperture,
+                current=current,
+                reference=context["reference"],
+                current_index=context["current_index"],
+                reference_index=context["reference_index"],
+                transit_duration_min=transit_duration_min,
+                oot_exclusion_min=oot_exclusion_min,
+                max_time_delta_seconds=max_time_delta_seconds,
+                min_in_event_cadences=min_in_event_cadences,
+                min_out_of_event_cadences=min_out_of_event_cadences,
+                bls_period_relative_half_width=bls_period_relative_half_width,
+                bls_n_periods=bls_n_periods,
+                bls_durations_min=bls_durations_min,
+                bls_oversample=bls_oversample,
+                min_bls_depth_snr=min_bls_depth_snr,
+            )
         )
-        for aperture in ADP_ONLY_APERTURES
-    ]
     metrics = pd.DataFrame(rows)
+    first_context = reference_contexts[ADP_ONLY_APERTURES[0]]
+    reference = first_context["reference"]
+    common = first_context["common"]
+    resolved_flux_column_mapping = {
+        aperture: str(reference_contexts[aperture]["reference"]["flux_column"])
+        for aperture in ADP_ONLY_APERTURES
+    }
+    current_common_counts = {
+        tuple(sorted(context["current_overlay_counts"].items()))
+        for context in reference_contexts.values()
+    }
+    reference_common_counts = {
+        tuple(sorted(context["reference_overlay_counts"].items()))
+        for context in reference_contexts.values()
+    }
+    if len(current_common_counts) != 1 or len(reference_common_counts) != 1:
+        raise RuntimeError("aperture quality-overlay audit counts disagree")
+    current_common_audit = dict(next(iter(current_common_counts)))
+    reference_common_audit = dict(next(iter(reference_common_counts)))
 
     metrics_tmp = metrics_csv.with_suffix(metrics_csv.suffix + ".tmp")
     manifest_tmp = manifest_json.with_suffix(manifest_json.suffix + ".tmp")
@@ -739,10 +929,14 @@ def build_wd1856_independent_metrics(
         compact_lc.resolve(),
         reference_table.resolve(),
         reference_product.resolve(),
+        cadence_reference_table.resolve(),
+        cadence_reference_manifest.resolve(),
     } or manifest_tmp.resolve() in {
         compact_lc.resolve(),
         reference_table.resolve(),
         reference_product.resolve(),
+        cadence_reference_table.resolve(),
+        cadence_reference_manifest.resolve(),
     }:
         raise ValueError("temporary output path collides with an input")
     try:
@@ -758,6 +952,7 @@ def build_wd1856_independent_metrics(
             "sector": SECTOR,
             "tic": WD1856_TIC,
             "independent": True,
+            "comparison_mode": INDEPENDENT_COMPARISON_MODE,
             "independence_basis": provenance.independence_basis.strip(),
             "current_extractor_family": CURRENT_EXTRACTOR_FAMILY,
             "reference_extractor_family": provenance.reference_extractor_family.strip(),
@@ -769,7 +964,8 @@ def build_wd1856_independent_metrics(
             "reference_target_id": provenance.reference_target_id.strip(),
             "cadence_match_policy": (
                 "exact common CADENCENO intersection; joint current/reference "
-                "QUALITY==0 and finite flux for photometric metrics"
+                "effective QUALITY==0 and finite flux for photometric metrics; "
+                "effective quality is native internal OR authoritative external"
             ),
             "scatter_definition": (
                 "1.4826*MAD in ppm after each series is normalized by its "
@@ -788,6 +984,7 @@ def build_wd1856_independent_metrics(
             ),
             "current_apertures": list(ADP_ONLY_APERTURES),
             "reference_product_aperture": provenance.reference_product_aperture.strip(),
+            "reference_flux_columns": resolved_flux_column_mapping,
             "current_compact_sha256": compact_sha256,
             "current_product_sha256": compact_sha256,
             "reference_product_sha256": reference_product_sha256,
@@ -804,12 +1001,21 @@ def build_wd1856_independent_metrics(
                 "cadence": str(reference["cadence_column"]),
                 "time": str(reference["time_column"]),
                 "quality": str(reference["quality_column"]),
-                "flux": str(reference["flux_column"]),
+                "flux_by_current_aperture": resolved_flux_column_mapping,
                 "tic": str(table_identity["identity_source"]["tic"]),
                 "sector": str(table_identity["identity_source"]["sector"]),
             },
             "reference_table_identity": table_identity,
             "reference_product_identity": product_identity,
+            "external_quality_overlay": {
+                **quality_reference.provenance,
+                "applied_before_common_cadence_metrics": True,
+                "current_compact_full_audit_counts": dict(
+                    current_full_overlay.counts
+                ),
+                "current_common_audit_counts": current_common_audit,
+                "reference_common_audit_counts": reference_common_audit,
+            },
             "fixed_ephemeris": {
                 "period_d": WD1856_PERIOD_D,
                 "t0_bjd": WD1856_T0_BJD,
@@ -833,16 +1039,29 @@ def build_wd1856_independent_metrics(
                 "current_compact": initial_input_size[str(compact_lc.resolve())],
                 "reference_table": initial_input_size[str(reference_table.resolve())],
                 "reference_product": initial_input_size[str(reference_product.resolve())],
+                "cadence_reference_table": initial_input_size[
+                    str(cadence_reference_table.resolve())
+                ],
+                "cadence_reference_manifest": initial_input_size[
+                    str(cadence_reference_manifest.resolve())
+                ],
             },
             "input_mtime_ns": {
                 "current_compact": initial_input_mtime_ns[str(compact_lc.resolve())],
                 "reference_table": initial_input_mtime_ns[str(reference_table.resolve())],
                 "reference_product": initial_input_mtime_ns[str(reference_product.resolve())],
+                "cadence_reference_table": initial_input_mtime_ns[
+                    str(cadence_reference_table.resolve())
+                ],
+                "cadence_reference_manifest": initial_input_mtime_ns[
+                    str(cadence_reference_manifest.resolve())
+                ],
             },
         }
         manifest_tmp.write_text(
             json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False) + "\n"
         )
+        quality_reference.assert_unchanged()
         final_input_sha256 = {
             str(path): file_sha256(path) for path in input_paths
         }
@@ -861,6 +1080,8 @@ def build_wd1856_independent_metrics(
 
 __all__ = [
     "INDEPENDENT_CONTRACT_VERSION",
+    "INDEPENDENT_COMPARISON_MODE",
     "IndependentExtractionProvenance",
     "build_wd1856_independent_metrics",
+    "parse_reference_flux_column_mappings",
 ]

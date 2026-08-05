@@ -16,6 +16,8 @@ REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL_teacher_v2}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
 DATA_ROOT="${TWIRL_A2V1_S56_ROOT:-/orcd/data/mki_aryeh/001/twirl/data_local/stage1_lightcurves/s56_A2v1}"
 COMPACT="${TWIRL_A2V1_S56_COMPACT:-${DATA_ROOT}/s56_A2v1_adp_pair_rebuilt.h5}"
+CADENCE_REFERENCE="${TWIRL_A2V1_CADENCE_REFERENCE:?set TWIRL_A2V1_CADENCE_REFERENCE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST:?set TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST}"
 OUT_ROOT="${TWIRL_TEACHER_V2_ROOT:-${REPO}/reports/stage5_validation/s56_A2v1_teacher_v2}"
 N_SHARDS="${TWIRL_TEACHER_V2_BLS_SHARDS:-40}"
 SHARD_INDEX="${SLURM_ARRAY_TASK_ID}"
@@ -30,9 +32,12 @@ export HDF5_USE_FILE_LOCKING=FALSE
 echo "[s56-t2-real-bls] host=$(hostname) shard=${SHARD_INDEX}/${N_SHARDS} start=$(date -Is)"
 "${PYTHON}" scripts/stage5_validation/build_s56_adp_real_bls_peaks.py \
   --compact-lc "${COMPACT}" \
+  --sector 56 \
+  --cadence-reference "${CADENCE_REFERENCE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
   --out-dir "${OUT_ROOT}/real_bls/shards" \
   --workers "${SLURM_CPUS_PER_TASK:-8}" \
-  --n-periods 200000 \
+  --n-periods 50000 \
   --n-peaks 10 \
   --shard-index "${SHARD_INDEX}" \
   --n-shards "${N_SHARDS}" \

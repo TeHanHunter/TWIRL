@@ -1,0 +1,8 @@
+# Source-only A2v1 sectors queued after S58-S63 validation.
+# Format: sector orbit-one:tag orbit-two:tag
+64 135:o1 136:o2
+65 137:o1 138:o2
+66 139:o1 140:o2
+67 141:o1 142:o2
+68 143:o1 144:o2
+69 145:o1 146:o2

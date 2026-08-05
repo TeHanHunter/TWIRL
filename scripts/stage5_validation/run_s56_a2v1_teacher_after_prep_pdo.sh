@@ -3,8 +3,8 @@
 set -euo pipefail
 
 REPO="${TWIRL_PDO_TEACHER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-OUT_ROOT="${TWIRL_TEACHER_SEARCH_ROOT:-/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v1}"
-NATIVE_H5="${OUT_ROOT}/inputs/s56_A2v1_adp_raw_pair_v1.h5"
+OUT_ROOT="${TWIRL_TEACHER_SEARCH_ROOT:-/pdo/users/tehan/twirl_stage5/s56_A2v1_teacher_search_v2}"
+NATIVE_H5="${OUT_ROOT}/inputs/s56_A2v1_adp_raw_pair_v2.h5"
 TORCH_PYTHON="${TWIRL_PDO_TORCH_PYTHON:-/pdo/users/tehan/envs/twirl-teacher-pdo-v2/bin/python}"
 RUNNER="${REPO}/scripts/stage5_validation/run_s56_a2v1_teacher_search_pdo.sh"
 LOG="${OUT_ROOT}/logs/s56_teacher_after_prep.log"

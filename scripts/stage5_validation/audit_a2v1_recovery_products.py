@@ -22,6 +22,8 @@ def main() -> int:
     parser.add_argument("--shards", type=Path, nargs="+", required=True)
     parser.add_argument("--raw-h5", type=Path, required=True)
     parser.add_argument("--adp-h5", type=Path, required=True)
+    parser.add_argument("--cadence-reference-table", type=Path, required=True)
+    parser.add_argument("--cadence-reference-manifest", type=Path, required=True)
     parser.add_argument("--out-json", type=Path, required=True)
     parser.add_argument("--relative-tolerance", type=float, default=1.0e-6)
     args = parser.parse_args()
@@ -36,6 +38,8 @@ def main() -> int:
         schedule=schedule,
         raw_h5=args.raw_h5,
         adp_h5=args.adp_h5,
+        cadence_reference_table=args.cadence_reference_table,
+        cadence_reference_manifest=args.cadence_reference_manifest,
         config=load_recovery_config(args.config),
         relative_tolerance=args.relative_tolerance,
     )

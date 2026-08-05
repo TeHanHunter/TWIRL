@@ -13,6 +13,8 @@ set -euo pipefail
 REPO="${TWIRL_ORCD_REPO:-/orcd/data/mki_aryeh/001/twirl/code/TWIRL}"
 PYTHON="${TWIRL_ORCD_PYTHON:-/orcd/data/mki_aryeh/001/twirl/envs/twirl-s56/bin/python}"
 COMPACT_LC="${TWIRL_ADP_REAL_BLS_COMPACT_LC:-data_local/stage3_injections/s56_twirlfs_v2_lc_export/s56_twirlfs_v2_adp_lc_export_pdo.h5}"
+CADENCE_REFERENCE="${TWIRL_A2V1_CADENCE_REFERENCE:?set TWIRL_A2V1_CADENCE_REFERENCE}"
+CADENCE_REFERENCE_MANIFEST="${TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST:?set TWIRL_A2V1_CADENCE_REFERENCE_MANIFEST}"
 OUT_DIR="${TWIRL_ADP_REAL_BLS_OUT_DIR:-reports/stage5_validation/s56_adp_real_bls_peaks}"
 WORKERS="${TWIRL_ADP_REAL_BLS_WORKERS:-${SLURM_CPUS_PER_TASK:-16}}"
 N_PERIODS="${TWIRL_ADP_REAL_BLS_N_PERIODS:-50000}"
@@ -35,9 +37,14 @@ echo "[adp-real-bls] workers=${WORKERS} n_periods=${N_PERIODS} n_peaks=${N_PEAKS
 
 "${PYTHON}" scripts/stage5_validation/build_s56_adp_real_bls_peaks.py \
   --compact-lc "${COMPACT_LC}" \
+  --sector 56 \
+  --cadence-reference "${CADENCE_REFERENCE}" \
+  --cadence-reference-manifest "${CADENCE_REFERENCE_MANIFEST}" \
   --out-dir "${OUT_DIR}" \
   --workers "${WORKERS}" \
   --n-periods "${N_PERIODS}" \
-  --n-peaks "${N_PEAKS}"
+  --n-peaks "${N_PEAKS}" \
+  --source-product-tag A2v1 \
+  --resume
 
 echo "[adp-real-bls] complete $(date -Is)"

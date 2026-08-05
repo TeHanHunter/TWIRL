@@ -19,7 +19,8 @@ from twirl.vetting.teacher_v2_active_learning import (
 )
 
 
-FRANKLIN_MULTISECTOR_POLICY_VERSION = "s56_s59_franklin_rank1_teacher_v1"
+FRANKLIN_MULTISECTOR_POLICY_VERSION = "s57_s59_franklin_rank1_teacher_v1"
+FRANKLIN_LABEL_RETURN_POLICY_VERSION = "franklin_morphology_accept_harmonic_mask_v1"
 
 _IDENTITY_COLUMNS: tuple[str, ...] = (
     "review_id",
@@ -35,6 +36,257 @@ _MORPHOLOGY_CLASSES: tuple[str, ...] = (
     "smooth_variable",
     "other",
 )
+_FRANKLIN_LABELS: frozenset[str] = frozenset(
+    {
+        "planet_like",
+        "wide_transit_like",
+        "eclipsing_binary_or_pceb",
+        "stellar_variability",
+        "instrumental_or_systematic",
+        "uncertain",
+        "skip",
+    }
+)
+
+
+def _string_value(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except TypeError:
+        pass
+    return str(value)
+
+
+def standalone_app_candidate_key(row: Mapping[str, Any] | pd.Series) -> str:
+    """Return the identity written by the standalone Franklin browser app.
+
+    This intentionally differs from :func:`twirl.vetting.label_io.candidate_key`.
+    Exact string preservation matters, so production callers should read both
+    queue and label CSV files with ``dtype=str`` and ``keep_default_na=False``.
+    """
+
+    return "|".join(
+        _string_value(row.get(column, ""))
+        for column in ("review_id", "tic", "sector", "period_d", "t0_bjd")
+    )
+
+
+def normalize_franklin_label_return(
+    queue: pd.DataFrame,
+    labels: pd.DataFrame,
+    *,
+    source_batch_id: str,
+    morphology_adjudicator: str,
+    morphology_accepted_utc: str,
+    expected_sector_counts: Mapping[int, int] | None = None,
+    native_h5_by_sector: Mapping[int, Path | str] | None = None,
+    expected_labeler: str = "franklin",
+    expected_label_source: str = "human",
+) -> pd.DataFrame:
+    """Strictly join one completed Franklin return to its exact frozen queue.
+
+    Franklin's labels are accepted at the sector-observation morphology level.
+    Reported period factors/statuses are retained as raw audit metadata but are
+    deliberately excluded from harmonic supervision unless a later, explicit
+    factor-only review produces a separate verified decision.
+    """
+
+    required_queue = {
+        "row_id",
+        "review_id",
+        "tic",
+        "sector",
+        "period_d",
+        "t0_bjd",
+        "duration_min",
+        "rep_peak_rank",
+        "source_kind",
+        "candidate_key",
+    }
+    required_labels = {
+        "row_id",
+        "candidate_key",
+        "tic",
+        "sector",
+        "label",
+        "label_source",
+        "labeler",
+        "notes",
+        "period_factor",
+        "period_status",
+        "updated_utc",
+    }
+    missing_queue = sorted(required_queue - set(queue.columns))
+    missing_labels = sorted(required_labels - set(labels.columns))
+    if missing_queue:
+        raise KeyError(f"Franklin queue is missing columns: {missing_queue}")
+    if missing_labels:
+        raise KeyError(f"Franklin labels are missing columns: {missing_labels}")
+    if not source_batch_id.strip():
+        raise ValueError("source_batch_id must be nonblank")
+    if not morphology_adjudicator.strip():
+        raise ValueError("morphology_adjudicator must be nonblank")
+    if not morphology_accepted_utc.strip():
+        raise ValueError("morphology_accepted_utc must be nonblank")
+    if not expected_labeler.strip() or not expected_label_source.strip():
+        raise ValueError("expected labeler/source must be nonblank")
+
+    public = queue.copy()
+    returned = labels.copy()
+    for name, frame in (("queue", public), ("labels", returned)):
+        row_ids = frame["row_id"].map(_string_value)
+        if row_ids.eq("").any() or row_ids.duplicated().any():
+            raise ValueError(f"Franklin {name} contains blank or duplicate row_id values")
+        frame["row_id"] = row_ids
+    if set(public["row_id"]) != set(returned["row_id"]):
+        missing = sorted(set(public["row_id"]) - set(returned["row_id"]))[:5]
+        extra = sorted(set(returned["row_id"]) - set(public["row_id"]))[:5]
+        raise ValueError(
+            "Franklin row coverage differs between queue and labels: "
+            f"missing={missing}, extra={extra}"
+        )
+
+    public["standalone_app_candidate_key"] = public.apply(
+        standalone_app_candidate_key, axis=1
+    )
+    if public["standalone_app_candidate_key"].duplicated().any():
+        raise ValueError("Franklin queue contains duplicate standalone app keys")
+    returned_key = returned["candidate_key"].map(_string_value)
+    if returned_key.eq("").any() or returned_key.duplicated().any():
+        raise ValueError("Franklin labels contain blank or duplicate candidate_key values")
+    returned["standalone_app_candidate_key"] = returned_key
+
+    public = public.rename(columns={"candidate_key": "pipeline_candidate_key"})
+    returned = returned.rename(
+        columns={
+            "tic": "returned_tic",
+            "sector": "returned_sector",
+            "label": "human_label",
+            "label_source": "human_label_source",
+            "labeler": "human_labeler",
+            "notes": "human_notes",
+            "period_factor": "reported_period_factor",
+            "period_status": "reported_period_status",
+            "updated_utc": "human_updated_utc",
+        }
+    )
+    keep = [
+        "row_id",
+        "standalone_app_candidate_key",
+        "returned_tic",
+        "returned_sector",
+        "human_label",
+        "human_label_source",
+        "human_labeler",
+        "human_notes",
+        "reported_period_factor",
+        "reported_period_status",
+        "human_updated_utc",
+    ]
+    joined = public.merge(
+        returned.loc[:, keep],
+        on="row_id",
+        how="left",
+        validate="one_to_one",
+        suffixes=("", "_returned"),
+    )
+    key_mismatch = joined["standalone_app_candidate_key"].ne(
+        joined["standalone_app_candidate_key_returned"]
+    )
+    tic_mismatch = joined["tic"].map(_string_value).ne(
+        joined["returned_tic"].map(_string_value)
+    )
+    sector_mismatch = joined["sector"].map(_string_value).ne(
+        joined["returned_sector"].map(_string_value)
+    )
+    mismatch = key_mismatch | tic_mismatch | sector_mismatch
+    if mismatch.any():
+        sample = joined.loc[
+            mismatch,
+            [
+                "row_id",
+                "standalone_app_candidate_key",
+                "standalone_app_candidate_key_returned",
+            ],
+        ].head(3)
+        raise ValueError(
+            "Franklin labels do not match the exact frozen queue; "
+            f"first={sample.to_dict(orient='records')}"
+        )
+    joined = joined.drop(
+        columns=[
+            "standalone_app_candidate_key_returned",
+            "returned_tic",
+            "returned_sector",
+        ]
+    )
+
+    labels_seen = set(joined["human_label"].fillna("").astype(str))
+    invalid_labels = sorted(labels_seen - _FRANKLIN_LABELS)
+    if invalid_labels or "" in labels_seen:
+        raise ValueError(f"Franklin return contains invalid or blank labels: {invalid_labels}")
+    observed_labelers = set(joined["human_labeler"].fillna("").astype(str))
+    if observed_labelers != {expected_labeler}:
+        raise ValueError(
+            "Franklin labeler differs: "
+            f"observed={sorted(observed_labelers)}, expected={expected_labeler!r}"
+        )
+    observed_label_sources = set(
+        joined["human_label_source"].fillna("").astype(str)
+    )
+    if observed_label_sources != {expected_label_source}:
+        raise ValueError(
+            "Franklin label source differs: "
+            f"observed={sorted(observed_label_sources)}, "
+            f"expected={expected_label_source!r}"
+        )
+    if not pd.to_numeric(joined["rep_peak_rank"], errors="coerce").eq(1).all():
+        raise ValueError("Franklin return contains a non-rank-1 review ephemeris")
+    if set(joined["source_kind"].fillna("").astype(str)) != {"real_candidate"}:
+        raise ValueError("Franklin return must be real-candidate only")
+
+    observed_sector_counts = {
+        int(key): int(value)
+        for key, value in pd.to_numeric(
+            joined["sector"], errors="raise"
+        ).value_counts().sort_index().items()
+    }
+    if expected_sector_counts is not None:
+        expected = {int(key): int(value) for key, value in expected_sector_counts.items()}
+        if observed_sector_counts != expected:
+            raise ValueError(
+                "Franklin sector counts differ: "
+                f"observed={observed_sector_counts}, expected={expected}"
+            )
+
+    joined["source_uid"] = (
+        source_batch_id + ":" + joined["standalone_app_candidate_key"].astype(str)
+    )
+    joined["source_batch_id"] = source_batch_id
+    joined["label_unit"] = "sector_observation"
+    joined["is_injected_row"] = False
+    joined["morphology_review_status"] = "accepted_batch_level"
+    joined["morphology_adjudicator"] = morphology_adjudicator
+    joined["morphology_accepted_utc"] = morphology_accepted_utc
+    joined["factor_review_status"] = "not_explicitly_reviewed"
+    joined["harmonic_supervision_verified"] = False
+    joined["label_return_policy_version"] = FRANKLIN_LABEL_RETURN_POLICY_VERSION
+    native_paths = {int(key): str(value) for key, value in (native_h5_by_sector or {}).items()}
+    joined["native_h5_path"] = pd.to_numeric(
+        joined["sector"], errors="raise"
+    ).map(native_paths).fillna("")
+
+    from twirl.vetting.adjudication_audit import add_harmonic_cnn_targets
+
+    joined = add_harmonic_cnn_targets(joined)
+    if joined["harmonic_include_v1"].astype(bool).any():
+        raise AssertionError("unverified Franklin factors entered harmonic supervision")
+    if joined["harmonic_target_v1"].fillna("").astype(str).ne("").any():
+        raise AssertionError("unverified Franklin factors produced harmonic targets")
+    return joined.reset_index(drop=True)
 
 
 def _read_table(path: Path) -> pd.DataFrame:
@@ -316,6 +568,13 @@ def build_franklin_multisector_batch(
         )
         selected.append(hidden)
         cumulative_exclusions.append(hidden.loc[:, ["tic"]].copy())
+        summary["policy_version"] = FRANKLIN_MULTISECTOR_POLICY_VERSION
+        summary["compact_ranker"] = (
+            "Teacher-v1 sqrt(p_planet_like * p_preserve)"
+        )
+        summary["morphology_ranker"] = (
+            "Teacher-v1 shape_plus_periodogram_bls ensemble"
+        )
         sector_summaries[str(sector)] = summary
 
     hidden = pd.concat(selected, ignore_index=True, sort=False)
@@ -441,9 +700,12 @@ def write_franklin_multisector_batch(
 
 
 __all__ = [
+    "FRANKLIN_LABEL_RETURN_POLICY_VERSION",
     "FRANKLIN_MULTISECTOR_POLICY_VERSION",
     "build_franklin_multisector_batch",
+    "normalize_franklin_label_return",
     "prepare_single_teacher_scores",
+    "standalone_app_candidate_key",
     "verify_franklin_multisector_batch",
     "write_franklin_multisector_batch",
 ]

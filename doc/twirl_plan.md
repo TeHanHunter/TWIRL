@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-17`.
+Last reconciled: `2026-08-03`.
 
 ## Current status
 
@@ -14,16 +14,61 @@ Last reconciled: `2026-07-17`.
   `source_id` as the scientific identifier and TIC as operational metadata.
 - `A2v1` is the active Stage 1 product family: no TIC-magnitude science cap,
   saturated-pixel ePSF masking, and sector-level ADP/ADP015 FITS products for
-  the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS) and S57
-  (`27,213` FITS) pass edge-aware HDF5/FITS validation; S58 and S59 pass their
-  full-product gates, and the resumable queue is producing S60-S63 from
-  `pdogpu5` after `pdogpu6` became unresponsive. See
+  the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS), S57
+  (`27,213` FITS), and S58-S63 pass their edge-aware HDF5/FITS product gates.
+  The next source-only production batch is S64-S69; it will refit all ePSFs
+  because no legacy ePSFs are available. See
   [Stage 1 history](twirl_progress_log.md#stage-1).
 - S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
   recovery in both active ADP apertures. Tier 0 verifies product integrity and
   benchmark behavior; it is not the Tier-1 science QA needed for survey
-  release. The `s56_harmonic_cnn_v1` teacher remains the active-learning
-  baseline. Teacher v2 was completed as an exploratory comparison but missed
+  release. The bounded S56-only Tier-1 code path is implemented and fail-
+  closed around the authoritative external-quality overlay, exact target/BLS
+  provenance, fixed injections, and an independent TESSCut route. The exact
+  `31,450`-target v2 audit exposed that a detector-level usable-fraction review
+  would veto otherwise searchable data: cam1/ccd1 retains thousands of usable
+  cadences per target despite a `0.743` median. Tier-1 therefore now treats
+  population, flag-fraction, scatter, and aperture-disagreement reviews as
+  sensitivity warnings. The checksum-locked v4 audit passes for bounded
+  enrichment: `31,446/31,450` targets are paired-teacher eligible,
+  `31,449/31,450` retain at least one searchable aperture, and no target is
+  excluded from flagged fraction alone. It remains `science_ready=false`.
+  The `s56_harmonic_cnn_v1` architecture remains the active-learning model
+  family. `teacher_v3` is the operational name for its frozen S56--S62
+  dataset/training release, not a new architecture and not a promotion of
+  exploratory teacher v2. The seven-sector morphology corpus and TIC-grouped
+  split are frozen. The native-independent, five-fold metadata baseline
+  completed on ORCD with the fixed test still sealed; it is a control, not
+  `teacher_v3` itself. The full release completed its fail-closed one-H200
+  training/evaluation contract with pooled development-OOF calibration,
+  genuinely retrained uncertain-label sensitivity, TIC-clustered intervals,
+  and checkpoint verification around the single fixed-test opening. On the
+  shared `528`-row real non-uncertain test support, the primary raises
+  balanced accuracy from `0.720` to `0.779` and macro F1 from `0.744` to
+  `0.809` over metadata only; Planet-like recall remains descriptive at
+  `8/14`. Teacher v3 is frozen for enrichment only: automatic promotion is
+  disabled and student training is blocked. The development-only
+  `teacher_ssl_v1` experiment (model-facing name **Teacher v4-SSL**) remains a
+  possible companion enrichment model. Its completed `6,168`-observation
+  native run established the fold-local VICReg infrastructure but is too
+  selected and too small to answer the broad-representation question. The
+  active experiment is therefore a checksum-frozen, leakage-safe S56--S62
+  full-pool run. Whole-TIC fixed-test and prospective-S63 exclusions reduce
+  the original `212,049` compact observations to an exact survey/search pool
+  of `175,366` observations (`125,630` TICs). The locked two-aperture BLS and
+  all `112` raw-source shards are complete and validated. A separate
+  BLS-derived native/model partition retains `175,347` observations and marks
+  `19` unsearchable observations as model-input exclusions while preserving
+  all `175,366` rows in the final audit. Fresh native-v2 inputs must pass an
+  exclusion-bearing canary, exact registry reconstruction, and a bounded
+  one-epoch smoke before five independent fold encoders run with up to four
+  one-H200 jobs concurrently. Labels, injections, fixed-test tensors, and S63
+  tensors remain forbidden during pretraining.
+  Teacher v3 stays operational until supervised fine-tuning and the matched
+  preregistered comparison pass.
+  The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
+  v2 was completed as an
+  exploratory comparison but missed
   its promotion gates, so it is not a production ranker or student-label
   generator. See [Stage 2 history](twirl_progress_log.md#stage-2).
 - LC-level injection/recovery, two-aperture vetting, and pixel-injection smokes
@@ -86,6 +131,16 @@ The operational contract is defined in the
 - compact exports and derived indices retain Gaia/TIC IDs, sector/orbit/
   detector provenance, cadence/quality information, product/schema version,
   and source checksums.
+- **Later-sector timing audit:** before producing any sector containing data on
+  or after `2026-01-31`, verify that the TGLC barycentric-correction ephemeris
+  brackets every cadence in each orbit/camera/CCD job and fails closed rather
+  than edge-clamping an out-of-range interpolation. Record the ephemeris
+  source/retrieval and coverage in the run provenance, and compare corrected
+  times at the beginning, middle, and end of each orbit with an independent
+  SPOC or TESSCut reference where available. This is required because a
+  static-ephemeris TGLC path reportedly produced source-dependent, minute-scale
+  timing errors after `2026-01-31`; the completed S56--S63 products predate
+  that interval.
 
 ### Candidate and label provenance
 
@@ -104,15 +159,17 @@ The operational contract is defined in the
 - Gaia-first master catalog, TIC bridge, TESS coverage products, detector job
   tables, reusable TGLC wrappers, A2v1 source overlays, masked ePSF path,
   ADP/ADP015 FITS writer, compact export, and edge-aware validator.
-- S56 and S57 are complete through required FITS validation. S56 also passes
-  Tier-0 integrity/benchmark QA; Tier-1 science QA remains open.
+- S56--S63 are complete through required HDF5/FITS validation. S56 also
+  passes the replacement quality-aware Tier-0 integrity/benchmark QA. Its
+  full-population bounded Tier-1 gate now authorizes enrichment under the
+  conservative exact-BLS paired-input contract.
 
 ### Current gate
 
-The S58-S63 serial queue is active. S59 passed its full-product gate, and the
-resumable S60 extraction is running on `pdogpu5` with the partial products
-retained. Do not create sector-specific production logic unless the sector is a
-documented exception.
+S58-S63 completed their gated HDF5/FITS production on `pdogpu5`. The S64-S69
+source-only batch is active on `pdogpu5` in the generic queue's explicit
+all-refit mode; partial legacy ePSF inputs remain a hard failure. Do not create
+sector-specific production logic unless the sector is a documented exception.
 
 ### Exit criteria
 
@@ -127,44 +184,125 @@ documented exception.
   missing cadences, quality flags, aperture outliers, WD 1856 timing, a fixed
   injection-preservation test, and a genuinely independent extraction
   comparison. A Tier-0 pass alone does not promote a sector for science use.
+  The bounded ADP-pair scope can authorize enrichment only; release promotion
+  requires the future full six-channel scope.
 
 ## Stage 2: transparent search and candidate generation (...)
 
 ### Implemented
 
-- Per-sector multi-aperture BLS, retained peak tables, cross-aperture
-  consolidation, heuristic vetting, LEO comparison, centroid diagnostics,
-  human-review tooling, and an ADP-only S56 active-learning teacher.
+- A transparent per-sector multi-aperture BLS algorithmic baseline, retained
+  peak tables, cross-aperture consolidation, heuristic vetting, LEO
+  comparison, centroid diagnostics, human-review tooling, and an ADP-only S56
+  active-learning teacher. The generic baseline still uses the quality field
+  stored in the input product; only the separate S56 enrichment builder is
+  currently bound to the authoritative external-quality overlay.
 
 ### Current gate
 
 The focused S56 compact revisit is complete (`407/407` sheets, including `11`
 new Planet-like labels from the `400` model-selected compact rows), but the
 separate blinded S56 `1,000`-TIC enrichment batch remains only partially
-labeled (`177/1,000` at the preserved checkpoint). Complete and audit that
-bounded S56 batch before expanding human review. An S57 queue was generated
-from `136,060` candidates over `27,212` real TICs before this gate and contains
-exactly six human labels. Preserve all six as explicitly premature
-experimental evidence, pause further S57 holdout consumption, and do not treat
-S57 as a pristine external holdout.
+labeled (`177/1,000` at the preserved checkpoint). Franklin completed the
+bounded `3,000`-row S57--S59 handoff (`1,000` per sector). The return contains
+`15` Planet-like, `121` Eclipse/contact, and `106` Broad-isolated-dip labels,
+but these remain morphology decisions rather than confirmed astrophysical
+classes. The user inspected the `347`-row special-case queue and accepted the
+return at the batch-level morphology layer. The exact queue and returned CSV
+are now frozen with a normalized `3,000`-row training artifact. This acceptance
+does not validate astrophysical class, period factor, or ephemeris.
 
-The immediate parallel work is to harden the existing S56 periodic/enrichment
-path, not to add search branches. Require the Tier-1 target pass mask, freeze a
-candidate-level aperture rule that keeps the small ADP aperture as the search
-channel and primary ADP aperture as contamination evidence unless injection
-and real-data tests justify a change, complete the bounded S56 review, and
-freeze the resulting candidate/label set. Defer the non-periodic dip detector,
-multi-sector aggregation, and false-alarm/background calibration until this
-path is robust. Those capabilities remain mandatory before the full survey
-search or a science-ready candidate catalog.
+The handoff rows are fresh sector observations, not all fresh targets: `133`
+TICs overlap the active real S56 training corpus, with `42` sector-to-sector
+label differences (`23` against explicitly final S56 adjudications). The
+training unit remains a sector observation, while every split must be
+TIC-grouped so repeated hosts never cross train/validation/test boundaries.
+The frozen teacher-v1 ranker was used only to enrich review: every displayed
+ephemeris is ADP-small BLS rank one, and model scores and selection buckets
+remained hidden. S57 is no longer a pristine external holdout.
+
+The model still receives all seven folds (`P/4`, `P/3`, `P/2`, `P`, `2P`,
+`3P`, `4P`) for every row. Franklin's standalone app preselected `P` and saved
+factor/status together with each morphology click, so those fields are retained
+only as audit metadata. All S57--S59 harmonic targets are explicitly masked
+unless a later factor-only review verifies them; injection truth and the
+existing explicitly verified S56 period decisions remain valid supervision.
+The complete S60--S62 return is frozen against the exact `3,000`-row handoff.
+TeHan then completed the uniform current-ADP Planet-like/EB pass over all `509`
+selected observations. The immutable decision snapshot contains `22` explicit
+changes and `487` suggestions accepted unchanged after the declared full pass,
+yielding `70` Planet-like, `419` Eclipse/contact, `10` Broad-isolated-dip, `7`
+stellar-variability, `2` uncertain, and `1` instrumental/systematic decisions.
+It preserves `64` explicitly verified S56 harmonic targets; all Franklin
+factor choices remain audit-only.
+
+The frozen `teacher_v3` corpus contains `8,181` observation rows (`7,724` real
+and `457` injections), of which `8,163` are active training rows. It includes
+all accepted labels from S56--S62, not only the final Planet-like/EB queue. The
+fixed split registry assigns all `7,903` TIC groups once to a `20%` test
+population or one of five development folds with zero TIC leakage. S63 remains
+reserved as a prospective external evaluation rather than being consumed for
+this training release.
+
+The split-bound per-sector mappings, seven observation-keyed native files,
+native registry, H200 training, single fixed-test opening, and dependent
+performance figure are complete. The
+[performance report](../reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/performance/)
+supports Teacher v3 as an enrichment tool, not an automatic classifier. Its
+primary improvement over metadata only is useful but not decisive, and the
+strong uncertain-masked control identifies label policy as the next
+model-development question. Keep the small ADP aperture as the search channel
+and the primary ADP aperture as contamination evidence unless later injection
+and real-data tests justify a change. Defer the non-periodic dip detector,
+multi-sector aggregation, and false-alarm/background calibration until the
+periodic enrichment and prospective S63 evaluation are frozen. Those
+capabilities remain mandatory before the full survey search or a science-ready
+candidate catalog.
+
+The frozen review now supports two sibling products:
+an immutable observation-level `(sector, TIC, candidate_key)` morphology
+corpus and a browsable enrichment-candidate table with a separate TIC roll-up.
+The roll-up may summarize repeated hosts but must not merge detection
+statistics or imply multi-sector confirmation. Both products retain target
+QA, aperture evidence, displayed ephemeris, harmonic-review status, label
+source, and exact input provenance.
 
 ### Model gate
 
-- Use `s56_harmonic_cnn_v1` as the active-learning baseline only.
+- Use `teacher_v3` for the frozen S56--S62 training release of the
+  `s56_harmonic_cnn_v1` architecture. Do not apply its native-v1 checkpoint to
+  quality-aware native-v2 inputs and do not interpret the release name as an
+  automatic production promotion.
+- The observation-keyed preparation table, immutable TIC split, seven native
+  inputs, and `(sector, TIC)` native registry are frozen and validated.
+  Repeated TICs may contribute sector observations but may never collide in
+  storage or cross a train/validation/test boundary.
+- Apply a bounded training-input gate to S57--S62: validate each A2v1 source,
+  regenerate quality-aware BLS/native inputs, and compare the reviewed
+  ephemeris with the current search result. Preserve a label automatically
+  only when the candidate identity remains compatible, including declared
+  harmonic-equivalent matches; route changed or ambiguous rows to a small
+  re-review queue.
+- Freeze one immutable TIC split registry before tensor construction and bind
+  the label corpus, target masks, cadence manifests, native-HDF5 registry,
+  training config, and checkpoint by checksum. Fit one calibration transform
+  from concatenated out-of-fold development logits before evaluating the
+  locked test set.
 - Treat the small real training set as the limiting resource: improve the
   versioned data/label manifest, TIC-grouped splits, source-separated
   evaluation, probability calibration, and bootstrap uncertainty before
   changing model architecture.
+- Treat **Teacher v4-SSL full-pool** as a development-only representation
+  experiment over the broad leakage-safe S56--S62 real-light-curve pool, not
+  only the previously selected labeled-candidate pool. Freeze whole-TIC
+  fixed-test and prospective-S63 exclusions before BLS or tensor construction;
+  ignore development labels during VICReg pretraining; do not use injections
+  or generate pseudo-labels. The five fold encoders must be fine-tuned only on
+  the existing frozen labels and compared with Teacher v3 on matched
+  development support before any fixed-test or prospective evaluation.
+- Report a label-policy sensitivity check for the dominant S57--S59
+  `uncertain` return (`2,106/3,000` rows): compare the accepted
+  uncertain-as-other mapping with masking those rows.
 - Reach at least `50` unique real Planet-like labels and pass locked grouped
   real-data performance/calibration gates before student pseudo-labeling.
 - Teacher v2 is an exploratory completed comparison that missed its external-
@@ -274,23 +412,32 @@ never a completeness measurement.
 
 ## Immediate implementation priorities
 
-1. Let the gated S59-S63 A2v1 HDF5/FITS queue continue with its existing
-   stop-on-failure gates; do not wait for it to finish before hardening S56.
-2. Complete the bounded S56 `active_search_pair` Tier-1 evidence: build the
-   authoritative cadence/quality reference, produce the genuinely independent
-   WD 1856 comparison, rerun the current Tier-0 report, and publish the target
-   QA pass mask. This scope may qualify enrichment but never science release.
-3. Complete and audit the bounded S56 periodic enrichment on the Tier-1 pass
-   set, freeze the candidate/aperture contract, and merge only confidently
-   adjudicated labels into a versioned training set. Keep S57 labeling paused.
-4. Retrain and evaluate teacher v1 on that frozen set with TIC-grouped,
-   source-separated, calibrated metrics and uncertainty intervals. Do not put
-   teacher v2, student pseudo-labels, or another model family on this path.
-5. After the periodic/enrichment path is robust, add the dip branch,
+Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
+parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
+queue does not block the S56--S62 candidate/teacher critical path below.
+
+1. Complete the leakage-safe Teacher v4-SSL full-pool experiment from its
+   frozen `175,366`-observation search pool and validated BLS/raw releases:
+   build fresh native-v2 inputs for the exact `175,347`-observation model
+   partition, preserve the `19` model exclusions in the audit, pass the
+   exclusion-bearing canary and bounded throughput smoke, and pretrain five
+   fold encoders with at most four one-H200 jobs concurrently. Then fine-tune
+   on the existing frozen labels and compare with Teacher v3 on matched
+   development support without opening fixed-test or S63 model tensors.
+   Additional manual labeling is not part of this step.
+2. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
+   the hash-bound morphology corpus plus the enrichment-only candidate
+   table/TIC index, preserving the raw edit log and all source provenance.
+3. Use S63 as the sealed prospective test: freeze the model, thresholds,
+   cohort, queue-construction rule, and metrics before blind labeling; include
+   a predeclared random/control slice, report TIC-disjoint hosts as the primary
+   evaluation and repeated hosts separately, and unblind once without tuning
+   from the result.
+4. After the periodic/enrichment path is robust, add the dip branch,
    multi-sector merging, and branch-aware false-alarm calibration; then rerun
    frozen-chain candidate-retention and representative pixel-level recovery
    before survey-wide enrichment or science claims.
-6. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
+5. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
    sample criteria; characterize the `764` no-TIC-bridge WDs and the S94+ QLP
    boundary before the survey release is locked.
 

@@ -10,14 +10,16 @@ if [[ -z "${REPO}" || ! -d "${REPO}/.git" ]]; then
   exit 2
 fi
 
-status="$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)"
+cd "${REPO}"
+
+status="$(git status --porcelain --untracked-files=all)"
 if [[ -n "${status}" ]]; then
   echo "[git-clean] refusing dirty checkout: ${REPO}" >&2
   printf '%s\n' "${status}" >&2
   exit 3
 fi
 
-head_sha="$(git -C "${REPO}" rev-parse HEAD)"
+head_sha="$(git rev-parse HEAD)"
 if [[ -n "${EXPECTED_SHA}" && "${head_sha}" != "${EXPECTED_SHA}" ]]; then
   echo "[git-clean] checkout SHA mismatch: ${head_sha} != ${EXPECTED_SHA}" >&2
   exit 4

@@ -56,9 +56,11 @@ not a required CLI argument for the reuse path.
 
 ## Pre-flight
 
-For each selected orbit/CCD, require exactly `196` prepared source pickles and
-`196` old ePSFs. Confirm TICA FFIs are present and inspect GPU memory before
-selecting explicit free devices. For example:
+For each selected orbit/CCD, require exactly `196` prepared source pickles.
+The legacy ePSF state must be either complete (`196` files, permitting
+empty-mask reuse) or absent (`0` files, requiring a saturated-mask refit for
+every source); reject partial legacy ePSF trees. Confirm TICA FFIs are present
+and inspect GPU memory before selecting explicit free devices. For example:
 
 ```bash
 for orbit in 121 122; do
@@ -151,9 +153,11 @@ bash /pdo/users/tehan/TWIRL/scripts/stage1_lightcurves/run_a2v1_sector_queue_pdo
 
 The queue uses an HDF5-only gate that opens every nonzero HDF5 as well as
 validating coverage before FITS production. It then validates the full
-HDF5-plus-FITS schema before advancing. It is a production chain, not a status
-monitor; inspect its persistent queue log manually when needed. Run it in
-detached tmux with verbose stage output redirected only to that log, not the
+HDF5-plus-FITS schema before advancing. Its input gate accepts a complete
+legacy ePSF tree for empty-mask reuse or a source-only tree that refits all
+ePSFs, but fails on partial legacy ePSFs. It is a production chain, not a
+status monitor; inspect its persistent queue log manually when needed. Run it
+in detached tmux with verbose stage output redirected only to that log, not the
 tmux TTY, because a full JSON validation report can otherwise fill the pane's
 output buffer and block the queue.
 
@@ -203,7 +207,8 @@ Production validation and science QA are separate gates:
 - **Tier-1 science QA** requires predeclared limits for RMS/MAD versus
   magnitude, cadence loss, quality flags, aperture outliers, fixed-injection
   preservation, and a genuinely independent extraction comparison. Only a
-  Tier-1 pass can promote a sector into a frozen survey release.
+  later `full_a2v1_product` Tier-1 pass can promote a sector into a frozen
+  survey release; the bounded active-pair scope can authorize enrichment only.
 
 The Tier-1 implementation keeps two scopes explicit:
 
@@ -217,6 +222,11 @@ The Tier-1 implementation keeps two scopes explicit:
   ADP/ADP015 `1x1`, `3x3`, and `5x5` channels and detector-stratified
   independent evidence before promotion is enabled.
 
+The current `active_search_pair` implementation, evidence builders, and
+contract names are S56-specific. They are not a generic sector-promotion
+interface and do not yet define the observation-keyed multi-sector input
+contract needed for seven-sector teacher training.
+
 Run the bounded scope with
 [`audit_a2v1_tier1_qa.py`](../scripts/stage1_lightcurves/audit_a2v1_tier1_qa.py)
 and the locked
@@ -226,27 +236,91 @@ cadence-reference table bound to the original QLP quaternion and SPOC-quality
 authorities, the frozen four-shard (`2,000` unique-host) injection canary, and
 an independent-extraction metrics table plus manifest. A prior TGLC production
 tree is the same extraction family and does not satisfy the independent gate.
-Build the two external evidence products with
+The configuration pins both the complete Tier-0 JSON and its BLS peak table;
+all six nested Tier-0 gates and the WD 1856 benchmark must pass.
+
+Build the SPOC intermediate, final cadence reference, and official TESSCut
+WD 1856 evidence with
+[`build_s56_spoc_quality_table.py`](../scripts/stage1_lightcurves/build_s56_spoc_quality_table.py),
 [`build_a2v1_cadence_reference.py`](../scripts/stage1_lightcurves/build_a2v1_cadence_reference.py)
 and
-[`build_a2v1_independent_extraction.py`](../scripts/stage1_lightcurves/build_a2v1_independent_extraction.py).
-The locked configuration deliberately retains impossible authority, shard,
-and independent-product hashes until the real S56 artifacts are built and
-reviewed; placeholders must not be replaced with inferred values. The fixed-
-injection metric is the fitted slope between `1 - transit_model` and the
-negative injected-minus-original detrended flux; BLS recovery or teacher
-scores do not substitute for this Stage 1 signal-preservation measurement.
+[`build_wd1856_tesscut_independent_extraction.py`](../scripts/stage1_lightcurves/build_wd1856_tesscut_independent_extraction.py).
+The generic
+[`build_a2v1_independent_extraction.py`](../scripts/stage1_lightcurves/build_a2v1_independent_extraction.py)
+remains available for another genuinely independent, explicitly mapped
+reference product. The official TESSCut comparison gates on signal presence
+and ephemeris timing; raw depth and scatter ratios are diagnostics because
+TESSCut aperture sums and decontaminated A2v1 flux do not share a dilution or
+noise transfer function.
+The locked configuration pins every reviewed input: the compact product,
+quality-aware Tier-0 summary and BLS table, cadence authority, injection
+shards and source-parity report, and independent-product evidence. No hash may
+be replaced with an inferred value. The fixed-injection metric is the fitted
+slope between `1 - transit_model` and the negative injected-minus-original
+detrended flux; BLS recovery or teacher scores do not substitute for this
+Stage 1 signal-preservation measurement.
 
 Every required gate reports `pass`, `review`, or `fail`; missing evidence,
-contract mismatch, or a stale Tier-0 report fails closed. Overall `pass`
-requires every gate to pass, while any review result keeps the overall state at
-`review`.
+contract mismatch, or a stale Tier-0 report fails closed. A `review` from the
+population-scatter, cadence/finite-data, or aperture-outlier diagnostics is
+retained as a sensitivity warning but is nonblocking for bounded enrichment.
+Reviews in the prerequisite, signal-preservation, or independent-extraction
+gates remain blocking; any `fail` remains blocking.
 
 The Tier-1 target table is a downstream data contract. Candidate generation,
-enrichment review, and teacher-set assembly must join it by TIC and retain only
-`tier1_target_qa_pass == True`; a sector-level pass does not license failed or
-review-status targets. The published summary includes the complete fixed-
-injection manifest and hashes all input and output evidence.
+enrichment review, and teacher-set assembly must join it by exact
+`(sector, TIC)` and retain only `tier1_target_searchable == True`. Searchability
+is intentionally a minimal catastrophic-data check for the current paired
+teacher contract: both active apertures must pass the exact locked BLS input
+preparation, including the shared effective-quality/finite-time/finite-flux
+mask, the `200`-cadence floor, finite nonzero normalization, conditional
+upper-tail clipping, and a nondegenerate post-cleaning baseline. Cadence
+structure must also be valid. Target `review` rows remain searchable.
+Flagged-cadence fraction, scatter, and aperture disagreement remain diagnostics
+and model/vetting features; they are not automatic target or detector
+exclusions.
+
+The table separately records whether at least one active aperture is searchable
+and which apertures survive. A target with one missing active channel is
+ineligible for the current two-channel teacher but remains available for
+single-aperture search or manual review; it is never converted into a negative
+label. The published summary includes the complete fixed-injection manifest
+and hashes all input and output evidence.
+
+Custom TWIRL/A2v1 FITS and compact products preserve the TGLC internal quality
+flag; they do **not** already contain the sector-level SPOC and QLP flags that
+the legacy QLP HLSP writer combines. For Tier-1 and every downstream
+enrichment artifact, define a good cadence as
+`internal_quality == 0 AND external_quality == 0`, where
+`external_quality = spoc_quality | (qlp_quality << 30)`. Regenerate the real
+BLS peaks with this hash-bound overlay, and require candidate metadata and
+both real and injected teacher-native tensors to use the same cadence table
+and manifest. The BLS summary, scoring table, and native HDF5 must retain the
+table and manifest checksums; an older internal-only artifact is incompatible.
+
+The accepted immutable S56 compact product has one known orbit-boundary
+exception: cadence `699957` is present for camera 3 but absent from that
+camera's authoritative QLP quaternion timeline. The cadence-reference v3
+manifest binds the exact four affected detector keys (`cam3/ccd1` through
+`cam3/ccd4`) under `authority_exclusions`. Downstream overlays assign those
+exact rows reserved external-quality bit `62`, count them explicitly, and
+exclude them from every search, injection, independent-extraction, and model
+input metric. They are not filled or treated as inferred SPOC/QLP values.
+Every undeclared missing detector cadence still fails closed. This is a
+bounded compatibility rule for the frozen S56 compact product, not a general
+production waiver; future products should continue trimming upstream cadence
+mismatches to the quaternion authority before export.
+
+The S56 native-input contract is therefore v2, while candidate artifacts bind
+that input through their separately versioned provenance envelope. A
+checkpoint trained under native version 1 must fail compatibility checks
+rather than be silently applied to changed quality channels and periodograms.
+Encoder caches, final checkpoints, and checkpoint-transfer manifests must also
+bind the exact native HDF5 and training-table hashes and live in a distinct
+native-v2 namespace. Recovery scoring must verify that selected-checkpoint
+manifest before allocating inference work, hash every candidate/native/model
+input before and after scoring, and publish its score table and summary
+atomically; the native-v1 recovery checkpoint default is retired.
 
 The TWIRL I release manifest must name each accepted sector's product and QA
 report checksums, the frozen sector cutoff, catalog/index version, and search

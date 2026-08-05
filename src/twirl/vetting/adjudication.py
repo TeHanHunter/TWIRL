@@ -95,6 +95,7 @@ ADJUDICATION_LEAKAGE_COLUMNS: frozenset[str] = frozenset(
         "preserve_include_v1",
         "harmonic_target_v1",
         "harmonic_include_v1",
+        "harmonic_supervision_verified",
         "note_period_factor",
         "effective_period_factor",
         "effective_period_d",

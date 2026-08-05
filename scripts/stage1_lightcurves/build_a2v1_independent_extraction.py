@@ -16,6 +16,7 @@ if str(SRC_ROOT) not in sys.path:
 from twirl.lightcurves.a2v1_independent_extraction import (  # noqa: E402
     IndependentExtractionProvenance,
     build_wd1856_independent_metrics,
+    parse_reference_flux_column_mappings,
 )
 
 
@@ -43,12 +44,33 @@ def build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--cadence-reference-table",
+        type=Path,
+        required=True,
+        help="Authoritative S56 detector-cadence external-quality CSV/Parquet.",
+    )
+    parser.add_argument(
+        "--cadence-reference-manifest",
+        type=Path,
+        required=True,
+        help="Hash-bound provenance JSON for --cadence-reference-table.",
+    )
+    parser.add_argument(
         "--reference-time-system",
         choices=("BJD", "BTJD"),
         required=True,
         help="Time system of the external table; BTJD means BJD-2457000.",
     )
-    parser.add_argument("--reference-flux-column", required=True)
+    parser.add_argument(
+        "--reference-flux-column",
+        action="append",
+        required=True,
+        metavar="CURRENT=REFERENCE",
+        help=(
+            "Map one active A2v1 aperture to its external reference flux column; "
+            "repeat exactly once for each active aperture."
+        ),
+    )
     parser.add_argument("--reference-cadence-column", default="CADENCENO")
     parser.add_argument("--reference-time-column", default="TIME")
     parser.add_argument("--reference-quality-column", default="QUALITY")
@@ -107,7 +129,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_arg_parser().parse_args(argv)
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+    try:
+        reference_flux_columns = parse_reference_flux_column_mappings(
+            args.reference_flux_column
+        )
+    except (TypeError, ValueError) as exc:
+        parser.error(str(exc))
     provenance = IndependentExtractionProvenance(
         current_repository=args.current_repository,
         current_revision=args.current_revision,
@@ -123,11 +152,13 @@ def main(argv: list[str] | None = None) -> int:
         compact_lc=args.compact_lc,
         reference_table=args.reference_table,
         reference_product=args.reference_product,
+        cadence_reference_table=args.cadence_reference_table,
+        cadence_reference_manifest=args.cadence_reference_manifest,
         metrics_csv=args.metrics_csv,
         manifest_json=args.manifest_json,
         provenance=provenance,
         reference_time_system=args.reference_time_system,
-        reference_flux_column=args.reference_flux_column,
+        reference_flux_columns=reference_flux_columns,
         reference_cadence_column=args.reference_cadence_column,
         reference_time_column=args.reference_time_column,
         reference_quality_column=args.reference_quality_column,

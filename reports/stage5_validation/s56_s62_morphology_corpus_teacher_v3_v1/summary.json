@@ -1,0 +1,61 @@
+{
+  "acceptance": {
+    "accept_unchanged_priors": true,
+    "declaration": "User declaration in Codex task: I have revisited the whole thing. Relabeled a couple. Go ahead and freeze this and prepare training new model.",
+    "review_status_counts": {
+      "accepted_unchanged_after_declared_full_pass": 487,
+      "explicit_override": 22
+    }
+  },
+  "accepted_utc": "2026-07-24T20:11:02Z",
+  "adjudicator": "tehan",
+  "created_utc": "2026-07-24T20:11:11.715641+00:00",
+  "final_label_counts": {
+    "eclipsing_binary_or_pceb": 419,
+    "instrumental_or_systematic": 1,
+    "planet_like": 70,
+    "stellar_variability": 7,
+    "uncertain": 2,
+    "wide_transit_like": 10
+  },
+  "inputs": {
+    "human_labels_final": {
+      "n_saved_rows": 22,
+      "path": "data_local/label_reviews/s56_s62_signal_rereview/human_labels_final.csv",
+      "sha256": "0d634766ec8092a8bea785710ac103ba5f95dd430a01d1e2ef380ea9ac552f46"
+    },
+    "review_queue": {
+      "path": "data_local/label_reviews/s56_s62_signal_rereview/review_queue_planet_eb.csv",
+      "sha256": "885be8c368491b5d2a6be26624bae39f02733cf31025efafa27cfa082c5b4369"
+    },
+    "source_label_provenance": {
+      "path": "data_local/label_reviews/s56_s62_signal_rereview/source_label_provenance.csv",
+      "sha256": "df858386d4d8d6f998beee801becdb17fd920219ec1cf5dab2e959bd8d5d306c"
+    }
+  },
+  "n_preserved_verified_harmonics": 64,
+  "n_rows": 509,
+  "n_unique_tics": 493,
+  "outputs": {
+    "accepted_label_decisions": {
+      "path": "reports/stage5_validation/s56_s62_morphology_corpus_teacher_v3_v1/accepted_label_decisions.csv",
+      "sha256": "47ffb23909dd2aceb3055d33969a903a356d6a79617b287ff172a6f156694278"
+    },
+    "accepted_signal_rereview": {
+      "path": "reports/stage5_validation/s56_s62_morphology_corpus_teacher_v3_v1/accepted_signal_rereview.csv",
+      "sha256": "0cbd9a3a293ab085f19f1a3510e526ba72ee6ac7bc95d0b98aa717e96e493e33"
+    },
+    "summary": {
+      "path": "reports/stage5_validation/s56_s62_morphology_corpus_teacher_v3_v1/summary.json"
+    }
+  },
+  "sector_counts": {
+    "56": 87,
+    "57": 28,
+    "58": 72,
+    "59": 36,
+    "60": 26,
+    "61": 169,
+    "62": 91
+  }
+}

@@ -40,6 +40,10 @@ REVIEW_APERTURES: tuple[str, ...] = (
 DEFAULT_DISPLAY_COLUMNS: tuple[str, ...] = (
     "tic",
     "sector",
+    "prior_label",
+    "prior_labeler",
+    "factor_review_status",
+    "same_sector_tic_count",
     "cam",
     "ccd",
     "tmag",
@@ -73,9 +77,11 @@ PROVENANCE_DISPLAY_COLUMNS: frozenset[str] = frozenset(
 
 PERIOD_FACTOR_OPTIONS: tuple[tuple[str, str], ...] = (
     ("0.25", "P/4"),
+    ("0.3333333333333333", "P/3"),
     ("0.5", "P/2"),
     ("1", "P"),
     ("2", "2P"),
+    ("3", "3P"),
     ("4", "4P"),
     ("unresolved", "Unresolved"),
 )
@@ -132,8 +138,23 @@ def find_leo_report_for_row(leo_report_roots: tuple[Path, ...], row: pd.Series) 
     return None if tic is None else find_leo_report(leo_report_roots, int(tic))
 
 
-def find_twirl_vet_sheet_for_row(twirl_vet_roots: tuple[Path, ...], row: pd.Series) -> Path | None:
+def find_twirl_vet_sheet_for_row(
+    twirl_vet_roots: tuple[Path, ...],
+    row: pd.Series,
+    *,
+    exact_name_only: bool = False,
+) -> Path | None:
     """Find a pre-rendered TWIRL two-aperture PNG vet sheet for ``row``."""
+    exact_name = _clean_value(row.get("twirl_vet_sheet_name"))
+    if exact_name_only:
+        if not exact_name:
+            return None
+        for root in twirl_vet_roots:
+            path = Path(root) / str(exact_name)
+            if path.is_file():
+                return path
+        return None
+
     names: list[str] = []
     for col in ("twirl_vet_sheet_name", "twirl_vet_sheet"):
         value = _clean_value(row.get(col))
@@ -224,7 +245,17 @@ def _candidate_key(row: pd.Series) -> str:
 
 def _normalize_period_factor(value: Any) -> tuple[str, str]:
     text = str(_clean_value(value) or "1").strip().lower()
-    aliases = {"0.250": "0.25", "0.50": "0.5", "1.0": "1", "2.0": "2", "4.0": "4", "?": "unresolved"}
+    aliases = {
+        "0.250": "0.25",
+        "0.333333": "0.3333333333333333",
+        "0.333333333333333": "0.3333333333333333",
+        "0.50": "0.5",
+        "1.0": "1",
+        "2.0": "2",
+        "3.0": "3",
+        "4.0": "4",
+        "?": "unresolved",
+    }
     text = aliases.get(text, text)
     if text not in PERIOD_FACTOR_VALUES:
         raise ValueError(f"unsupported period factor: {value}")
@@ -256,12 +287,12 @@ class CandidateStore:
             return order
         rng = np.random.default_rng(int(self.random_seed))
         if self.unlabeled_first:
-            labels = self.frame["label"].fillna("").astype(str).to_numpy()
-            unlabeled = order[labels == ""]
-            labeled = order[labels != ""]
-            rng.shuffle(unlabeled)
-            rng.shuffle(labeled)
-            order = np.concatenate([unlabeled, labeled])
+            reviewed = self.frame["reviewed"].fillna(False).astype(bool).to_numpy()
+            pending = order[~reviewed]
+            completed = order[reviewed]
+            rng.shuffle(pending)
+            rng.shuffle(completed)
+            order = np.concatenate([pending, completed])
         else:
             rng.shuffle(order)
         if len(order) > 1 and int(order[0]) == 0:
@@ -272,12 +303,26 @@ class CandidateStore:
         return latest_label_records(self.labels_out, columns=ADJUDICATION_LABEL_COLUMNS)
 
     def _apply_labels(self) -> None:
+        initial_columns = {
+            "label": "initial_label",
+            "notes": "initial_notes",
+            "period_factor": "initial_period_factor",
+            "period_status": "initial_period_status",
+        }
         for col in ("label", "label_source", "labeler", "notes", "updated_utc", "period_factor", "period_status"):
             if col not in self.frame.columns:
-                self.frame[col] = "1" if col == "period_factor" else ""
+                self.frame[col] = ""
             else:
                 self.frame[col] = self.frame[col].fillna("").astype(object)
-        self.frame.loc[self.frame["period_factor"].astype(str).eq(""), "period_factor"] = "1"
+            initial_col = initial_columns.get(col)
+            if initial_col and initial_col in self.frame.columns:
+                initial = self.frame[initial_col].fillna("").astype(str)
+                blank = self.frame[col].astype(str).eq("")
+                self.frame.loc[blank, col] = initial.loc[blank]
+        self.frame["period_factor"] = self.frame["period_factor"].map(
+            lambda value: _normalize_period_factor(value)[0]
+        )
+        self.frame["reviewed"] = False
         if self.labels.empty:
             return
         labels = self.labels.drop_duplicates("row_id", keep="last").set_index("row_id")
@@ -290,6 +335,10 @@ class CandidateStore:
                     if col == "period_factor":
                         value = _normalize_period_factor(value)[0]
                     self.frame.loc[int(row_id), col] = value
+            saved_label = str(_clean_value(label_row.get("label")) or "")
+            self.frame.loc[int(row_id), "reviewed"] = (
+                saved_label in LABEL_OPTIONS
+            )
 
     @property
     def count(self) -> int:
@@ -341,21 +390,25 @@ class CandidateStore:
         for key, value in record.items():
             if key in self.frame.columns:
                 self.frame.loc[index, key] = value
+        self.frame.loc[index, "reviewed"] = label in LABEL_OPTIONS
         self.labels_out.parent.mkdir(parents=True, exist_ok=True)
         self.labels.to_csv(self.labels_out, index=False)
         return record
 
     def summary(self) -> dict[str, Any]:
         labels = self.frame["label"].fillna("").astype(str)
-        labeled = labels.ne("")
+        reviewed = self.frame["reviewed"].fillna(False).astype(bool)
+        labeled = reviewed & labels.ne("")
         return {
             "count": self.count,
             "labeled": int(labeled.sum()),
             "unlabeled": int((~labeled).sum()),
+            "reviewed": int(reviewed.sum()),
+            "pending_review": int((~reviewed).sum()),
             "label_counts": labels[labeled].value_counts().sort_index().to_dict(),
             "candidates_path": str(self.candidates_path),
             "labels_out": str(self.labels_out),
-            "period_factor_counts": self.frame.loc[labeled, "period_factor"].fillna("1").astype(str).value_counts().sort_index().to_dict(),
+            "period_factor_counts": self.frame.loc[reviewed, "period_factor"].fillna("1").astype(str).value_counts().sort_index().to_dict(),
         }
 
 
@@ -373,6 +426,7 @@ class LightCurveVettingApp:
         shuffle_order: bool = False,
         random_seed: int = 56,
         unlabeled_first: bool = True,
+        exact_twirl_vet_sheets: bool = False,
     ) -> None:
         self.store = CandidateStore(
             candidates_path=Path(candidates_path),
@@ -384,6 +438,7 @@ class LightCurveVettingApp:
         self.hlsp_root = Path(hlsp_root)
         self.leo_report_roots = tuple(Path(p) for p in leo_report_roots)
         self.twirl_vet_roots = tuple(Path(p) for p in twirl_vet_roots)
+        self.exact_twirl_vet_sheets = bool(exact_twirl_vet_sheets)
         self.default_aperture = default_aperture
         self.labeler = labeler
         self.leo_metrics_by_review_id, self.leo_metrics_by_tic = load_leo_metric_maps(self.store.candidates_path)
@@ -417,7 +472,11 @@ class LightCurveVettingApp:
                 int(sector) if sector is not None else None,
             )
         leo_report = find_leo_report_for_row(self.leo_report_roots, row)
-        twirl_vet_sheet = find_twirl_vet_sheet_for_row(self.twirl_vet_roots, row)
+        twirl_vet_sheet = find_twirl_vet_sheet_for_row(
+            self.twirl_vet_roots,
+            row,
+            exact_name_only=self.exact_twirl_vet_sheets,
+        )
         twirl_vet_sheet_version = ""
         if twirl_vet_sheet is not None:
             try:
@@ -439,6 +498,7 @@ class LightCurveVettingApp:
             "display": display,
             "label": label,
             "label_source": (_clean_value(row.get("label_source")) or "") if label else "",
+            "reviewed": bool(row.get("reviewed", False)),
             "labeler": _clean_value(row.get("labeler")) or self.labeler,
             "notes": _clean_value(row.get("notes")) or "",
             "updated_utc": _clean_value(row.get("updated_utc")) or "",
@@ -580,7 +640,11 @@ class LightCurveVettingApp:
                     elif parsed.path == "/twirl_vet_sheet.png":
                         index = int(query.get("index", ["0"])[0])
                         row = app.store.row(index)
-                        sheet = find_twirl_vet_sheet_for_row(app.twirl_vet_roots, row)
+                        sheet = find_twirl_vet_sheet_for_row(
+                            app.twirl_vet_roots,
+                            row,
+                            exact_name_only=app.exact_twirl_vet_sheets,
+                        )
                         if sheet is None:
                             self.send_error(HTTPStatus.NOT_FOUND, "TWIRL vet sheet not found")
                         else:
@@ -704,7 +768,7 @@ def _index_html() -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TWIRL S56 vetter</title>
+<title>TWIRL signal vetter</title>
 <style>
 body {{ margin: 0; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; color: #17202a; background: #f6f7f9; }}
 header {{ display: grid; grid-template-columns: minmax(360px, 1fr) auto; gap: 8px 14px; align-items: center; padding: 9px 14px; background: #ffffff; border-bottom: 1px solid #d9dee7; position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 8px rgba(23, 32, 42, 0.06); }}
@@ -920,7 +984,7 @@ async function loadCandidate(index) {{
     + (data.leo_plot_error ? `<div>leo_plot_error</div><div>${{esc(data.leo_plot_error)}}</div>` : "")
     + (data.leo_error ? `<div>leo_error</div><div>${{esc(data.leo_error)}}</div>` : "")
     + `<div>hlsp_path</div><div>${{esc(data.hlsp_path || "")}}</div>`;
-  document.getElementById("summary").textContent = `${{data.summary.labeled}} labeled, ${{data.summary.unlabeled}} open`;
+  document.getElementById("summary").textContent = `${{data.summary.reviewed}} reviewed, ${{data.summary.pending_review}} open`;
   const leoFrame = document.getElementById("leoFrame");
   const leoEmpty = document.getElementById("leoEmpty");
   const leoLink = document.getElementById("leoLink");
@@ -978,7 +1042,9 @@ async function loadCandidate(index) {{
   if (lcDetails.open) {{
     await loadPlot(data.index, currentAperture());
   }}
-  document.getElementById("status").textContent = data.label ? `saved: ${{data.label}}` : "";
+  document.getElementById("status").textContent = data.reviewed
+    ? (data.label ? `saved: ${{data.label}}` : "saved without a label")
+    : (data.label ? `suggested: ${{data.label}}` : "");
   preloadNextCandidates(data.index);
   document.body.focus({{ preventScroll: true }});
 }}

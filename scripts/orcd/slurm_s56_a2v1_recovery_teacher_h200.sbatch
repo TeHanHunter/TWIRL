@@ -17,7 +17,8 @@ SECTOR="${TWIRL_RECOVERY_SECTOR:-56}"
 SECTOR_TAG="s${SECTOR}"
 LOG_ROOT="${TWIRL_RECOVERY_LOG_ROOT:-/orcd/data/mki_aryeh/001/twirl/logs/${SECTOR_TAG}_a2v1_recovery}"
 OUT_ROOT="${TWIRL_RECOVERY_ROOT:-${REPO}/reports/stage5_validation/${SECTOR_TAG}_A2v1_teacher_v1_recovery}"
-CHECKPOINT_ROOT="${TWIRL_TEACHER_CHECKPOINT_ROOT:-${REPO}/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1/shape_plus_periodogram_bls}"
+CHECKPOINT_ROOT="${TWIRL_TEACHER_CHECKPOINT_ROOT:-${REPO}/reports/stage5_validation/s56_label_adjudication_real343/retrained/s56_harmonic_cnn_v1_native_v2/shape_plus_periodogram_bls}"
+CHECKPOINT_MANIFEST="${TWIRL_TEACHER_CHECKPOINT_MANIFEST:-$(dirname "${CHECKPOINT_ROOT}")/selected_checkpoint_manifest.json}"
 MODE="${TWIRL_RECOVERY_MODE:-full}"
 
 if [[ "${MODE}" == "smoke" ]]; then
@@ -49,6 +50,7 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1 HDF5_USE_FILE_LOCKING=FALS
     "${CHECKPOINT_ROOT}/fold_2/teacher.pt" \
     "${CHECKPOINT_ROOT}/fold_3/teacher.pt" \
     "${CHECKPOINT_ROOT}/fold_4/teacher.pt" \
+  --checkpoint-manifest "${CHECKPOINT_MANIFEST}" \
   --out-scores "${OUT_SCORES}" \
   --batch-size 32 \
   --workers 4 \
