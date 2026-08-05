@@ -79,6 +79,16 @@ FULLPOOL_COMPLETION_BINDING = (
 EXPECTED_REAL_DEVELOPMENT_ROWS = 6_168
 EXPECTED_REAL_DEVELOPMENT_TICS = 6_054
 EXPECTED_REAL_DEVELOPMENT_UNCERTAIN_ROWS = 3_780
+EXPECTED_MATCHED_DEVELOPMENT_ROWS = 5_560
+EXPECTED_MATCHED_DEVELOPMENT_TICS = 5_446
+EXPECTED_MATCHED_DEVELOPMENT_UNCERTAIN_ROWS = 3_480
+EXPECTED_S63_RESERVED_LABEL_ROWS = 608
+EXPECTED_S63_RESERVED_LABEL_TICS = 608
+EXPECTED_S63_RESERVED_LABEL_SECTORS = {61: 206, 62: 402}
+EXPECTED_FULLPOOL_RAW_ROWS = 212_049
+EXPECTED_FULLPOOL_RETAINED_ROWS = 175_366
+EXPECTED_FULLPOOL_EXCLUDED_ROWS = 36_683
+EXPECTED_S63_RESERVED_TICS = 53_512
 EXPECTED_DUPLICATE_TARGET_SECTOR_LABEL_ROWS = 4
 EXPECTED_DUPLICATE_TARGET_SECTOR_KEYS = 2
 LABEL_POLICIES: tuple[str, ...] = (
@@ -148,6 +158,209 @@ def require_fresh_evaluation_output(path: Path) -> Path:
         )
     output.mkdir(parents=True, exist_ok=False)
     return output
+
+
+def _read_bound_json(
+    binding: Mapping[str, Any],
+    *,
+    artifact: str,
+) -> tuple[dict[str, Any], Path, str]:
+    if not isinstance(binding, Mapping) or not {"path", "sha256"}.issubset(
+        binding
+    ):
+        raise RuntimeError(f"{artifact} binding is incomplete")
+    path = Path(str(binding["path"])).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    if "size_bytes" in binding and path.stat().st_size != int(
+        binding["size_bytes"]
+    ):
+        raise RuntimeError(f"{artifact} size changed")
+    observed_sha256 = _file_sha256(path)
+    if observed_sha256 != str(binding["sha256"]):
+        raise RuntimeError(f"{artifact} hash changed")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{artifact} must be a JSON object")
+    return payload, path, observed_sha256
+
+
+def _validate_preregistered_label_exclusions(
+    *,
+    excluded: pd.DataFrame,
+    registry_summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Prove unmatched labels are raw inputs held out for prospective S63."""
+
+    if (
+        len(excluded) != EXPECTED_S63_RESERVED_LABEL_ROWS
+        or excluded["tic"].nunique() != EXPECTED_S63_RESERVED_LABEL_TICS
+    ):
+        raise RuntimeError(
+            "unmatched development-label population changed: "
+            f"rows={len(excluded)}, tics={excluded['tic'].nunique()}"
+        )
+    sector_counts = {
+        int(sector): int(count)
+        for sector, count in excluded["sector"].value_counts().sort_index().items()
+    }
+    if sector_counts != EXPECTED_S63_RESERVED_LABEL_SECTORS:
+        raise RuntimeError(
+            "unmatched development-label sectors changed: "
+            f"{sector_counts} != {EXPECTED_S63_RESERVED_LABEL_SECTORS}"
+        )
+    if excluded["tic"].duplicated().any():
+        raise RuntimeError("an unmatched development TIC has multiple label rows")
+
+    provenance = registry_summary.get("source_provenance")
+    if not isinstance(provenance, Mapping):
+        raise RuntimeError("SSL registry lacks source provenance")
+    fullpool_summary, fullpool_summary_path, fullpool_summary_sha256 = (
+        _read_bound_json(
+            provenance.get("frozen_pool_summary", {}),
+            artifact="frozen full-pool summary",
+        )
+    )
+    counts = fullpool_summary.get("counts", {})
+    observed_pool_counts = {
+        "input": int(counts.get("input", {}).get("n_observations", -1)),
+        "retained": int(counts.get("retained", {}).get("n_observations", -1)),
+        "excluded": int(
+            counts.get("excluded_input", {}).get("n_observations", -1)
+        ),
+    }
+    expected_pool_counts = {
+        "input": EXPECTED_FULLPOOL_RAW_ROWS,
+        "retained": EXPECTED_FULLPOOL_RETAINED_ROWS,
+        "excluded": EXPECTED_FULLPOOL_EXCLUDED_ROWS,
+    }
+    if observed_pool_counts != expected_pool_counts:
+        raise RuntimeError(
+            "frozen full-pool inventory counts changed: "
+            f"{observed_pool_counts} != {expected_pool_counts}"
+        )
+    if fullpool_summary.get("exclusion_scope") != (
+        "whole host: exclude every S56--S62 observation of any TIC in the "
+        "frozen fixed-test registry or prospective S63 reservation"
+    ):
+        raise RuntimeError("frozen full-pool whole-host exclusion scope changed")
+
+    summary_inputs = fullpool_summary.get("inputs")
+    if not isinstance(summary_inputs, Mapping):
+        raise RuntimeError("frozen full-pool summary lacks input bindings")
+    reserved_binding = summary_inputs.get("s63_reserved_tics")
+    reserved_hosts = provenance.get("reserved_hosts")
+    if not isinstance(reserved_binding, Mapping) or not isinstance(
+        reserved_hosts, Mapping
+    ):
+        raise RuntimeError("prospective S63 host authority is missing")
+    for field in ("path", "sha256", "size_bytes"):
+        if str(reserved_binding.get(field)) != str(reserved_hosts.get(field)):
+            raise RuntimeError(
+                f"prospective S63 host bindings disagree for {field}"
+            )
+    reserved_path = Path(str(reserved_binding["path"])).expanduser().resolve()
+    if not reserved_path.is_file():
+        raise FileNotFoundError(reserved_path)
+    if reserved_path.stat().st_size != int(reserved_binding["size_bytes"]):
+        raise RuntimeError("prospective S63 host inventory size changed")
+    reserved_sha256 = _file_sha256(reserved_path)
+    if reserved_sha256 != str(reserved_binding["sha256"]):
+        raise RuntimeError("prospective S63 host inventory hash changed")
+    reserved_tics = {
+        int(value.strip())
+        for value in reserved_path.read_text(encoding="utf-8").splitlines()
+        if value.strip()
+    }
+    if len(reserved_tics) != EXPECTED_S63_RESERVED_TICS:
+        raise RuntimeError(
+            "prospective S63 TIC count changed: "
+            f"{len(reserved_tics)} != {EXPECTED_S63_RESERVED_TICS}"
+        )
+    excluded_tics = set(
+        pd.to_numeric(excluded["tic"], errors="raise").astype(np.int64)
+    )
+    if not excluded_tics.issubset(reserved_tics):
+        unexpected = sorted(excluded_tics - reserved_tics)
+        raise RuntimeError(
+            "unmatched labels are not prospective S63 whole-host exclusions: "
+            f"{unexpected[:10]}"
+        )
+
+    compact_exports = summary_inputs.get("compact_exports")
+    if not isinstance(compact_exports, list):
+        raise RuntimeError("frozen full-pool summary lacks compact exports")
+    export_by_sector = {
+        int(record["sector"]): record
+        for record in compact_exports
+        if isinstance(record, Mapping) and "sector" in record
+    }
+    raw_manifest_audit: dict[str, Any] = {}
+    for sector, expected_count in sector_counts.items():
+        export = export_by_sector.get(sector)
+        if not isinstance(export, Mapping):
+            raise RuntimeError(f"no compact-export authority for Sector {sector}")
+        manifest, manifest_path, manifest_sha256 = _read_bound_json(
+            export.get("manifest", {}),
+            artifact=f"Sector {sector} compact manifest",
+        )
+        records = manifest.get("records")
+        if not isinstance(records, list) or len(records) != int(
+            export.get("n_exported_targets", -1)
+        ):
+            raise RuntimeError(f"Sector {sector} compact manifest count changed")
+        raw_tics = {
+            int(record["tic"])
+            for record in records
+            if isinstance(record, Mapping) and "tic" in record
+        }
+        expected_tics = set(
+            pd.to_numeric(
+                excluded.loc[excluded["sector"].eq(sector), "tic"],
+                errors="raise",
+            ).astype(np.int64)
+        )
+        if len(expected_tics) != expected_count or not expected_tics.issubset(
+            raw_tics
+        ):
+            absent = sorted(expected_tics - raw_tics)
+            raise RuntimeError(
+                f"Sector {sector} excluded labels are absent from the raw "
+                f"compact manifest: {absent[:10]}"
+            )
+        raw_manifest_audit[str(sector)] = {
+            "path": str(manifest_path),
+            "sha256": manifest_sha256,
+            "n_raw_observations": int(len(records)),
+            "n_excluded_label_observations_present": int(len(expected_tics)),
+        }
+
+    return {
+        "reason": "prospective_s63_whole_tic_holdout",
+        "n_rows": int(len(excluded)),
+        "n_tics": int(len(excluded_tics)),
+        "sector_counts": {str(key): value for key, value in sector_counts.items()},
+        "human_label_counts": {
+            str(name): int(value)
+            for name, value in excluded["human_label"]
+            .astype(str)
+            .value_counts()
+            .sort_index()
+            .items()
+        },
+        "review_ids_sha256": _string_set_sha256(
+            excluded["review_id"].astype(str).tolist()
+        ),
+        "tics_sha256": _string_set_sha256(
+            excluded["tic"].astype(str).tolist()
+        ),
+        "reserved_inventory": str(reserved_path),
+        "reserved_inventory_sha256": reserved_sha256,
+        "fullpool_summary": str(fullpool_summary_path),
+        "fullpool_summary_sha256": fullpool_summary_sha256,
+        "raw_compact_inventory_present": True,
+        "raw_compact_manifests": raw_manifest_audit,
+    }
 
 
 def load_fullpool_development_labels(
@@ -248,16 +461,29 @@ def load_fullpool_development_labels(
         validate="many_to_one",
         indicator=True,
     )
-    if not merged["_merge"].eq("both").all():
-        missing = merged.loc[
-            merged["_merge"].ne("both"),
-            ["review_id", "sector", "tic"],
-        ].head(10)
-        raise RuntimeError(
-            "development labels are absent from the frozen full-pool registry: "
-            f"{missing.to_dict(orient='records')}"
+    excluded = merged.loc[merged["_merge"].ne("both")].copy()
+    exclusion_audit: dict[str, Any] | None = None
+    if len(excluded):
+        exclusion_audit = _validate_preregistered_label_exclusions(
+            excluded=excluded,
+            registry_summary=registry_summary,
         )
-    merged = merged.drop(columns="_merge")
+    merged = merged.loc[merged["_merge"].eq("both")].drop(columns="_merge")
+    if (
+        len(merged) != EXPECTED_MATCHED_DEVELOPMENT_ROWS
+        or merged["tic"].nunique() != EXPECTED_MATCHED_DEVELOPMENT_TICS
+    ):
+        raise RuntimeError(
+            "retained full-pool development support changed: "
+            f"rows={len(merged)}, tics={merged['tic'].nunique()}"
+        )
+    matched_uncertain = merged["human_label"].astype(str).eq("uncertain")
+    if int(matched_uncertain.sum()) != EXPECTED_MATCHED_DEVELOPMENT_UNCERTAIN_ROWS:
+        raise RuntimeError(
+            "retained full-pool uncertain-label count changed: "
+            f"{int(matched_uncertain.sum())} != "
+            f"{EXPECTED_MATCHED_DEVELOPMENT_UNCERTAIN_ROWS}"
+        )
     for column in (
         "ssl_pool_include",
         "fixed_test_member",
@@ -310,7 +536,15 @@ def load_fullpool_development_labels(
         "scope": "real_development_labels_only",
         "n_rows": int(len(merged)),
         "n_tics": int(merged["tic"].nunique()),
-        "n_uncertain_rows": int(uncertain.sum()),
+        "n_uncertain_rows": int(matched_uncertain.sum()),
+        "n_source_development_rows": int(len(rows)),
+        "n_source_development_tics": int(rows["tic"].nunique()),
+        "n_source_uncertain_rows": int(uncertain.sum()),
+        "support_rule": (
+            "intersection_with_retained_fullpool_ssl_registry_after_"
+            "preregistered_whole_tic_exclusions"
+        ),
+        "excluded_label_authority": exclusion_audit,
         "evaluation_unit": "candidate_review_record",
         "n_unique_target_sector_native_inputs": int(
             merged.loc[:, ["sector", "tic"]].drop_duplicates().shape[0]
@@ -1339,6 +1573,8 @@ def run_fullpool_ssl_evaluation_preflight(
 
 
 __all__ = [
+    "EXPECTED_MATCHED_DEVELOPMENT_ROWS",
+    "EXPECTED_MATCHED_DEVELOPMENT_TICS",
     "EXPECTED_REAL_DEVELOPMENT_ROWS",
     "EXPECTED_REAL_DEVELOPMENT_TICS",
     "FULLPOOL_EVALUATION_RUN_ID",

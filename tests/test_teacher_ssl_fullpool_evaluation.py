@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import numpy as np
 import pandas as pd
@@ -78,6 +79,26 @@ def _registry(rows: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _patch_all_labels_matched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        evaluation,
+        "EXPECTED_MATCHED_DEVELOPMENT_ROWS",
+        evaluation.EXPECTED_REAL_DEVELOPMENT_ROWS,
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "EXPECTED_MATCHED_DEVELOPMENT_TICS",
+        evaluation.EXPECTED_REAL_DEVELOPMENT_TICS,
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "EXPECTED_MATCHED_DEVELOPMENT_UNCERTAIN_ROWS",
+        evaluation.EXPECTED_REAL_DEVELOPMENT_UNCERTAIN_ROWS,
+    )
+
+
 def test_probability_metrics_reports_multiclass_map() -> None:
     truth = np.arange(len(MORPHOLOGY_CLASSES), dtype=int)
     probability = np.eye(len(MORPHOLOGY_CLASSES), dtype=float)
@@ -96,6 +117,7 @@ def test_development_label_binding_uses_fullpool_inputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _patch_all_labels_matched(monkeypatch)
     rows = _development_rows()
     registry = _registry(rows)
     training = tmp_path / "training.csv"
@@ -163,6 +185,7 @@ def test_development_label_binding_rejects_fold_disagreement(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _patch_all_labels_matched(monkeypatch)
     rows = _development_rows()
     registry = _registry(rows)
     registry.loc[0, "ssl_held_out_fold"] = (
@@ -205,6 +228,155 @@ def test_development_label_binding_rejects_fold_disagreement(
             registry_summary_path=registry_summary,
             seed=56,
         )
+
+
+def test_development_label_binding_proves_s63_whole_tic_exclusions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = _development_rows()
+    excluded_indices = [1000, 4000]
+    rows.loc[excluded_indices, "sector"] = np.asarray([61, 62], dtype=np.int16)
+    excluded = rows.loc[excluded_indices].copy()
+    registry = _registry(rows).loc[
+        lambda value: ~value.set_index(["sector", "tic"]).index.isin(
+            excluded.set_index(["sector", "tic"]).index
+        )
+    ].reset_index(drop=True)
+
+    reserved_path = tmp_path / "s63_reserved_tics.txt"
+    reserved_path.write_text(
+        "".join(f"{int(value)}\n" for value in excluded["tic"]),
+        encoding="utf-8",
+    )
+    compact_exports = []
+    for sector in (61, 62):
+        tic = int(excluded.loc[excluded["sector"].eq(sector), "tic"].iloc[0])
+        manifest_path = tmp_path / f"s{sector}.manifest.json"
+        manifest_path.write_text(
+            json.dumps({"records": [{"sector": sector, "tic": tic}]}) + "\n",
+            encoding="utf-8",
+        )
+        compact_exports.append(
+            {
+                "sector": sector,
+                "n_exported_targets": 1,
+                "manifest": {
+                    "path": str(manifest_path),
+                    "sha256": evaluation._file_sha256(manifest_path),
+                    "size_bytes": manifest_path.stat().st_size,
+                },
+            }
+        )
+    fullpool_summary_path = tmp_path / "fullpool.summary.json"
+    fullpool_summary_path.write_text(
+        json.dumps(
+            {
+                "counts": {
+                    "input": {"n_observations": len(rows)},
+                    "retained": {"n_observations": len(rows) - 2},
+                    "excluded_input": {"n_observations": 2},
+                },
+                "exclusion_scope": (
+                    "whole host: exclude every S56--S62 observation of any TIC "
+                    "in the frozen fixed-test registry or prospective S63 "
+                    "reservation"
+                ),
+                "inputs": {
+                    "s63_reserved_tics": {
+                        "path": str(reserved_path),
+                        "sha256": evaluation._file_sha256(reserved_path),
+                        "size_bytes": reserved_path.stat().st_size,
+                    },
+                    "compact_exports": compact_exports,
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    registry_summary_payload = {
+        "summary_schema_version": "test",
+        "source_provenance": {
+            "frozen_pool_summary": {
+                "path": str(fullpool_summary_path),
+                "sha256": evaluation._file_sha256(fullpool_summary_path),
+                "size_bytes": fullpool_summary_path.stat().st_size,
+            },
+            "reserved_hosts": {
+                "path": str(reserved_path),
+                "sha256": evaluation._file_sha256(reserved_path),
+                "size_bytes": reserved_path.stat().st_size,
+            },
+        },
+    }
+    training = tmp_path / "training.csv"
+    registry_path = tmp_path / "registry.parquet"
+    registry_summary = tmp_path / "registry.summary.json"
+    training.write_text("training\n", encoding="utf-8")
+    registry_path.write_text("registry\n", encoding="utf-8")
+    registry_summary.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(evaluation, "EXPECTED_S63_RESERVED_LABEL_ROWS", 2)
+    monkeypatch.setattr(evaluation, "EXPECTED_S63_RESERVED_LABEL_TICS", 2)
+    monkeypatch.setattr(
+        evaluation,
+        "EXPECTED_S63_RESERVED_LABEL_SECTORS",
+        {61: 1, 62: 1},
+    )
+    monkeypatch.setattr(evaluation, "EXPECTED_S63_RESERVED_TICS", 2)
+    monkeypatch.setattr(evaluation, "EXPECTED_FULLPOOL_RAW_ROWS", len(rows))
+    monkeypatch.setattr(
+        evaluation, "EXPECTED_FULLPOOL_RETAINED_ROWS", len(rows) - 2
+    )
+    monkeypatch.setattr(evaluation, "EXPECTED_FULLPOOL_EXCLUDED_ROWS", 2)
+    monkeypatch.setattr(
+        evaluation, "EXPECTED_MATCHED_DEVELOPMENT_ROWS", len(rows) - 2
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "EXPECTED_MATCHED_DEVELOPMENT_TICS",
+        evaluation.EXPECTED_REAL_DEVELOPMENT_TICS - 2,
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "EXPECTED_MATCHED_DEVELOPMENT_UNCERTAIN_ROWS",
+        evaluation.EXPECTED_REAL_DEVELOPMENT_UNCERTAIN_ROWS - 1,
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "_read_training_table_with_stable_hash",
+        lambda *args, **kwargs: (
+            pd.DataFrame({"placeholder": [1]}),
+            evaluation._file_sha256(training),
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        evaluation, "validate_teacher_v3_training_table", lambda source: None
+    )
+    monkeypatch.setattr(
+        evaluation, "_active_release_rows", lambda source, seed: rows.copy()
+    )
+    monkeypatch.setattr(
+        evaluation,
+        "load_fullpool_ssl_registry",
+        lambda **kwargs: (registry.copy(), registry_summary_payload),
+    )
+
+    bound, audit = evaluation.load_fullpool_development_labels(
+        training_table_path=training,
+        registry_path=registry_path,
+        registry_summary_path=registry_summary,
+        seed=56,
+    )
+
+    assert len(bound) == len(rows) - 2
+    assert not set(excluded["review_id"]).intersection(bound["review_id"])
+    authority = audit["excluded_label_authority"]
+    assert authority["reason"] == "prospective_s63_whole_tic_holdout"
+    assert authority["n_rows"] == 2
+    assert authority["raw_compact_inventory_present"] is True
+    assert set(authority["raw_compact_manifests"]) == {"61", "62"}
 
 
 def test_orcd_evaluation_asset_uses_one_h200_and_sealed_development() -> None:
