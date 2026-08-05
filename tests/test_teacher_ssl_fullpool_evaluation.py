@@ -18,6 +18,13 @@ def _development_rows() -> pd.DataFrame:
     sector = 56 + np.arange(n_rows, dtype=np.int16) % 7
     sector[: n_rows - n_tics] = 56
     sector[n_tics:] = 57
+    sector[n_tics : n_tics + 2] = sector[:2]
+    period = np.ones(n_rows, dtype=float)
+    epoch = np.full(n_rows, 2_459_000.0, dtype=float)
+    duration = np.full(n_rows, 10.0, dtype=float)
+    period[n_tics : n_tics + 2] = (2.0, 3.0)
+    epoch[n_tics : n_tics + 2] += (0.1, 0.2)
+    duration[n_tics : n_tics + 2] = (5.0, 6.0)
     human_label = np.asarray(
         ["uncertain"] * evaluation.EXPECTED_REAL_DEVELOPMENT_UNCERTAIN_ROWS
         + ["planet_like", "eclipsing_binary_or_pceb", "stellar_variability"]
@@ -36,9 +43,9 @@ def _development_rows() -> pd.DataFrame:
             "cv_fold": [fold_by_tic[int(value)] for value in tic],
             "human_label": human_label,
             "is_injected_row": False,
-            "period_d": 1.0,
-            "t0_bjd": 2_459_000.0,
-            "duration_min": 10.0,
+            "period_d": period,
+            "t0_bjd": epoch,
+            "duration_min": duration,
             "native_h5_path": "/old/native.h5",
             "native_group_path": "/old/group",
         }
@@ -46,7 +53,7 @@ def _development_rows() -> pd.DataFrame:
 
 
 def _registry(rows: pd.DataFrame) -> pd.DataFrame:
-    return pd.DataFrame(
+    registry = pd.DataFrame(
         {
             "sector": rows["sector"],
             "tic": rows["tic"],
@@ -65,6 +72,9 @@ def _registry(rows: pd.DataFrame) -> pd.DataFrame:
             "ssl_held_out_fold": rows["cv_fold"],
             "fold_assignment_source": "frozen_development_split",
         }
+    )
+    return registry.drop_duplicates(["sector", "tic"], keep="first").reset_index(
+        drop=True
     )
 
 
@@ -131,8 +141,11 @@ def test_development_label_binding_uses_fullpool_inputs(
 
     assert len(bound) == evaluation.EXPECTED_REAL_DEVELOPMENT_ROWS
     assert bound["tic"].nunique() == evaluation.EXPECTED_REAL_DEVELOPMENT_TICS
-    assert bound["period_d"].eq(0.25).all()
-    assert bound["teacher_v3_period_d"].eq(1.0).all()
+    assert np.array_equal(
+        np.sort(bound["period_d"].unique()),
+        np.asarray([1.0, 2.0, 3.0]),
+    )
+    assert bound["fullpool_period_d"].eq(0.25).all()
     assert bound["native_h5_path"].eq("/new/native.h5").all()
     assert np.array_equal(
         bound["cv_fold"].to_numpy(dtype=int),
@@ -141,6 +154,9 @@ def test_development_label_binding_uses_fullpool_inputs(
     assert audit["fixed_test_tensors_constructed"] is False
     assert audit["sector_63_rows_present"] is False
     assert audit["injected_rows_present"] is False
+    assert audit["evaluation_unit"] == "candidate_review_record"
+    assert audit["n_duplicate_target_sector_label_rows"] == 4
+    assert audit["n_duplicate_target_sector_keys"] == 2
 
 
 def test_development_label_binding_rejects_fold_disagreement(

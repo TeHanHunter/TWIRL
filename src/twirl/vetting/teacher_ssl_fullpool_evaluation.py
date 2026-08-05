@@ -79,6 +79,8 @@ FULLPOOL_COMPLETION_BINDING = (
 EXPECTED_REAL_DEVELOPMENT_ROWS = 6_168
 EXPECTED_REAL_DEVELOPMENT_TICS = 6_054
 EXPECTED_REAL_DEVELOPMENT_UNCERTAIN_ROWS = 3_780
+EXPECTED_DUPLICATE_TARGET_SECTOR_LABEL_ROWS = 4
+EXPECTED_DUPLICATE_TARGET_SECTOR_KEYS = 2
 LABEL_POLICIES: tuple[str, ...] = (
     "uncertain_as_other",
     "uncertain_masked",
@@ -189,14 +191,25 @@ def load_fullpool_development_labels(
             f"{int(uncertain.sum())} != "
             f"{EXPECTED_REAL_DEVELOPMENT_UNCERTAIN_ROWS}"
         )
-    if rows.duplicated(["sector", "tic"]).any():
-        examples = rows.loc[
-            rows.duplicated(["sector", "tic"], keep=False),
-            ["review_id", "sector", "tic"],
-        ].head(10)
+    duplicate_input = rows.duplicated(["sector", "tic"], keep=False)
+    duplicate_rows = rows.loc[duplicate_input].copy()
+    duplicate_keys = duplicate_rows.loc[:, ["sector", "tic"]].drop_duplicates()
+    if (
+        len(duplicate_rows) != EXPECTED_DUPLICATE_TARGET_SECTOR_LABEL_ROWS
+        or len(duplicate_keys) != EXPECTED_DUPLICATE_TARGET_SECTOR_KEYS
+    ):
         raise RuntimeError(
-            "development labels repeat a full-pool observation key: "
-            f"{examples.to_dict(orient='records')}"
+            "candidate-label/full-pool-input multiplicity changed: "
+            f"rows={len(duplicate_rows)}, keys={len(duplicate_keys)}"
+        )
+    candidate_ephemeris = ["period_d", "t0_bjd", "duration_min"]
+    duplicate_ephemerides = duplicate_rows.loc[
+        :, ["sector", "tic", *candidate_ephemeris]
+    ].drop_duplicates()
+    if len(duplicate_ephemerides) != len(duplicate_rows):
+        raise RuntimeError(
+            "duplicate target-sector label records do not have distinct "
+            "candidate ephemerides"
         )
 
     registry, registry_summary = load_fullpool_ssl_registry(
@@ -232,7 +245,7 @@ def load_fullpool_development_labels(
         registry_labels,
         on=["sector", "tic"],
         how="left",
-        validate="one_to_one",
+        validate="many_to_one",
         indicator=True,
     )
     if not merged["_merge"].eq("both").all():
@@ -273,11 +286,14 @@ def load_fullpool_development_labels(
             "Teacher-v3 development folds disagree with SSL held-out folds"
         )
 
-    for name in ("period_d", "t0_bjd", "duration_min", "native_h5_path", "native_group_path"):
+    # Preserve the candidate-specific frozen ephemeris.  Two S56 target-sector
+    # light curves each have two reviewed candidate periods, including one
+    # genuine label disagreement.  They share one raw native light curve but
+    # must remain distinct folded model inputs for matched Teacher-v3 support.
+    for name in ("native_h5_path", "native_group_path"):
         merged[f"teacher_v3_{name}"] = merged[name]
         merged[name] = merged[f"fullpool_{name}"]
     merged["ssl_observation_id"] = merged["fullpool_ssl_observation_id"]
-    merged["bls_status"] = merged["fullpool_bls_status"]
     merged["native_h5_sha256"] = merged["fullpool_native_h5_sha256"]
     merged["native_contract_version"] = merged[
         "fullpool_native_contract_version"
@@ -295,6 +311,17 @@ def load_fullpool_development_labels(
         "n_rows": int(len(merged)),
         "n_tics": int(merged["tic"].nunique()),
         "n_uncertain_rows": int(uncertain.sum()),
+        "evaluation_unit": "candidate_review_record",
+        "n_unique_target_sector_native_inputs": int(
+            merged.loc[:, ["sector", "tic"]].drop_duplicates().shape[0]
+        ),
+        "n_duplicate_target_sector_label_rows": int(len(duplicate_rows)),
+        "n_duplicate_target_sector_keys": int(len(duplicate_keys)),
+        "duplicate_candidate_ephemerides_distinct": True,
+        "candidate_ephemeris_source": (
+            "frozen_teacher_v3_review_record; fullpool_registry_ephemeris_"
+            "retained_as_audit_columns_only"
+        ),
         "review_ids_sha256": _string_set_sha256(
             merged["review_id"].astype(str).tolist()
         ),
