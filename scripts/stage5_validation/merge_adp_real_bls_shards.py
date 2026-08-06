@@ -76,6 +76,21 @@ _RAW_V4_SHARD_FIELDS = (
     "raw_source_summary",
     "raw_source_summary_sha256",
 )
+_S63_TARGET_METADATA_CONTRACT = (
+    "twirl_teacher_v3_s63_rank1_candidate_metadata_v1"
+)
+_S63_TARGET_METADATA_COLUMNS = (
+    "adp_sml_own_even_depth",
+    "adp_sml_own_odd_depth",
+    "adp_sml_own_even_odd_depth_delta",
+    "adp_sml_own_even_odd_sigma_delta",
+    "adp_sml_trend_ptp",
+    "adp_own_even_depth",
+    "adp_own_odd_depth",
+    "adp_own_even_odd_depth_delta",
+    "adp_own_even_odd_sigma_delta",
+    "adp_trend_ptp",
+)
 
 
 def _sha256(path: Path) -> str:
@@ -270,6 +285,19 @@ def merge_shards(
     summary_payloads = [json.loads(path.read_text()) for path in summaries]
     baseline = summary_payloads[0]
     invariant_fields = list(_INVARIANT_SUMMARY_FIELDS)
+    if "producer_git_sha" in baseline:
+        invariant_fields.append("producer_git_sha")
+    s63_target_metadata = "target_metadata_contract_version" in baseline
+    if s63_target_metadata:
+        invariant_fields.extend(
+            ("target_metadata_contract_version", "target_metadata_columns")
+        )
+        if baseline.get("target_metadata_contract_version") != (
+            _S63_TARGET_METADATA_CONTRACT
+        ) or baseline.get("target_metadata_columns") != list(
+            _S63_TARGET_METADATA_COLUMNS
+        ):
+            raise ValueError("S63 BLS target-metadata declaration mismatch")
     optional_groups = (
         _TARGET_SELECTION_INVARIANT_FIELDS,
         _ORBITID_INVARIANT_FIELDS,
@@ -522,6 +550,28 @@ def merge_shards(
         column: int(pd.to_numeric(target_quality[column], errors="raise").sum())
         for column in quality_count_columns
     }
+    target_metadata_finite_counts: dict[str, int] = {}
+    if s63_target_metadata:
+        missing_metadata = sorted(set(_S63_TARGET_METADATA_COLUMNS) - set(frame))
+        if missing_metadata:
+            raise ValueError(
+                f"merged S63 BLS rows lack target metadata: {missing_metadata}"
+            )
+        target_metadata_finite_counts = {
+            column: int(
+                np.isfinite(
+                    pd.to_numeric(target_quality[column], errors="coerce").to_numpy(
+                        dtype=float
+                    )
+                ).sum()
+            )
+            for column in _S63_TARGET_METADATA_COLUMNS
+        }
+        if any(count == 0 for count in target_metadata_finite_counts.values()):
+            raise ValueError(
+                "merged S63 BLS has a wholly nonfinite target feature: "
+                f"{target_metadata_finite_counts}"
+            )
     merged_orbitid_summary: dict[str, Any] = {}
     if all(field in baseline for field in _ORBITID_INVARIANT_FIELDS):
         merged_orbitid_summary = _orbitid_summary_from_rows(
@@ -566,6 +616,15 @@ def merge_shards(
                 .items()
             },
             "quality_counts_over_unique_targets": (quality_counts_over_unique_targets),
+            **(
+                {
+                    "target_metadata_finite_counts": (
+                        target_metadata_finite_counts
+                    )
+                }
+                if s63_target_metadata
+                else {}
+            ),
             **(
                 {
                     "raw_compact_cadence_inventory_passed": True,

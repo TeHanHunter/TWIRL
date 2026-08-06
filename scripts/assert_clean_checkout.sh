@@ -5,7 +5,7 @@ set -euo pipefail
 REPO="${1:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
 EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA:-}"
 
-if [[ -z "${REPO}" || ! -d "${REPO}/.git" ]]; then
+if [[ -z "${REPO}" || ( ! -d "${REPO}/.git" && ! -f "${REPO}/.git" ) ]]; then
   echo "[git-clean] not a Git checkout: ${REPO:-<unset>}" >&2
   exit 2
 fi

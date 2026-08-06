@@ -254,9 +254,13 @@ Teacher-v3 current-ADP/native contract for the primary test; the corrected SSL
 tensor contract would be a separately preregistered sensitivity, not a silent
 input substitution. Freeze all hashes, the rank-one two-aperture BLS rule,
 queue quotas, random/control design, metrics, and stopping rule before opening
-S63 model scores. Scores enrich a blinded human-review queue and never become
-labels. The growing positive class is explicitly **human-confirmed
-Planet-like transit morphology**, not a sample of confirmed exoplanets.
+S63 model scores. Scores enrich a reviewer-safe, score-hidden human-review
+queue and never become labels. The queue withholds explicit cohort and
+selection annotations, but visible TIC identity remains technically joinable
+to the frozen Teacher-v3 corpus; do not describe that boundary as
+cryptographic blinding. The growing positive class is explicitly
+**human-confirmed Planet-like transit morphology**, not a sample of confirmed
+exoplanets.
 
 ### Model gate
 
@@ -407,18 +411,19 @@ Resume S65 from its single failed CCD and continue S66--S69 as a parallel
 Stage-1 lane. Its stop-on-failure gates remain mandatory, but gathering every
 later sector does not block the sealed S63 model test.
 
-1. Run the checksum-bound Teacher-v3 prospective S63 lane once: validate the
-   accepted A2v1 products, build the compact current-ADP and cadence authority,
-   freeze the exact model-ready disjoint/repeated cohorts, run the locked
-   rank-one two-aperture BLS/native path, and score with the unchanged frozen
-   five-fold Teacher-v3 ensemble. Select a deterministic blinded enrichment
+1. Complete the exact-commit run of the implemented checksum-bound Teacher-v3
+   prospective S63 lane: preserve and revalidate the accepted A2v1 receipt,
+   build the attested compact current-ADP and cadence authority, freeze the
+   exact model-ready disjoint/repeated cohorts, run the locked rank-one
+   two-aperture BLS/native path, and score with the unchanged frozen five-fold
+   Teacher-v3 ensemble. Select a deterministic annotation-withheld enrichment
    queue plus a preregistered control sample; do not inspect scores before the
    contract is frozen or use probabilities as labels.
-2. Complete blinded human review and then unblind once. Report Planet-like
-   morphology yield/precision and top-K lift versus the control, with primary
-   TIC-disjoint hosts and repeated hosts separated. Do not claim sector-wide
-   recall or balanced accuracy from an enrichment-biased queue. Only accepted
-   human morphology decisions may enlarge the next training corpus.
+2. Complete annotation-withheld human review and then unblind once. Report
+   Planet-like morphology yield/precision and top-K lift versus the control,
+   with primary TIC-disjoint hosts and repeated hosts separated. Do not claim
+   sector-wide recall or balanced accuracy from an enrichment-biased queue.
+   Only accepted human morphology decisions may enlarge the next training corpus.
 3. Publish the frozen Teacher-v3 release and reviewed S56--S62 morphology
    corpus/candidate TIC index, while archiving Teacher v4-SSL as a completed
    non-promoted development experiment. In parallel, repair S65 and continue

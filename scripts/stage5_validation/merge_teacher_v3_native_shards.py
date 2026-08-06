@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import sys
 
+import h5py
 import pandas as pd
 
 
@@ -22,6 +23,31 @@ from twirl.vetting.harmonic_inputs import (  # noqa: E402
     native_group_path,
     verify_raw_pair_contract,
 )
+from twirl.vetting.s63_preprocessing import (  # noqa: E402
+    validate_producer_git_sha,
+)
+
+S63_PROSPECTIVE_CONTRACT = "s63_teacher_v3_prospective_v1"
+
+
+def _authorize_sector(*, sector: int, prospective_contract: str | None) -> str:
+    if 56 <= int(sector) <= 62:
+        if prospective_contract is not None:
+            raise ValueError(
+                "legacy Teacher-v3 sectors must not set --prospective-contract"
+            )
+        return "teacher_v3_s56_s62_legacy"
+    if int(sector) == 63 and prospective_contract == S63_PROSPECTIVE_CONTRACT:
+        return S63_PROSPECTIVE_CONTRACT
+    if int(sector) == 63:
+        raise ValueError(
+            "S63 native merge requires --prospective-contract "
+            f"{S63_PROSPECTIVE_CONTRACT}"
+        )
+    raise ValueError(
+        "Teacher-v3 native merge is bounded to legacy S56-S62 plus "
+        "explicitly authorized prospective S63"
+    )
 
 
 def _truth(values):
@@ -53,6 +79,7 @@ def _validate_shard_contract(
     shard_paths: list[Path],
     *,
     training_table_sha256: str,
+    expected_producer_git_sha: str | None = None,
 ) -> dict[str, object]:
     """Require one complete, nonduplicated shard-index sequence."""
 
@@ -81,6 +108,15 @@ def _validate_shard_contract(
                 raise ValueError(
                     f"native shard {path} does not bind the exact training table"
                 )
+            if expected_producer_git_sha is not None:
+                observed_producer = validate_producer_git_sha(
+                    source.attrs.get("producer_git_sha"),
+                    label=f"native shard {path} producer_git_sha",
+                )
+                if observed_producer != expected_producer_git_sha:
+                    raise ValueError(
+                        f"native shard {path} producer Git SHA differs from merge"
+                    )
             shard_indices.append(shard_index)
     expected_indices = list(range(expected_n_shards))
     if sorted(shard_indices) != expected_indices:
@@ -113,9 +149,27 @@ def main() -> None:
     parser.add_argument("--shards", type=Path, nargs="+", required=True)
     parser.add_argument("--out-h5", type=Path, required=True)
     parser.add_argument("--training-table", type=Path, required=True)
+    parser.add_argument(
+        "--prospective-contract",
+        choices=(S63_PROSPECTIVE_CONTRACT,),
+        help="Required only for the sealed prospective S63 inference lane.",
+    )
+    parser.add_argument("--producer-git-sha")
     args = parser.parse_args()
-    if args.sector < 56 or args.sector > 62:
-        raise SystemExit("Teacher-v3 native merge is bounded to sectors 56-62")
+    try:
+        authorization = _authorize_sector(
+            sector=args.sector,
+            prospective_contract=args.prospective_contract,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    producer_git_sha: str | None = None
+    if args.sector == 63:
+        if args.producer_git_sha is None:
+            raise SystemExit("prospective S63 native merge requires --producer-git-sha")
+        producer_git_sha = validate_producer_git_sha(args.producer_git_sha)
+    elif args.producer_git_sha is not None:
+        raise SystemExit("legacy Teacher-v3 native merge must not set --producer-git-sha")
     output = args.out_h5.resolve()
     summary_path = output.with_suffix(".summary.json")
     pending = output.with_suffix(output.suffix + ".merge_pending")
@@ -158,11 +212,16 @@ def main() -> None:
     shard_contract = _validate_shard_contract(
         args.shards,
         training_table_sha256=training_table_sha256,
+        expected_producer_git_sha=producer_git_sha,
     )
     merge = merge_raw_pair_shards(
         shard_paths=args.shards,
         out_h5=pending,
     )
+    if producer_git_sha is not None:
+        with h5py.File(pending, "r+") as h5:
+            h5.attrs["producer_git_sha"] = producer_git_sha
+            h5.flush()
     verification = verify_raw_pair_contract(
         pending,
         require_errors=True,
@@ -174,6 +233,7 @@ def main() -> None:
     identity_match = not missing_paths and not unexpected_paths
     count_match = merge["counts"] == expected
     summary = {
+        "authorization_contract": authorization,
         "sector": int(args.sector),
         "merge": merge,
         "verification": verification,
@@ -188,6 +248,8 @@ def main() -> None:
         "missing_group_paths": missing_paths,
         "unexpected_group_paths": unexpected_paths,
     }
+    if producer_git_sha is not None:
+        summary["producer_git_sha"] = producer_git_sha
     if (
         not verification["passed"]
         or not count_match

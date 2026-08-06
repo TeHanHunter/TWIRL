@@ -7,29 +7,62 @@ ORBIT_ONE="${2:?usage: $0 <sector> <orbit-one> <orbit-two> [output-dir]}"
 ORBIT_TWO="${3:?usage: $0 <sector> <orbit-one> <orbit-two> [output-dir]}"
 OUTPUT_DIR="${4:-/pdo/users/tehan/twirl-teacher-v3/a2v1_cadence_reference/s${SECTOR}}"
 
-if (( SECTOR < 56 || SECTOR > 62 )); then
-  echo "Teacher-v3 cadence preparation is bounded to sectors 56-62." >&2
+S63_PROSPECTIVE_CONTRACT="s63_teacher_v3_prospective_v1"
+PROSPECTIVE_CONTRACT="${TWIRL_TEACHER_V3_PROSPECTIVE_CONTRACT:-}"
+if (( SECTOR >= 56 && SECTOR <= 62 )); then
+  if [[ -n "${PROSPECTIVE_CONTRACT}" ]]; then
+    echo "Legacy Teacher-v3 cadence preparation must not set a prospective contract." >&2
+    exit 2
+  fi
+elif (( SECTOR == 63 )); then
+  if [[ "${PROSPECTIVE_CONTRACT}" != "${S63_PROSPECTIVE_CONTRACT}" ]]; then
+    echo "S63 cadence preparation requires TWIRL_TEACHER_V3_PROSPECTIVE_CONTRACT=${S63_PROSPECTIVE_CONTRACT}." >&2
+    exit 64
+  fi
+  if [[ "${ORBIT_ONE},${ORBIT_TWO}" != "133,134" && "${ORBIT_ONE},${ORBIT_TWO}" != "134,133" ]]; then
+    echo "The prospective S63 cadence authority is locked to orbits 133 and 134." >&2
+    exit 64
+  fi
+else
+  echo "Teacher-v3 cadence preparation is bounded to legacy S56-S62 plus explicitly authorized prospective S63." >&2
   exit 2
 fi
 if (( ORBIT_ONE <= 0 || ORBIT_TWO <= 0 || ORBIT_ONE == ORBIT_TWO )); then
   echo "Orbit IDs must be distinct positive integers." >&2
   exit 2
 fi
-if [[ "${OUTPUT_DIR}" != /pdo/users/tehan/* ]]; then
-  echo "Refusing a PDO output outside /pdo/users/tehan/: ${OUTPUT_DIR}" >&2
+REPO="${TWIRL_ROOT:-/pdo/users/tehan/TWIRL}"
+PDO_USER_ROOT="$(realpath -e -- /pdo/users/tehan)"
+REPO="$(realpath -e -- "${REPO}")"
+OUTPUT_DIR="$(realpath -m -- "${OUTPUT_DIR}")"
+if [[ "${OUTPUT_DIR}" != "${PDO_USER_ROOT}"/* \
+   || "${OUTPUT_DIR}" == "${REPO}" \
+   || "${OUTPUT_DIR}" == "${REPO}"/* ]]; then
+  echo "PDO cadence output must be canonical, under ${PDO_USER_ROOT}, and outside the checkout: ${OUTPUT_DIR}" >&2
   exit 2
 fi
-
-REPO="${TWIRL_ROOT:-/pdo/users/tehan/TWIRL}"
 PYTHON_BIN="${PYTHON_BIN:-/sw/qlp-environment/.venv/bin/python}"
 QLP_ROOT="${TWIRL_QLP_AUTHORITY_ROOT:-/pdo/qlp-data}"
 SPOC_ROOT="${TWIRL_SPOC_FLAG_ROOT:-${QLP_ROOT}/spocflags}"
 OVERWRITE="${TWIRL_OVERWRITE_CADENCE_REFERENCE:-0}"
 
+if (( SECTOR == 63 )); then
+  if [[ -z "${TWIRL_EXPECTED_GIT_SHA:-}" ]]; then
+    echo "Prospective S63 cadence preparation requires TWIRL_EXPECTED_GIT_SHA." >&2
+    exit 2
+  fi
+  "${REPO}/scripts/assert_clean_checkout.sh" "${REPO}"
+fi
+
 SPOC_TABLE="${OUTPUT_DIR}/spoc_quality.csv"
 SPOC_PROVENANCE="${OUTPUT_DIR}/spoc_quality.provenance.json"
 REFERENCE_TABLE="${OUTPUT_DIR}/cadence_reference.csv"
 REFERENCE_MANIFEST="${OUTPUT_DIR}/cadence_reference.manifest.json"
+
+if (( SECTOR == 63 )) && [[ "${OVERWRITE}" != "0" ]]; then
+  echo "Prospective S63 cadence preparation never permits overwrite." >&2
+  exit 4
+fi
 
 mkdir -p "${OUTPUT_DIR}"
 cd "${REPO}"
@@ -39,6 +72,11 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
+if (( SECTOR == 63 )); then
+  export PYTHONNOUSERSITE=1
+  export HDF5_USE_FILE_LOCKING=FALSE
+  export LD_LIBRARY_PATH="/sw/python-versions/python-3.11.9/lib:/pdo/app/anaconda/anaconda2-4.4.0/lib:${LD_LIBRARY_PATH:-}"
+fi
 
 quat_args=()
 spoc_args=()
@@ -98,6 +136,14 @@ fi
   --output-table "${REFERENCE_TABLE}" \
   --output-manifest "${REFERENCE_MANIFEST}" \
   "${overwrite_args[@]}"
+
+if (( SECTOR == 63 )); then
+  manifest_pre_sha="$(sha256sum "${REFERENCE_MANIFEST}" | awk '{print $1}')"
+  "${PYTHON_BIN}" scripts/stage5_validation/attest_s63_teacher_v3_json.py \
+    --json "${REFERENCE_MANIFEST}" \
+    --expected-sha256 "${manifest_pre_sha}" \
+    --producer-git-sha "${TWIRL_EXPECTED_GIT_SHA}"
+fi
 
 sha256sum "${REFERENCE_TABLE}" "${REFERENCE_MANIFEST}" > \
   "${OUTPUT_DIR}/cadence_reference.sha256"

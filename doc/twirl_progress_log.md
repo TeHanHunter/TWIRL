@@ -533,16 +533,51 @@ sample.
   sampling, metrics, and one-time unblinding policy. The primary run will
   preserve Teacher v3's original current-ADP/native input contract;
   an SSL corrected-input sensitivity would be a separate future experiment.
-  Scores will select a blinded enrichment queue plus a preregistered control
-  and will never be treated as labels.
+  Scores will select an annotation-withheld enrichment queue plus a
+  preregistered control and will never be treated as labels.
+- `2026-08-06`: Built the checksum-bound S63 preprocessing, inference, and
+  review-queue lane without opening S63 model scores. The implementation keeps
+  the accepted Stage-1 validation source immutable, makes an attested run-local
+  receipt copy, requires the compact ADP pair to match its accepted FITS root,
+  counts, zero-skip record inventory, and HDF5 target identities, and propagates
+  one exact clean producer Git SHA through cadence, model-ready, cohort, BLS,
+  candidate, raw-source, native-input, scoring, and queue artifacts. The
+  [prospective assets](../reports/stage5_validation/teacher_v3_s63_prospective_v1/)
+  now include a pre-score selection policy with SHA-256 `52e63c4d...692f`;
+  the original prospective-plan bytes remain unchanged at `c2fcc7c7...ec8f`.
+  Its explicit erratum narrows the review boundary honestly: score, bucket,
+  control-stratum, and explicit cohort annotations are withheld, but visible
+  TIC identity makes cohort membership technically joinable. Cohort-wise
+  analysis still waits for all `1,100` accepted morphology decisions. A first
+  PDO compact export from the earlier planning commit completed with `53,249`
+  exported targets, zero read/filter/duplicate/missing-flux skips, and a
+  `7.18`-GB HDF5. It is retained only as a diagnostic data-path smoke; it
+  cannot authorize scoring and must be superseded by the exact tested
+  implementation commit.
+- `2026-08-06`: Final adversarial validation caught two pre-launch contract
+  gaps before any S63 score was opened. The first candidate path omitted ten
+  Teacher-v3 checkpoint features: own-ephemeris odd/even depths, their delta
+  and significance, and trend amplitude in each ADP aperture. The BLS path now
+  measures those quantities with the training-time two-aperture implementation,
+  the candidate table carries their exact prefixed columns, and launch plus
+  scoring fail closed on missing or wholly nonfinite features. The second gap
+  allowed a queue consumer to verify hashes without proving the complete
+  frozen Teacher-v3 release and candidate evidence. Queue publication now
+  requires the exact five checkpoints, release documents, score policy,
+  initial/final clean-checkout audits, and full candidate-column equality;
+  public and hidden queue products are both mode `0700/0600`, use an exact
+  public-column allowlist, and require paired completion markers without
+  exposing hidden hashes. Repository validation passed with `837` tests and
+  `29` skips; the detection sample and documentation checks also passed.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Implement and synthetic-smoke the checksum-bound S63 prospective
-lane, freeze its compact/model-ready cohort and all remaining input hashes,
-then run Teacher v3 once and produce a blinded enrichment-plus-control review
-queue. Do not inspect S63 scores before the freeze, schedule unrelated corpus
-labeling, or start student pseudo-labeling.
+**Next:** Commit and deploy the tested S63 lane, rerun its receipt, cadence,
+and compact stages from that exact clean Git object, freeze the model-ready
+cohorts and remaining input hashes, then run Teacher v3 once and produce the
+annotation-withheld enrichment-plus-control review queue. Do not inspect S63
+scores before the freeze, schedule unrelated corpus labeling, or start student
+pseudo-labeling.
 
 ### Human labels and harmonic review
 
@@ -564,7 +599,7 @@ labeling, or start student pseudo-labeling.
   them; all seven folds remain model inputs regardless of that mask.
 
 **Next:** Use the frozen Teacher v3 release to enrich the sealed S63 review
-while preserving blinded score provenance and a random/control slice. Require
+while preserving score-hidden provenance and a random/control slice. Require
 the prospective result plus a predeclared rare-factor and oracle-factor
 evaluation before any architecture iteration or student pseudo-labeling.
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
+from functools import lru_cache
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -26,7 +28,15 @@ from twirl.lightcurves.detrend_presets import (  # noqa: E402
     TWIRL_FS_V2_ADP015Q_BRANCH,
     compare_column_names,
 )
+from twirl.lightcurves.external_quality import (  # noqa: E402
+    ORBITID_POLICIES,
+    load_external_quality_reference,
+)
 from twirl.vetting.lightcurve_label_app import find_hlsp_path  # noqa: E402
+from twirl.vetting.s63_preprocessing import (  # noqa: E402
+    validate_producer_git_sha,
+    validate_sha256,
+)
 from twirl.vetting.two_aperture import DEFAULT_TWO_APERTURE_APERTURES, render_two_aperture_sheet  # noqa: E402
 
 
@@ -35,6 +45,14 @@ DEFAULT_QUEUE = (
 )
 DEFAULT_HLSP_ROOT = REPO_ROOT / "data_local/stage1_lightcurves/hlsp_s0056_twirl_fs_v2_adp015q_compare"
 DEFAULT_OUT_DIR = REPO_ROOT / "reports/stage5_validation/s56_mixed_teacher_queue_pdo/twirl_vet_sheets"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        while block := handle.read(8 * 1024 * 1024):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _json_default(value: Any) -> Any:
@@ -68,24 +86,28 @@ def _row_id(row: pd.Series, fallback: int) -> str:
     return f"row{fallback:05d}_tic{tic}"
 
 
-def _render_one(
-    payload: tuple[
-        dict[str, Any],
-        int,
-        str,
-        str,
-        str,
-        str,
-        str,
-        tuple[str, ...],
-        int,
-        int,
-        str,
-        str,
-        str,
-        tuple[float, ...],
-    ]
-) -> dict[str, Any]:
+@lru_cache(maxsize=4)
+def _quality_reference_for_worker(
+    table_path: str,
+    manifest_path: str,
+    sector: int,
+):
+    expected_orbits = (133, 134) if int(sector) == 63 else None
+    expected_detectors = (
+        tuple((camera, ccd) for camera in range(1, 5) for ccd in range(1, 5))
+        if int(sector) == 63
+        else None
+    )
+    return load_external_quality_reference(
+        table_path=Path(table_path),
+        manifest_path=Path(manifest_path),
+        sector=int(sector),
+        expected_orbits=expected_orbits,
+        expected_detectors=expected_detectors,
+    )
+
+
+def _render_one(payload: tuple[Any, ...]) -> dict[str, Any]:
     (
         row,
         idx,
@@ -100,6 +122,9 @@ def _render_one(
         overwrite_s,
         use_row_ephemeris_s,
         write_pdf_s,
+        cadence_reference_s,
+        cadence_manifest_s,
+        orbitid_policy,
         harmonic_factors,
     ) = payload
     hlsp_root = Path(hlsp_root_s)
@@ -123,6 +148,10 @@ def _render_one(
         "twirl_vet_sheet_pdf_name": out_path.with_suffix(".pdf").name if write_pdf else "",
         "twirl_vet_status": "",
     }
+    declared_sheet = str(row.get("twirl_vet_sheet_name", "")).strip()
+    if declared_sheet and declared_sheet != out_path.name:
+        record["twirl_vet_status"] = "declared_filename_mismatch"
+        return record
     if out_path.exists() and not overwrite:
         record["twirl_vet_status"] = "reused"
         return record
@@ -156,6 +185,39 @@ def _render_one(
     if missing:
         record["twirl_vet_status"] = "missing_apertures:" + ",".join(missing)
         return record
+    if cadence_reference_s or cadence_manifest_s:
+        if not cadence_reference_s or not cadence_manifest_s or sector is None:
+            record["twirl_vet_status"] = "external_quality_contract_incomplete"
+            return record
+        try:
+            reference = _quality_reference_for_worker(
+                cadence_reference_s,
+                cadence_manifest_s,
+                sector,
+            )
+            overlay = reference.apply(
+                sector=int(lc.sector),
+                camera=int(lc.cam),
+                ccd=int(lc.ccd),
+                cadenceno=lc.cadenceno,
+                orbitid=lc.orbitid,
+                internal_quality=lc.quality,
+                context=f"review sheet TIC {tic}",
+                orbitid_policy=orbitid_policy,
+            )
+        except Exception as exc:
+            record["twirl_vet_status"] = (
+                f"external_quality_error:{type(exc).__name__}: {exc}"
+            )
+            return record
+        lc.quality = overlay.quality
+        lc.orbitid = overlay.resolved_orbitid
+        record.update(
+            {f"quality_{key}": int(value) for key, value in overlay.counts.items()}
+        )
+        record["cadence_reference_sha256"] = reference.table_sha256
+        record["cadence_reference_manifest_sha256"] = reference.manifest_sha256
+        record["orbitid_policy"] = orbitid_policy
     cfg = BLSConfig(
         apertures=apertures,
         n_periods=int(n_periods),
@@ -200,12 +262,42 @@ def render_queue(
     overwrite: bool,
     use_row_ephemeris: bool,
     write_pdf: bool,
+    cadence_reference: Path | None = None,
+    cadence_reference_manifest: Path | None = None,
+    orbitid_policy: str = "strict",
+    producer_git_sha: str | None = None,
+    launch_manifest_sha256: str | None = None,
     harmonic_factors: tuple[float, ...] = (),
 ) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
     queue = pd.read_csv(queue_csv)
     if limit > 0:
         queue = queue.head(limit).copy()
+    if (cadence_reference is None) != (cadence_reference_manifest is None):
+        raise ValueError(
+            "cadence reference table and manifest must be supplied together"
+        )
+    if (producer_git_sha is None) != (launch_manifest_sha256 is None):
+        raise ValueError(
+            "producer Git SHA and launch-manifest SHA-256 must be supplied together"
+        )
+    if producer_git_sha is not None:
+        producer_git_sha = validate_producer_git_sha(producer_git_sha)
+        launch_manifest_sha256 = validate_sha256(
+            launch_manifest_sha256, label="launch manifest SHA-256"
+        )
+    quality_reference = None
+    if cadence_reference is not None:
+        sectors = sorted(
+            set(pd.to_numeric(queue["sector"], errors="raise").astype(int))
+        )
+        if len(sectors) != 1:
+            raise ValueError("external-quality rendering requires one exact sector")
+        quality_reference = _quality_reference_for_worker(
+            str(Path(cadence_reference).resolve()),
+            str(Path(cadence_reference_manifest).resolve()),
+            sectors[0],
+        )
     payloads = [
         (
             row,
@@ -221,6 +313,9 @@ def render_queue(
             "1" if overwrite else "0",
             "1" if use_row_ephemeris else "0",
             "1" if write_pdf else "0",
+            str(cadence_reference) if cadence_reference else "",
+            str(cadence_reference_manifest) if cadence_reference_manifest else "",
+            orbitid_policy,
             harmonic_factors,
         )
         for idx, row in enumerate(queue.to_dict("records"))
@@ -241,11 +336,15 @@ def render_queue(
     metrics = pd.DataFrame(rows)
     metrics_csv.parent.mkdir(parents=True, exist_ok=True)
     metrics.to_csv(metrics_csv, index=False)
+    if quality_reference is not None:
+        quality_reference.assert_unchanged()
     summary = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "queue_csv": str(queue_csv),
+        "queue_csv_sha256": _sha256(queue_csv),
         "hlsp_root": str(hlsp_root),
         "lc_export_h5": str(lc_export_h5) if lc_export_h5 else "",
+        "lc_export_h5_sha256": _sha256(lc_export_h5) if lc_export_h5 else "",
         "injection_h5": str(injection_h5) if injection_h5 else "",
         "out_dir": str(out_dir),
         "metrics_csv": str(metrics_csv),
@@ -260,7 +359,13 @@ def render_queue(
         "n_peaks": int(n_peaks),
         "use_row_ephemeris": bool(use_row_ephemeris),
         "write_pdf": bool(write_pdf),
+        "external_quality": (
+            quality_reference.provenance if quality_reference is not None else None
+        ),
+        "orbitid_policy": orbitid_policy if quality_reference is not None else None,
         "harmonic_factors": [float(value) for value in harmonic_factors],
+        "producer_git_sha": producer_git_sha,
+        "launch_manifest_sha256": launch_manifest_sha256,
     }
     summary_json.parent.mkdir(parents=True, exist_ok=True)
     summary_json.write_text(
@@ -294,6 +399,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     ap.add_argument("--metrics-csv", type=Path, default=None)
     ap.add_argument("--summary-json", type=Path, default=None)
+    ap.add_argument("--cadence-reference", type=Path)
+    ap.add_argument("--cadence-reference-manifest", type=Path)
+    ap.add_argument("--orbitid-policy", choices=ORBITID_POLICIES, default="strict")
+    ap.add_argument("--producer-git-sha")
+    ap.add_argument("--launch-manifest-sha256")
     ap.add_argument("--branch-name", default=TWIRL_FS_V2_ADP015Q_BRANCH)
     ap.add_argument(
         "--apertures",
@@ -362,6 +472,11 @@ def main(argv: list[str] | None = None) -> int:
         overwrite=bool(args.overwrite),
         use_row_ephemeris=bool(args.use_row_ephemeris),
         write_pdf=not bool(args.no_pdf),
+        cadence_reference=args.cadence_reference,
+        cadence_reference_manifest=args.cadence_reference_manifest,
+        orbitid_policy=args.orbitid_policy,
+        producer_git_sha=args.producer_git_sha,
+        launch_manifest_sha256=args.launch_manifest_sha256,
         harmonic_factors=tuple(args.harmonic_factors),
     )
     print(json.dumps(summary, indent=2, sort_keys=True, default=_json_default))

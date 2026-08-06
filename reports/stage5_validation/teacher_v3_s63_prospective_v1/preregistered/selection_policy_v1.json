@@ -1,0 +1,147 @@
+{
+  "schema_version": "twirl_teacher_v3_s63_selection_policy_v1",
+  "created_date": "2026-08-06",
+  "status": "frozen_before_s63_scores",
+  "sector": 63,
+  "score_data_opened_when_frozen": false,
+  "purpose": "Deterministic Teacher-v3 enrichment plus seeded stratified controls for identity-visible human morphology review with model and selection annotations withheld",
+  "unit": "one successful rank-one DET_FLUX_ADP_SML candidate per unique TIC, with rank-one DET_FLUX_ADP context",
+  "cohort_evaluation": {
+    "primary": "Teacher-v3-disjoint model-ready S63 TICs",
+    "repeated_host": "Model-ready S63 TICs present in the frozen Teacher-v3 morphology corpus",
+    "independence_rule": "Compute every percentile and selection score independently within each complete cohort before any bucket depletion"
+  },
+  "required_score_columns": [
+    "p_planet_like",
+    "p_eclipse_contact",
+    "p_smooth_variable",
+    "p_other",
+    "p_preserve",
+    "morphology_entropy",
+    "ensemble_disagreement",
+    "all p_harmonic_* probabilities"
+  ],
+  "score_formulas": {
+    "planet_preserve": {
+      "formula": "0.55*p_planet_like + 0.35*p_preserve + 0.10*I(period_d >= 1.0 and sde_max <= 40.0)",
+      "weights": {
+        "p_planet_like": 0.55,
+        "p_preserve": 0.35,
+        "long_period_low_sde_indicator": 0.1
+      }
+    },
+    "eclipse_contact": {
+      "formula": "p_eclipse_contact",
+      "weights": {
+        "p_eclipse_contact": 1.0
+      }
+    },
+    "smooth_variable": {
+      "formula": "p_smooth_variable",
+      "weights": {
+        "p_smooth_variable": 1.0
+      }
+    },
+    "broad_dip": {
+      "formula": "p_preserve * broad_duty_cycle_percentile * (1 - 0.5*p_eclipse_contact) * (1 - 0.5*p_smooth_variable)",
+      "duty_cycle": "duration_min / (period_d * 1440.0)"
+    },
+    "disagreement_harmonic": {
+      "formula": "0.45*morphology_entropy + 0.35*ensemble_disagreement + 0.20*max(non-P p_harmonic_* probabilities)",
+      "weights": {
+        "morphology_entropy": 0.45,
+        "ensemble_disagreement": 0.35,
+        "maximum_non_P_harmonic_probability": 0.2
+      }
+    }
+  },
+  "broad_duty_cycle_percentile": {
+    "population": "all validated unique-TIC candidates in the current cohort before any bucket depletion",
+    "cohorts_processed_separately": true,
+    "algorithm": "pandas Series.rank(method='average', pct=True) on duty_cycle",
+    "tie_rule": "equal duty cycles receive their average one-based rank divided by cohort size"
+  },
+  "deterministic_bucket_selection": {
+    "depletion_order": [
+      "planet_preserve",
+      "eclipse_contact",
+      "smooth_variable",
+      "broad_dip",
+      "disagreement_harmonic"
+    ],
+    "ordering_within_each_remaining_pool": [
+      "bucket selection score descending",
+      "sde_max descending",
+      "tic ascending"
+    ],
+    "probability_threshold": null,
+    "inclusion_probability": null,
+    "selection_weight": null,
+    "descriptive_cut_fraction": "bucket quota divided by the remaining unique-TIC pool size immediately before that deterministic bucket; descriptive only, never a sampling probability or prevalence weight"
+  },
+  "control_selection": {
+    "selection_seed": 630056,
+    "population": "unique TICs remaining in the cohort after all five deterministic buckets",
+    "stratification_variable": "sde_max from rank-one DET_FLUX_ADP_SML",
+    "pre_qcut_order": "tic ascending",
+    "tie_rule": "rank(method='first') so equal SDE values are ordered by ascending TIC",
+    "qcut_algorithm": "pandas qcut of the first-ranked SDE values into exactly four integer quartiles labeled 1,2,3,4; duplicate edges or fewer than four strata fail closed",
+    "draw_allocation": "floor(control_quota/4) per quartile, with one additional draw assigned in quartile order 1,2,... for the control_quota modulo 4 remainder",
+    "within_stratum_order": "ascending lowercase SHA-256 hex digest of the ASCII string '{seed}|{cohort}|control|q{stratum}|{tic}'",
+    "sampling_without_replacement": true,
+    "inclusion_probability": "realized stratum draw count divided by stratum population",
+    "selection_weight": "stratum population divided by realized stratum draw count"
+  },
+  "combined_queue_order": {
+    "algorithm": "ascending lowercase SHA-256 hex digest of the ASCII string '{seed}|combined-review-order|{tic}'",
+    "explicitly_annotates_cohort_or_bucket": false,
+    "scope": "The seeded order itself does not encode an explicit cohort or bucket annotation; visible TIC identity remains externally joinable"
+  },
+  "quotas": {
+    "primary": {
+      "planet_preserve": 300,
+      "eclipse_contact": 200,
+      "smooth_variable": 150,
+      "broad_dip": 100,
+      "disagreement_harmonic": 150,
+      "stratified_control": 100,
+      "total": 1000
+    },
+    "repeated_host": {
+      "planet_preserve": 30,
+      "eclipse_contact": 20,
+      "smooth_variable": 15,
+      "broad_dip": 10,
+      "disagreement_harmonic": 15,
+      "stratified_control": 10,
+      "total": 100
+    }
+  },
+  "shortage_policy": "Fail closed before publication if any exact deterministic bucket or control-stratum draw cannot be filled; never backfill across buckets, strata, or cohorts",
+  "erratum_to_prospective_plan": {
+    "affected_field": "blinded_queue.reviewer_visible_fields_exclude entry 'cohort membership'",
+    "interpretation": "The original wording means explicit cohort annotation is withheld; TIC and candidate identity remain visible and technically joinable to the frozen Teacher-v3 corpus",
+    "prospective_plan_bytes_unchanged": true,
+    "s63_teacher_scores_opened_before_erratum": false
+  },
+  "blinding": {
+    "reviewer_visible_excludes": [
+      "teacher probabilities and logits",
+      "ensemble disagreement and entropy",
+      "all selection scores and ranks",
+      "selection bucket",
+      "control stratum",
+      "explicit cohort annotation",
+      "all hidden artifact hashes"
+    ],
+    "reviewer_visible_identity": [
+      "tic",
+      "candidate_key",
+      "vet-sheet identity"
+    ],
+    "cohort_annotation_withheld": true,
+    "cohort_joinable_from_visible_tic": true,
+    "cohort_analysis_deferred_until_review_complete": true,
+    "review_completion": "All 1100 frozen rows require an accepted human morphology decision before one-time unblinding and cohort-wise analysis"
+  }
+}

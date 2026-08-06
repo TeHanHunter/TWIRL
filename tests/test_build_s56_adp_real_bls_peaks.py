@@ -39,7 +39,12 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _write_compact(path: Path, *, n_cadences: int = 220) -> tuple[int, np.ndarray]:
+def _write_compact(
+    path: Path,
+    *,
+    n_cadences: int = 220,
+    sector: int = 56,
+) -> tuple[int, np.ndarray]:
     tic = 123456789
     cadences = np.arange(1000, 1000 + n_cadences, dtype=np.int32)
     orbitid = np.where(np.arange(n_cadences) < n_cadences // 2, 119, 120)
@@ -53,7 +58,7 @@ def _write_compact(path: Path, *, n_cadences: int = 220) -> tuple[int, np.ndarra
             {
                 "tic": tic,
                 "tessmag": 17.5,
-                "sector": 56,
+                "sector": sector,
                 "camera": 1,
                 "ccd": 1,
             }
@@ -279,6 +284,94 @@ def test_external_bad_cadences_are_combined_before_bls(
     assert {row["external_quality_policy_contract"] for row in rows} == {
         module.EXTERNAL_QUALITY_POLICY_CONTRACT
     }
+
+
+def test_s63_bls_rows_persist_rank_one_checkpoint_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from twirl.search.candidates import BLSPeak
+
+    module = _load_module()
+    compact_path = tmp_path / "compact_s63.h5"
+    tic, _ = _write_compact(compact_path, sector=63)
+    module._EXTERNAL_QUALITY_PROVENANCE = {
+        "table_sha256": "a" * 64,
+        "manifest_sha256": "b" * 64,
+        "authority_exclusion_policy_contract": "test",
+        "authority_exclusion_external_bit": 31,
+        "authority_exclusions_sha256": "c" * 64,
+        "n_authority_exclusions": 0,
+    }
+    monkeypatch.setattr(
+        module,
+        "_apply_external_quality",
+        lambda lc: {
+            "n_cad_internal_bad": 0,
+            "n_cad_external_bad": 0,
+            "n_cad_external_only_bad": 0,
+            "n_cad_effective_bad": 0,
+            "n_cad_authority_excluded": 0,
+            "n_cad_orbitid_reference_matched": len(lc.time),
+            "n_cad_orbitid_mismatch": 0,
+            "n_cad_orbitid_corrected": 0,
+            "orbitid_correction_signature_sha256": "d" * 64,
+        },
+    )
+
+    def fake_run(lc, cfg, *, aperture):
+        del cfg
+        return SimpleNamespace(
+            tic=lc.tic,
+            sector=lc.sector,
+            cam=lc.cam,
+            ccd=lc.ccd,
+            tmag=lc.tmag,
+            aperture=aperture,
+            n_cad_total=len(lc.time),
+            n_cad_quality=len(lc.time),
+            n_cad_kept=len(lc.time),
+            n_cad_edge_trimmed=0,
+            n_cad_sigma_clipped=0,
+            dropout_frac=0.0,
+            quality_dropout_frac=0.0,
+            n_orbits=2,
+            baseline_d=3.0,
+            status="ok",
+            peaks=[BLSPeak(1, 1.2, 2_457_001.0, 10.0, 0.1, 9.0, 8.0, 3.0)],
+        )
+
+    expected = {
+        column: float(index + 1)
+        for index, column in enumerate(module.S63_TARGET_METADATA_COLUMNS)
+    }
+    captured: dict[str, object] = {}
+
+    def fake_measure(lc, *, anchor_peak, own_peaks, apertures):
+        captured.update(
+            {
+                "tic": lc.tic,
+                "anchor_peak": anchor_peak,
+                "own_peaks": own_peaks,
+                "apertures": apertures,
+            }
+        )
+        return expected
+
+    monkeypatch.setattr(module, "run_bls_on_lc", fake_run)
+    monkeypatch.setattr(
+        module, "measure_two_aperture_candidate_metadata", fake_measure
+    )
+    rows = module._process_target((tic, str(compact_path), _cfg_payload()))
+
+    assert captured["tic"] == tic
+    assert captured["apertures"] == module.ADP_ONLY_APERTURES
+    assert set(captured["own_peaks"]) == set(module.ADP_ONLY_APERTURES)
+    assert len(rows) == 2
+    for row in rows:
+        assert row["target_metadata_contract_version"] == (
+            module.S63_TARGET_METADATA_CONTRACT_VERSION
+        )
+        assert {column: row[column] for column in expected} == expected
 
 
 def test_raw_v4_rebuilds_adp_and_proves_exact_cadence_inventory(

@@ -13,6 +13,18 @@ human review confirms that morphology decision only; it does not confirm that
 the source is an exoplanet. Teacher probabilities are queue-selection metadata
 and never become labels.
 
+## Blinding boundary and plan erratum
+
+The committed prospective plan's statement that reviewer-visible fields
+exclude “cohort membership” means that the queue withholds an explicit cohort
+annotation. It does not mean cohort identity is cryptographically hidden. TIC,
+candidate identity, and vet-sheet identity remain visible for scientific
+vetting, so a reviewer could technically join them to the frozen Teacher v3
+corpus and infer repeated-host status. The prospective-plan bytes remain
+unchanged; the pre-score selection policy records this interpretation as an
+explicit erratum. Cohort-wise unblinding and analysis remain deferred until all
+`1,100` frozen rows have accepted morphology decisions.
+
 ## Frozen design
 
 - Use the existing five-fold Teacher v3 `shape_plus_periodogram_bls` ensemble,
@@ -33,8 +45,13 @@ and never become labels.
   rank-one ADP-small ephemeris for one candidate row per TIC. The primary ADP
   aperture is retained as contamination/context evidence.
 - Build a deterministic `1,000`-TIC primary queue and a `100`-TIC repeated-host
-  side queue. The hidden bucket quotas are fixed in the JSON plan. Reviewers see
-  neither probabilities nor bucket names.
+  side queue. The exact formulas, depletion order, tie-breaks, within-cohort
+  percentile population, seeded control draw, and hidden quotas are frozen in
+  [the selection policy](preregistered/selection_policy_v1.json). Deterministic
+  enriched rows have no sampling inclusion probability; only the seeded control
+  rows retain stratum inclusion fractions and weights. Reviewers see neither
+  probabilities, bucket names, nor an explicit cohort annotation. Visible TIC
+  and candidate identity nevertheless make cohort status technically joinable.
 - Complete the frozen review once, archive the human decisions, and unblind the
   selection provenance once. Do not tune Teacher v3, thresholds, quotas, or the
   label policy from the result.
@@ -65,8 +82,20 @@ may not.
 2. Finish and validate the cadence, compact, BLS, candidate, and native-input
    artifacts using synthetic and prior-sector smokes first.
 3. Publish `preregistered/launch_manifest.json` with the exact Git object and
-   every S63 input/output hash listed as pending in the JSON plan.
-4. Score once, construct the hidden queue atomically, and render the two-
-   aperture review sheets.
-5. Human-review all frozen rows, then unblind once and publish the prospective
-   result. Any follow-up model or input-contract sensitivity is a new version.
+   every S63 input/output hash listed as pending in the JSON plan, including
+   the byte-exact selection-policy hash.
+4. Score once, then publish the reviewer-safe queue and hidden selection
+   provenance into distinct fresh, non-nested directories. Both directories
+   are unpublished science and remain private (`0700` directories, `0600`
+   files) until an explicit release decision. Both are fully staged before
+   commit, and consumers require the matching bundle ID in the final public and
+   private `bundle_complete.json` markers; an interrupted split publication is
+   invalid. The public marker binds public files only, while the private marker
+   retains the full cross-directory hash audit.
+   The queue also re-proves the frozen Teacher-v3 release identity and all five
+   checkpoint hashes, and it compares every candidate-derived field to the
+   score table before selection. Render review sheets only from the verified
+   reviewer-safe bundle.
+5. Human-review all frozen rows without cohort-wise analysis, then unblind once
+   and publish the prospective result. Any follow-up model or input-contract
+   sensitivity is a new version.

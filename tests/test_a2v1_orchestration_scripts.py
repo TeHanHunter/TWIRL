@@ -113,6 +113,30 @@ def test_checkout_guard_uses_legacy_git_compatible_directory_change() -> None:
     assert 'cd "${REPO}"' in guard
     assert "git -C" not in guard
     assert "--porcelain=v1" not in guard
+    assert '! -d "${REPO}/.git" && ! -f "${REPO}/.git"' in guard
+
+
+def test_checkout_guard_accepts_a_clean_linked_worktree(tmp_path: Path) -> None:
+    source = _write_clean_repo(tmp_path)
+    worktree = tmp_path / "linked-worktree"
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(worktree), "HEAD"],
+        cwd=source,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        ["bash", str(CHECKOUT_GUARD), str(worktree)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (worktree / ".git").is_file()
+    assert f"[git-clean] repo={worktree}" in result.stdout
 
 
 def test_a2v1_queue_accepts_only_complete_or_absent_legacy_epsfs() -> None:

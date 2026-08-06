@@ -45,6 +45,9 @@ from twirl.vetting.adp_only import (  # noqa: E402
     validate_adp_only_apertures,
 )
 from twirl.vetting.recovery50_teacher import json_default, write_table  # noqa: E402
+from twirl.vetting.two_aperture import (  # noqa: E402
+    measure_two_aperture_candidate_metadata,
+)
 from twirl.vetting.ssl_full_pool_native import (  # noqa: E402
     FULL_POOL_NATIVE_DETREND_CONFIG_SHA256,
     FULL_POOL_NATIVE_DETREND_CONTRACT_VERSION,
@@ -88,6 +91,21 @@ ORBITID_RECONCILIATION_CONTRACT_VERSION = "a2v1_compact_orbitid_reconciliation_v
 TARGET_SELECTION_CONTRACT_VERSION = "a2v1_bls_target_allowlist_v1"
 RAW_V4_INPUT_CONTRACT_VERSION = (
     "twirl_teacher_ssl_fullpool_raw_v1_detector_consistent_bls_v4"
+)
+S63_TARGET_METADATA_CONTRACT_VERSION = (
+    "twirl_teacher_v3_s63_rank1_candidate_metadata_v1"
+)
+S63_TARGET_METADATA_COLUMNS = (
+    "adp_sml_own_even_depth",
+    "adp_sml_own_odd_depth",
+    "adp_sml_own_even_odd_depth_delta",
+    "adp_sml_own_even_odd_sigma_delta",
+    "adp_sml_trend_ptp",
+    "adp_own_even_depth",
+    "adp_own_odd_depth",
+    "adp_own_even_odd_depth_delta",
+    "adp_own_even_odd_sigma_delta",
+    "adp_trend_ptp",
 )
 
 # Populated once per worker by ``_initialize_external_quality_worker``.  The
@@ -1099,9 +1117,21 @@ def _process_target(payload: tuple[Any, ...]) -> list[dict[str, Any]]:
     if _EXTERNAL_QUALITY_PROVENANCE is None:
         raise RuntimeError("external-quality provenance was not initialized")
     rows: list[dict[str, Any]] = []
+    rank_one_peaks: dict[str, dict[str, Any]] = {}
     for aperture in ADP_ONLY_APERTURES:
         result = run_bls_on_lc(lc, cfg, aperture=aperture)
         current = _result_rows(result)
+        rank_one = next(
+            (
+                row
+                for row in current
+                if int(row.get("peak_rank", 0)) == 1
+                and str(row.get("status", "")) == "ok"
+            ),
+            None,
+        )
+        if rank_one is not None:
+            rank_one_peaks[aperture] = dict(rank_one)
         for row in current:
             row["source_product_tag"] = str(cfg_payload.get("source_product_tag", ""))
             row.update(config_provenance)
@@ -1145,6 +1175,29 @@ def _process_target(payload: tuple[Any, ...]) -> list[dict[str, Any]]:
                 else ""
             )
         rows.extend(current)
+    if int(lc.sector) == 63:
+        target_metadata = {
+            column: float("nan") for column in S63_TARGET_METADATA_COLUMNS
+        }
+        anchor = rank_one_peaks.get(ADP_ONLY_APERTURES[0])
+        if anchor is not None:
+            measured = measure_two_aperture_candidate_metadata(
+                lc,
+                anchor_peak=anchor,
+                own_peaks=rank_one_peaks,
+                apertures=ADP_ONLY_APERTURES,
+            )
+            target_metadata.update(
+                {
+                    column: measured.get(column, float("nan"))
+                    for column in S63_TARGET_METADATA_COLUMNS
+                }
+            )
+        for row in rows:
+            row.update(target_metadata)
+            row["target_metadata_contract_version"] = (
+                S63_TARGET_METADATA_CONTRACT_VERSION
+            )
     return rows
 
 
@@ -1518,6 +1571,38 @@ def build_peak_table(
     observed_tics = set(
         pd.to_numeric(peaks["tic"], errors="raise").astype(np.int64).tolist()
     )
+    target_metadata_summary: dict[str, Any] = {}
+    if int(sector) == 63:
+        missing_metadata = sorted(set(S63_TARGET_METADATA_COLUMNS) - set(peaks))
+        if missing_metadata:
+            raise ValueError(f"S63 BLS rows lack target metadata: {missing_metadata}")
+        if set(peaks["target_metadata_contract_version"].astype(str)) != {
+            S63_TARGET_METADATA_CONTRACT_VERSION
+        }:
+            raise ValueError("S63 BLS target metadata contract mismatch")
+        target_metadata = peaks.drop_duplicates("tic", keep="first")
+        finite_counts = {
+            column: int(
+                np.isfinite(
+                    pd.to_numeric(target_metadata[column], errors="coerce").to_numpy(
+                        dtype=float
+                    )
+                ).sum()
+            )
+            for column in S63_TARGET_METADATA_COLUMNS
+        }
+        if any(count == 0 for count in finite_counts.values()):
+            raise ValueError(
+                "S63 BLS target metadata contains a wholly nonfinite feature: "
+                f"{finite_counts}"
+            )
+        target_metadata_summary = {
+            "target_metadata_contract_version": (
+                S63_TARGET_METADATA_CONTRACT_VERSION
+            ),
+            "target_metadata_columns": list(S63_TARGET_METADATA_COLUMNS),
+            "target_metadata_finite_counts": finite_counts,
+        }
     expected_tics = set(tics)
     if observed_tics != expected_tics:
         raise ValueError(
@@ -1675,6 +1760,7 @@ def build_peak_table(
             .items()
         },
         "quality_counts_over_unique_targets": (quality_counts_over_unique_targets),
+        **target_metadata_summary,
         **raw_cadence_audit,
         "outputs": {
             "peak_table": str(output_path),
