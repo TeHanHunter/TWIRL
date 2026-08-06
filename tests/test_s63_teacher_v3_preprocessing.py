@@ -112,6 +112,36 @@ def test_s63_stage1_preflight_is_strict(tmp_path: Path) -> None:
     audit = module.validate_accepted_stage1(path)
     assert audit["passed"] is True
     assert audit["orbits"] == [133, 134]
+    assert audit["expected_contract_evidence"] == "embedded_expected_contract"
+
+    legacy = _accepted_stage1()
+    legacy.pop("expected_contract")
+    legacy["expected_h5_by_orbit"] = {"133": 16, "134": 16}
+    legacy["expected_h5_by_ccd"] = {
+        f"o{orbit}_cam{camera}_ccd{ccd}": 1
+        for orbit in (133, 134)
+        for camera in range(1, 5)
+        for ccd in range(1, 5)
+    }
+    legacy["n_expected_h5"] = 32
+    _write_json(path, legacy)
+    legacy_audit = module.validate_accepted_stage1(path)
+    assert legacy_audit["passed"] is True
+    assert legacy_audit["expected_contract_evidence"] == (
+        "legacy_exact_orbit_detector_counts"
+    )
+
+    missing_legacy_evidence = _accepted_stage1()
+    missing_legacy_evidence.pop("expected_contract")
+    _write_json(path, missing_legacy_evidence)
+    with pytest.raises(ValueError, match="expected_h5_by_orbit"):
+        module.validate_accepted_stage1(path)
+
+    corrupt_legacy_counts = dict(legacy)
+    corrupt_legacy_counts["expected_h5_by_orbit"] = {"133": 16, "134": 17}
+    _write_json(path, corrupt_legacy_counts)
+    with pytest.raises(ValueError, match="does not sum"):
+        module.validate_accepted_stage1(path)
 
     failed = _accepted_stage1()
     failed["h5"]["n_unreadable_h5"] = 1

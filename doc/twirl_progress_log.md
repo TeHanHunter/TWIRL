@@ -569,6 +569,15 @@ sample.
   public-column allowlist, and require paired completion markers without
   exposing hidden hashes. Repository validation passed with `837` tests and
   `29` skips; the detection sample and documentation checks also passed.
+- `2026-08-06`: The first exact-commit PDO preflight stopped before writing
+  because the immutable accepted S63 validation (`619d70aa...a1`) predates the
+  validator's embedded `expected_contract` field. The receipt still contains
+  independent exact expectation evidence: positive counts for orbits `133`
+  and `134`, all `32` orbit/camera/CCD cells, and totals equal to
+  `n_expected_h5=107,104`. The compatibility gate now accepts the older schema
+  only when that complete key set and both sums agree; missing, nonpositive, or
+  inconsistent legacy counts fail. The original accepted receipt remains
+  unchanged, and its real PDO JSON passes the corrected read-only preflight.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 

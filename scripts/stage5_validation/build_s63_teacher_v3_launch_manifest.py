@@ -208,15 +208,70 @@ def validate_accepted_stage1(
             if column not in required:
                 failures.append(f"schema lacks {column}")
     expected_contract = summary.get("expected_contract")
-    if not isinstance(expected_contract, Mapping):
-        failures.append("expected_contract is missing")
-    else:
+    expected_contract_evidence = "embedded_expected_contract"
+    if isinstance(expected_contract, Mapping):
         if expected_contract.get("ok") is not True:
             failures.append("expected_contract.ok is not true")
         if sorted(expected_contract.get("requested_orbits", [])) != list(ORBITS):
             failures.append("expected_contract requested orbits are not 133/134")
         if expected_contract.get("missing_requested_orbits") != []:
             failures.append("expected_contract has missing requested orbits")
+    elif expected_contract is None:
+        # Accepted S63 was produced by the immediately preceding validator
+        # schema.  It predates ``expected_contract`` but independently records
+        # exact positive expectation counts for both requested orbits and all
+        # 32 orbit/camera/CCD cells.  Require that complete redundant evidence
+        # rather than weakening the gate or rewriting the immutable receipt.
+        expected_contract_evidence = "legacy_exact_orbit_detector_counts"
+        by_orbit = summary.get("expected_h5_by_orbit")
+        by_detector = summary.get("expected_h5_by_ccd")
+        expected_orbit_keys = {str(orbit) for orbit in ORBITS}
+        expected_detector_keys = {
+            f"o{orbit}_cam{camera}_ccd{ccd}"
+            for orbit in ORBITS
+            for camera in range(1, 5)
+            for ccd in range(1, 5)
+        }
+
+        def positive_counts(
+            value: Any, expected_keys: set[str], *, label: str
+        ) -> dict[str, int] | None:
+            if not isinstance(value, Mapping) or set(value) != expected_keys:
+                failures.append(f"{label} does not exactly cover S63 orbits 133/134")
+                return None
+            parsed: dict[str, int] = {}
+            for key in sorted(expected_keys):
+                raw = value[key]
+                if isinstance(raw, bool):
+                    failures.append(f"{label}.{key} is not a positive integer")
+                    return None
+                try:
+                    count = int(raw)
+                except (TypeError, ValueError):
+                    failures.append(f"{label}.{key} is not a positive integer")
+                    return None
+                if count <= 0 or str(count) != str(raw).strip():
+                    failures.append(f"{label}.{key} is not a positive integer")
+                    return None
+                parsed[key] = count
+            return parsed
+
+        orbit_counts = positive_counts(
+            by_orbit, expected_orbit_keys, label="expected_h5_by_orbit"
+        )
+        detector_counts = positive_counts(
+            by_detector, expected_detector_keys, label="expected_h5_by_ccd"
+        )
+        try:
+            declared_total = int(summary.get("n_expected_h5", -1))
+        except (TypeError, ValueError):
+            declared_total = -1
+        if orbit_counts is not None and sum(orbit_counts.values()) != declared_total:
+            failures.append("expected_h5_by_orbit does not sum to n_expected_h5")
+        if detector_counts is not None and sum(detector_counts.values()) != declared_total:
+            failures.append("expected_h5_by_ccd does not sum to n_expected_h5")
+    else:
+        failures.append("expected_contract is neither an object nor absent")
     h5 = summary.get("h5")
     if not isinstance(h5, Mapping):
         failures.append("HDF5 audit is missing")
@@ -257,6 +312,7 @@ def validate_accepted_stage1(
         "n_missing_fits_edge_warn_tics": int(
             fits.get("n_missing_fits_edge_warn_tics", 0)
         ),
+        "expected_contract_evidence": expected_contract_evidence,
         "passed": True,
     }
     if receipt_attestation is not None:
