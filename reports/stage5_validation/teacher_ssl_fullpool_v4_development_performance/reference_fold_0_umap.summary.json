@@ -1,0 +1,22 @@
+{
+  "coordinates": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/teacher_ssl_fullpool_v4_development_performance/reference_fold_0_umap_coordinates.csv",
+  "coordinates_sha256": "5cdfa7ee2fec40e00994ec1112850cd02e62e1ed283049f68c767f26c4c54b34",
+  "embedding_path": "/private/tmp/twirl_ssl_v4_eval_sync/reference_fold_0_embeddings_safe.npz",
+  "embedding_sha256": "0c19fe3b117b21848fe1360b3326eaece0004966367944cad7f943d1556620f2",
+  "input_embedding_dim": 128,
+  "n_rows": 5560,
+  "pca_components": 50,
+  "pca_explained_variance_fraction": 0.9960411787033081,
+  "schema_version": "twirl_teacher_ssl_fullpool_evaluation_figures_v1",
+  "scope": "exploratory_fold_0_reference_encoder; labels_overlay_only; not_a_performance_estimate",
+  "umap": {
+    "metric": "euclidean_after_unit_norm_and_pca50",
+    "min_dist": 0.15,
+    "n_neighbors": 30,
+    "random_state": 560064
+  },
+  "versions": {
+    "scikit-learn": "1.5.2",
+    "umap-learn": "0.5.7"
+  }
+}

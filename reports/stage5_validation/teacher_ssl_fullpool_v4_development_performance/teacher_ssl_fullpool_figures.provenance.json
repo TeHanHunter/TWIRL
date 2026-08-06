@@ -1,0 +1,41 @@
+{
+  "development_performance": {
+        "pdf": "teacher_ssl_fullpool_development_performance.pdf",
+    "pdf_sha256": "fd3a880ca1850c193b9c2b606b9bf4e82a138d14cd6ea19bb74d443a93df007b",
+        "per_class_input": "development_per_class_metrics.csv",
+    "per_class_input_sha256": "0f0d3d64ca0ade15bb7a9ef31a2bede8732d5a412442a8562d74f1577571d6f9",
+        "performance_input": "development_performance.csv",
+    "performance_input_sha256": "01a77896ada57aef35cc531a190211a738ea2f2c006f4fa6d727be469d53ac33",
+        "png": "teacher_ssl_fullpool_development_performance.png",
+    "png_sha256": "30ef2a2688ffaab55cfdbf456609acab33690e0bb7eddb08da2c1d8321833983"
+  },
+  "schema_version": "twirl_teacher_ssl_fullpool_evaluation_figures_v1",
+  "umap": {
+        "coordinates": "reference_fold_0_umap_coordinates.csv",
+    "coordinates_sha256": "5cdfa7ee2fec40e00994ec1112850cd02e62e1ed283049f68c767f26c4c54b34",
+    "embedding_path": "/private/tmp/twirl_ssl_v4_eval_sync/reference_fold_0_embeddings_safe.npz",
+    "embedding_sha256": "0c19fe3b117b21848fe1360b3326eaece0004966367944cad7f943d1556620f2",
+    "figure": {
+            "pdf": "teacher_ssl_fullpool_reference_umap.pdf",
+      "pdf_sha256": "7f09b3e62a5eae4ccd57ef16c37e20c4394b66905cfca6d9e8dab64f3da36728",
+            "png": "teacher_ssl_fullpool_reference_umap.png",
+      "png_sha256": "7adb8c3b73e8f72108b1a0ca5eaa2753f2af2c37874a3fa57ee1e85baece8755"
+    },
+    "input_embedding_dim": 128,
+    "n_rows": 5560,
+    "pca_components": 50,
+    "pca_explained_variance_fraction": 0.9960411787033081,
+    "schema_version": "twirl_teacher_ssl_fullpool_evaluation_figures_v1",
+    "scope": "exploratory_fold_0_reference_encoder; labels_overlay_only; not_a_performance_estimate",
+    "umap": {
+      "metric": "euclidean_after_unit_norm_and_pca50",
+      "min_dist": 0.15,
+      "n_neighbors": 30,
+      "random_state": 560064
+    },
+    "versions": {
+      "scikit-learn": "1.5.2",
+      "umap-learn": "0.5.7"
+    }
+  }
+}

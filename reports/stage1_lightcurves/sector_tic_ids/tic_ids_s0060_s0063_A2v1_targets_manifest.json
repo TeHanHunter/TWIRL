@@ -1,0 +1,87 @@
+{
+  "schema_version": "twirl_sector_tic_export_v1",
+  "created_utc": "2026-08-06T14:37:15.218566Z",
+  "selection": "All unique positive TIC IDs in the supplied TWIRL observation table for each sector; no post-production Pwd cut is applied.",
+  "input_observation_table": "data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits",
+  "input_observation_table_sha256": "2f42698420a5e2d945a3fd60d3ddc057c06f3fd19c2b9882829ea0c26e5280d9",
+  "sectors": [
+    {
+      "sector": 60,
+      "n_unique_tics": 27165,
+      "n_highconf_pwd_gt_0p75": 19652,
+      "n_lower_pwd_candidates": 7513,
+      "orbits": [
+        127,
+        128
+      ],
+      "n_tics_by_orbit": {
+        "127": 27165,
+        "128": 27165
+      },
+      "tic_csv": "tic_ids_s0060_A2v1_targets.csv",
+      "context_csv": "tic_ids_s0060_A2v1_target_context.csv",
+      "tic_csv_sha256": "a89137c5cc94da67e8a85bfc025dd26b56fe2be81e8103b5a1dbc4a39e921487",
+      "context_csv_sha256": "0ef826f6af5eb1a3054c58c6e1c15aeb7335b643d0868c141345750524891dc2"
+    },
+    {
+      "sector": 61,
+      "n_unique_tics": 41403,
+      "n_highconf_pwd_gt_0p75": 23501,
+      "n_lower_pwd_candidates": 17902,
+      "orbits": [
+        129,
+        130
+      ],
+      "n_tics_by_orbit": {
+        "129": 41403,
+        "130": 41403
+      },
+      "tic_csv": "tic_ids_s0061_A2v1_targets.csv",
+      "context_csv": "tic_ids_s0061_A2v1_target_context.csv",
+      "tic_csv_sha256": "b2cc58a67568c40bed499f32628d63193e205fc566cd289d02e28563823f0735",
+      "context_csv_sha256": "d03fb36568d0d56e3c18d0a16c2dc3bfa4280c0936ef35bb50c34f4dc9def87e"
+    },
+    {
+      "sector": 62,
+      "n_unique_tics": 40158,
+      "n_highconf_pwd_gt_0p75": 22070,
+      "n_lower_pwd_candidates": 18088,
+      "orbits": [
+        131,
+        132
+      ],
+      "n_tics_by_orbit": {
+        "131": 40158,
+        "132": 40158
+      },
+      "tic_csv": "tic_ids_s0062_A2v1_targets.csv",
+      "context_csv": "tic_ids_s0062_A2v1_target_context.csv",
+      "tic_csv_sha256": "23329a568d8e2bb2c58ca64ced6b8973a7ef15f9246a3f6c758adfcd723c2c75",
+      "context_csv_sha256": "0e5f21a2d751700a4e9ed55c3e8be749109eb9e9fd53be833832dcc268e06979"
+    },
+    {
+      "sector": 63,
+      "n_unique_tics": 53512,
+      "n_highconf_pwd_gt_0p75": 22685,
+      "n_lower_pwd_candidates": 30827,
+      "orbits": [
+        133,
+        134
+      ],
+      "n_tics_by_orbit": {
+        "133": 53512,
+        "134": 53512
+      },
+      "tic_csv": "tic_ids_s0063_A2v1_targets.csv",
+      "context_csv": "tic_ids_s0063_A2v1_target_context.csv",
+      "tic_csv_sha256": "ff4efeb5fb7863b13eca6d042723314c1991b30feda82d358b3f7fffd9582844",
+      "context_csv_sha256": "64bda37a234d62daf4aead2f6e4add891391e01c9ab82bf86279989a980d8949"
+    }
+  ],
+  "combined_tic_csv": "tic_ids_s0060_s0063_A2v1_targets.csv",
+  "combined_tic_csv_sha256": "ed5041ff9517701c1d915610bda41b4a58ad48f08a4e359bddb8915418971ab2",
+  "combined_context_csv": "tic_ids_s0060_s0063_A2v1_target_context.csv",
+  "combined_context_csv_sha256": "f51d31bccbc7cefc94dd56ba63d638bed099bc57261fb0664777a4eba029f744",
+  "n_combined_sector_tic_rows": 162238,
+  "n_unique_tics_across_sectors": 121155
+}

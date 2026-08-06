@@ -6,7 +6,7 @@ unresolved questions belong in [ideas](ideas.md), and operational commands
 belong in the relevant runbook. Report-level plans and status files are dated
 evidence, not project authority.
 
-Last reconciled: `2026-07-29`.
+Last reconciled: `2026-08-06`.
 
 ## Current status
 
@@ -15,10 +15,10 @@ Last reconciled: `2026-07-29`.
 - `A2v1` is the active Stage 1 product family: no TIC-magnitude science cap,
   saturated-pixel ePSF masking, and sector-level ADP/ADP015 FITS products for
   the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS), S57
-  (`27,213` FITS), and S58-S63 pass their edge-aware HDF5/FITS product gates.
-  The next source-only production batch is S64-S69; it will refit all ePSFs
-  because no legacy ePSFs are available. See
-  [Stage 1 history](twirl_progress_log.md#stage-1).
+  (`27,213` FITS), and S58-S64 pass their edge-aware HDF5/FITS product gates.
+  S65 stopped after one orbit-138 detector hit a CuPy out-of-memory error;
+  resume that one CCD with safer GPU concurrency before continuing S66-S69.
+  See [Stage 1 history](twirl_progress_log.md#stage-1).
 - S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
   recovery in both active ADP apertures. Tier 0 verifies product integrity and
   benchmark behavior; it is not the Tier-1 science QA needed for survey
@@ -34,60 +34,28 @@ Last reconciled: `2026-07-29`.
   `31,449/31,450` retain at least one searchable aperture, and no target is
   excluded from flagged fraction alone. It remains `science_ready=false`.
   The `s56_harmonic_cnn_v1` architecture remains the active-learning model
-  family. `teacher_v3` is the operational name for its frozen S56--S62
-  dataset/training release, not a new architecture and not a promotion of
-  exploratory teacher v2. The seven-sector morphology corpus and TIC-grouped
-  split are frozen. The native-independent, five-fold metadata baseline
-  completed on ORCD with the fixed test still sealed; it is a control, not
-  `teacher_v3` itself. The full release completed its fail-closed one-H200
-  training/evaluation contract with pooled development-OOF calibration,
-  genuinely retrained uncertain-label sensitivity, TIC-clustered intervals,
-  and checkpoint verification around the single fixed-test opening. On the
-  shared `528`-row real non-uncertain test support, the primary raises
-  balanced accuracy from `0.720` to `0.779` and macro F1 from `0.744` to
-  `0.809` over metadata only; Planet-like recall remains descriptive at
-  `8/14`. Teacher v3 is frozen for enrichment only: automatic promotion is
-  disabled and student training is blocked. The development-only
-  `teacher_ssl_v1` experiment (model-facing name **Teacher v4-SSL**) remains a
-  possible companion enrichment model. Its completed `6,168`-observation
-  native run established the fold-local VICReg infrastructure but is too
-  selected and too small to answer the broad-representation question. The
-  active experiment is therefore a checksum-frozen, leakage-safe S56--S62
-  full-pool run. Whole-TIC fixed-test and prospective-S63 exclusions reduce
-  the original `212,049` compact observations to an exact survey/search pool
-  of `175,366` observations (`125,630` TICs). The locked two-aperture BLS and
-  all `112` raw-source shards are complete and validated. A separate
-  BLS-derived native/model partition retains `175,347` observations and marks
-  `19` unsearchable observations as model-input exclusions while preserving
-  all `175,366` rows in the final audit. The uniform native-v2 rebuild and
-  registry are complete at `112/112` shards with exact `175,347`-observation
-  coverage. The first five-fold launch failed before epoch 1 because one
-  quality-flagged sentinel remained model-active, not because of H200 health.
-  A full corrected numerical rerun then failed closed at `175,338/175,347`
-  passing observations: all nine failures are in S60 and trace to legacy
-  compact ADP flux fitted before the final external-quality overlay. The
-  quality-aware model mask therefore is not a sufficient correction. The
-  effective-quality-aware ADP contract is explicitly approved. The first
-  fresh-v3 diagnostic canaries exposed a second fail-closed defect: the ADP
-  spline was conditioned on absolute BJD rather than compact-source BTJD.
-  S56 completed without warnings, but S60 emitted `3,324` exact NumPy
-  `RankWarning`s, so neither diagnostic HDF5 is model eligible and no
-  downstream v3 stage ran. The corrected fresh-v3r1 implementation detrends
-  on bounded compact BTJD, publishes absolute BJD separately, captures only
-  the exact authorized warning signature, and requires a zero-warning ledger
-  before publication. It will rebuild all `112` native shards uniformly from
-  immutable raw-v1 photometry with the final effective quality applied during
-  both ADP03q fits, then repeat the exact numerical gate and bounded one-epoch
-  smoke before relaunching the five independent fold encoders with up to four
-  one-H200 jobs concurrently. Labels, injections, fixed-test tensors, and S63
-  tensors remain forbidden during pretraining.
-  Teacher v3 stays operational until supervised fine-tuning and the matched
-  preregistered comparison pass.
-  The old native-v1 checkpoint is never reused with native-v2 inputs. Teacher
-  v2 was completed as an
-  exploratory comparison but missed
-  its promotion gates, so it is not a production ranker or student-label
-  generator. See [Stage 2 history](twirl_progress_log.md#stage-2).
+  family. `teacher_v3` is its frozen S56--S62 dataset/training release. Its
+  five-fold run, pooled development-OOF calibration, uncertain-label
+  sensitivity, clustered intervals, and single fixed-test opening are
+  complete. On the shared `528`-row real non-uncertain fixed-test support it
+  improves balanced accuracy from `0.720` to `0.779` and macro F1 from
+  `0.744` to `0.809` over metadata only; Planet-like recall is only `8/14`
+  and remains descriptive. Teacher v3 is frozen for enrichment only:
+  automatic promotion is disabled and student training is blocked.
+  The development-only full-pool **Teacher v4-SSL** experiment is also
+  complete. It used `175,347` eligible S56--S62 observations after whole-TIC
+  fixed-test and S63 exclusions and passed its corrected BTJD/effective-
+  quality numerical contract. On matched development OOF support, fine-tuned
+  SSL did not show a decisive improvement over Teacher v3: uncertain-as-other
+  balanced accuracy/macro F1 are `0.775/0.789` versus `0.801/0.789`, while
+  uncertain-masked values are `0.821/0.808` versus `0.822/0.802`. The
+  uncertain-masked Planet-like average precision is lower (`0.614` versus
+  `0.763`). The frozen linear probe is substantially worse. Teacher v4-SSL is
+  therefore archived as useful representation-learning evidence, not
+  promoted or carried into the primary S63 test. Teacher v3 remains the
+  operational enrichment model. Teacher v2 likewise remains a rejected
+  exploratory comparison. See
+  [Stage 2 history](twirl_progress_log.md#stage-2).
 - LC-level injection/recovery, two-aperture vetting, and pixel-injection smokes
   exist, but there is not yet a frozen survey-wide completeness product. The
   transparent non-periodic dip branch, multi-sector search, stable archive
@@ -166,17 +134,19 @@ The operational contract is defined in the
 - Gaia-first master catalog, TIC bridge, TESS coverage products, detector job
   tables, reusable TGLC wrappers, A2v1 source overlays, masked ePSF path,
   ADP/ADP015 FITS writer, compact export, and edge-aware validator.
-- S56--S63 are complete through required HDF5/FITS validation. S56 also
+- S56--S64 are complete through required HDF5/FITS validation. S56 also
   passes the replacement quality-aware Tier-0 integrity/benchmark QA. Its
   full-population bounded Tier-1 gate now authorizes enrichment under the
   conservative exact-BLS paired-input contract.
 
 ### Current gate
 
-S58-S63 completed their gated HDF5/FITS production on `pdogpu5`. The S64-S69
-source-only batch is active on `pdogpu5` in the generic queue's explicit
-all-refit mode; partial legacy ePSF inputs remain a hard failure. Do not create
-sector-specific production logic unless the sector is a documented exception.
+S58-S64 completed their gated HDF5/FITS production on `pdogpu5`. The S65
+queue stopped after orbit 137 and `15/16` orbit-138 CCDs completed; orbit 138
+`cam4/ccd1` failed during ePSF construction on a small CuPy allocation. Resume
+only the missing CCD with reduced GPU concurrency, re-enter the unchanged
+stop-on-failure gates, and then continue S66-S69. Do not create sector-specific
+production logic unless the sector is a documented exception.
 
 ### Exit criteria
 
@@ -274,6 +244,20 @@ statistics or imply multi-sector confirmation. Both products retain target
 QA, aperture evidence, displayed ephemeris, harmonic-review status, label
 source, and exact input provenance.
 
+The next model use is the sealed prospective S63 enrichment run. Its primary
+cohort is every validated, model-ready S63 TIC absent from the frozen Teacher
+v3 corpus; repeated Teacher-v3 hosts form a separately reported side cohort.
+The current nonzero-HDF5 inventory finds `53,249` S63 TICs (`52,487` disjoint
+and `762` repeated), but the final cohort must be frozen from the validated
+compact export rather than this filename inventory. Use the original
+Teacher-v3 current-ADP/native contract for the primary test; the corrected SSL
+tensor contract would be a separately preregistered sensitivity, not a silent
+input substitution. Freeze all hashes, the rank-one two-aperture BLS rule,
+queue quotas, random/control design, metrics, and stopping rule before opening
+S63 model scores. Scores enrich a blinded human-review queue and never become
+labels. The growing positive class is explicitly **human-confirmed
+Planet-like transit morphology**, not a sample of confirmed exoplanets.
+
 ### Model gate
 
 - Use `teacher_v3` for the frozen S56--S62 training release of the
@@ -299,19 +283,19 @@ source, and exact input provenance.
   versioned data/label manifest, TIC-grouped splits, source-separated
   evaluation, probability calibration, and bootstrap uncertainty before
   changing model architecture.
-- Treat **Teacher v4-SSL full-pool** as a development-only representation
-  experiment over the broad leakage-safe S56--S62 real-light-curve pool, not
-  only the previously selected labeled-candidate pool. Freeze whole-TIC
-  fixed-test and prospective-S63 exclusions before BLS or tensor construction;
-  ignore development labels during VICReg pretraining; do not use injections
-  or generate pseudo-labels. The five fold encoders must be fine-tuned only on
-  the existing frozen labels and compared with Teacher v3 on matched
-  development support before any fixed-test or prospective evaluation.
+- Archive **Teacher v4-SSL full-pool** as a completed development-only
+  representation experiment. Its fine-tuned matched-OOF result does not beat
+  Teacher v3 decisively and its frozen linear probe fails badly; do not use it
+  for S63 ranking, student labels, or automatic classification. Any corrected-
+  input S63 sensitivity must be declared separately after the primary
+  Teacher-v3 prospective result is frozen.
 - Report a label-policy sensitivity check for the dominant S57--S59
   `uncertain` return (`2,106/3,000` rows): compare the accepted
   uncertain-as-other mapping with masking those rows.
-- Reach at least `50` unique real Planet-like labels and pass locked grouped
-  real-data performance/calibration gates before student pseudo-labeling.
+- The current reviewed set reaches `65` unique human-confirmed Planet-like
+  morphology TICs, but that count alone does not authorize student
+  pseudo-labeling. Require the locked grouped real-data performance,
+  calibration, and prospective-enrichment gates as well.
 - Teacher v2 is an exploratory completed comparison that missed its external-
   retention and morphology-promotion gates. Do not promote or iterate it on
   the critical path. Any future model iteration requires the rare-factor and
@@ -419,33 +403,26 @@ never a completeness measurement.
 
 ## Immediate implementation priorities
 
-Keep the gated S64--S69 A2v1 source-only, all-ePSF-refit queue active as a
-parallel Stage-1 lane. Its stop-on-failure gates remain mandatory, but that
-queue does not block the S56--S62 candidate/teacher critical path below.
+Resume S65 from its single failed CCD and continue S66--S69 as a parallel
+Stage-1 lane. Its stop-on-failure gates remain mandatory, but gathering every
+later sector does not block the sealed S63 model test.
 
-1. Complete the leakage-safe Teacher v4-SSL full-pool experiment from its
-   frozen `175,366`-observation search pool and validated BLS/raw releases:
-   preserve the completed native-v2 products as diagnostic provenance but do
-   not admit them to the fresh model release. The effective-quality-aware ADP
-   contract is explicitly approved, but the absolute-BJD-conditioned v3
-   diagnostic products are ineligible. Use only the corrected fresh-v3r1
-   BTJD-detrending contract to rebuild all `112` native shards from immutable
-   raw-v1 photometry for the exact `175,347`-observation model partition while
-   preserving the `19` exclusions in the `175,366`-row audit. Require zero
-   authorized RankWarnings, pass the exact full-partition numerical gate and
-   a fresh bounded throughput smoke, then relaunch five fold encoders with at
-   most four one-H200 jobs concurrently. Fine-tune on the existing frozen
-   labels and compare with Teacher v3 on matched development support without
-   opening fixed-test or S63 model tensors. Additional manual labeling is not
-   part of this step.
-2. Freeze the completed Teacher v3 checkpoint as enrichment only and publish
-   the hash-bound morphology corpus plus the enrichment-only candidate
-   table/TIC index, preserving the raw edit log and all source provenance.
-3. Use S63 as the sealed prospective test: freeze the model, thresholds,
-   cohort, queue-construction rule, and metrics before blind labeling; include
-   a predeclared random/control slice, report TIC-disjoint hosts as the primary
-   evaluation and repeated hosts separately, and unblind once without tuning
-   from the result.
+1. Run the checksum-bound Teacher-v3 prospective S63 lane once: validate the
+   accepted A2v1 products, build the compact current-ADP and cadence authority,
+   freeze the exact model-ready disjoint/repeated cohorts, run the locked
+   rank-one two-aperture BLS/native path, and score with the unchanged frozen
+   five-fold Teacher-v3 ensemble. Select a deterministic blinded enrichment
+   queue plus a preregistered control sample; do not inspect scores before the
+   contract is frozen or use probabilities as labels.
+2. Complete blinded human review and then unblind once. Report Planet-like
+   morphology yield/precision and top-K lift versus the control, with primary
+   TIC-disjoint hosts and repeated hosts separated. Do not claim sector-wide
+   recall or balanced accuracy from an enrichment-biased queue. Only accepted
+   human morphology decisions may enlarge the next training corpus.
+3. Publish the frozen Teacher-v3 release and reviewed S56--S62 morphology
+   corpus/candidate TIC index, while archiving Teacher v4-SSL as a completed
+   non-promoted development experiment. In parallel, repair S65 and continue
+   the gated later-sector light-curve queue.
 4. After the periodic/enrichment path is robust, add the dip branch,
    multi-sector merging, and branch-aware false-alarm calibration; then rerun
    frozen-chain candidate-retention and representative pixel-level recovery

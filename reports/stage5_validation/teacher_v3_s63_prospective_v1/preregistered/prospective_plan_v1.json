@@ -1,0 +1,181 @@
+{
+  "schema_version": "twirl_teacher_v3_s63_prospective_plan_v1",
+  "created_date": "2026-08-06",
+  "status": "plan_frozen_launch_manifest_pending",
+  "sector": 63,
+  "purpose": "Prospective Teacher-v3 enrichment of a blinded human morphology review queue",
+  "scientific_language": {
+    "positive_label": "human-confirmed Planet-like transit morphology",
+    "not_claimed": [
+      "confirmed exoplanet",
+      "sector-wide classifier performance",
+      "sector-wide recall",
+      "sector-wide prevalence",
+      "automatic label",
+      "pseudo-label",
+      "discovery claim"
+    ]
+  },
+  "frozen_teacher_v3": {
+    "run_id": "teacher_v3_s56_s62_a2v1_current_adp",
+    "release_name": "teacher_v3",
+    "model_version": "s56_harmonic_cnn_v1",
+    "selected_profile": "shape_plus_periodogram_bls",
+    "input_contract_version": "s56_adp_raw_pair_v2",
+    "checkpoint_namespace": "twirl_teacher_v3_s56_s62_native_v1",
+    "selection_policy": "fixed_before_test",
+    "temperature_calibration_scope": "concatenated_five_fold_development_oof_logits",
+    "temperature": 1.5352457073925125,
+    "summary_sha256": "0bdcb064a7e67f2304ba58b1e79c462daa7cc8aad5ad64d2f57a86c4dae46e99",
+    "pretest_model_freeze_sha256": "140ad51dcbbad66cc8fbb10a9fd138f383fdeb0698be47cc1f083a3e48ed2eb3",
+    "selected_checkpoint_manifest_sha256": "94ba7eb41e5f03657d279291127d2d06c59fe965b89f5708a1098c9ed7da9148",
+    "pooled_oof_calibration_sha256": "4aab1f0a23c22927f51eb7b1df1bda5fe98cc89ac34732d5a55329b704897bdf",
+    "checkpoints": [
+      {
+        "fold": 0,
+        "sha256": "dc919b9a8e46de8dfe267226827ec8ecd2001686480f48684e3f6aa50471f623"
+      },
+      {
+        "fold": 1,
+        "sha256": "70e8de02697723f7ae88771f434045aa617f3d19b8b6746e21a6bc74f1fd41a5"
+      },
+      {
+        "fold": 2,
+        "sha256": "ed63c96e0262d9dd845aa4d632d8a64554aa0f5cde40ec2d9656f8acfd5d682b"
+      },
+      {
+        "fold": 3,
+        "sha256": "25cf56ab3ad0817d96efd8402a331adce617acd0d34f880f20b670741987cc34"
+      },
+      {
+        "fold": 4,
+        "sha256": "3986ca5ed6ca45fdca38dcaebcc5160648589af5edcee609edda15385e6ce1ac"
+      }
+    ],
+    "automatic_promotion": false,
+    "student_training_authorized": false
+  },
+  "frozen_training_identity": {
+    "morphology_corpus_sha256": "7f05bd9e8b7c7b04c7cf6ec0b45df6300fb0cb08623acbfbec65fb85cd66ebd7",
+    "tic_split_registry_sha256": "551747a18175ecc3c4dbcc9d464e2f521f0550cb9e045c28c6a7580455922f7c",
+    "n_corpus_tics": 7903
+  },
+  "s63_identity_reservation": {
+    "identity_only": true,
+    "light_curves_opened_when_reserved": false,
+    "n_requested_tics": 53512,
+    "n_requested_observations": 107104,
+    "reserved_tics_sha256": "0560961c44e73d24f4466f6873c6308b89b9c3ac1d32df5cee7ee87141f6c98b",
+    "observation_table_sha256": "2f42698420a5e2d945a3fd60d3ddc057c06f3fd19c2b9882829ea0c26e5280d9"
+  },
+  "planning_inventory_not_cohort_authority": {
+    "nonzero_hdf5_tic_csv_sha256": "7c9cd932984199caca0072fcf498b54aaf5a1a16ff03fedd88476147f958ae1f",
+    "nonzero_hdf5_tic_metadata_sha256": "77a6d029f8f9123db4aa16b83224e9be45738ef3e9ffe1793ca3e6e42e56fa20",
+    "n_nonzero_hdf5_tics": 53249,
+    "n_preliminary_teacher_v3_disjoint_tics": 52487,
+    "n_preliminary_repeated_tics": 762,
+    "authority_note": "Final cohort counts and hashes must come from the validated compact/model-ready export."
+  },
+  "cohort_policy": {
+    "primary": "Every model-ready S63 TIC absent from the frozen Teacher-v3 morphology corpus",
+    "secondary": "Every model-ready S63 TIC present in the frozen Teacher-v3 morphology corpus",
+    "unit": "one S63 rank-one ADP-small candidate per TIC",
+    "cross_cohort_overlap_allowed": false,
+    "report_secondary_separately": true
+  },
+  "search_contract": {
+    "apertures": [
+      "DET_FLUX_ADP_SML",
+      "DET_FLUX_ADP"
+    ],
+    "anchor_aperture": "DET_FLUX_ADP_SML",
+    "context_aperture": "DET_FLUX_ADP",
+    "n_periods": 50000,
+    "n_retained_peaks_per_aperture": 10,
+    "candidate_peak_rank": 1,
+    "orbitid_policy": "strict",
+    "quality_policy": "internal_quality == 0 and (spoc_quality | (qlp_quality << 30)) == 0",
+    "absolute_probability_threshold": null,
+    "selection_policy": "fixed rank-based quotas; no post-score threshold tuning"
+  },
+  "blinded_queue": {
+    "selection_seed": 630056,
+    "primary": {
+      "n_tics": 1000,
+      "quotas": {
+        "planet_preserve": 300,
+        "eclipse_contact": 200,
+        "smooth_variable": 150,
+        "broad_dip": 100,
+        "disagreement_harmonic": 150,
+        "stratified_control": 100
+      }
+    },
+    "repeated_host_side_cohort": {
+      "n_tics": 100,
+      "quotas": {
+        "planet_preserve": 30,
+        "eclipse_contact": 20,
+        "smooth_variable": 15,
+        "broad_dip": 10,
+        "disagreement_harmonic": 15,
+        "stratified_control": 10
+      }
+    },
+    "control_sampling": "After deterministic enrichment buckets, divide remaining TICs into ADP-small BLS-SDE quartiles and sample uniformly without replacement within seeded strata; retain stratum population, draw count, and realized inclusion fraction.",
+    "quota_failure_policy": "Fail closed before queue publication if any exact bucket quota cannot be filled; do not backfill from another bucket.",
+    "reviewer_visible_fields_exclude": [
+      "teacher probability",
+      "teacher logit",
+      "ensemble disagreement",
+      "selection bucket",
+      "selection rank",
+      "cohort membership"
+    ],
+    "review_completion": "All 1100 frozen rows must have an accepted human morphology decision before unblinding."
+  },
+  "evaluation": {
+    "primary_population": "Teacher-v3-disjoint S63 TICs only",
+    "primary_metrics": [
+      "Planet-like morphology count and fraction by hidden bucket",
+      "planet_preserve Planet-like fraction divided by stratified-control Planet-like fraction",
+      "Planet-like cumulative yield and lift at K=50,100,200,300 versus the stratified control",
+      "exact review completion and provenance integrity"
+    ],
+    "uncertainty": "TIC-clustered bootstrap confidence intervals for queue yields; finite-population stratum accounting for the randomized control",
+    "predeclared_enrichment_gate": {
+      "minimum_primary_planet_preserve_planet_like": 10,
+      "minimum_planet_preserve_to_control_rate_ratio": 3.0,
+      "zero_control_handling": "Report the ratio as infinite only if planet_preserve has at least 10 Planet-like decisions and control has zero; also report the finite Haldane-Anscombe sensitivity ratio.",
+      "effect": "Controls whether Teacher v3 is reused as the default enrichment ranker for later sectors; it does not invalidate accepted human labels or promote the model to classification."
+    },
+    "not_estimable_from_primary_queue": [
+      "sector-wide recall",
+      "sector-wide balanced accuracy",
+      "sector-wide class prevalence"
+    ],
+    "unblinding_policy": "Archive the complete human decision table, then unblind once and publish without tuning from S63."
+  },
+  "training_reuse": {
+    "human_decisions_may_join_next_versioned_corpus_after_report_freeze": true,
+    "teacher_scores_may_become_labels": false,
+    "pseudo_labels_authorized": false,
+    "repeated_hosts_must_remain_tic_grouped_in_future_splits": true
+  },
+  "launch_manifest_required_before_s63_scoring": {
+    "git_commit": null,
+    "accepted_stage1_validation_sha256": null,
+    "cadence_reference_csv_sha256": null,
+    "cadence_reference_manifest_sha256": null,
+    "compact_adp_pair_h5_sha256": null,
+    "compact_adp_pair_manifest_sha256": null,
+    "model_ready_allowlist_sha256": null,
+    "primary_cohort_sha256": null,
+    "repeated_host_cohort_sha256": null,
+    "bls_merged_table_sha256": null,
+    "candidate_table_sha256": null,
+    "native_h5_sha256": null,
+    "native_manifest_sha256": null,
+    "rule": "Publish these values in a new immutable launch_manifest.json and validate them before the first S63 model-scoring job."
+  }
+}

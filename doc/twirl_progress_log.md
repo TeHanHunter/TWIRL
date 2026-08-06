@@ -45,6 +45,23 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
 - `2026-07-17`: S59 completed at `19:05 EDT` after HDF5 extraction and the required FITS/full-product gates. The `r3` S60 log stopped updating at `00:03 EDT` while `pdogpu6` became unresponsive; the shared tree retained `27,048` orbit-`127` and `15,390` orbit-`128` HDF5 files. After a clean `pdogpu5` GPU/runtime preflight, the unchanged manifest restarted as `twirl-a2v1-s58-s63-queue-r4-pdogpu5` at `11:00 EDT` on GPUs `4,5,6,7`. It revalidates accepted sectors and resumes S60 without deleting partial products.
 - `2026-07-18`: The `r4` queue completed S60 (`15:45 EDT`), S61 (`01:27 EDT`), S62 (`10:59 EDT`), and S63 (`21:35 EDT`) after their HDF5, FITS, and full A2v1 schema gates. The terminal log reports `A2v1 queue complete`; no worker remained active.
 - `2026-07-20`: Confirmed S64-S65's complete prepared source trees (`3,136` pickles per orbit) with no legacy ePSFs. The generic queue now permits either a complete reusable ePSF tree or an absent tree that forces all saturated-mask ePSF refits, while rejecting partial ePSF preparation. At `09:38 EDT`, the clean-clone tmux queue `twirl-a2v1-s64-s69-queue-r1-pdogpu5` started [S64-S69](../configs/a2v1_production_s64_s69.txt) on GPUs `4,5,6,7`; S64 preflight accepted both orbits with `epsf_mode=refit-all` and entered HDF5 extraction.
+- `2026-08-06`: A live read-only PDO audit reconciled the later-sector queue.
+  S64 is fully accepted: `159,781/160,656` expected HDF5 observation products
+  and `79,842/80,254` expected sector FITS targets are present; all `875`
+  HDF5 and `412` FITS omissions are declared `edge_warn`, with zero zero-byte,
+  unreadable, non-edge-missing, or bad-schema products. S65 orbit 137 is
+  complete and orbit 138 completed `15/16` detector cells. Its only missing
+  cell is `cam4/ccd1`, where ePSF construction stopped on a CuPy out-of-memory
+  error while requesting about `98.6 MiB`. No Stage-1 queue is active, and
+  S66-S69 have not completed. Resume only that failed CCD with safer GPU
+  concurrency before re-entering the unchanged sector gates.
+- `2026-08-06`: Published reproducible S60-S63 target and HDF5 filename
+  inventories for collaborator crossmatching. The broad observation-table
+  target lists contain `27,165`, `41,403`, `40,158`, and `53,512` TICs; the
+  corresponding nonzero-HDF5 filename unions contain `27,036`, `41,168`,
+  `39,964`, and `53,249`. Every difference (`129`, `235`, `194`, and `263`)
+  is an explicit observation-table `edge_warn`; these filename scans do not
+  replace the accepted HDF5-openability/full-schema validation.
 - `2026-07-20`: Rendered representative S56-S63 A2v1 pixel-mask diagnostics with the [mask-map renderer](../scripts/stage1_lightcurves/plot_a2v1_pixel_mask_maps.py): first-orbit `cam1/ccd1`, first `20` staged FFIs per sector. The left panel is the TGLC threshold-mask proxy; the right panel reports the corresponding per-cutout masked fraction and outlines local A2v1 ePSF refits, which are the nonempty-static-mask cases under the prefill contract. All eight PNGs opened successfully; the contact sheet is in `reports/stage1_lightcurves/a2v1_pixel_mask_maps/`.
 - `2026-07-16`: Reclassified the existing S56 A2v1 QA as Tier-0
   integrity/benchmark QA. It remains valid evidence for product coverage and
@@ -166,11 +183,10 @@ current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
   `628,955`-row BLS binding and all published output hashes validate, and the
   local suite passes `420` tests with `3` skips plus detection and docs checks.
 
-**Next:** Keep the gated S64-S69 source-only production queue active in
-parallel. Apply the v4 paired-input mask when the S56--S62 label corpus is
-frozen; retain the three primary-only cases for manual or single-aperture
-review and do not spend the current critical path on additional Tier-1
-threshold work.
+**Next:** Resume S65 orbit-138 `cam4/ccd1` with reduced GPU concurrency, then
+re-enter the unchanged FITS/full-schema gate and continue S66-S69. Keep this
+parallel to the S63 prospective Teacher-v3 lane; later-sector gathering does
+not block that sealed test.
 
 ### Catalog, archive index, and sample control
 
@@ -479,25 +495,65 @@ sample.
   launched. The corrected fresh-v3r1 contract detrends on compact BTJD,
   publishes exact absolute BJD separately, rejects non-authorized warnings,
   and requires a zero RankWarning ledger through every downstream gate.
+- `2026-08-06`: Prepared a
+  [Julien-team meeting package](../reports/meeting_julien_team_20260806/README.md)
+  from the frozen `509`-observation S56--S62 morphology review, including a
+  browsable index of all reviewed rows, the full `80`-observation
+  Planet-like/broad-wide atlas, Teacher v1--v3 evidence, and a time-stamped
+  Teacher v4-SSL status. The presentation keeps morphology separate from
+  confirmation and enrichment separate from automatic classification; it
+  introduces no discovery, completeness, occurrence-rate, or final SSL
+  transfer-performance claim.
+- `2026-08-06`: Completed the corrected full-pool Teacher v4-SSL development
+  evaluation without opening S63. On the exact matched development-OOF
+  support, Teacher v3 versus fine-tuned SSL balanced accuracy/macro F1 is
+  `0.801/0.789` versus `0.775/0.789` under uncertain-as-other and
+  `0.822/0.802` versus `0.821/0.808` under uncertain-masked. The latter
+  profile's Planet-like average precision is `0.763` for Teacher v3 versus
+  `0.614` for SSL, while the frozen SSL linear probe is substantially worse
+  in both label policies. The confidence intervals overlap on the aggregate
+  metrics, so the result does not establish a reliable improvement. The
+  [figures and exact tables](../reports/stage5_validation/teacher_ssl_fullpool_v4_development_performance/)
+  are archived as representation-learning evidence; Teacher v4-SSL is not
+  promoted, not used for S63, and not a pseudo-label generator. Teacher v3
+  remains the frozen operational enrichment model.
+- `2026-08-06`: The user authorized the sealed prospective S63 Teacher-v3 run
+  and clarified the scientific label language: the growing positive sample is
+  **human-confirmed Planet-like transit morphology**, not confirmed
+  exoplanets. A read-only PDO/ORCD audit found accepted S63 Stage-1 inputs and
+  the hash-verified five-fold Teacher-v3 release, but no S63 cadence, compact,
+  BLS, native, score, or review artifact and no active job. The frozen
+  `53,512`-TIC reservation has SHA-256 `0560961c...`. The preliminary nonzero-
+  HDF5 inventory contains `53,249` represented TICs: `52,487` are disjoint
+  from the Teacher-v3 corpus and define the prospective primary cohort, while
+  `762` repeated hosts are a separately reported side cohort. Final counts
+  must be frozen from the validated compact/model-ready export. The
+  [prospective plan](../reports/stage5_validation/teacher_v3_s63_prospective_v1/README.md)
+  pins the model/checkpoint hashes, search rule, hidden queue quotas, control
+  sampling, metrics, and one-time unblinding policy. The primary run will
+  preserve Teacher v3's original current-ADP/native input contract;
+  an SSL corrected-input sensitivity would be a separate future experiment.
+  Scores will select a blinded enrichment queue plus a preregistered control
+  and will never be treated as labels.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Complete the Teacher v4-SSL follow-up gates, freeze Teacher v3 as
-enrichment only, publish the reviewed S56--S62 candidate table/TIC roll-up,
-and define the sealed S63 queue, thresholds, random-control slice, and
-prospective metrics before blind review. Do not schedule more corpus labeling
-or start student pseudo-labeling. Add dip, multi-sector, and false-alarm
-branches only after this prospective periodic path is robust.
+**Next:** Implement and synthetic-smoke the checksum-bound S63 prospective
+lane, freeze its compact/model-ready cohort and all remaining input hashes,
+then run Teacher v3 once and produce a blinded enrichment-plus-control review
+queue. Do not inspect S63 scores before the freeze, schedule unrelated corpus
+labeling, or start student pseudo-labeling.
 
 ### Human labels and harmonic review
 
 - The strict S56 adjudication audit completed `343/343` decisions across `323`
   unique real sources, with repeat agreement `0.85` and Cohen's kappa `0.814`.
-- The locked adjudicated training set contains only `12` Planet-like sources.
-  The compact revisit adds `11` new Planet-like enrichment candidates, but they
-  remain separate evidence until the bounded S56 audit merges and resolves
-  them. Student pseudo-labeling requires at least `50` unique real Planet-like
-  sources and the locked real-data gates.
+- The final uniform S56--S62 review contains `70` Planet-like morphology
+  observations across `65` unique TICs. These are human-confirmed morphology
+  decisions, not confirmed planets or an unbiased occurrence sample. Meeting
+  the old `50`-TIC count threshold does not by itself authorize student
+  pseudo-labeling; grouped performance, calibration, and prospective-
+  enrichment gates remain unmet.
 - Rare harmonic supervision remains inadequate for promoting or iterating the
   exploratory teacher-v2 design: `P/3` has no supervised example and `3P` has
   only three in the current harmonic table.
