@@ -29,6 +29,7 @@ readonly WORKERS=8
 readonly SEED=560064
 readonly LINEAR_PROBE_STEPS=500
 readonly BOOTSTRAP_DRAWS=2000
+readonly RESUME="${TWIRL_EVALUATION_RESUME:-0}"
 
 : "${TWIRL_ORCD_REPO:?controller must export TWIRL_ORCD_REPO}"
 : "${TWIRL_EXPECTED_GIT_SHA:?controller must export TWIRL_EXPECTED_GIT_SHA}"
@@ -53,9 +54,20 @@ for input in \
     exit 3
   fi
 done
-if [[ -e "${EVALUATION_ROOT}" ]]; then
+if [[ "${RESUME}" != "0" && "${RESUME}" != "1" ]]; then
+  echo "TWIRL_EVALUATION_RESUME must be 0 or 1." >&2
+  exit 4
+fi
+if [[ "${RESUME}" == "0" && -e "${EVALUATION_ROOT}" ]]; then
   echo "Refusing to overwrite full-pool evaluation: ${EVALUATION_ROOT}" >&2
   exit 4
+fi
+if [[ "${RESUME}" == "1" ]]; then
+  if [[ ! -d "${EVALUATION_ROOT}" ]] || \
+     [[ -e "${EVALUATION_ROOT}/summary.json" ]]; then
+    echo "Resume requires one interrupted, non-final evaluation root." >&2
+    exit 4
+  fi
 fi
 
 mkdir -p "${TWIRL_ROOT}/logs" "$(dirname "${EVALUATION_ROOT}")"
@@ -68,6 +80,10 @@ module load cuda/13.1.0 || module load cuda/12.9.1 || true
 nvidia-smi
 
 echo "[teacher-ssl-fullpool-v4-eval] start=$(date -Is) output=${EVALUATION_ROOT}"
+EVALUATION_ARGS=()
+if [[ "${RESUME}" == "1" ]]; then
+  EVALUATION_ARGS+=(--resume)
+fi
 "${PYTHON}" scripts/stage5_validation/evaluate_teacher_ssl_fullpool.py \
   --training-table "${TRAINING_TABLE}" \
   --registry "${REGISTRY}" \
@@ -80,5 +96,6 @@ echo "[teacher-ssl-fullpool-v4-eval] start=$(date -Is) output=${EVALUATION_ROOT}
   --workers "${WORKERS}" \
   --seed "${SEED}" \
   --linear-probe-steps "${LINEAR_PROBE_STEPS}" \
-  --bootstrap-draws "${BOOTSTRAP_DRAWS}"
+  --bootstrap-draws "${BOOTSTRAP_DRAWS}" \
+  "${EVALUATION_ARGS[@]}"
 echo "[teacher-ssl-fullpool-v4-eval] complete=$(date -Is)"

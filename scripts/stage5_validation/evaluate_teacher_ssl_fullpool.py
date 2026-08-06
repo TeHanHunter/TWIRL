@@ -43,12 +43,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow a bounded local test without CUDA; production uses one H200.",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "Contract-check and resume the known interrupted evaluation root; "
+            "completed artifacts are validated before reuse."
+        ),
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
     if args.preflight_only:
+        if args.resume:
+            raise ValueError("--resume cannot be combined with --preflight-only")
         summary = run_fullpool_ssl_evaluation_preflight(
             training_table_path=args.training_table,
             registry_path=args.registry,
@@ -75,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         linear_probe_steps=int(args.linear_probe_steps),
         bootstrap_draws=int(args.bootstrap_draws),
         require_cuda=not bool(args.allow_cpu),
+        resume=bool(args.resume),
     )
     print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))
     return 0

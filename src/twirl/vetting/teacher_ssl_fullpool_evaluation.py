@@ -160,6 +160,105 @@ def require_fresh_evaluation_output(path: Path) -> Path:
     return output
 
 
+def _read_json_object(path: Path, *, artifact: str) -> dict[str, Any]:
+    path = Path(path).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{artifact} must be a JSON object")
+    return payload
+
+
+def _validate_resume_run_contract(
+    *,
+    output_dir: Path,
+    expected_contract: Mapping[str, Any],
+    current_input_provenance: Mapping[str, str],
+) -> dict[str, Any]:
+    """Validate an interrupted evaluation root before any artifact reuse."""
+
+    output = Path(output_dir).expanduser().resolve()
+    if not output.is_dir():
+        raise FileNotFoundError(output)
+    for completed in (
+        output / "summary.json",
+        output / "development_performance.csv",
+        output / "development_per_class_metrics.csv",
+    ):
+        if completed.exists():
+            raise RuntimeError(
+                "refusing to resume an evaluation with final artifacts: "
+                f"{completed}"
+            )
+    contract_path = output / "run_contract.json"
+    contract = _read_json_object(
+        contract_path,
+        artifact="interrupted evaluation run contract",
+    )
+    fields = (
+        "schema_version",
+        "run_id",
+        "model_facing_name",
+        "scope",
+        "label_policies",
+        "fold_encoder_rule",
+        "fine_tune_epochs",
+        "batch_size",
+        "workers",
+        "seed",
+        "linear_probe_steps",
+        "bootstrap_draws",
+        "fixed_test_container_opened",
+        "fixed_test_tensors_constructed",
+        "fixed_test_labels_used",
+        "sector_63_rows_loaded",
+        "injections_loaded",
+        "automatic_production_promotion",
+    )
+    changed = [
+        name
+        for name in fields
+        if contract.get(name) != expected_contract.get(name)
+    ]
+    if changed:
+        raise RuntimeError(
+            "interrupted evaluation contract changed: "
+            f"{changed}"
+        )
+    provenance_fields = (
+        "training_table_sha256",
+        "fullpool_registry_sha256",
+        "fullpool_registry_summary_sha256",
+        "fullpool_completion_release_sha256",
+        "fullpool_training_code_revision",
+    )
+    provenance_changed = [
+        name
+        for name in provenance_fields
+        if contract.get(name) != current_input_provenance.get(name)
+    ]
+    if provenance_changed:
+        raise RuntimeError(
+            "interrupted evaluation input provenance changed: "
+            f"{provenance_changed}"
+        )
+    original_revision = str(contract.get("evaluation_code_revision", ""))
+    if len(original_revision) != 40:
+        raise RuntimeError("interrupted evaluation lacks a Git revision")
+    return {
+        "mode": "contract_checked_resume",
+        "interrupted_run_contract": str(contract_path),
+        "interrupted_run_contract_sha256": _file_sha256(contract_path),
+        "interrupted_evaluation_code_revision": original_revision,
+        "resume_evaluation_code_revision": str(
+            current_input_provenance["evaluation_code_revision"]
+        ),
+        "fixed_test_status": "sealed_not_loaded_not_evaluated",
+        "sector_63_status": "reserved_not_loaded",
+    }
+
+
 def _read_bound_json(
     binding: Mapping[str, Any],
     *,
@@ -812,12 +911,14 @@ def export_all_fold_embeddings(
     with reference_path.open("wb") as stream:
         np.savez_compressed(
             stream,
-            review_id=rows["review_id"].astype(str).to_numpy(),
-            ssl_observation_id=rows["ssl_observation_id"].astype(str).to_numpy(),
+            review_id=rows["review_id"].astype(str).to_numpy(dtype=str),
+            ssl_observation_id=rows["ssl_observation_id"].astype(str).to_numpy(
+                dtype=str
+            ),
             tic=pd.to_numeric(rows["tic"], errors="raise").to_numpy(dtype=np.int64),
             sector=pd.to_numeric(rows["sector"], errors="raise").to_numpy(dtype=np.int16),
             cv_fold=pd.to_numeric(rows["cv_fold"], errors="raise").to_numpy(dtype=np.int8),
-            human_label=rows["human_label"].astype(str).to_numpy(),
+            human_label=rows["human_label"].astype(str).to_numpy(dtype=str),
             morphology_target=rows["morphology_target_index"].to_numpy(dtype=np.int8),
             period_d=pd.to_numeric(rows["period_d"], errors="raise").to_numpy(dtype=np.float64),
             duration_min=pd.to_numeric(
@@ -833,7 +934,7 @@ def export_all_fold_embeddings(
     with held_path.open("wb") as stream:
         np.savez_compressed(
             stream,
-            review_id=rows["review_id"].astype(str).to_numpy(),
+            review_id=rows["review_id"].astype(str).to_numpy(dtype=str),
             tic=pd.to_numeric(rows["tic"], errors="raise").to_numpy(dtype=np.int64),
             cv_fold=pd.to_numeric(rows["cv_fold"], errors="raise").to_numpy(dtype=np.int8),
             embedding=held_embedding,
@@ -854,6 +955,108 @@ def export_all_fold_embeddings(
         "diagnostics": diagnostics,
     }
     _write_json(output_dir / "embedding_export.summary.json", audit)
+    return all_embeddings, audit
+
+
+def validate_and_recompute_existing_embeddings(
+    *,
+    rows: pd.DataFrame,
+    encoders: Sequence[Mapping[str, Any]],
+    output_dir: Path,
+    batch_size: int,
+    workers: int,
+    seed: int,
+    require_cuda: bool,
+) -> tuple[list[np.ndarray], dict[str, Any]]:
+    """Recompute fold embeddings and prove equality with persisted exports."""
+
+    output_dir = Path(output_dir).expanduser().resolve()
+    summary_path = output_dir / "embedding_export.summary.json"
+    summary = _read_json_object(
+        summary_path,
+        artifact="interrupted embedding export summary",
+    )
+    reference_path = output_dir / "reference_fold_0_embeddings.npz"
+    held_path = output_dir / "fold_safe_held_embeddings.npz"
+    expected_bindings = (
+        (
+            "reference_embeddings",
+            "reference_embeddings_sha256",
+            reference_path,
+        ),
+        (
+            "fold_safe_embeddings",
+            "fold_safe_embeddings_sha256",
+            held_path,
+        ),
+    )
+    for path_field, hash_field, expected_path in expected_bindings:
+        if Path(str(summary.get(path_field, ""))).resolve() != expected_path:
+            raise RuntimeError(
+                f"interrupted embedding path changed for {path_field}"
+            )
+        if _file_sha256(expected_path) != str(summary.get(hash_field, "")):
+            raise RuntimeError(
+                f"interrupted embedding hash changed for {path_field}"
+            )
+
+    all_embeddings: list[np.ndarray] = []
+    diagnostics: list[dict[str, Any]] = []
+    for record in encoders:
+        fold = int(record["fold"])
+        embedding = _extract_encoder_embeddings(
+            rows=rows,
+            encoder_state=record["encoder_state_dict"],
+            batch_size=int(batch_size),
+            workers=int(workers),
+            seed=int(seed) + 1000 * fold,
+            require_cuda=bool(require_cuda),
+        )
+        all_embeddings.append(embedding)
+        diagnostics.append({"fold": fold, **_embedding_diagnostics(embedding)})
+        print(
+            f"[fullpool-eval-resume] recomputed encoder fold {fold} embeddings",
+            flush=True,
+        )
+
+    # These files were created by the trusted, hash-bound interrupted run.
+    # Its first revision stored pandas string arrays as object dtype, so pickle
+    # is enabled only after validating the complete artifact hash above.
+    with np.load(reference_path, allow_pickle=True) as payload:
+        if payload["review_id"].astype(str).tolist() != rows[
+            "review_id"
+        ].astype(str).tolist():
+            raise RuntimeError("reference embedding row identities changed")
+        persisted_reference = payload["embedding"].astype(np.float32)
+    if not np.array_equal(persisted_reference, all_embeddings[0]):
+        raise RuntimeError("recomputed reference embeddings changed")
+
+    recomputed_held = np.empty((len(rows), 128), dtype=np.float32)
+    for fold, embedding in enumerate(all_embeddings):
+        mask = rows["cv_fold"].to_numpy(dtype=int) == fold
+        recomputed_held[mask] = embedding[mask]
+    with np.load(held_path, allow_pickle=True) as payload:
+        if payload["review_id"].astype(str).tolist() != rows[
+            "review_id"
+        ].astype(str).tolist():
+            raise RuntimeError("held embedding row identities changed")
+        persisted_held = payload["embedding"].astype(np.float32)
+    if not np.array_equal(persisted_held, recomputed_held):
+        raise RuntimeError("recomputed fold-safe embeddings changed")
+
+    audit = dict(summary)
+    audit.update(
+        {
+            "resume_reused": True,
+            "resume_validation": (
+                "all_five_encoders_recomputed; reference_and_fold_safe_"
+                "exports_exactly_equal"
+            ),
+            "resume_diagnostics": diagnostics,
+            "summary": str(summary_path),
+            "summary_sha256": _file_sha256(summary_path),
+        }
+    )
     return all_embeddings, audit
 
 
@@ -1070,12 +1273,256 @@ def run_frozen_linear_probe(
     return oof, summary
 
 
+def load_existing_linear_probe(
+    *,
+    all_rows: pd.DataFrame,
+    policy: str,
+    output_dir: Path,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Validate and load a completed probe from an interrupted evaluation."""
+
+    rows = _policy_rows(all_rows, policy)
+    output_dir = Path(output_dir).expanduser().resolve()
+    summary_path = output_dir / "summary.json"
+    summary = _read_json_object(
+        summary_path,
+        artifact=f"interrupted {policy} frozen-probe summary",
+    )
+    predictions_path = output_dir / "development_oof_predictions.csv"
+    expected_summary = {
+        "scope": "five_fold_real_development_oof_frozen_encoder_probe",
+        "label_policy": policy,
+        "encoder_selection": (
+            "fold_k_encoder_excluded_complete_held_fold_k_tics"
+        ),
+        "probe": "fixed_step_class_weighted_linear_softmax",
+    }
+    changed = [
+        name
+        for name, value in expected_summary.items()
+        if summary.get(name) != value
+    ]
+    if changed:
+        raise RuntimeError(
+            f"interrupted {policy} frozen probe changed: {changed}"
+        )
+    if Path(str(summary.get("predictions", ""))).resolve() != predictions_path:
+        raise RuntimeError("interrupted frozen-probe prediction path changed")
+    if _file_sha256(predictions_path) != str(
+        summary.get("predictions_sha256", "")
+    ):
+        raise RuntimeError("interrupted frozen-probe prediction hash changed")
+    oof = pd.read_csv(predictions_path)
+    expected_rows = rows.loc[rows["morphology_target_index"].ge(0)].copy()
+    expected_ids = set(expected_rows["review_id"].astype(str))
+    if (
+        oof["review_id"].astype(str).duplicated().any()
+        or set(oof["review_id"].astype(str)) != expected_ids
+    ):
+        raise RuntimeError("interrupted frozen-probe support changed")
+    aligned = expected_rows.set_index("review_id").loc[
+        oof["review_id"].astype(str)
+    ]
+    for column, expected_values in (
+        ("tic", pd.to_numeric(aligned["tic"], errors="raise").to_numpy()),
+        ("cv_fold", aligned["cv_fold"].to_numpy(dtype=int)),
+        (
+            "morphology_target",
+            aligned["morphology_target_index"].to_numpy(dtype=int),
+        ),
+    ):
+        observed = pd.to_numeric(oof[column], errors="raise").to_numpy()
+        if not np.array_equal(observed, expected_values):
+            raise RuntimeError(
+                f"interrupted frozen-probe {column} identity changed"
+            )
+    probability_columns = [f"p_{label}" for label in MORPHOLOGY_CLASSES]
+    metrics = probability_metrics(
+        oof["morphology_target"].to_numpy(dtype=int),
+        oof.loc[:, probability_columns].to_numpy(dtype=float),
+    )
+    for name in (
+        "accuracy",
+        "balanced_accuracy",
+        "macro_f1",
+        "macro_average_precision",
+        "expected_calibration_error",
+    ):
+        if not np.isclose(
+            float(metrics[name]),
+            float(summary["metrics"][name]),
+            rtol=0.0,
+            atol=1.0e-12,
+        ):
+            raise RuntimeError(
+                f"interrupted frozen-probe metric changed: {name}"
+            )
+    loaded = dict(summary)
+    loaded.update(
+        {
+            "resume_reused": True,
+            "resume_summary": str(summary_path),
+            "resume_summary_sha256": _file_sha256(summary_path),
+        }
+    )
+    return oof, loaded
+
+
+def load_existing_finetuned_policy(
+    *,
+    rows: pd.DataFrame,
+    policy: str,
+    fine_tune_root: Path,
+    encoders: Sequence[Mapping[str, Any]],
+    expected_input_provenance: Mapping[str, str],
+    expected_evaluation_code_revision: str,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Validate pooled OOF artifacts and calibrated checkpoints for reuse."""
+
+    import torch
+
+    profile_dir = Path(fine_tune_root).expanduser().resolve() / FULLPOOL_SSL_PROFILE
+    calibration_path = profile_dir / "pooled_oof_calibration.json"
+    calibration = _read_json_object(
+        calibration_path,
+        artifact=f"interrupted {policy} pooled calibration",
+    )
+    expected_calibration = {
+        "schema_version": FULLPOOL_EVALUATION_OOF_SCHEMA,
+        "scope": "five_fold_real_development_oof_fine_tuned",
+        "label_policy": policy,
+        "n_rows": int(len(rows)),
+        "n_real_rows": int(len(rows)),
+        "n_tics": int(rows["tic"].nunique()),
+        "evaluation_code_revision": str(expected_evaluation_code_revision),
+    }
+    changed = [
+        name
+        for name, value in expected_calibration.items()
+        if calibration.get(name) != value
+    ]
+    for name, value in expected_input_provenance.items():
+        if name == "evaluation_code_revision":
+            continue
+        if calibration.get(name) != value:
+            changed.append(name)
+    if changed:
+        raise RuntimeError(
+            f"interrupted {policy} pooled calibration changed: "
+            f"{sorted(set(changed))}"
+        )
+    calibration_sha256 = _file_sha256(calibration_path)
+    oof_path = profile_dir / "development_oof_predictions.csv"
+    if Path(str(calibration.get("oof_predictions", ""))).resolve() != oof_path:
+        raise RuntimeError(f"interrupted {policy} OOF path changed")
+    if _file_sha256(oof_path) != str(
+        calibration.get("oof_predictions_sha256", "")
+    ):
+        raise RuntimeError(f"interrupted {policy} OOF hash changed")
+    oof = pd.read_csv(oof_path)
+    expected_ids = set(rows["review_id"].astype(str))
+    if (
+        oof["review_id"].astype(str).duplicated().any()
+        or set(oof["review_id"].astype(str)) != expected_ids
+    ):
+        raise RuntimeError(f"interrupted {policy} OOF support changed")
+    aligned = rows.set_index("review_id").loc[oof["review_id"].astype(str)]
+    for column, expected_values in (
+        ("tic", pd.to_numeric(aligned["tic"], errors="raise").to_numpy()),
+        ("cv_fold", aligned["cv_fold"].to_numpy(dtype=int)),
+        (
+            "morphology_target",
+            aligned["morphology_target_index"].to_numpy(dtype=int),
+        ),
+    ):
+        observed = pd.to_numeric(oof[column], errors="raise").to_numpy()
+        if not np.array_equal(observed, expected_values):
+            raise RuntimeError(f"interrupted {policy} OOF {column} changed")
+
+    embedding_path = profile_dir / "development_oof_embeddings.npz"
+    if not embedding_path.is_file():
+        raise FileNotFoundError(embedding_path)
+    with np.load(embedding_path) as payload:
+        embedding_ids = payload["review_id"].astype(str)
+        embedding_tics = payload["tic"].astype(np.int64)
+        embedding = payload["embedding"].astype(np.float32)
+    if (
+        set(embedding_ids) != expected_ids
+        or embedding.shape != (len(rows), 128)
+        or not np.isfinite(embedding).all()
+    ):
+        raise RuntimeError(f"interrupted {policy} OOF embeddings changed")
+    tic_by_review = dict(
+        zip(
+            rows["review_id"].astype(str),
+            pd.to_numeric(rows["tic"], errors="raise").to_numpy(
+                dtype=np.int64
+            ),
+        )
+    )
+    if not np.array_equal(
+        embedding_tics,
+        np.asarray([tic_by_review[value] for value in embedding_ids]),
+    ):
+        raise RuntimeError(f"interrupted {policy} embedding TICs changed")
+
+    checkpoint_hashes: dict[str, str] = {}
+    for encoder in encoders:
+        fold = int(encoder["fold"])
+        checkpoint_path = profile_dir / f"fold_{fold}" / "teacher.pt"
+        checkpoint = torch.load(
+            checkpoint_path,
+            map_location="cpu",
+            weights_only=False,
+        )
+        expected_checkpoint = {
+            "schema_version": FULLPOOL_EVALUATION_CHECKPOINT_SCHEMA,
+            "run_id": FULLPOOL_EVALUATION_RUN_ID,
+            "model_facing_name": FULLPOOL_SSL_MODEL_FACING_NAME,
+            "checkpoint_namespace": FULLPOOL_EVALUATION_NAMESPACE,
+            "label_policy": policy,
+            "profile": FULLPOOL_SSL_PROFILE,
+            "fold": fold,
+            "ssl_encoder_checkpoint_sha256": encoder["checkpoint_sha256"],
+            "temperature_calibration_scope": "pooled_development_oof",
+            "pooled_oof_calibration_sha256": calibration_sha256,
+            "evaluation_code_revision": str(
+                expected_evaluation_code_revision
+            ),
+        }
+        mismatch = [
+            name
+            for name, value in expected_checkpoint.items()
+            if checkpoint.get(name) != value
+        ]
+        if mismatch:
+            raise RuntimeError(
+                f"interrupted {policy} fold {fold} checkpoint changed: "
+                f"{mismatch}"
+            )
+        checkpoint_hashes[str(fold)] = _file_sha256(checkpoint_path)
+
+    loaded = dict(calibration)
+    loaded.update(
+        {
+            "resume_reused": True,
+            "pooled_oof_calibration": str(calibration_path),
+            "pooled_oof_calibration_sha256": calibration_sha256,
+            "oof_embeddings": str(embedding_path),
+            "oof_embeddings_sha256": _file_sha256(embedding_path),
+            "checkpoint_sha256": checkpoint_hashes,
+        }
+    )
+    return oof, loaded
+
+
 def load_teacher_v3_baseline_oof(
     *,
     baseline_root: Path,
     policy: str,
     expected_review_ids: Sequence[str],
     expected_truth: Mapping[str, int],
+    expected_tic: Mapping[str, int],
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Load Teacher-v3 OOF predictions on exactly the requested real support."""
 
@@ -1114,6 +1561,28 @@ def load_teacher_v3_baseline_oof(
     baseline = baseline.sort_values("review_id", kind="stable").reset_index(drop=True)
     if set(baseline["review_id"].astype(str)) != expected:
         raise RuntimeError("Teacher-v3 matched support changed during selection")
+    tic_by_review = {
+        str(review_id): int(tic) for review_id, tic in expected_tic.items()
+    }
+    if set(tic_by_review) != expected:
+        raise RuntimeError(
+            "Teacher-v3 TIC authority does not exactly match requested support"
+        )
+    expected_tics = np.asarray(
+        [tic_by_review[str(value)] for value in baseline["review_id"]],
+        dtype=np.int64,
+    )
+    if "tic" in baseline:
+        observed_tics = pd.to_numeric(
+            baseline["tic"], errors="raise"
+        ).to_numpy(dtype=np.int64)
+        if not np.array_equal(observed_tics, expected_tics):
+            raise RuntimeError("Teacher-v3 baseline TIC identity changed")
+    else:
+        # Legacy Teacher-v3 fold predictions predate the explicit TIC column.
+        # Bind TIC only from the already-authorized matched evaluation rows so
+        # whole-host bootstrap resampling remains exact and auditable.
+        baseline["tic"] = expected_tics
     expected_target = np.asarray(
         [expected_truth[str(value)] for value in baseline["review_id"]],
         dtype=int,
@@ -1259,6 +1728,7 @@ def run_fullpool_ssl_evaluation(
     linear_probe_steps: int = 500,
     bootstrap_draws: int = 2000,
     require_cuda: bool = True,
+    resume: bool = False,
 ) -> dict[str, Any]:
     """Run representation export, probes, and full five-fold transfer tests."""
 
@@ -1272,7 +1742,11 @@ def run_fullpool_ssl_evaluation(
             raise ValueError(f"{name} must be positive")
     if int(workers) < 0:
         raise ValueError("workers must be nonnegative")
-    output = require_fresh_evaluation_output(output_dir)
+    output = (
+        Path(output_dir).expanduser().resolve()
+        if resume
+        else require_fresh_evaluation_output(output_dir)
+    )
     code_revision = _code_revision()
     rows, label_audit = load_fullpool_development_labels(
         training_table_path=training_table_path,
@@ -1323,71 +1797,138 @@ def run_fullpool_ssl_evaluation(
         **input_provenance,
     }
     contract_path = output / "run_contract.json"
-    run_contract_sha256 = _write_json(contract_path, run_contract)
-    embeddings, embedding_audit = export_all_fold_embeddings(
-        rows=rows,
-        encoders=encoders,
-        output_dir=output / "representation",
-        batch_size=int(batch_size),
-        workers=int(workers),
-        seed=int(seed),
-        require_cuda=bool(require_cuda),
-    )
+    resume_audit: dict[str, Any] | None = None
+    resume_contract_path: Path | None = None
+    resume_contract_sha256: str | None = None
+    if resume:
+        resume_audit = _validate_resume_run_contract(
+            output_dir=output,
+            expected_contract=run_contract,
+            current_input_provenance=input_provenance,
+        )
+        run_contract_sha256 = _file_sha256(contract_path)
+        resume_contract_path = output / "resume_contract.json"
+        if resume_contract_path.exists():
+            raise RuntimeError(
+                f"resume contract already exists: {resume_contract_path}"
+            )
+        resume_contract = {
+            "schema_version": FULLPOOL_EVALUATION_SCHEMA,
+            "run_id": FULLPOOL_EVALUATION_RUN_ID,
+            "created_utc": datetime.now(timezone.utc).isoformat(),
+            "action": "contract_checked_resume_after_evaluator_failure",
+            "failure_repaired": (
+                "legacy_teacher_v3_predictions_missing_tic_column; tic_"
+                "bound_by_review_id_from_authorized_evaluation_support"
+            ),
+            **resume_audit,
+            **input_provenance,
+        }
+        resume_contract_sha256 = _write_json(
+            resume_contract_path,
+            resume_contract,
+        )
+        embeddings, embedding_audit = (
+            validate_and_recompute_existing_embeddings(
+                rows=rows,
+                encoders=encoders,
+                output_dir=output / "representation",
+                batch_size=int(batch_size),
+                workers=int(workers),
+                seed=int(seed),
+                require_cuda=bool(require_cuda),
+            )
+        )
+    else:
+        run_contract_sha256 = _write_json(contract_path, run_contract)
+        embeddings, embedding_audit = export_all_fold_embeddings(
+            rows=rows,
+            encoders=encoders,
+            output_dir=output / "representation",
+            batch_size=int(batch_size),
+            workers=int(workers),
+            seed=int(seed),
+            require_cuda=bool(require_cuda),
+        )
 
     comparison_records: list[dict[str, Any]] = []
     class_records: list[dict[str, Any]] = []
     policy_summaries: dict[str, Any] = {}
     for policy_index, policy in enumerate(LABEL_POLICIES):
         policy_dir = output / "policies" / policy
-        policy_dir.mkdir(parents=True, exist_ok=False)
         policy_rows = _policy_rows(rows, policy)
-        probe_oof, probe_summary = run_frozen_linear_probe(
-            all_rows=rows,
-            embeddings_by_fold=embeddings,
-            policy=policy,
-            output_dir=policy_dir / "frozen_linear_probe",
-            seed=int(seed),
-            steps=int(linear_probe_steps),
-        )
-
         fine_tune_root = policy_dir / "fine_tuned"
-        fine_tune_root.mkdir(parents=True, exist_ok=False)
-        fold_results: list[dict[str, Any]] = []
-        artifact_context = {
-            "checkpoint_schema": FULLPOOL_EVALUATION_CHECKPOINT_SCHEMA,
-            "run_id": FULLPOOL_EVALUATION_RUN_ID,
-            "model_facing_name": FULLPOOL_SSL_MODEL_FACING_NAME,
-            "checkpoint_namespace": FULLPOOL_EVALUATION_NAMESPACE,
-            "label_policy": policy,
-            "log_name": f"fullpool-eval-{policy}",
-        }
-        for fold, encoder in enumerate(encoders):
-            fold_results.append(
-                _run_finetune_fold(
-                    rows=policy_rows,
-                    fold=fold,
-                    ssl_result=encoder,
-                    out_dir=fine_tune_root,
-                    input_provenance=input_provenance,
-                    fine_tune_epochs=int(fine_tune_epochs),
-                    batch_size=int(batch_size),
-                    workers=int(workers),
-                    seed=int(seed),
-                    require_cuda=bool(require_cuda),
-                    artifact_context=artifact_context,
-                )
+        reuse_interrupted_policy = bool(resume and policy_index == 0)
+        if reuse_interrupted_policy:
+            if resume_audit is None:
+                raise AssertionError("resume audit was not initialized")
+            probe_oof, probe_summary = load_existing_linear_probe(
+                all_rows=rows,
+                policy=policy,
+                output_dir=policy_dir / "frozen_linear_probe",
             )
-        fine_oof, fine_summary = _pool_development_oof(
-            rows=policy_rows,
-            fold_results=fold_results,
-            out_dir=fine_tune_root,
-            input_provenance=input_provenance,
-            artifact_context={
-                "oof_schema": FULLPOOL_EVALUATION_OOF_SCHEMA,
-                "scope": "five_fold_real_development_oof_fine_tuned",
+            fine_oof, fine_summary = load_existing_finetuned_policy(
+                rows=policy_rows,
+                policy=policy,
+                fine_tune_root=fine_tune_root,
+                encoders=encoders,
+                expected_input_provenance=input_provenance,
+                expected_evaluation_code_revision=str(
+                    resume_audit["interrupted_evaluation_code_revision"]
+                ),
+            )
+            print(
+                f"[fullpool-eval-resume] reused completed {policy} probe "
+                "and five-fold fine-tune",
+                flush=True,
+            )
+        else:
+            policy_dir.mkdir(parents=True, exist_ok=False)
+            probe_oof, probe_summary = run_frozen_linear_probe(
+                all_rows=rows,
+                embeddings_by_fold=embeddings,
+                policy=policy,
+                output_dir=policy_dir / "frozen_linear_probe",
+                seed=int(seed),
+                steps=int(linear_probe_steps),
+            )
+            fine_tune_root.mkdir(parents=True, exist_ok=False)
+            fold_results: list[dict[str, Any]] = []
+            artifact_context = {
+                "checkpoint_schema": FULLPOOL_EVALUATION_CHECKPOINT_SCHEMA,
+                "run_id": FULLPOOL_EVALUATION_RUN_ID,
+                "model_facing_name": FULLPOOL_SSL_MODEL_FACING_NAME,
+                "checkpoint_namespace": FULLPOOL_EVALUATION_NAMESPACE,
                 "label_policy": policy,
-            },
-        )
+                "log_name": f"fullpool-eval-{policy}",
+            }
+            for fold, encoder in enumerate(encoders):
+                fold_results.append(
+                    _run_finetune_fold(
+                        rows=policy_rows,
+                        fold=fold,
+                        ssl_result=encoder,
+                        out_dir=fine_tune_root,
+                        input_provenance=input_provenance,
+                        fine_tune_epochs=int(fine_tune_epochs),
+                        batch_size=int(batch_size),
+                        workers=int(workers),
+                        seed=int(seed),
+                        require_cuda=bool(require_cuda),
+                        artifact_context=artifact_context,
+                    )
+                )
+            fine_oof, fine_summary = _pool_development_oof(
+                rows=policy_rows,
+                fold_results=fold_results,
+                out_dir=fine_tune_root,
+                input_provenance=input_provenance,
+                artifact_context={
+                    "oof_schema": FULLPOOL_EVALUATION_OOF_SCHEMA,
+                    "scope": "five_fold_real_development_oof_fine_tuned",
+                    "label_policy": policy,
+                },
+            )
         active_fine = fine_oof.loc[
             fine_oof["morphology_target"].to_numpy(dtype=int) >= 0
         ].copy()
@@ -1402,8 +1943,20 @@ def run_fullpool_ssl_evaluation(
             policy=policy,
             expected_review_ids=list(expected_truth),
             expected_truth=expected_truth,
+            expected_tic=dict(
+                zip(
+                    active_fine["review_id"].astype(str),
+                    pd.to_numeric(
+                        active_fine["tic"], errors="raise"
+                    ).to_numpy(dtype=np.int64),
+                )
+            ),
         )
         baseline_path = policy_dir / "teacher_v3_matched_oof_predictions.csv"
+        if baseline_path.exists():
+            raise RuntimeError(
+                f"refusing to overwrite baseline predictions: {baseline_path}"
+            )
         baseline.to_csv(
             baseline_path,
             index=False,
@@ -1489,6 +2042,11 @@ def run_fullpool_ssl_evaluation(
         "evaluation_code_revision": code_revision,
         "run_contract": str(contract_path),
         "run_contract_sha256": run_contract_sha256,
+        "resume": resume_audit,
+        "resume_contract": (
+            str(resume_contract_path) if resume_contract_path else None
+        ),
+        "resume_contract_sha256": resume_contract_sha256,
         "label_authority": label_audit,
         "encoder_authority": encoder_audit,
         "embedding_export": embedding_audit,

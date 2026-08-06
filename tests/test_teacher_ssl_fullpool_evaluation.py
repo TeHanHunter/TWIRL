@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -111,6 +113,61 @@ def test_probability_metrics_reports_multiclass_map() -> None:
     assert set(metrics["per_class_average_precision"]) == set(
         MORPHOLOGY_CLASSES
     )
+
+
+def test_teacher_v3_baseline_binds_legacy_predictions_to_authorized_tics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "teacher_v3"
+    summary_path = root / "summary.json"
+    summary_path.parent.mkdir(parents=True)
+    summary_path.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        evaluation,
+        "TEACHER_V3_EXPECTED_SUMMARY_SHA256",
+        evaluation._file_sha256(summary_path),
+    )
+    review_ids = [f"review-{fold}" for fold in range(5)]
+    truth = {
+        review_id: fold % len(MORPHOLOGY_CLASSES)
+        for fold, review_id in enumerate(review_ids)
+    }
+    tics = {review_id: 900_000 + fold for fold, review_id in enumerate(review_ids)}
+    for fold, review_id in enumerate(review_ids):
+        fold_dir = (
+            root
+            / evaluation.FULLPOOL_SSL_PROFILE
+            / f"fold_{fold}"
+        )
+        fold_dir.mkdir(parents=True)
+        target = truth[review_id]
+        probability = np.full(len(MORPHOLOGY_CLASSES), 0.1, dtype=float)
+        probability[target] = 0.7
+        payload = {
+            "review_id": [review_id],
+            "morphology_target": [target],
+            **{
+                f"p_{label}": [probability[index]]
+                for index, label in enumerate(MORPHOLOGY_CLASSES)
+            },
+        }
+        pd.DataFrame(payload).to_csv(
+            fold_dir / "validation_predictions.csv",
+            index=False,
+        )
+
+    baseline, summary = evaluation.load_teacher_v3_baseline_oof(
+        baseline_root=root,
+        policy="uncertain_as_other",
+        expected_review_ids=review_ids,
+        expected_truth=truth,
+        expected_tic=tics,
+    )
+
+    assert baseline.set_index("review_id")["tic"].to_dict() == tics
+    assert summary["n_tics"] == 5
+    assert summary["metrics"]["accuracy"] == pytest.approx(1.0)
 
 
 def test_development_label_binding_uses_fullpool_inputs(
@@ -379,6 +436,196 @@ def test_development_label_binding_proves_s63_whole_tic_exclusions(
     assert set(authority["raw_compact_manifests"]) == {"61", "62"}
 
 
+def test_resume_recomputes_and_validates_interrupted_embedding_exports(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = pd.DataFrame(
+        {
+            "review_id": [f"review-{fold}" for fold in range(5)],
+            "tic": np.arange(100, 105, dtype=np.int64),
+            "cv_fold": np.arange(5, dtype=np.int8),
+        }
+    )
+    encoders = [
+        {"fold": fold, "encoder_state_dict": {"test_fold": fold}}
+        for fold in range(5)
+    ]
+
+    def fake_extract(**kwargs: object) -> np.ndarray:
+        state = kwargs["encoder_state"]
+        assert isinstance(state, dict)
+        return np.full(
+            (len(rows), 128),
+            float(state["test_fold"]),
+            dtype=np.float32,
+        )
+
+    monkeypatch.setattr(evaluation, "_extract_encoder_embeddings", fake_extract)
+    output = tmp_path / "representation"
+    output.mkdir()
+    reference_path = output / "reference_fold_0_embeddings.npz"
+    held_path = output / "fold_safe_held_embeddings.npz"
+    with reference_path.open("wb") as stream:
+        np.savez_compressed(
+            stream,
+            review_id=rows["review_id"].to_numpy(dtype=object),
+            embedding=np.zeros((len(rows), 128), dtype=np.float32),
+        )
+    with held_path.open("wb") as stream:
+        np.savez_compressed(
+            stream,
+            review_id=rows["review_id"].to_numpy(dtype=object),
+            embedding=np.repeat(
+                np.arange(5, dtype=np.float32)[:, None], 128, axis=1
+            ),
+        )
+    summary_path = output / "embedding_export.summary.json"
+    summary_path.write_text(
+        json.dumps(
+            {
+                "reference_embeddings": str(reference_path),
+                "reference_embeddings_sha256": evaluation._file_sha256(
+                    reference_path
+                ),
+                "fold_safe_embeddings": str(held_path),
+                "fold_safe_embeddings_sha256": evaluation._file_sha256(
+                    held_path
+                ),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    embeddings, audit = evaluation.validate_and_recompute_existing_embeddings(
+        rows=rows,
+        encoders=encoders,
+        output_dir=output,
+        batch_size=2,
+        workers=0,
+        seed=56,
+        require_cuda=False,
+    )
+
+    assert len(embeddings) == 5
+    assert audit["resume_reused"] is True
+    assert "exactly_equal" in audit["resume_validation"]
+
+
+def test_resume_validates_calibrated_finetuned_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_torch = SimpleNamespace()
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    rows = pd.DataFrame(
+        {
+            "review_id": [f"review-{fold}" for fold in range(5)],
+            "tic": np.arange(900, 905, dtype=np.int64),
+            "cv_fold": np.arange(5, dtype=np.int8),
+            "morphology_target_index": np.arange(5, dtype=int) % 4,
+        }
+    )
+    fine_root = tmp_path / "fine_tuned"
+    profile = fine_root / evaluation.FULLPOOL_SSL_PROFILE
+    profile.mkdir(parents=True)
+    probability = np.full((5, 4), 0.1, dtype=float)
+    probability[np.arange(5), rows["morphology_target_index"]] = 0.7
+    oof = pd.DataFrame(
+        {
+            "review_id": rows["review_id"],
+            "tic": rows["tic"],
+            "cv_fold": rows["cv_fold"],
+            "morphology_target": rows["morphology_target_index"],
+            **{
+                f"p_{label}": probability[:, index]
+                for index, label in enumerate(MORPHOLOGY_CLASSES)
+            },
+        }
+    )
+    oof_path = profile / "development_oof_predictions.csv"
+    oof.to_csv(oof_path, index=False)
+    embedding_path = profile / "development_oof_embeddings.npz"
+    with embedding_path.open("wb") as stream:
+        np.savez_compressed(
+            stream,
+            review_id=rows["review_id"].to_numpy(dtype=str),
+            tic=rows["tic"].to_numpy(dtype=np.int64),
+            embedding=np.zeros((5, 128), dtype=np.float32),
+        )
+    interrupted_revision = "a" * 40
+    current_provenance = {
+        "evaluation_code_revision": "b" * 40,
+        "training_table_sha256": "1" * 64,
+        "fullpool_registry_sha256": "2" * 64,
+        "fullpool_registry_summary_sha256": "3" * 64,
+        "fullpool_completion_release_sha256": "4" * 64,
+        "fullpool_training_code_revision": "c" * 40,
+    }
+    calibration_path = profile / "pooled_oof_calibration.json"
+    calibration = {
+        "schema_version": evaluation.FULLPOOL_EVALUATION_OOF_SCHEMA,
+        "scope": "five_fold_real_development_oof_fine_tuned",
+        "label_policy": "uncertain_as_other",
+        "n_rows": 5,
+        "n_real_rows": 5,
+        "n_tics": 5,
+        "evaluation_code_revision": interrupted_revision,
+        "oof_predictions": str(oof_path),
+        "oof_predictions_sha256": evaluation._file_sha256(oof_path),
+        **{
+            name: value
+            for name, value in current_provenance.items()
+            if name != "evaluation_code_revision"
+        },
+    }
+    calibration_path.write_text(
+        json.dumps(calibration) + "\n",
+        encoding="utf-8",
+    )
+    calibration_sha256 = evaluation._file_sha256(calibration_path)
+    encoders = []
+    for fold in range(5):
+        fold_dir = profile / f"fold_{fold}"
+        fold_dir.mkdir()
+        checkpoint_path = fold_dir / "teacher.pt"
+        checkpoint_path.write_text(f"checkpoint-{fold}\n", encoding="utf-8")
+        encoders.append({"fold": fold, "checkpoint_sha256": f"ssl-{fold}"})
+
+    def fake_torch_load(path: Path, **kwargs: object) -> dict[str, object]:
+        fold = int(Path(path).parent.name.removeprefix("fold_"))
+        return {
+            "schema_version": evaluation.FULLPOOL_EVALUATION_CHECKPOINT_SCHEMA,
+            "run_id": evaluation.FULLPOOL_EVALUATION_RUN_ID,
+            "model_facing_name": evaluation.FULLPOOL_SSL_MODEL_FACING_NAME,
+            "checkpoint_namespace": evaluation.FULLPOOL_EVALUATION_NAMESPACE,
+            "label_policy": "uncertain_as_other",
+            "profile": evaluation.FULLPOOL_SSL_PROFILE,
+            "fold": fold,
+            "ssl_encoder_checkpoint_sha256": f"ssl-{fold}",
+            "temperature_calibration_scope": "pooled_development_oof",
+            "pooled_oof_calibration_sha256": calibration_sha256,
+            "evaluation_code_revision": interrupted_revision,
+        }
+
+    monkeypatch.setattr(fake_torch, "load", fake_torch_load, raising=False)
+
+    loaded_oof, summary = evaluation.load_existing_finetuned_policy(
+        rows=rows,
+        policy="uncertain_as_other",
+        fine_tune_root=fine_root,
+        encoders=encoders,
+        expected_input_provenance=current_provenance,
+        expected_evaluation_code_revision=interrupted_revision,
+    )
+
+    assert len(loaded_oof) == 5
+    assert summary["resume_reused"] is True
+    assert len(summary["checkpoint_sha256"]) == 5
+
+
 def test_orcd_evaluation_asset_uses_one_h200_and_sealed_development() -> None:
     root = Path(__file__).resolve().parents[1]
     asset = (
@@ -392,5 +639,7 @@ def test_orcd_evaluation_asset_uses_one_h200_and_sealed_development() -> None:
     assert "--completion-release" in asset
     assert "--baseline-teacher-v3-root" in asset
     assert "--bootstrap-draws" in asset
+    assert "TWIRL_EVALUATION_RESUME" in asset
+    assert "--resume" in asset
     assert "fixed_test_predictions" not in asset
     assert "sector_63" not in asset.lower()
