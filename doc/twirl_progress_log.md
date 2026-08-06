@@ -578,15 +578,30 @@ sample.
   only when that complete key set and both sums agree; missing, nonpositive, or
   inconsistent legacy counts fail. The original accepted receipt remains
   unchanged, and its real PDO JSON passes the corrected read-only preflight.
+- `2026-08-06`: Exact commit `af83863e` completed the authoritative PDO
+  preprocessing gates without opening S63 model scores. The attested accepted
+  Stage-1 receipt has SHA-256 `f351529b...dbc`; the cadence authority contains
+  `179,040` rows for orbits `133/134`; and the `7,183,065,848`-byte compact ADP
+  pair exported exactly `53,249` targets with zero read, filter, duplicate, or
+  missing-flux skips (SHA-256 `aa299a9a...db48`). Model readiness froze the
+  same `53,249` TICs and documented `263` reserved edge omissions. The exact
+  partition is `52,487` Teacher-v3-disjoint primary TICs plus `762` repeated
+  hosts, with disjointness and exhaustive-union checks passed. All artifacts
+  identify the positive decision as human-confirmed Planet-like transit
+  morphology and explicitly disclaim confirmed-exoplanet status. The sealed
+  inputs were transferred to user-owned ORCD storage, recomputed byte-for-byte,
+  and atomically published beside a clean detached `af83863e` checkout. Slurm
+  test-only admission passed; the locked 16-shard CPU BLS array is job
+  `19793979`, with after-success merge job `19793980`.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Commit and deploy the tested S63 lane, rerun its receipt, cadence,
-and compact stages from that exact clean Git object, freeze the model-ready
-cohorts and remaining input hashes, then run Teacher v3 once and produce the
+**Next:** Monitor ORCD BLS array `19793979` and merge `19793980`; after their
+independent artifact gates pass, build and merge the native-input shards,
+publish the immutable launch manifest, run Teacher v3 once, and produce the
 annotation-withheld enrichment-plus-control review queue. Do not inspect S63
-scores before the freeze, schedule unrelated corpus labeling, or start student
-pseudo-labeling.
+scores before the launch freeze, schedule unrelated corpus labeling, or start
+student pseudo-labeling.
 
 ### Human labels and harmonic review
 

@@ -247,9 +247,10 @@ source, and exact input provenance.
 The next model use is the sealed prospective S63 enrichment run. Its primary
 cohort is every validated, model-ready S63 TIC absent from the frozen Teacher
 v3 corpus; repeated Teacher-v3 hosts form a separately reported side cohort.
-The current nonzero-HDF5 inventory finds `53,249` S63 TICs (`52,487` disjoint
-and `762` repeated), but the final cohort must be frozen from the validated
-compact export rather than this filename inventory. Use the original
+The exact-commit S63 compact/model-ready gate has now frozen `53,249` usable
+TICs: `52,487` are disjoint from the Teacher-v3 corpus and `762` are repeated
+hosts. A further `263` reserved TICs are documented Stage-1 edge omissions and
+are excluded from model input. Use the original
 Teacher-v3 current-ADP/native contract for the primary test; the corrected SSL
 tensor contract would be a separately preregistered sensitivity, not a silent
 input substitution. Freeze all hashes, the rank-one two-aperture BLS rule,
@@ -412,13 +413,13 @@ Stage-1 lane. Its stop-on-failure gates remain mandatory, but gathering every
 later sector does not block the sealed S63 model test.
 
 1. Complete the exact-commit run of the implemented checksum-bound Teacher-v3
-   prospective S63 lane: preserve and revalidate the accepted A2v1 receipt,
-   build the attested compact current-ADP and cadence authority, freeze the
-   exact model-ready disjoint/repeated cohorts, run the locked rank-one
-   two-aperture BLS/native path, and score with the unchanged frozen five-fold
-   Teacher-v3 ensemble. Select a deterministic annotation-withheld enrichment
-   queue plus a preregistered control sample; do not inspect scores before the
-   contract is frozen or use probabilities as labels.
+   prospective S63 lane. The accepted receipt, cadence authority, compact
+   current-ADP export, model-ready allowlist, and disjoint/repeated cohorts are
+   frozen and hash-verified on PDO and ORCD; finish the submitted locked
+   rank-one two-aperture BLS/native path, then score with the unchanged frozen
+   five-fold Teacher-v3 ensemble. Select a deterministic annotation-withheld
+   enrichment queue plus a preregistered control sample; do not inspect scores
+   before the contract is frozen or use probabilities as labels.
 2. Complete annotation-withheld human review and then unblind once. Report
    Planet-like morphology yield/precision and top-K lift versus the control,
    with primary TIC-disjoint hosts and repeated hosts separated. Do not claim
