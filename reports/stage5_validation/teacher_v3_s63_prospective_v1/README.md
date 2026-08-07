@@ -62,6 +62,15 @@ final cohort authority. It contains `53,249` S63 TICs with nonzero HDF5 files:
 only from the validated compact/model-ready export and will be bound in a new
 immutable launch manifest before the first S63 model-scoring job.
 
+The transparent BLS candidate gate subsequently identified `89` model-ready
+TICs without a successful rank-one result in both required ADP apertures. All
+`89` are in the disjoint primary cohort; none are repeated hosts. They remain
+in model-ready/cohort accounting as explicit pre-score BLS failures but cannot
+enter candidate, native, scoring, or queue artifacts. The resulting candidate
+population is `53,160` TICs. This availability rule was recorded before any
+Teacher-v3 S63 score was opened; it does not depend on model output and does
+not change the immutable prospective-plan bytes.
+
 ## Primary reporting
 
 Report human Planet-like morphology yield for each hidden selection bucket,

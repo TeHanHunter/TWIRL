@@ -262,7 +262,12 @@ v3 corpus; repeated Teacher-v3 hosts form a separately reported side cohort.
 The exact-commit S63 compact/model-ready gate has now frozen `53,249` usable
 TICs: `52,487` are disjoint from the Teacher-v3 corpus and `762` are repeated
 hosts. A further `263` reserved TICs are documented Stage-1 edge omissions and
-are excluded from model input. Use the original
+are excluded from model input. The transparent BLS gate leaves `53,160`
+successful two-aperture rank-one candidates: `89` model-ready primary-cohort
+TICs have an explicit pre-score BLS failure, while all `762` repeated hosts
+remain candidate-eligible. Retain those failures in cohort accounting but do
+not fabricate candidates or pass them to native input, scoring, or review.
+Use the original
 Teacher-v3 current-ADP/native contract for the primary test; the corrected SSL
 tensor contract would be a separately preregistered sensitivity, not a silent
 input substitution. Freeze all hashes, the rank-one two-aperture BLS rule,
@@ -430,7 +435,8 @@ one-cell A2v1 parity smoke; cap it at two H200s and 78 live ORCD CPUs.
    prospective S63 lane. The accepted receipt, cadence authority, compact
    current-ADP export, model-ready allowlist, and disjoint/repeated cohorts are
    frozen and hash-verified on PDO and ORCD, and the locked rank-one
-   two-aperture BLS table is complete. Finish the candidate/native path, then
+   two-aperture BLS table is complete. Finish the corrected candidate/native
+   path with the `89` pre-score BLS failures retained explicitly, then
    score with the unchanged frozen five-fold Teacher-v3 ensemble. Select a
    deterministic annotation-withheld enrichment queue plus a preregistered
    control sample; do not inspect scores before the contract is frozen or use

@@ -558,7 +558,8 @@ sample.
   one exact clean producer Git SHA through cadence, model-ready, cohort, BLS,
   candidate, raw-source, native-input, scoring, and queue artifacts. The
   [prospective assets](../reports/stage5_validation/teacher_v3_s63_prospective_v1/)
-  now include a pre-score selection policy with SHA-256 `52e63c4d...692f`;
+  now include a pre-score selection policy; its current pre-score errata-bound
+  SHA-256 is `51f238c5...5e3e`;
   the original prospective-plan bytes remain unchanged at `c2fcc7c7...ec8f`.
   Its explicit erratum narrows the review boundary honestly: score, bucket,
   control-stratum, and explicit cohort annotations are withheld, but visible
@@ -619,6 +620,20 @@ sample.
   attested finite-count ledger and merged `passed=true` gate remain intact.
   Preserve those warnings as diagnostic provenance and require the candidate
   builder's one-row-per-TIC and feature-presence gates before native export.
+- `2026-08-07`: Candidate job `19868952` failed closed before publishing any
+  candidate or score artifact because the compact-derived model-ready set was
+  broader than the successful two-aperture rank-one population. Exact audit
+  found `53,160/53,249` candidate-eligible TICs: `80` lack ADP-small rank one,
+  `79` lack primary-ADP rank one, and their union is `89`. All `89` belong to
+  the Teacher-v3-disjoint primary cohort; no repeated host is affected. The
+  candidate contract is corrected pre-score to preserve all `89` in
+  model-ready/cohort accounting as explicit BLS-ineligible observations while
+  excluding them from native input, scoring, and queue selection. The
+  selection policy records that transparent status-only rule with S63 Teacher
+  scores still unopened; the immutable prospective-plan bytes remain
+  unchanged. Launch provenance now binds the exact upstream preprocessing Git
+  object separately from the clean descendant that produces candidate/native
+  and score artifacts.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 

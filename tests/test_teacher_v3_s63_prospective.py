@@ -442,6 +442,9 @@ def test_plan_and_tic_inventories_are_byte_hash_bound(tmp_path: Path) -> None:
     assert policy["status"] == "frozen_before_s63_scores"
     assert policy["deterministic_bucket_selection"]["inclusion_probability"] is None
     assert policy["erratum_to_prospective_plan"]["prospective_plan_bytes_unchanged"] is True
+    assert policy["pre_score_candidate_availability"][
+        "s63_teacher_scores_opened_before_record"
+    ] is False
     assert policy["blinding"]["cohort_annotation_withheld"] is True
     assert policy["blinding"]["cohort_joinable_from_visible_tic"] is True
     assert policy_sha == file_sha256(SELECTION_POLICY_PATH)
@@ -573,12 +576,29 @@ def test_candidate_contract_uses_rank_one_small_with_primary_context(tmp_path: P
         )
 
     missing_primary = _candidate_peaks([101, 102, 103]).drop(index=3)
-    with pytest.raises(ValueError, match="lack successful rank-one ADP-primary"):
+    with pytest.raises(ValueError, match="lack explained rank-one ADP-primary"):
         build_s63_rank_one_candidates(
             missing_primary,
             model_ready_tics=[101, 102, 103],
             artifact_hashes=_candidate_hashes(),
         )
+
+    explained_primary_failure = _candidate_peaks([101, 102, 103])
+    failed = explained_primary_failure["tic"].eq(101) & explained_primary_failure[
+        "aperture"
+    ].eq(ADP_ONLY_APERTURES[1])
+    explained_primary_failure.loc[failed, "status"] = "too_few_cadences"
+    explained_primary_failure.loc[failed, "peak_rank"] = 0
+    eligible, eligible_summary = build_s63_rank_one_candidates(
+        explained_primary_failure,
+        model_ready_tics=[101, 102, 103],
+        artifact_hashes=_candidate_hashes(),
+    )
+    assert eligible["tic"].tolist() == [102, 103]
+    assert eligible_summary["n_model_ready_tics"] == 3
+    assert eligible_summary["n_bls_ineligible_tics"] == 1
+    assert eligible_summary["bls_ineligible_tics"] == [101]
+    assert eligible_summary["teacher_scores_opened"] is False
 
     absent_metadata = _candidate_peaks([101, 102, 103])
     absent_metadata["adp_trend_ptp"] = np.nan
@@ -718,6 +738,24 @@ def test_review_queue_is_deterministic_exact_and_blinded(tmp_path: Path) -> None
     assert hidden["execution_git_sha"].eq(_git_sha()).all()
     assert hidden["queue_order_hash"].is_monotonic_increasing
     assert "queue_order_hash" not in queue
+
+    # Transparent pre-score BLS failures remain in cohort accounting but do
+    # not appear in the candidate/score population.
+    excluded_before_scoring = set(primary[:5])
+    subset_scores = scores.loc[
+        ~scores["tic"].isin(excluded_before_scoring)
+    ].reset_index(drop=True)
+    subset_queue, subset_hidden, _, _ = build_s63_prospective_review_queue(
+        subset_scores,
+        primary_tics=primary,
+        repeated_host_tics=repeated,
+        artifact_hashes=_queue_hashes(),
+        selection_policy=_selection_policy(),
+        launch_binding=_queue_launch_binding(),
+        producer_git_sha=_git_sha(),
+    )
+    assert len(subset_queue) == 1100
+    assert not set(subset_hidden["tic"]) & excluded_before_scoring
     fractional_queue = queue.copy()
     fractional_hidden = hidden.copy()
     fractional_queue["row_id"] = fractional_queue["row_id"].astype(float)

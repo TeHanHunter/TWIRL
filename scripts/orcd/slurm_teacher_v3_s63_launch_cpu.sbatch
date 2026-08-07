@@ -22,6 +22,7 @@ fi
 TWIRL_ROOT="${TWIRL_ORCD_ROOT:-/orcd/data/mki_aryeh/001/twirl}"
 REPO="${TWIRL_ORCD_REPO:?set the clean pinned TWIRL checkout}"
 EXPECTED_GIT_SHA="${TWIRL_EXPECTED_GIT_SHA:?set the full deployed Git SHA}"
+UPSTREAM_PRODUCER_GIT_SHA="${TWIRL_S63_UPSTREAM_PRODUCER_GIT_SHA:?set the exact upstream preprocessing Git SHA}"
 PYTHON="${TWIRL_ORCD_STAGE2_PYTHON:-${TWIRL_ROOT}/envs/twirl-s56/bin/python}"
 
 PLAN="${TWIRL_S63_PROSPECTIVE_PLAN:?set prospective plan}"
@@ -156,6 +157,7 @@ export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
   --raw-source-h5 "${RAW}" --raw-source-summary "${RAW_SUMMARY}" \
   --native-h5 "${NATIVE}" --native-summary "${NATIVE_SUMMARY}" \
   --repo "${REPO}" --expected-git-sha "${EXPECTED_GIT_SHA}" \
+  --upstream-producer-git-sha "${UPSTREAM_PRODUCER_GIT_SHA}" \
   --out "${PENDING_OUTPUT}" >/dev/null
 if [[ ! -s "${PENDING_OUTPUT}" ]]; then
   echo "S63 launch builder did not create its staged manifest." >&2

@@ -124,6 +124,13 @@
     "prospective_plan_bytes_unchanged": true,
     "s63_teacher_scores_opened_before_erratum": false
   },
+  "pre_score_candidate_availability": {
+    "candidate_population": "Model-ready S63 TICs with a successful rank-one BLS result in both DET_FLUX_ADP_SML and DET_FLUX_ADP",
+    "failure_handling": "Retain BLS-ineligible TICs in model-ready cohort accounting but exclude them from candidate, native, scoring, and queue artifacts",
+    "failure_basis": "Transparent BLS status only; Teacher-v3 scores remain unopened",
+    "prospective_plan_bytes_unchanged": true,
+    "s63_teacher_scores_opened_before_record": false
+  },
   "blinding": {
     "reviewer_visible_excludes": [
       "teacher probabilities and logits",

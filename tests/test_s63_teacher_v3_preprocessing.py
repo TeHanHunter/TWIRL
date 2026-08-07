@@ -509,7 +509,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
     _write_json(
         candidate_summary,
         {
-            "schema_version": "twirl_teacher_v3_s63_rank1_candidates_v1",
+            "schema_version": module.CANDIDATE_CONTRACT_VERSION,
             "sector": 63,
             "science_ready": False,
             "promotion_enabled": False,
@@ -518,6 +518,12 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
             ),
             "n_rows": 2,
             "n_unique_tics": 2,
+            "n_model_ready_tics": 2,
+            "n_bls_ineligible_tics": 0,
+            "bls_ineligible_tics": [],
+            "candidate_tics_sha256": module.tic_inventory_sha256({1, 2}),
+            "bls_ineligible_tics_sha256": module.tic_inventory_sha256(set()),
+            "teacher_scores_opened": False,
             "candidate_table_sha256": module.file_sha256(candidates),
             "artifact_hashes": {
                 "prospective_plan_sha256": module.file_sha256(plan),
@@ -592,6 +598,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
     ).stdout.strip()
+    upstream_git_sha = "a" * 40
 
     # Freeze the immutable production receipt, then attest only its exact copy.
     hlsp_root = tmp_path / "accepted_hlsp"
@@ -615,7 +622,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
     accepted_payload = dict(source_payload)
     accepted_payload.update(
         {
-            "producer_git_sha": git_sha,
+            "producer_git_sha": upstream_git_sha,
             "attestation_contract_version": (
                 "twirl_teacher_v3_s63_stage1_receipt_attestation_v1"
             ),
@@ -629,7 +636,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
 
     with h5py.File(compact, "r+") as h5:
         h5.attrs["hlsp_root"] = str(hlsp_root)
-        h5.attrs["producer_git_sha"] = git_sha
+        h5.attrs["producer_git_sha"] = upstream_git_sha
         h5.attrs["attestation_contract_version"] = (
             "twirl_teacher_v3_s63_compact_attestation_v1"
         )
@@ -668,7 +675,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
                 }
                 for tic in (1, 2)
             ],
-            "producer_git_sha": git_sha,
+            "producer_git_sha": upstream_git_sha,
             "attestation_contract_version": (
                 "twirl_teacher_v3_s63_compact_attestation_v1"
             ),
@@ -678,12 +685,12 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
     compact_manifest_sha = module.file_sha256(compact_manifest)
 
     cadence_payload = json.loads(cadence_manifest.read_text())
-    cadence_payload["producer_git_sha"] = git_sha
+    cadence_payload["producer_git_sha"] = upstream_git_sha
     _write_json(cadence_manifest, cadence_payload)
     cadence_manifest_sha = module.file_sha256(cadence_manifest)
 
     model_payload = json.loads(model_ready_summary.read_text())
-    model_payload["producer_git_sha"] = git_sha
+    model_payload["producer_git_sha"] = upstream_git_sha
     model_payload["source_hashes"].update(
         {
             "accepted_stage1_validation_sha256": accepted_sha,
@@ -693,12 +700,12 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
     )
     _write_json(model_ready_summary, model_payload)
     cohort_payload = json.loads(cohort_summary.read_text())
-    cohort_payload["producer_git_sha"] = git_sha
+    cohort_payload["producer_git_sha"] = upstream_git_sha
     _write_json(cohort_summary, cohort_payload)
     bls_payload = json.loads(bls_summary.read_text())
     bls_payload.update(
         {
-            "producer_git_sha": git_sha,
+            "producer_git_sha": upstream_git_sha,
             "compact_lc_sha256": compact_sha,
             "cadence_reference_manifest_sha256": cadence_manifest_sha,
             "target_metadata_contract_version": (
@@ -775,6 +782,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
         native_summary=native_summary,
         repo=repo,
         expected_git_sha=git_sha,
+        upstream_producer_git_sha=upstream_git_sha,
     )
     manifest = module.build_launch_manifest(args)
     assert manifest["passed"] is True
@@ -808,7 +816,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
             compact,
             compact_manifest,
             accepted_validation_path=accepted,
-            expected_producer_git_sha=git_sha,
+            expected_producer_git_sha=upstream_git_sha,
         )
     compact_manifest.write_text(compact_manifest_original, encoding="utf-8")
 
@@ -825,7 +833,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
             cadence_manifest_sha256=cadence_manifest_sha,
             allowlist_sha256=module.file_sha256(model_ready),
             allowlist_tics=[1, 2],
-            expected_producer_git_sha=git_sha,
+            expected_producer_git_sha=upstream_git_sha,
         )
     bls_summary.write_text(bls_summary_original, encoding="utf-8")
 
@@ -835,7 +843,7 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
     _write_json(
         subset_summary,
         {
-            "schema_version": "twirl_teacher_v3_s63_rank1_candidates_v1",
+            "schema_version": module.CANDIDATE_CONTRACT_VERSION,
             "producer_git_sha": git_sha,
             "sector": 63,
             "science_ready": False,
@@ -845,6 +853,12 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
             ),
             "n_rows": 1,
             "n_unique_tics": 1,
+            "n_model_ready_tics": 2,
+            "n_bls_ineligible_tics": 1,
+            "bls_ineligible_tics": [2],
+            "candidate_tics_sha256": module.tic_inventory_sha256({1}),
+            "bls_ineligible_tics_sha256": module.tic_inventory_sha256({2}),
+            "teacher_scores_opened": False,
             "candidate_table_sha256": module.file_sha256(subset_candidates),
             "artifact_hashes": {
                 "prospective_plan_sha256": module.file_sha256(plan),
@@ -853,18 +867,19 @@ def test_full_synthetic_s63_launch_manifest(tmp_path: Path) -> None:
             },
         },
     )
-    with pytest.raises(ValueError, match="exactly equal"):
-        module._validate_candidates(
-            candidates_path=subset_candidates,
-            summary_path=subset_summary,
-            model_ready_tics={1, 2},
-            expected_hashes={
-                "prospective_plan": module.file_sha256(plan),
-                "bls_peaks": module.file_sha256(peaks),
-                "allowlist": module.file_sha256(model_ready),
-            },
-            expected_producer_git_sha=git_sha,
-        )
+    subset_result = module._validate_candidates(
+        candidates_path=subset_candidates,
+        summary_path=subset_summary,
+        model_ready_tics={1, 2},
+        expected_hashes={
+            "prospective_plan": module.file_sha256(plan),
+            "bls_peaks": module.file_sha256(peaks),
+            "allowlist": module.file_sha256(model_ready),
+        },
+        expected_producer_git_sha=git_sha,
+    )
+    assert subset_result["n_candidate_tics"] == 1
+    assert subset_result["n_bls_ineligible_tics"] == 1
 
     (repo / "untracked.txt").write_text("dirty\n", encoding="utf-8")
     with pytest.raises(ValueError, match="fully clean"):

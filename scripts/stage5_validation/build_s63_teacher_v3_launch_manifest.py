@@ -41,8 +41,10 @@ from twirl.vetting.harmonic_inputs import (  # noqa: E402
     RAW_PAIR_CONTRACT_VERSION,
 )
 from twirl.vetting.teacher_v3_prospective import (  # noqa: E402
+    CANDIDATE_CONTRACT_VERSION,
     load_selection_policy,
     load_prospective_plan,
+    tic_inventory_sha256,
 )
 from twirl.vetting.s63_preprocessing import (  # noqa: E402
     require_producer_git_sha,
@@ -669,22 +671,42 @@ def _validate_candidates(
     candidate_tics = set(
         pd.to_numeric(candidates["tic"], errors="raise").astype(int).tolist()
     )
-    if candidate_tics != model_ready_tics:
+    if not candidate_tics or not candidate_tics.issubset(model_ready_tics):
         raise ValueError(
-            "candidate TICs must exactly equal the model-ready allowlist; "
-            f"missing={sorted(model_ready_tics - candidate_tics)[:10]}, "
+            "candidate TICs must be a nonempty subset of the model-ready allowlist; "
             f"extra={sorted(candidate_tics - model_ready_tics)[:10]}"
         )
     if candidates["tic"].duplicated().any():
         raise ValueError("candidate table must contain at most one row per TIC")
-    if summary.get("schema_version") != "twirl_teacher_v3_s63_rank1_candidates_v1":
+    if summary.get("schema_version") != CANDIDATE_CONTRACT_VERSION:
         raise ValueError("candidate summary schema mismatch")
     if summary.get("sector") != SECTOR:
         raise ValueError("candidate summary is not S63")
-    if int(summary.get("n_rows", -1)) != len(model_ready_tics) or int(
+    if int(summary.get("n_rows", -1)) != len(candidate_tics) or int(
         summary.get("n_unique_tics", -1)
-    ) != len(model_ready_tics):
-        raise ValueError("candidate summary does not cover every model-ready TIC once")
+    ) != len(candidate_tics):
+        raise ValueError("candidate summary does not cover every candidate TIC once")
+    excluded_tics = model_ready_tics - candidate_tics
+    declared_excluded = summary.get("bls_ineligible_tics")
+    if not isinstance(declared_excluded, list) or {
+        int(value) for value in declared_excluded
+    } != excluded_tics:
+        raise ValueError("candidate summary BLS-ineligible TIC inventory drifted")
+    if int(summary.get("n_model_ready_tics", -1)) != len(model_ready_tics) or int(
+        summary.get("n_bls_ineligible_tics", -1)
+    ) != len(excluded_tics):
+        raise ValueError("candidate summary model-ready/exclusion counts drifted")
+    if _valid_sha256(
+        summary.get("candidate_tics_sha256"), label="candidate TIC hash"
+    ) != tic_inventory_sha256(candidate_tics):
+        raise ValueError("candidate summary candidate TIC hash drifted")
+    if _valid_sha256(
+        summary.get("bls_ineligible_tics_sha256"),
+        label="BLS-ineligible TIC hash",
+    ) != tic_inventory_sha256(excluded_tics):
+        raise ValueError("candidate summary BLS-ineligible TIC hash drifted")
+    if summary.get("teacher_scores_opened") is not False:
+        raise ValueError("candidate summary must prove Teacher-v3 scores were unopened")
     if summary.get("science_ready") is not False or summary.get(
         "promotion_enabled"
     ) is not False:
@@ -728,6 +750,8 @@ def _validate_candidates(
     return {
         "n_candidates": int(len(candidates)),
         "n_candidate_tics": int(len(candidate_tics)),
+        "n_bls_ineligible_tics": int(len(excluded_tics)),
+        "bls_ineligible_tics_sha256": tic_inventory_sha256(excluded_tics),
         "_candidate_tics": sorted(candidate_tics),
         "passed": True,
     }
@@ -906,6 +930,10 @@ def _publish_json_atomic(payload: Mapping[str, Any], output: Path) -> None:
 def build_launch_manifest(args: argparse.Namespace) -> dict[str, Any]:
     git = _git_identity(args.repo, args.expected_git_sha)
     producer_git_sha = git["sha"]
+    upstream_producer_git_sha = validate_producer_git_sha(
+        args.upstream_producer_git_sha,
+        label="upstream preprocessing producer Git SHA",
+    )
     artifacts = {
         "preregistered_contract": _artifact(args.preregistered_contract, label="preregistered contract"),
         "selection_policy": _artifact(args.selection_policy, label="selection policy"),
@@ -938,18 +966,18 @@ def build_launch_manifest(args: argparse.Namespace) -> dict[str, Any]:
     selection_policy = _validate_selection_policy(args.selection_policy)
     stage1 = validate_accepted_stage1(
         args.accepted_validation,
-        expected_producer_git_sha=producer_git_sha,
+        expected_producer_git_sha=upstream_producer_git_sha,
     )
     cadence = _validate_cadence(
         args.cadence_table,
         args.cadence_manifest,
-        expected_producer_git_sha=producer_git_sha,
+        expected_producer_git_sha=upstream_producer_git_sha,
     )
     compact = _validate_compact(
         args.compact_h5,
         args.compact_manifest,
         accepted_validation_path=args.accepted_validation,
-        expected_producer_git_sha=producer_git_sha,
+        expected_producer_git_sha=upstream_producer_git_sha,
     )
     reserved_tics = _read_tic_inventory(args.reserved_tics, label="reserved TIC inventory")
     reservation = preregistered["s63_identity_reservation"]
@@ -992,7 +1020,7 @@ def build_launch_manifest(args: argparse.Namespace) -> dict[str, Any]:
         },
         n_reserved=len(reserved_tics),
         n_model_ready=len(model_ready_tics),
-        expected_producer_git_sha=producer_git_sha,
+        expected_producer_git_sha=upstream_producer_git_sha,
     )
     primary_tics = _read_tic_inventory(
         args.primary_cohort, label="primary prospective cohort"
@@ -1020,7 +1048,9 @@ def build_launch_manifest(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("model-ready plus excluded inventories do not recover the seal")
     cohort_summary = _load_json(args.cohort_summary, label="prospective cohort summary")
     require_producer_git_sha(
-        cohort_summary, producer_git_sha, label="prospective cohort summary"
+        cohort_summary,
+        upstream_producer_git_sha,
+        label="prospective cohort summary",
     )
     if cohort_summary.get("schema_version") != "twirl_teacher_v3_s63_cohorts_v1":
         raise ValueError("prospective cohort summary schema mismatch")
@@ -1065,7 +1095,7 @@ def build_launch_manifest(args: argparse.Namespace) -> dict[str, Any]:
         cadence_manifest_sha256=artifacts["cadence_manifest"]["sha256"],
         allowlist_sha256=artifacts["model_ready_allowlist"]["sha256"],
         allowlist_tics=model_ready_tics,
-        expected_producer_git_sha=producer_git_sha,
+        expected_producer_git_sha=upstream_producer_git_sha,
     )
     candidates = _validate_candidates(
         candidates_path=args.candidates,
@@ -1108,6 +1138,7 @@ def build_launch_manifest(args: argparse.Namespace) -> dict[str, Any]:
         "score_or_queue_read": False,
         "git": git,
         "producer_git_sha": producer_git_sha,
+        "upstream_preprocessing_producer_git_sha": upstream_producer_git_sha,
         "artifacts": artifacts,
         "checks": {
             "accepted_stage1": stage1,
@@ -1173,6 +1204,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--native-summary", type=Path)
     parser.add_argument("--repo", type=Path, default=ROOT)
     parser.add_argument("--expected-git-sha")
+    parser.add_argument("--upstream-producer-git-sha")
     parser.add_argument("--out", type=Path)
     return parser
 
@@ -1223,6 +1255,7 @@ def main(argv: list[str] | None = None) -> int:
         "native_h5",
         "native_summary",
         "expected_git_sha",
+        "upstream_producer_git_sha",
         "out",
     )
     missing = [name for name in required if getattr(args, name) in (None, "")]

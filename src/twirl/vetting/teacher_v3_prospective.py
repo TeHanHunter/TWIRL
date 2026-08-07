@@ -37,7 +37,7 @@ S63_SECTOR = 63
 PROSPECTIVE_PLAN_SCHEMA = "twirl_teacher_v3_s63_prospective_plan_v1"
 SELECTION_POLICY_SCHEMA = "twirl_teacher_v3_s63_selection_policy_v1"
 COHORT_CONTRACT_VERSION = "twirl_teacher_v3_s63_cohorts_v1"
-CANDIDATE_CONTRACT_VERSION = "twirl_teacher_v3_s63_rank1_candidates_v1"
+CANDIDATE_CONTRACT_VERSION = "twirl_teacher_v3_s63_rank1_candidates_v2"
 QUEUE_POLICY_VERSION = "twirl_teacher_v3_s63_blinded_enrichment_v1"
 PROSPECTIVE_USE_SCOPE = "human_morphology_enrichment_only"
 S63_LAUNCH_CONTRACT = "twirl_teacher_v3_s63_prospective_launch_v1"
@@ -519,6 +519,27 @@ def validate_selection_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     }
     if dict(erratum) != expected_erratum:
         raise ValueError("selection policy prospective-plan erratum drifted")
+    candidate_availability = _mapping(
+        policy.get("pre_score_candidate_availability"),
+        context="selection policy candidate availability",
+    )
+    expected_candidate_availability = {
+        "candidate_population": (
+            "Model-ready S63 TICs with a successful rank-one BLS result in "
+            "both DET_FLUX_ADP_SML and DET_FLUX_ADP"
+        ),
+        "failure_handling": (
+            "Retain BLS-ineligible TICs in model-ready cohort accounting but "
+            "exclude them from candidate, native, scoring, and queue artifacts"
+        ),
+        "failure_basis": (
+            "Transparent BLS status only; Teacher-v3 scores remain unopened"
+        ),
+        "prospective_plan_bytes_unchanged": True,
+        "s63_teacher_scores_opened_before_record": False,
+    }
+    if dict(candidate_availability) != expected_candidate_availability:
+        raise ValueError("selection policy candidate-availability record drifted")
     blinding = _mapping(
         policy.get("blinding"), context="selection policy blinding"
     )
@@ -1338,15 +1359,28 @@ def build_s63_rank_one_candidates(
     primary = frame.loc[
         rank_one & good & frame["aperture"].astype(str).eq(ADP_ONLY_APERTURES[1])
     ].copy()
-    for name, selected in (("ADP-small", small), ("ADP-primary", primary)):
+    successful_tics: dict[str, set[int]] = {}
+    for name, aperture, selected in (
+        ("ADP-small", ADP_ONLY_APERTURES[0], small),
+        ("ADP-primary", ADP_ONLY_APERTURES[1], primary),
+    ):
         if selected["tic"].duplicated().any():
             raise ValueError(f"S63 BLS table has duplicate rank-one {name} rows")
         selected_tics = set(selected["tic"].astype(np.int64))
-        if selected_tics != model:
+        unexplained_missing = []
+        for tic in sorted(model - selected_tics):
+            rows = frame.loc[
+                frame["tic"].astype(np.int64).eq(tic)
+                & frame["aperture"].astype(str).eq(aperture)
+            ]
+            if rows.empty or rows["status"].astype(str).eq("ok").all():
+                unexplained_missing.append(tic)
+        if unexplained_missing:
             raise ValueError(
-                f"model-ready TICs lack successful rank-one {name} results: "
-                f"{sorted(model - selected_tics)[:10]}"
+                f"model-ready TICs lack explained rank-one {name} results: "
+                f"{unexplained_missing[:10]}"
             )
+        successful_tics[name] = selected_tics
         for column in ("period_d", "t0_bjd", "duration_min"):
             _strict_numeric(selected, column, positive=column != "t0_bjd")
         if set(selected["target_metadata_contract_version"].astype(str)) != {
@@ -1366,6 +1400,14 @@ def build_s63_rank_one_candidates(
                     f"rank-one {name} metadata {column} is wholly absent"
                 )
             selected[column] = numeric
+    candidate_tics = successful_tics["ADP-small"] & successful_tics["ADP-primary"]
+    if not candidate_tics:
+        raise ValueError("S63 BLS produced no two-aperture rank-one candidates")
+    bls_ineligible_tics = model - candidate_tics
+    missing_small = model - successful_tics["ADP-small"]
+    missing_primary = model - successful_tics["ADP-primary"]
+    small = small.loc[small["tic"].astype(np.int64).isin(candidate_tics)].copy()
+    primary = primary.loc[primary["tic"].astype(np.int64).isin(candidate_tics)].copy()
     small = small.sort_values("tic", kind="stable").reset_index(drop=True)
     primary = primary.sort_values("tic", kind="stable").reset_index(drop=True)
     for column in TEACHER_V3_CANDIDATE_METADATA_COLUMNS:
@@ -1436,8 +1478,8 @@ def build_s63_rank_one_candidates(
     out["candidate_key"] = out.apply(candidate_key, axis=1)
     for key, value in hashes.items():
         out[key] = value
-    if out["tic"].nunique() != len(model) or len(out) != len(model):
-        raise RuntimeError("S63 candidate table is not one unique row per model-ready TIC")
+    if out["tic"].nunique() != len(candidate_tics) or len(out) != len(candidate_tics):
+        raise RuntimeError("S63 candidate table is not one unique row per eligible TIC")
     out = out.sort_values("tic", kind="stable").reset_index(drop=True)
     summary = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -1446,13 +1488,26 @@ def build_s63_rank_one_candidates(
         "prospective_use_scope": PROSPECTIVE_USE_SCOPE,
         "science_ready": False,
         "promotion_enabled": False,
-        "candidate_policy": "one successful ADP-small rank-one row per model-ready TIC",
+        "candidate_policy": (
+            "one successful ADP-small rank-one row with successful ADP-primary "
+            "context per BLS-eligible model-ready TIC"
+        ),
         "context_policy": "successful ADP-primary rank-one context required",
+        "bls_ineligible_policy": (
+            "retain in model-ready cohort accounting; exclude before native/scoring/queue"
+        ),
         "teacher_v3_metadata_columns": list(TEACHER_V3_CANDIDATE_METADATA_COLUMNS),
         "n_rows": len(out),
         "n_unique_tics": int(out["tic"].nunique()),
+        "n_model_ready_tics": len(model),
+        "n_bls_ineligible_tics": len(bls_ineligible_tics),
+        "n_missing_rank_one_adp_small": len(missing_small),
+        "n_missing_rank_one_adp_primary": len(missing_primary),
         "artifact_hashes": hashes,
         "candidate_tics_sha256": tic_inventory_sha256(set(out["tic"].astype(int))),
+        "bls_ineligible_tics_sha256": tic_inventory_sha256(bls_ineligible_tics),
+        "bls_ineligible_tics": sorted(bls_ineligible_tics),
+        "teacher_scores_opened": False,
     }
     return out, summary
 
@@ -1880,7 +1935,12 @@ def build_s63_prospective_review_queue(
     repeated = set(repeated_values)
     if primary & repeated:
         raise ValueError("primary and repeated-host cohorts overlap")
-    candidates = _validate_score_candidates(scores, primary | repeated)
+    score_tics = set(
+        pd.to_numeric(scores["tic"], errors="raise").astype(np.int64).tolist()
+    )
+    if not score_tics or not score_tics.issubset(primary | repeated):
+        raise ValueError("Teacher-v3 score TICs fall outside the frozen cohort union")
+    candidates = _validate_score_candidates(scores, score_tics)
     # Percentile-derived quantities are deliberately computed on each complete
     # cohort independently and before the first deterministic bucket is removed.
     primary_candidates = _selection_scores(
