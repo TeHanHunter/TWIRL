@@ -82,10 +82,14 @@ Last reconciled: `2026-08-06`.
 - Discovery engine: transparent periodic and non-periodic searches first.
   Machine learning may rank or triage candidates only after its inputs,
   provenance, and held-out behavior are auditable.
-- Compute boundary: primary TGLC/ePSF production stays on PDO. ORCD consumes
-  compact exports for downstream search, injections, features, and models.
-  Routine ORCD work uses CPU nodes or one H200; more than two H200s requires
-  explicit approval for the specific run.
+- Compute boundary: PDO remains the authoritative TGLC input and accepted
+  Stage-1 product home. ORCD normally consumes compact exports for downstream
+  search, injections, features, and models. A bounded A2v1 H200 production
+  pilot is now authorized using immutable prepared source-pickle cells staged
+  through Blackhole/Globus; do not transfer raw FFIs as well or rebuild PDO
+  catalogs/cutouts on ORCD. The pilot is capped at two H200s and 78 live ORCD
+  CPUs, and no ORCD result is accepted until ePSF/HDF5 products return to PDO
+  and pass the unchanged sector gates there.
 
 ## Product and interface contracts
 
@@ -147,6 +151,14 @@ queue stopped after orbit 137 and `15/16` orbit-138 CCDs completed; orbit 138
 only the missing CCD with reduced GPU concurrency, re-enter the unchanged
 stop-on-failure gates, and then continue S66-S69. Do not create sector-specific
 production logic unless the sector is a documented exception.
+
+The Blackhole/Globus-to-ORCD A2v1 pilot is a parallel infrastructure lane, not
+a relaxed product gate. The first transport probe reached only `30.8 MB/s`,
+far below the expected near-`1 GB/s` rate; diagnose that endpoint path and
+prove the exact TGLC/CuPy parity smoke before using ORCD for the missing S65
+cell. Stream prepared `(orbit, camera, CCD)` source cells, not both source
+pickles and raw FFIs, and retain HDF5 on both systems only after returned PDO
+hash and schema validation.
 
 ### Exit criteria
 
@@ -410,16 +422,19 @@ never a completeness measurement.
 
 Resume S65 from its single failed CCD and continue S66--S69 as a parallel
 Stage-1 lane. Its stop-on-failure gates remain mandatory, but gathering every
-later sector does not block the sealed S63 model test.
+later sector does not block the sealed S63 model test. The authorized ORCD
+pilot may accelerate this lane only after the transfer-rate diagnosis and a
+one-cell A2v1 parity smoke; cap it at two H200s and 78 live ORCD CPUs.
 
 1. Complete the exact-commit run of the implemented checksum-bound Teacher-v3
    prospective S63 lane. The accepted receipt, cadence authority, compact
    current-ADP export, model-ready allowlist, and disjoint/repeated cohorts are
-   frozen and hash-verified on PDO and ORCD; finish the submitted locked
-   rank-one two-aperture BLS/native path, then score with the unchanged frozen
-   five-fold Teacher-v3 ensemble. Select a deterministic annotation-withheld
-   enrichment queue plus a preregistered control sample; do not inspect scores
-   before the contract is frozen or use probabilities as labels.
+   frozen and hash-verified on PDO and ORCD, and the locked rank-one
+   two-aperture BLS table is complete. Finish the candidate/native path, then
+   score with the unchanged frozen five-fold Teacher-v3 ensemble. Select a
+   deterministic annotation-withheld enrichment queue plus a preregistered
+   control sample; do not inspect scores before the contract is frozen or use
+   probabilities as labels.
 2. Complete annotation-withheld human review and then unblind once. Report
    Planet-like morphology yield/precision and top-K lift versus the control,
    with primary TIC-disjoint hosts and repeated hosts separated. Do not claim

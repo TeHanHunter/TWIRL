@@ -5,7 +5,7 @@ CPU/GPU nodes. It is operational guidance, not a scientific pipeline decision.
 Dated S56 commands and job outcomes are retained as proven examples; consult
 the live plan and progress log before treating them as current work.
 
-Last updated: `2026-07-13`. ORCD access last verified: `2026-06-30`.
+Last updated: `2026-08-07`. ORCD access last verified: `2026-08-07`.
 
 ## Access And Scheduler Names
 
@@ -223,6 +223,13 @@ run has passed and the scaling need is clear. The standard ORCD submit helper
 refuses Slurm scripts requesting more than `2` H200s unless
 `TWIRL_ALLOW_MANY_H200=1` is set for a specifically approved submit.
 
+For the explicitly authorized A2v1 Stage-1 compute pilot, use at most two
+H200s and cap all simultaneously live ORCD CPU allocations for that lane at
+78 CPUs (one quarter of the private partition's documented 312 CPUs). Prefer
+two independent one-H200 orbit/camera/CCD workers over one multi-GPU TGLC
+process. Begin with one H200 and one S65 orbit-138/cam4/ccd1 smoke; the two-GPU
+stream is enabled only after parity and product gates pass.
+
 The `2026-06-30` control-socket probe succeeds non-interactively from Codex
 after the user opens the socket. `pg_mki_aryeh` currently exposes two CPU nodes
 and one H200 node; test-only submissions for both CPU and H200 jobs succeed.
@@ -275,12 +282,40 @@ Personal ORCD locations:
 Use `/orcd/data/mki_aryeh/001/twirl/` for shared TWIRL products. Use scratch
 for temporary job-local expansions and delete or compact outputs afterward.
 
+### Blackhole/Globus transport pilot
+
+The MKI gateway collection is `TESS TSO`
+(`d8ea14bc-dca1-4cbc-92b6-b76d7289b6d2`); collection path `/` maps to
+`blackhole:/globus/tso`. The Engaging destination collection is
+`MIT ORCD Engaging Collection`
+(`ec54b570-cac5-47f7-b2a1-100c2078686f`). The official Globus CLI is installed
+locally through `pipx`, and `tehan@mit.edu` has refreshable data-access consent
+for both collections. Do not put Globus refresh tokens in scripts or the repo.
+
+The 2026-08-07 encrypted/checksum-verified 4 GiB probe succeeded but reached
+only `30.8 MB/s` (`246 Mb/s`) with zero faults. Globus had already selected
+concurrency 4, parallelism 8, and pipelining 20; eight simultaneous tasks did
+not improve aggregate throughput. This is not the expected near-`1 GB/s`
+path. See the [transport report]
+(../reports/infrastructure/blackhole_globus_transfer_probe_20260807.md) and
+ask MKI/ORCD to inspect the gateway/DTN route before treating the timing as
+production capacity.
+
+Stage one prepared `(orbit, camera, CCD)` source-pickle cell at a time. The
+A2v1 reuse path does not need the raw FFIs once the immutable 196 prepared
+source pickles exist; never transfer both by default. Publish through partial,
+hash/count/openability, and atomic-ready gates. Return ePSF and HDF5 outputs to
+PDO, validate them there, retain HDF5 on both systems, and remove temporary
+Blackhole/ORCD source and ePSF trees only after returned PDO hashes pass.
+
 ## TWIRL Policy
 
-PDO remains the Stage 1 TGLC/ePSF production home because it has the TICA/QLP
-file layout, pyticdb/catalog access, and existing TGLC production tree. Do not
-try to re-home the primary raw extraction pipeline onto ORCD unless a separate
-data-staging design is approved.
+PDO remains the authoritative Stage 1 TGLC/ePSF input and accepted-product home
+because it has the TICA/QLP file layout, pyticdb/catalog access, and existing
+TGLC production tree. Do not re-home catalogs/cutouts or the primary raw-FFI
+pipeline onto ORCD. The approved exception is the bounded A2v1 compute pilot:
+stage existing prepared source pickles temporarily, run exact-hook ePSF/HDF5
+work on H200s, and return products to PDO for unchanged validation.
 
 ORCD should consume compact downstream products:
 

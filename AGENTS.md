@@ -118,10 +118,20 @@ If this file and those docs disagree, treat the docs as authoritative and update
 ## MIT TGLC Operating Assumptions
 
 - Stage 1 uses the MIT-adapted TGLC fork on MIT PDO machines.
-- ORCD/H200 is downstream compute for compact exports, injection-recovery, GPU search, feature extraction, and later ML triage; do not move primary Stage 1 TGLC/ePSF production there by default.
+- ORCD/H200 is normally downstream compute for compact exports,
+  injection-recovery, GPU search, feature extraction, and later ML triage.
+  The user has explicitly authorized one bounded A2v1 Stage-1 compute pilot:
+  stage immutable prepared source-pickle `(orbit, camera, CCD)` cells through
+  Blackhole/Globus, run exact-hook ePSF/HDF5 work on ORCD, and return outputs
+  to PDO for the unchanged gates. PDO remains authoritative; do not transfer
+  raw FFIs as well or rebuild catalogs/cutouts on ORCD by default.
 - On ORCD, default GPU jobs to `1` H200 and use at most `2` H200s unless the
   user explicitly approves a larger request for a specific run. Do not occupy
   the full H200 node for routine smokes, BLS/ranker jobs, or exploratory tests.
+- For the authorized A2v1 pilot, use at most `2` H200s and at most `78` live
+  ORCD CPUs across the lane. Retain HDF5 on PDO and ORCD; remove temporary
+  Blackhole/ORCD source and ePSF data only after returned PDO hashes and schema
+  gates pass.
 - Treat the MIT fork as an orbit/camera/CCD production pipeline, not a `quick_lc.py` replacement.
 - Assume:
   - TICA FFIs are pre-staged on disk

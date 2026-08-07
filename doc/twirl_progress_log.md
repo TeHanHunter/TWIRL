@@ -19,9 +19,24 @@ details here; keep the plan limited to milestone status.
   isolated PDO teacher-search run with recorded SHA-256 values. No new ORCD
   authentication should be initiated by automation when the user-owned control
   socket is absent.
+- `2026-08-07`: Verified the new Blackhole/Globus transport route and installed
+  the persistent Globus CLI. `tehan` has `tso`/`globus` membership and write
+  access under `/globus/tso`; both `TESS TSO` and `MIT ORCD Engaging
+  Collection` are CLI-accessible with refreshable consent. A checksum-verified
+  4 GiB/eight-file transfer completed without faults but reached only
+  `30.8 MB/s` (`246 Mb/s`) over 139 s, despite Globus-selected concurrency 4,
+  parallelism 8, and pipelining 20. Eight simultaneous tasks did not improve
+  aggregate throughput, while a Blackhole-local write reached `706 MB/s`.
+  Temporary probe payloads were removed. The detailed [transport report]
+  (../reports/infrastructure/blackhole_globus_transfer_probe_20260807.md)
+  records task IDs, timings, access state, and the proposed source-pickle
+  streaming boundary. A user-opened Blackhole-to-PDO control socket and a
+  CuPy/TGLC H200 parity environment remain required before production.
 
-**Next:** Use ORCD only for bounded, versioned downstream jobs required by the
-current Stage 2/3 gates; do not expand GPU allocation or move raw TGLC trees.
+**Next:** Ask MKI/ORCD to diagnose the approximately `250 Mb/s` managed-endpoint
+path versus the expected near-`1 GB/s` rate. Then prove a single S65
+orbit-138/cam4/ccd1 prepared-source A2v1 smoke on one H200 before enabling the
+authorized two-H200, at-most-78-CPU streaming lane; PDO remains authoritative.
 
 ## Stage 1
 
@@ -593,15 +608,25 @@ sample.
   and atomically published beside a clean detached `af83863e` checkout. Slurm
   test-only admission passed; the locked 16-shard CPU BLS array is job
   `19793979`, with after-success merge job `19793980`.
+- `2026-08-07`: All `16` S63 BLS shards and dependent merge completed with
+  Slurm exit code `0:0`. The merged summary passed exact coverage of `53,249`
+  unique TICs, strict cadence/orbit reconciliation with zero mismatches, both
+  ADP apertures, `50,000` periods, and up to `10` peaks. It contains
+  `1,063,549` rows (`1,063,390` valid peak rows and `159` explicit
+  `too_few_cadences` rows); the merged Parquet SHA-256 is
+  `6738a582...1075`. Six shard stderr files contain eight NumPy
+  `Mean of empty slice` warnings from sparse odd/even metadata, while the
+  attested finite-count ledger and merged `passed=true` gate remain intact.
+  Preserve those warnings as diagnostic provenance and require the candidate
+  builder's one-row-per-TIC and feature-presence gates before native export.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Monitor ORCD BLS array `19793979` and merge `19793980`; after their
-independent artifact gates pass, build and merge the native-input shards,
-publish the immutable launch manifest, run Teacher v3 once, and produce the
-annotation-withheld enrichment-plus-control review queue. Do not inspect S63
-scores before the launch freeze, schedule unrelated corpus labeling, or start
-student pseudo-labeling.
+**Next:** Build and validate the one-row-per-TIC candidate table, then build
+and merge the native-input shards, publish the immutable launch manifest, run
+Teacher v3 once, and produce the annotation-withheld enrichment-plus-control
+review queue. Do not inspect S63 scores before the launch freeze, schedule
+unrelated corpus labeling, or start student pseudo-labeling.
 
 ### Human labels and harmonic review
 
