@@ -71,6 +71,12 @@ population is `53,160` TICs. This availability rule was recorded before any
 Teacher-v3 S63 score was opened; it does not depend on model output and does
 not change the immutable prospective-plan bytes.
 
+Corrected CPU candidate job `19869834` completed from exact commit `46161232`.
+The duplicate-free `53,160`-row Parquet has SHA-256 `0a844238...d2c2`; its
+summary has SHA-256 `4b0f9069...042e` and records
+`teacher_scores_opened=false`. The next required gate is the authoritative PDO
+raw-source export for this exact candidate population.
+
 ## Primary reporting
 
 Report human Planet-like morphology yield for each hidden selection bucket,

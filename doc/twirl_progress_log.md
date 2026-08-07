@@ -634,11 +634,22 @@ sample.
   unchanged. Launch provenance now binds the exact upstream preprocessing Git
   object separately from the clean descendant that produces candidate/native
   and score artifacts.
+- `2026-08-07`: Corrected CPU candidate job `19869834` completed from clean
+  exact commit `46161232` with Slurm exit `0:0`. The published rank-one table
+  has exactly `53,160` unique, duplicate-free TICs (SHA-256
+  `0a844238...d2c2`); its summary SHA-256 is `4b0f9069...042e`. Independent
+  cohort audit confirms all `89` BLS-ineligible TICs are in the frozen primary
+  cohort, zero are repeated hosts, and all `762` repeated hosts remain
+  candidate-eligible. The candidate summary records `80` missing ADP-small
+  rank-one results, `79` missing primary-ADP rank-one results, the exact
+  `89`-TIC union, and `teacher_scores_opened=false`. The compact candidate
+  artifacts are hash-verified in ORCD and local transfer staging; the next
+  authoritative step is the S63 raw-source export on PDO.
 - Transparent per-sector BLS exists; the non-periodic dip branch and
   multi-sector aggregation remain unimplemented production gates.
 
-**Next:** Build and validate the one-row-per-TIC candidate table, then build
-and merge the native-input shards, publish the immutable launch manifest, run
+**Next:** Export the exact candidate population's raw sources on PDO, then
+build and merge the native-input shards, publish the immutable launch manifest, run
 Teacher v3 once, and produce the annotation-withheld enrichment-plus-control
 review queue. Do not inspect S63 scores before the launch freeze, schedule
 unrelated corpus labeling, or start student pseudo-labeling.
