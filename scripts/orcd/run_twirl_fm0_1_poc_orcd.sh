@@ -35,6 +35,8 @@ Actions (run separately; no stage is auto-promoted):
   submit-real-train        Create the same fresh Stage-1-safe receipt, then
                            submit one H200 FM0.1.1 real-release training job.
   submit-post-validation   Independently validate the synthetic mechanics artifacts.
+  submit-real-post-validation
+                           Independently validate one immutable real-data run.
   status                   Read only the named run jobs and receipts.
 
 Default mode only prints the remote commands. --execute is required for any
@@ -59,6 +61,8 @@ Additional bindings:
                      TWIRL_FM0_TARGET_STEP (1--20000)
   submit-post-validation: TWIRL_FM0_SMOKE_OUTPUT,
                           TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
+  submit-real-post-validation: TWIRL_FM0_TRAIN_OUTPUT,
+                               TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
 EOF
 }
 
@@ -389,6 +393,18 @@ case "${ACTION}" in
     input_binding; safe_remote_path "${TWIRL_FM0_SMOKE_OUTPUT}" && safe_remote_path "${TWIRL_FM0_ADMISSION_RECEIPT}" || { echo "Unsafe smoke/admission path." >&2; exit 2; }; require_hash 64 "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
     require_socket
     submit_once "${LAUNCH_DIR}/post-validation.job" "twirl-fm0-postvalidate" "scripts/orcd/slurm_twirl_fm0_1_post_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_SMOKE_OUTPUT=${TWIRL_FM0_SMOKE_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${TWIRL_FM0_ADMISSION_RECEIPT},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
+    ;;
+  submit-real-post-validation)
+    : "${TWIRL_FM0_TRAIN_OUTPUT:?set exact real training output}"
+    : "${TWIRL_FM0_ADMISSION_RECEIPT:?set admission receipt}"
+    : "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256:?set admission hash}"
+    input_binding
+    safe_remote_path "${TWIRL_FM0_TRAIN_OUTPUT}" && safe_remote_path "${TWIRL_FM0_ADMISSION_RECEIPT}" || { echo "Unsafe training/admission path." >&2; exit 2; }
+    require_hash 64 "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
+    require_socket
+    real_validation_name=$(basename "${TWIRL_FM0_TRAIN_OUTPUT}")
+    [[ "${real_validation_name}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Unsafe real validation name." >&2; exit 2; }
+    submit_once "${LAUNCH_DIR}/real-post-validation-${real_validation_name}.job" "twirl-fm0-real-validate" "scripts/orcd/slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_TRAIN_OUTPUT=${TWIRL_FM0_TRAIN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${TWIRL_FM0_ADMISSION_RECEIPT},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
     ;;
   status)
     require_socket

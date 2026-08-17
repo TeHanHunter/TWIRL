@@ -143,6 +143,7 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
         "slurm_twirl_fm0_1_input_validation_cpu.sbatch",
         "slurm_twirl_fm0_1_loader_smoke_cpu.sbatch",
         "slurm_twirl_fm0_1_post_validation_cpu.sbatch",
+        "slurm_twirl_fm0_1_real_post_validation_cpu.sbatch",
     )
     for name in cpu_wrappers:
         script = text(name)
@@ -186,6 +187,17 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "--synthetic-smoke" not in real
     assert "scientific_training_eligible" in real
     assert "TWIRL_FM0_ADMISSION_RECEIPT_SHA256" in real
+
+    real_post = text("slurm_twirl_fm0_1_real_post_validation_cpu.sbatch")
+    assert "validate_twirl_fm0_release.py" in real_post
+    assert 'validation.get("real_data_consumed") is not True' in real_post
+    assert 'admission.get("requested_fm_resources")' in real_post
+    assert "twirl_fm0_1_orcd_real_post_validation_v1" in real_post
+    assert "foundation_model_claim_authorized" in real_post
+
+    controller = text("run_twirl_fm0_1_poc_orcd.sh")
+    assert "submit-real-post-validation)" in controller
+    assert "slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" in controller
 
 
 def test_input_gate_uses_correct_local_time_and_exact_shard_allowlist() -> None:
