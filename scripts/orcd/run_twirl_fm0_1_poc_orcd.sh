@@ -289,7 +289,7 @@ case "${ACTION}" in
     ;;
   deploy)
     require_socket
-    remote "set -euo pipefail; test -d '${REMOTE_SOURCE}/.git'; git -C '${REMOTE_SOURCE}' cat-file -e '${EXPECTED_SHA}^{commit}'; if [[ -e '${REMOTE_REPO}' ]]; then [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]; else git -C '${REMOTE_SOURCE}' worktree add --detach '${REMOTE_REPO}' '${EXPECTED_SHA}'; fi; [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]; git -C '${REMOTE_REPO}' rev-parse HEAD"
+    remote "set -euo pipefail; test -d '${REMOTE_SOURCE}/.git'; git -C '${REMOTE_SOURCE}' cat-file -e '${EXPECTED_SHA}^{commit}'; if [[ -e '${REMOTE_REPO}' ]]; then [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]; else git -C '${REMOTE_SOURCE}' worktree add --detach '${REMOTE_REPO}' '${EXPECTED_SHA}'; fi; if git -C '${REMOTE_REPO}' sparse-checkout list >/dev/null 2>&1; then git -C '${REMOTE_REPO}' sparse-checkout add reports/stage5_validation/twirl_fm0_1_design_freeze_v1; fi; test -s '${REMOTE_REPO}/reports/stage5_validation/twirl_fm0_1_design_freeze_v1/freeze.json'; [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]; git -C '${REMOTE_REPO}' rev-parse HEAD"
     ;;
   build-env)
     require_socket

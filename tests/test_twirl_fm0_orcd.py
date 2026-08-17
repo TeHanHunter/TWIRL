@@ -79,6 +79,14 @@ def test_controller_is_noninteractive_dry_run_by_default() -> None:
     assert "ControlPath=${CONTROL_PATH}" in script
 
 
+def test_deploy_materializes_the_frozen_receipt_in_sparse_worktrees() -> None:
+    script = text("run_twirl_fm0_1_poc_orcd.sh")
+    receipt = "reports/stage5_validation/twirl_fm0_1_design_freeze_v1"
+    assert "sparse-checkout list" in script
+    assert f"sparse-checkout add {receipt}" in script
+    assert f"test -s '${{REMOTE_REPO}}/{receipt}/freeze.json'" in script
+
+
 def test_environment_builder_binds_current_operational_config() -> None:
     builder = text("build_orcd_fm0_env.sh")
     assert f'EXPECTED_ORCD_CONFIG_SHA256="{sha256(OP_CONFIG)}"' in builder
