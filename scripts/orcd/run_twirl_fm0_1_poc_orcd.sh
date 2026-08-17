@@ -62,6 +62,7 @@ Additional bindings:
   submit-post-validation: TWIRL_FM0_SMOKE_OUTPUT,
                           TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
   submit-real-post-validation: TWIRL_FM0_TRAIN_OUTPUT,
+                               TWIRL_FM0_RUN_GIT_SHA,
                                TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
 EOF
 }
@@ -396,15 +397,17 @@ case "${ACTION}" in
     ;;
   submit-real-post-validation)
     : "${TWIRL_FM0_TRAIN_OUTPUT:?set exact real training output}"
+    : "${TWIRL_FM0_RUN_GIT_SHA:?set exact training commit SHA}"
     : "${TWIRL_FM0_ADMISSION_RECEIPT:?set admission receipt}"
     : "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256:?set admission hash}"
     input_binding
     safe_remote_path "${TWIRL_FM0_TRAIN_OUTPUT}" && safe_remote_path "${TWIRL_FM0_ADMISSION_RECEIPT}" || { echo "Unsafe training/admission path." >&2; exit 2; }
     require_hash 64 "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
+    require_hash 40 "${TWIRL_FM0_RUN_GIT_SHA}"
     require_socket
     real_validation_name=$(basename "${TWIRL_FM0_TRAIN_OUTPUT}")
     [[ "${real_validation_name}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Unsafe real validation name." >&2; exit 2; }
-    submit_once "${LAUNCH_DIR}/real-post-validation-${real_validation_name}.job" "twirl-fm0-real-validate" "scripts/orcd/slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_TRAIN_OUTPUT=${TWIRL_FM0_TRAIN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${TWIRL_FM0_ADMISSION_RECEIPT},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
+    submit_once "${LAUNCH_DIR}/real-post-validation-${TWIRL_FM0_RUN_GIT_SHA:0:12}-${real_validation_name}.job" "twirl-fm0-real-validate" "scripts/orcd/slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_RUN_GIT_SHA=${TWIRL_FM0_RUN_GIT_SHA},TWIRL_FM0_TRAIN_OUTPUT=${TWIRL_FM0_TRAIN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${TWIRL_FM0_ADMISSION_RECEIPT},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
     ;;
   status)
     require_socket

@@ -194,6 +194,8 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert 'admission.get("requested_fm_resources")' in real_post
     assert "twirl_fm0_1_orcd_real_post_validation_v1" in real_post
     assert "foundation_model_claim_authorized" in real_post
+    assert "TWIRL_FM0_RUN_GIT_SHA" in real_post
+    assert '"run_git_sha"' in real_post
 
     controller = text("run_twirl_fm0_1_poc_orcd.sh")
     assert "submit-real-post-validation)" in controller

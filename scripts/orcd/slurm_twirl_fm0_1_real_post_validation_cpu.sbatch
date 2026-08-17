@@ -15,6 +15,7 @@ set -euo pipefail
 umask 027
 : "${TWIRL_ORCD_REPO:?missing detached repository}"
 : "${TWIRL_EXPECTED_GIT_SHA:?missing exact validator SHA}"
+: "${TWIRL_FM0_RUN_GIT_SHA:?missing exact training SHA}"
 : "${TWIRL_FM0_RUN_ROOT:?missing run root}"
 : "${TWIRL_FM0_TRAIN_OUTPUT:?missing real training output}"
 : "${TWIRL_FM0_INPUT_RECEIPT:?missing exact input receipt}"
@@ -23,17 +24,19 @@ umask 027
 : "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256:?missing admission receipt hash}"
 readonly REPO="$(realpath -m -- "${TWIRL_ORCD_REPO}")"
 readonly RUN_ROOT="$(realpath -m -- "${TWIRL_FM0_RUN_ROOT}")"
+readonly CAMPAIGN_ROOT="/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_1_s56_s67_poc"
 readonly TRAIN="$(realpath -m -- "${TWIRL_FM0_TRAIN_OUTPUT}")"
 readonly INPUT_RECEIPT="$(realpath -m -- "${TWIRL_FM0_INPUT_RECEIPT}")"
 readonly ADMISSION_RECEIPT="$(realpath -m -- "${TWIRL_FM0_ADMISSION_RECEIPT}")"
 readonly PYTHON="/orcd/data/mki_aryeh/001/twirl/envs/twirl-fm0-poc-py3119-torch2110-cu128-v1/bin/python"
-readonly VALIDATION_ROOT="${RUN_ROOT}/validations/$(basename "${TRAIN}")"
+readonly VALIDATION_ROOT="${RUN_ROOT}/validations/${TWIRL_FM0_RUN_GIT_SHA:0:12}-$(basename "${TRAIN}")"
 readonly RUN_VALIDATION="${VALIDATION_ROOT}/independent_run_validation.json"
 readonly OUT="${VALIDATION_ROOT}/post_validation.receipt.json"
 die() { echo "[fm0-real-validate] ERROR: $*" >&2; exit 2; }
 for path in "${TRAIN}" "${INPUT_RECEIPT}" "${ADMISSION_RECEIPT}"; do
-  [[ "${path}" == "${RUN_ROOT}"/* ]] || die "authority path escapes run root: ${path}"
+  [[ "${path}" == "${CAMPAIGN_ROOT}"/* ]] || die "authority path escapes campaign root: ${path}"
 done
+[[ "${TWIRL_FM0_RUN_GIT_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "invalid training SHA"
 [[ "$(git -C "${REPO}" rev-parse HEAD)" == "${TWIRL_EXPECTED_GIT_SHA}" && -z "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]] || die "validator repository is not exact and clean"
 [[ "$(sha256sum "${INPUT_RECEIPT}" | awk '{print $1}')" == "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" ]] || die "input receipt drift"
 [[ "$(sha256sum "${ADMISSION_RECEIPT}" | awk '{print $1}')" == "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}" ]] || die "admission receipt drift"
@@ -45,6 +48,7 @@ export PYTHONPATH="${REPO}/src"
   --run-dir "${TRAIN}" \
   --output "${RUN_VALIDATION}"
 TWIRL_FM0_TRAIN="${TRAIN}" TWIRL_FM0_VALIDATOR_SHA="${TWIRL_EXPECTED_GIT_SHA}" \
+TWIRL_FM0_RUN_SHA="${TWIRL_FM0_RUN_GIT_SHA}" \
 TWIRL_FM0_INPUT_SHA="${TWIRL_FM0_INPUT_RECEIPT_SHA256}" \
 TWIRL_FM0_ADMISSION_SHA="${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}" \
 TWIRL_FM0_INPUT_RECEIPT="${INPUT_RECEIPT}" \
@@ -66,7 +70,7 @@ if input_receipt.get("schema_version") != "twirl_fm0_1_input_release_receipt_v1"
     raise SystemExit("input receipt did not pass")
 if admission.get("schema_version") != "twirl_fm0_1_orcd_admission_receipt_v1" or admission.get("passed") is not True:
     raise SystemExit("admission receipt did not pass")
-if admission.get("expected_git_sha") != os.environ["TWIRL_FM0_VALIDATOR_SHA"]:
+if admission.get("expected_git_sha") != os.environ["TWIRL_FM0_RUN_SHA"]:
     raise SystemExit("admission code binding drift")
 if admission.get("input_receipt", {}).get("sha256") != os.environ["TWIRL_FM0_INPUT_SHA"]:
     raise SystemExit("admission input binding drift")
@@ -76,7 +80,7 @@ if validation.get("passed") is not True or validation.get("checkpoint_inspected"
     raise SystemExit("independent checkpoint inspection did not pass")
 if validation.get("real_data_consumed") is not True or validation.get("synthetic_only") is not False:
     raise SystemExit("real-data validation boundary drift")
-if contract.get("expected_git_sha") != os.environ["TWIRL_FM0_VALIDATOR_SHA"]:
+if contract.get("expected_git_sha") != os.environ["TWIRL_FM0_RUN_SHA"]:
     raise SystemExit("run code binding drift")
 if contract.get("input_release", {}).get("receipt_sha256") != os.environ["TWIRL_FM0_INPUT_SHA"]:
     raise SystemExit("run input binding drift")
@@ -88,6 +92,7 @@ payload = {
     "created_at_utc": datetime.now(timezone.utc).isoformat(),
     "passed": True,
     "validator_git_sha": os.environ["TWIRL_FM0_VALIDATOR_SHA"],
+    "run_git_sha": os.environ["TWIRL_FM0_RUN_SHA"],
     "real_data_consumed": True,
     "scientific_result": False,
     "production_authorized": False,
