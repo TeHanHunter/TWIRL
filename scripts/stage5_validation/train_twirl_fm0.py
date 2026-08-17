@@ -17,7 +17,12 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from twirl.models.fm0.dataset import SyntheticFM0Config, SyntheticFM0Dataset  # noqa: E402
+from twirl.models.fm0.dataset import (  # noqa: E402
+    FM0ReleaseDataset,
+    FM0ReleaseDatasetConfig,
+    SyntheticFM0Config,
+    SyntheticFM0Dataset,
+)
 from twirl.models.fm0.model import (  # noqa: E402
     architecture_for_variant,
     build_fm0_model,
@@ -25,16 +30,20 @@ from twirl.models.fm0.model import (  # noqa: E402
 )
 from twirl.models.fm0.training import (  # noqa: E402
     FM0OptimizationConfig,
+    run_real_training,
     run_synthetic_training,
     seed_everything,
 )
 from twirl.models.fm0.validation import (  # noqa: E402
+    REAL_RUN_CONTRACT_SCHEMA_VERSION,
+    REAL_RUN_SUMMARY_SCHEMA_VERSION,
     RUN_CONTRACT_SCHEMA_VERSION,
     RUN_SUMMARY_SCHEMA_VERSION,
     read_json,
     require_clean_git_revision,
     sha256_file,
     validate_frozen_authorities,
+    validate_real_run_release,
     validate_run_release,
     write_json_with_sha256,
     write_sha256_sidecar,
@@ -75,14 +84,9 @@ def _load_config(path: Path) -> dict[str, object]:
 
 def main() -> int:
     args = _parser().parse_args()
-    if not args.synthetic_smoke:
+    if args.synthetic_smoke == (args.input_release is not None):
         raise SystemExit(
-            "This entrypoint currently supports --synthetic-smoke only; the "
-            "real input-release loader remains a separate gated integration."
-        )
-    if args.input_release is not None:
-        raise SystemExit(
-            "--input-release is intentionally unavailable in the synthetic-only trainer"
+            "choose exactly one of --synthetic-smoke or --input-release"
         )
     authorities = validate_frozen_authorities(
         design_path=args.design,
@@ -119,6 +123,7 @@ def main() -> int:
     if args.expected_git_sha:
         git_sha = require_clean_git_revision(ROOT, args.expected_git_sha)
     input_receipt = None
+    receipt_payload = None
     receipt_argument = args.input_release_receipt
     if receipt_argument is None and os.environ.get("TWIRL_FM0_INPUT_RECEIPT"):
         receipt_argument = Path(os.environ["TWIRL_FM0_INPUT_RECEIPT"])
@@ -131,7 +136,60 @@ def main() -> int:
         input_receipt = {
             "path": str(receipt_path),
             "sha256": observed_receipt_hash,
-            "consumed_by_synthetic_smoke": False,
+        }
+        receipt_payload = read_json(receipt_path)
+    if not args.synthetic_smoke and input_receipt is None:
+        raise ValueError("real-data training requires an input-release receipt")
+
+    release_dataset = None
+    release_binding = None
+    if not args.synthetic_smoke:
+        if receipt_payload is None or receipt_payload.get("schema_version") != (
+            "twirl_fm0_1_input_release_receipt_v1"
+        ):
+            raise ValueError("real-data input receipt has the wrong schema")
+        if (
+            receipt_payload.get("passed") is not True
+            or receipt_payload.get("scientific_training_eligible") is not True
+        ):
+            raise ValueError("real-data input receipt does not authorize training")
+        if receipt_payload.get("science_bindings") != authorities:
+            raise ValueError("input receipt differs from the frozen science authorities")
+        release_root = args.input_release.resolve(strict=True)
+        manifest_path = (release_root / "manifest.csv").resolve(strict=True)
+        receipt_release = receipt_payload.get("release")
+        if not isinstance(receipt_release, dict):
+            raise ValueError("input receipt release binding is malformed")
+        manifest_sha = sha256_file(manifest_path)
+        if (
+            Path(str(receipt_release.get("manifest_path", ""))).resolve(strict=True)
+            != manifest_path
+            or receipt_release.get("manifest_sha256") != manifest_sha
+        ):
+            raise ValueError("input receipt does not bind the requested release")
+        release_dataset = FM0ReleaseDataset(
+            FM0ReleaseDatasetConfig(
+                release_root=str(release_root),
+                manifest_sha256=manifest_sha,
+                variant=args.variant,
+                seed=args.seed,
+                source_partition="poc_train",
+                windows_per_epoch=int(optimization.max_optimizer_steps)
+                * int(optimization.effective_batch_windows),
+            )
+        )
+        release_binding = {
+            "release_root": str(release_root),
+            "manifest_path": str(manifest_path),
+            "manifest_sha256": manifest_sha,
+            "receipt_path": input_receipt["path"],
+            "receipt_sha256": input_receipt["sha256"],
+            "n_sources": release_dataset.contract["n_sources"],
+            "n_observations": release_dataset.contract["n_observations"],
+            "source_partition": "poc_train",
+            "certifies_full_campaign": bool(
+                receipt_payload.get("certifies_full_campaign", False)
+            ),
         }
     output = args.output_dir.resolve()
     if args.resume_checkpoint is None:
@@ -142,19 +200,26 @@ def main() -> int:
         raise FileNotFoundError("resume output directory does not exist")
 
     run_contract = {
-        "schema_version": RUN_CONTRACT_SCHEMA_VERSION,
+        "schema_version": (
+            RUN_CONTRACT_SCHEMA_VERSION
+            if args.synthetic_smoke
+            else REAL_RUN_CONTRACT_SCHEMA_VERSION
+        ),
         "campaign_id": config["campaign_id"],
         "variant": args.variant,
         "architecture": resolved_architecture,
         "seed": args.seed,
-        "synthetic_smoke": True,
-        "real_data_consumed": False,
+        "synthetic_smoke": bool(args.synthetic_smoke),
+        "real_data_consumed": not args.synthetic_smoke,
         "precision": args.precision,
         "device_request": args.device,
         "target_step": args.target_step,
         "micro_batch_windows": args.micro_batch_windows,
         "authorities": authorities,
-        "input_release_receipt_precondition": input_receipt,
+        "input_release_receipt_precondition": (
+            input_receipt if args.synthetic_smoke else None
+        ),
+        "input_release": release_binding,
         "expected_git_sha": git_sha,
         "optimization": asdict(optimization),
     }
@@ -173,27 +238,49 @@ def main() -> int:
         enforce_parameter_budget=True,
     )
     parameter_count = count_trainable_parameters(model)
-    dataset_config = SyntheticFM0Config(variant=args.variant, seed=args.seed)
-    dataset = SyntheticFM0Dataset(dataset_config)
-    result = run_synthetic_training(
-        model=model,
-        dataset=dataset,
-        output_dir=output,
-        run_contract=run_contract,
-        optimization=optimization,
-        target_step=args.target_step,
-        micro_batch_windows=args.micro_batch_windows,
-        device=args.device,
-        precision=args.precision,
-        use_vicreg=args.variant == "TWIRL-FM0.1.5",
-        resume_checkpoint=args.resume_checkpoint,
-    )
+    if args.synthetic_smoke:
+        dataset = SyntheticFM0Dataset(
+            SyntheticFM0Config(variant=args.variant, seed=args.seed)
+        )
+        result = run_synthetic_training(
+            model=model,
+            dataset=dataset,
+            output_dir=output,
+            run_contract=run_contract,
+            optimization=optimization,
+            target_step=args.target_step,
+            micro_batch_windows=args.micro_batch_windows,
+            device=args.device,
+            precision=args.precision,
+            use_vicreg=args.variant == "TWIRL-FM0.1.5",
+            resume_checkpoint=args.resume_checkpoint,
+        )
+    else:
+        if release_dataset is None:  # pragma: no cover - defensive
+            raise RuntimeError("real release dataset was not constructed")
+        result = run_real_training(
+            model=model,
+            dataset=release_dataset,
+            output_dir=output,
+            run_contract=run_contract,
+            optimization=optimization,
+            target_step=args.target_step,
+            micro_batch_windows=args.micro_batch_windows,
+            device=args.device,
+            precision=args.precision,
+            resume_checkpoint=args.resume_checkpoint,
+        )
     checkpoint_path = output / "checkpoint.pt"
     checkpoint_sha = write_sha256_sidecar(checkpoint_path)
     summary = {
-        "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+        "schema_version": (
+            RUN_SUMMARY_SCHEMA_VERSION
+            if args.synthetic_smoke
+            else REAL_RUN_SUMMARY_SCHEMA_VERSION
+        ),
         "passed": True,
-        "synthetic_only": True,
+        "synthetic_only": bool(args.synthetic_smoke),
+        "real_data_consumed": not args.synthetic_smoke,
         "scientific_result": False,
         "variant": args.variant,
         "architecture": model.config.architecture,
@@ -207,7 +294,11 @@ def main() -> int:
         "checkpoint_sha256": checkpoint_sha,
     }
     write_json_with_sha256(output / "summary.json", summary)
-    validation = validate_run_release(output)
+    validation = (
+        validate_run_release(output)
+        if args.synthetic_smoke
+        else validate_real_run_release(output)
+    )
     print(json.dumps(validation, indent=2, sort_keys=True))
     return 0
 

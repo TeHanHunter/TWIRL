@@ -13,6 +13,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from .dataset import (
+    FM0ReleaseDataset,
     SyntheticFM0Dataset,
     collate_fm0_samples,
     move_batch_to_device,
@@ -28,6 +29,14 @@ except ImportError:  # pragma: no cover - local base environment omits Torch
 
 
 CHECKPOINT_SCHEMA_VERSION = "twirl_fm0_1_checkpoint_v1"
+
+
+def _dataset_contract(dataset: Any) -> dict[str, Any]:
+    if isinstance(dataset, SyntheticFM0Dataset):
+        return {"kind": "synthetic", "config": asdict(dataset.config)}
+    if isinstance(dataset, FM0ReleaseDataset):
+        return dict(dataset.contract)
+    raise TypeError("unsupported FM0 training dataset")
 
 
 @dataclass(frozen=True)
@@ -280,7 +289,7 @@ def checkpoint_payload(
     global_step: int,
     run_contract: Mapping[str, Any],
     optimization: FM0OptimizationConfig,
-    dataset: SyntheticFM0Dataset,
+    dataset: Any,
     loss_history: list[dict[str, float]],
 ) -> dict[str, Any]:
     """Capture every state needed for exact optimizer-step continuation."""
@@ -302,7 +311,10 @@ def checkpoint_payload(
         },
         "model_config": asdict(model_config),
         "optimization_config": asdict(optimization),
-        "synthetic_dataset_config": asdict(dataset.config),
+        "dataset_contract": _dataset_contract(dataset),
+        "synthetic_dataset_config": (
+            asdict(dataset.config) if isinstance(dataset, SyntheticFM0Dataset) else None
+        ),
         "run_contract": dict(run_contract),
         "loss_history": list(loss_history),
     }
@@ -329,7 +341,7 @@ def load_checkpoint(
     scheduler: Any,
     expected_run_contract: Mapping[str, Any],
     expected_optimization: FM0OptimizationConfig,
-    dataset: SyntheticFM0Dataset,
+    dataset: Any,
 ) -> tuple[int, list[dict[str, float]]]:
     """Load and validate a full FM0 checkpoint, including RNG and sampler state."""
 
@@ -345,7 +357,13 @@ def load_checkpoint(
         raise ValueError("FM0 checkpoint optimization contract mismatch")
     if payload.get("model_config") != asdict(model.config):
         raise ValueError("FM0 checkpoint model configuration mismatch")
-    if payload.get("synthetic_dataset_config") != asdict(dataset.config):
+    observed_dataset_contract = payload.get("dataset_contract")
+    if observed_dataset_contract is None and isinstance(dataset, SyntheticFM0Dataset):
+        observed_dataset_contract = {
+            "kind": "synthetic",
+            "config": payload.get("synthetic_dataset_config"),
+        }
+    if observed_dataset_contract != _dataset_contract(dataset):
         raise ValueError("FM0 checkpoint dataset configuration mismatch")
     model.load_state_dict(payload["model_state"], strict=True)
     optimizer.load_state_dict(payload["optimizer_state"])
@@ -364,7 +382,7 @@ def load_checkpoint(
 
 
 def _sample_for_absolute_index(
-    dataset: SyntheticFM0Dataset,
+    dataset: Any,
     absolute_index: int,
     *,
     mask_view: int,
@@ -478,10 +496,10 @@ def _backprop_effective_batch_vicreg(
     }
 
 
-def run_synthetic_training(
+def _run_training(
     *,
     model: Any,
-    dataset: SyntheticFM0Dataset,
+    dataset: Any,
     output_dir: str | Path,
     run_contract: Mapping[str, Any],
     optimization: FM0OptimizationConfig,
@@ -490,9 +508,10 @@ def run_synthetic_training(
     device: str,
     precision: str,
     use_vicreg: bool,
+    synthetic_only: bool,
     resume_checkpoint: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Run an explicitly synthetic smoke and write full rotating checkpoints."""
+    """Run deterministic FM0 training and write full rotating checkpoints."""
 
     require_torch()
     if target_step <= 0 or target_step > optimization.max_optimizer_steps:
@@ -630,7 +649,7 @@ def run_synthetic_training(
             **metric_sums,
         }
         if not all(math.isfinite(value) for value in metrics.values()):
-            raise RuntimeError("non-finite FM0 synthetic training metric")
+            raise RuntimeError("non-finite FM0 training metric")
         loss_history.append(metrics)
         payload = checkpoint_payload(
             model=model,
@@ -665,5 +684,70 @@ def run_synthetic_training(
         "elapsed_seconds_this_invocation": elapsed,
         "precision": precision,
         "device": str(resolved_device),
-        "synthetic_only": True,
+        "synthetic_only": bool(synthetic_only),
     }
+
+
+def run_synthetic_training(
+    *,
+    model: Any,
+    dataset: SyntheticFM0Dataset,
+    output_dir: str | Path,
+    run_contract: Mapping[str, Any],
+    optimization: FM0OptimizationConfig,
+    target_step: int,
+    micro_batch_windows: int,
+    device: str,
+    precision: str,
+    use_vicreg: bool,
+    resume_checkpoint: str | Path | None = None,
+) -> dict[str, Any]:
+    """Run an explicitly synthetic numerical smoke."""
+
+    return _run_training(
+        model=model,
+        dataset=dataset,
+        output_dir=output_dir,
+        run_contract=run_contract,
+        optimization=optimization,
+        target_step=target_step,
+        micro_batch_windows=micro_batch_windows,
+        device=device,
+        precision=precision,
+        use_vicreg=use_vicreg,
+        synthetic_only=True,
+        resume_checkpoint=resume_checkpoint,
+    )
+
+
+def run_real_training(
+    *,
+    model: Any,
+    dataset: FM0ReleaseDataset,
+    output_dir: str | Path,
+    run_contract: Mapping[str, Any],
+    optimization: FM0OptimizationConfig,
+    target_step: int,
+    micro_batch_windows: int,
+    device: str,
+    precision: str,
+    resume_checkpoint: str | Path | None = None,
+) -> dict[str, Any]:
+    """Train FM0.1.1--0.1.4 on a checksum-bound real input release."""
+
+    if model.config.variant == "TWIRL-FM0.1.5":
+        raise ValueError("FM0.1.5 real training must explicitly enable VICReg")
+    return _run_training(
+        model=model,
+        dataset=dataset,
+        output_dir=output_dir,
+        run_contract=run_contract,
+        optimization=optimization,
+        target_step=target_step,
+        micro_batch_windows=micro_batch_windows,
+        device=device,
+        precision=precision,
+        use_vicreg=False,
+        synthetic_only=False,
+        resume_checkpoint=resume_checkpoint,
+    )

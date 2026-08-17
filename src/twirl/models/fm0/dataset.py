@@ -7,13 +7,24 @@ numerical smoke.
 """
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import csv
 import hashlib
 import math
+from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+from .input_release import (
+    INPUT_RELEASE_SCHEMA_VERSION,
+    MANIFEST_COLUMNS,
+    ObservationRelease,
+    load_input_release,
+)
+from .registry import sha256_file
 
 
 WINDOW_LENGTH = 2048
@@ -406,6 +417,184 @@ class SyntheticFM0Dataset:
             variant=self.config.variant,
             mask_seed=_stable_seed(
                 "fm0-mask",
+                self.config.seed,
+                self.epoch,
+                index,
+                mask_view,
+            ),
+            window_length=self.config.window_length,
+        )
+
+    def __getitem__(self, index: int) -> dict[str, np.ndarray]:
+        return self.sample(index, mask_view=0)
+
+
+@dataclass(frozen=True)
+class FM0ReleaseDatasetConfig:
+    """Immutable binding for source-first sampling from one FM input release."""
+
+    release_root: str
+    manifest_sha256: str
+    variant: str
+    seed: int = 560067
+    source_partition: str = "poc_train"
+    windows_per_epoch: int = 1_280_000
+    window_length: int = WINDOW_LENGTH
+    shard_cache_size: int = 8
+
+    def __post_init__(self) -> None:
+        variant_view_indices(self.variant)
+        if len(self.manifest_sha256) != 64:
+            raise ValueError("manifest_sha256 must be a lowercase SHA-256")
+        if any(character not in "0123456789abcdef" for character in self.manifest_sha256):
+            raise ValueError("manifest_sha256 must be a lowercase SHA-256")
+        if self.source_partition not in {"poc_train", "poc_development"}:
+            raise ValueError("real pretraining may use only train or development sources")
+        if self.windows_per_epoch <= 0 or self.window_length <= 0:
+            raise ValueError("window counts and length must be positive")
+        if self.shard_cache_size <= 0:
+            raise ValueError("shard_cache_size must be positive")
+
+
+class FM0ReleaseDataset:
+    """Deterministic source-first sampler over a checksum-bound FM release.
+
+    Gaia/TIC identifiers remain in the sampler-side manifest and are never
+    returned by :meth:`sample`.  One item is one chronological window from one
+    visit; repeated visits of the same source remain grouped for sampling and
+    split purposes rather than being concatenated into a model tensor.
+    """
+
+    def __init__(self, config: FM0ReleaseDatasetConfig) -> None:
+        self.config = config
+        self.epoch = 0
+        self.release_root = Path(config.release_root).resolve(strict=True)
+        self.manifest_path = self.release_root / "manifest.csv"
+        if sha256_file(self.manifest_path) != config.manifest_sha256:
+            raise ValueError("FM0 release manifest differs from its frozen hash")
+
+        with self.manifest_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if tuple(reader.fieldnames or ()) != MANIFEST_COLUMNS:
+                raise ValueError("FM0 release manifest columns differ from the contract")
+            rows = [dict(row) for row in reader]
+        if not rows:
+            raise ValueError("FM0 release manifest is empty")
+
+        grouped: dict[str, list[dict[str, str]]] = {}
+        for row in rows:
+            if row["input_release_schema_version"] != INPUT_RELEASE_SCHEMA_VERSION:
+                raise ValueError("FM0 release row has the wrong schema")
+            if row["source_partition"] != config.source_partition:
+                continue
+            if row["scientific_training_eligible"] != "True":
+                raise ValueError("FM0 release contains a training-ineligible selected row")
+            relative = Path(row["relative_path"])
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("FM0 release shard path escapes the release root")
+            shard = (self.release_root / relative).resolve()
+            if self.release_root not in shard.parents or not shard.is_file():
+                raise ValueError("FM0 release references an unavailable shard")
+            row["_resolved_shard"] = str(shard)
+            grouped.setdefault(row["leakage_component_id"], []).append(row)
+        if not grouped:
+            raise ValueError(f"FM0 release has no rows in {config.source_partition}")
+        self._source_ids = tuple(sorted(grouped))
+        self._visits = {
+            source: tuple(sorted(grouped[source], key=lambda row: row["observation_key"]))
+            for source in self._source_ids
+        }
+        self._cache: OrderedDict[str, ObservationRelease] = OrderedDict()
+
+    @property
+    def contract(self) -> dict[str, Any]:
+        return {
+            "kind": "fm0_input_release",
+            "release_root": str(self.release_root),
+            "manifest_sha256": self.config.manifest_sha256,
+            "variant": self.config.variant,
+            "seed": self.config.seed,
+            "source_partition": self.config.source_partition,
+            "windows_per_epoch": self.config.windows_per_epoch,
+            "window_length": self.config.window_length,
+            "n_sources": len(self._source_ids),
+            "n_observations": sum(len(rows) for rows in self._visits.values()),
+        }
+
+    def __len__(self) -> int:
+        return self.config.windows_per_epoch
+
+    def set_epoch(self, epoch: int) -> None:
+        if epoch < 0:
+            raise ValueError("epoch must be nonnegative")
+        self.epoch = int(epoch)
+
+    def _load_visit(self, row: Mapping[str, str]) -> ObservationRelease:
+        path = row["_resolved_shard"]
+        cached = self._cache.pop(path, None)
+        if cached is not None:
+            self._cache[path] = cached
+            return cached
+        if sha256_file(path) != row["sha256"]:
+            raise ValueError("FM0 release shard differs from its manifest hash")
+        release = load_input_release(path)
+        self._cache[path] = release
+        while len(self._cache) > self.config.shard_cache_size:
+            self._cache.popitem(last=False)
+        return release
+
+    def _selection(self, index: int) -> tuple[dict[str, str], ObservationRelease, np.ndarray]:
+        rng = np.random.default_rng(
+            _stable_seed("fm0-release-host-first", self.config.seed, self.epoch, index)
+        )
+        source = self._source_ids[int(rng.integers(0, len(self._source_ids)))]
+        visits = self._visits[source]
+        row = visits[int(rng.integers(0, len(visits)))]
+        release = self._load_visit(row)
+        segment_ids = np.unique(release.segment_id)
+        if segment_ids.size == 0:
+            raise ValueError("FM0 release visit has no chronological segment")
+        segment_id = int(segment_ids[int(rng.integers(0, segment_ids.size))])
+        indices = np.flatnonzero(release.segment_id == segment_id)
+        if indices.size == 0 or np.any(np.diff(indices) != 1):
+            raise ValueError("FM0 release segment is empty or non-contiguous")
+        return row, release, indices
+
+    def sample(self, index: int, *, mask_view: int = 0) -> dict[str, np.ndarray]:
+        if index < 0:
+            index += len(self)
+        if not 0 <= index < len(self):
+            raise IndexError(index)
+        _row, release, segment_indices = self._selection(index)
+        start = deterministic_window_start(
+            int(segment_indices.size),
+            sample_index=index,
+            epoch=self.epoch,
+            seed=self.config.seed,
+            window_length=self.config.window_length,
+        )
+        selected = segment_indices[start : start + self.config.window_length]
+        local_time = release.local_time_cadences[selected].astype(np.float32, copy=True)
+        time_valid = release.time_valid[selected]
+        finite_valid = time_valid & np.isfinite(local_time)
+        if np.any(finite_valid):
+            local_time[finite_valid] -= local_time[np.flatnonzero(finite_valid)[0]]
+        release_window = {
+            "flux": release.flux[selected],
+            "flux_valid": release.flux_valid[selected],
+            "flux_error": release.flux_error[selected],
+            "error_valid": release.error_valid[selected],
+            "local_time_cadences": local_time,
+            "delta_time_cadences": release.delta_time_cadences[selected],
+            "time_valid": time_valid,
+            "segment_boundary": release.segment_boundary[selected],
+            "view_present": release.view_present,
+        }
+        return prepare_model_window(
+            release_window,
+            variant=self.config.variant,
+            mask_seed=_stable_seed(
+                "fm0-release-mask",
                 self.config.seed,
                 self.epoch,
                 index,

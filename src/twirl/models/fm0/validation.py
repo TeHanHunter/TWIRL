@@ -13,6 +13,9 @@ from typing import Any, Mapping
 RUN_CONTRACT_SCHEMA_VERSION = "twirl_fm0_1_synthetic_run_contract_v1"
 RUN_SUMMARY_SCHEMA_VERSION = "twirl_fm0_1_synthetic_run_summary_v1"
 RUN_VALIDATION_SCHEMA_VERSION = "twirl_fm0_1_synthetic_run_validation_v1"
+REAL_RUN_CONTRACT_SCHEMA_VERSION = "twirl_fm0_1_real_run_contract_v1"
+REAL_RUN_SUMMARY_SCHEMA_VERSION = "twirl_fm0_1_real_run_summary_v1"
+REAL_RUN_VALIDATION_SCHEMA_VERSION = "twirl_fm0_1_real_run_validation_v1"
 
 
 def sha256_file(path: str | Path) -> str:
@@ -167,6 +170,7 @@ def _inspect_trusted_checkpoint(
         "model_config",
         "optimization_config",
         "synthetic_dataset_config",
+        "dataset_contract",
         "run_contract",
         "loss_history",
     }
@@ -270,13 +274,31 @@ def _inspect_trusted_checkpoint(
     ):
         raise ValueError("FM0 checkpoint sampler state is inconsistent")
 
-    dataset = checkpoint.get("synthetic_dataset_config")
-    if (
-        not isinstance(dataset, Mapping)
-        or dataset.get("variant") != variant
-        or dataset.get("seed") != contract.get("seed")
-    ):
-        raise ValueError("FM0 checkpoint synthetic dataset contract mismatch")
+    dataset_contract = checkpoint.get("dataset_contract")
+    if not isinstance(dataset_contract, Mapping):
+        raise ValueError("FM0 checkpoint dataset contract is missing")
+    if contract.get("synthetic_smoke"):
+        dataset = checkpoint.get("synthetic_dataset_config")
+        if (
+            dataset_contract.get("kind") != "synthetic"
+            or not isinstance(dataset, Mapping)
+            or dataset_contract.get("config") != dataset
+            or dataset.get("variant") != variant
+            or dataset.get("seed") != contract.get("seed")
+        ):
+            raise ValueError("FM0 checkpoint synthetic dataset contract mismatch")
+    else:
+        release_binding = contract.get("input_release")
+        if (
+            dataset_contract.get("kind") != "fm0_input_release"
+            or not isinstance(release_binding, Mapping)
+            or dataset_contract.get("manifest_sha256")
+            != release_binding.get("manifest_sha256")
+            or dataset_contract.get("source_partition") != "poc_train"
+            or dataset_contract.get("variant") != variant
+            or dataset_contract.get("seed") != contract.get("seed")
+        ):
+            raise ValueError("FM0 checkpoint real dataset contract mismatch")
     for state_name in ("optimizer_state", "scheduler_state", "rng_state"):
         if not isinstance(checkpoint.get(state_name), Mapping):
             raise ValueError(f"FM0 checkpoint {state_name} is malformed")
@@ -376,6 +398,83 @@ def validate_run_release(
         "schema_version": RUN_VALIDATION_SCHEMA_VERSION,
         "passed": True,
         "synthetic_only": True,
+        "run_dir": str(root),
+        "variant": summary.get("variant"),
+        "architecture": summary.get("architecture"),
+        "global_step": int(summary["global_step"]),
+        "artifact_sha256": hashes,
+        "checkpoint_inspected": bool(inspect_checkpoint),
+        "checkpoint_tensor_count": (
+            checkpoint_inspection["tensor_count"]
+            if checkpoint_inspection is not None
+            else None
+        ),
+    }
+
+
+def validate_real_run_release(
+    run_dir: str | Path,
+    *,
+    inspect_checkpoint: bool = True,
+) -> dict[str, Any]:
+    """Validate one trusted, checksum-bound real-data FM0.1 run release."""
+
+    root = Path(run_dir).resolve(strict=True)
+    contract_path = root / "run_contract.json"
+    checkpoint_path = root / "checkpoint.pt"
+    summary_path = root / "summary.json"
+    hashes = {
+        path.name: _verify_sidecar(path)
+        for path in (contract_path, checkpoint_path, summary_path)
+        if path.is_file()
+    }
+    if set(hashes) != {"run_contract.json", "checkpoint.pt", "summary.json"}:
+        raise ValueError("FM0 real-data run release is incomplete")
+    contract = read_json(contract_path)
+    summary = read_json(summary_path)
+    if contract.get("schema_version") != REAL_RUN_CONTRACT_SCHEMA_VERSION:
+        raise ValueError("FM0 real run-contract schema mismatch")
+    if summary.get("schema_version") != REAL_RUN_SUMMARY_SCHEMA_VERSION:
+        raise ValueError("FM0 real summary schema mismatch")
+    if contract.get("synthetic_smoke") or summary.get("synthetic_only"):
+        raise ValueError("real-data validator rejects synthetic runs")
+    if contract.get("real_data_consumed") is not True:
+        raise ValueError("real-data run contract does not declare real input")
+    release = contract.get("input_release")
+    if not isinstance(release, Mapping):
+        raise ValueError("real-data run lacks an input-release binding")
+    receipt_path = Path(str(release.get("receipt_path", ""))).resolve(strict=True)
+    manifest_path = Path(str(release.get("manifest_path", ""))).resolve(strict=True)
+    if sha256_file(receipt_path) != release.get("receipt_sha256"):
+        raise ValueError("real-data input receipt changed after training")
+    if sha256_file(manifest_path) != release.get("manifest_sha256"):
+        raise ValueError("real-data manifest changed after training")
+    receipt = read_json(receipt_path)
+    if (
+        receipt.get("passed") is not True
+        or receipt.get("scientific_training_eligible") is not True
+        or receipt.get("release", {}).get("manifest_sha256")
+        != release.get("manifest_sha256")
+    ):
+        raise ValueError("real-data input receipt does not authorize training")
+    if summary.get("run_contract_sha256") != hashes["run_contract.json"]:
+        raise ValueError("summary does not bind the real run contract")
+    if summary.get("checkpoint_sha256") != hashes["checkpoint.pt"]:
+        raise ValueError("summary does not bind the real checkpoint")
+    if not summary.get("passed") or int(summary.get("global_step", 0)) <= 0:
+        raise ValueError("FM0 real-data training did not complete")
+    checkpoint_inspection = None
+    if inspect_checkpoint:
+        checkpoint_inspection = _inspect_trusted_checkpoint(
+            checkpoint_path,
+            contract=contract,
+            summary=summary,
+        )
+    return {
+        "schema_version": REAL_RUN_VALIDATION_SCHEMA_VERSION,
+        "passed": True,
+        "synthetic_only": False,
+        "real_data_consumed": True,
         "run_dir": str(root),
         "variant": summary.get("variant"),
         "architecture": summary.get("architecture"),
