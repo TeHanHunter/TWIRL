@@ -24,7 +24,7 @@ STATE_PATH = Path(
     "/orcd/data/mki_aryeh/001/twirl/logs/twirl_fm0_1_s56_s65_tar_ingress/"
     "state.json"
 )
-GLOBUS = Path.home() / ".local/share/twirl-globus-cli/bin/globus"
+GLOBUS = Path.home() / ".local/twirl-globus-cli/bin/globus"
 
 
 def utc_now() -> str:
