@@ -4,8 +4,8 @@
 #SBATCH --job-name=twirl-fm0-1-1-real
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH -c 8
-#SBATCH --mem=96G
+#SBATCH -c 4
+#SBATCH --mem=32G
 #SBATCH --gres=gpu:h200:1
 #SBATCH -t 47:30:00
 #SBATCH -o /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.out
@@ -74,7 +74,7 @@ assert loader["input_receipt"]["sha256"] == input_sha
 assert admission["schema_version"] == "twirl_fm0_1_orcd_admission_receipt_v1" and admission["passed"] is True
 assert admission["expected_git_sha"] == expected_sha
 assert admission["input_receipt"]["sha256"] == input_sha
-assert admission["requested_fm_resources"] == {"h200": 1, "cpus": 8, "memory_mib": 98304}
+assert admission["requested_fm_resources"] == {"h200": 1, "cpus": 4, "memory_mib": 32768}
 now = int(time.time())
 if now < admission["created_at_epoch"] - 30 or now > admission["expires_at_epoch"]:
     raise SystemExit("admission receipt is not fresh at job start")

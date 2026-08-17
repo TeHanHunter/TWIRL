@@ -39,6 +39,7 @@ def test_operational_config_binds_the_byte_exact_science_freeze() -> None:
 def test_admission_reserves_stage1_before_exactly_one_fm_h200() -> None:
     payload = json.loads(OP_CONFIG.read_text(encoding="utf-8"))
     assert payload["scheduler"]["partition"] == "pg_mki_aryeh"
+    assert payload["scheduler"]["reclaimable_partition"] == "mit_preemptable"
     assert payload["scheduler"]["configured_h200"] == 8
     assert payload["scheduler"]["gpu_array_forbidden"] is True
     assert payload["scheduler"]["multi_gpu_forbidden"] is True
@@ -52,11 +53,13 @@ def test_admission_reserves_stage1_before_exactly_one_fm_h200() -> None:
         "dependency_pending_reason": "Dependency",
     }
     assert payload["jobs"]["fp32_smoke_h200"]["h200"] == 1
-    assert payload["jobs"]["fp32_smoke_h200"]["cpus"] == 8
-    assert payload["jobs"]["fp32_smoke_h200"]["memory_mib"] == 98304
+    assert payload["jobs"]["fp32_smoke_h200"]["cpus"] == 4
+    assert payload["jobs"]["fp32_smoke_h200"]["memory_mib"] == 32768
     assert payload["jobs"]["fp32_smoke_h200"]["walltime"] == "02:00:00"
     assert payload["admission"]["ttl_seconds"] == 300
     assert payload["admission"]["inspect_all_partition_jobs"] is True
+    assert payload["admission"]["inspect_all_gpu_node_jobs"] is True
+    assert payload["admission"]["verify_partition_priority_preemption"] is True
 
 
 def test_controller_is_noninteractive_dry_run_by_default() -> None:
@@ -100,6 +103,9 @@ def test_controller_admission_uses_all_queue_and_node_tres() -> None:
     assert 'ADMISSION_TMP="${tmp}"' in script
     assert 'ADMISSION_TMP=""' in script
     assert "squeue -p '${PARTITION}'" in script
+    assert "squeue -w '${GPU_NODE}'" in script
+    assert "PreemptType" in script
+    assert "reclaimable_node_jobs" in script
     assert "-t RUNNING,PENDING,CONFIGURING,COMPLETING" in script
     assert "scontrol show node -o '${GPU_NODE}'" in script
     assert 'field(node_raw, "AllocTRES")' in script
@@ -146,8 +152,8 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
 
     smoke = text("slurm_twirl_fm0_1_fp32_smoke_h200.sbatch")
     assert "#SBATCH --gres=gpu:h200:1" in smoke
-    assert "#SBATCH -c 8" in smoke
-    assert "#SBATCH --mem=96G" in smoke
+    assert "#SBATCH -c 4" in smoke
+    assert "#SBATCH --mem=32G" in smoke
     assert "#SBATCH -t 02:00:00" in smoke
     assert "#SBATCH --array" not in smoke
     assert "--precision fp32" in smoke
@@ -170,8 +176,8 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
 
     real = text("slurm_twirl_fm0_1_real_train_h200.sbatch")
     assert "#SBATCH --gres=gpu:h200:1" in real
-    assert "#SBATCH -c 8" in real
-    assert "#SBATCH --mem=96G" in real
+    assert "#SBATCH -c 4" in real
+    assert "#SBATCH --mem=32G" in real
     assert "#SBATCH -t 47:30:00" in real
     assert "#SBATCH --array" not in real
     assert "--variant TWIRL-FM0.1.1" in real

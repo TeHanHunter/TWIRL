@@ -7,8 +7,8 @@
 #SBATCH --job-name=twirl-fm0-fp32-smoke
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH -c 8
-#SBATCH --mem=96G
+#SBATCH -c 4
+#SBATCH --mem=32G
 #SBATCH --gres=gpu:h200:1
 #SBATCH -t 02:00:00
 #SBATCH -o /orcd/data/mki_aryeh/001/twirl/logs/%x-%j.out
@@ -78,7 +78,7 @@ assert d["passed"] is True
 assert d["expected_git_sha"] == os.environ["TWIRL_FM0_EXPECTED_SHA"]
 assert d["input_receipt"]["path"] == os.environ["TWIRL_FM0_INPUT_RECEIPT"]
 assert d["input_receipt"]["sha256"] == os.environ["TWIRL_FM0_INPUT_RECEIPT_SHA256"]
-assert d["requested_fm_resources"] == {"h200": 1, "cpus": 8, "memory_mib": 98304}
+assert d["requested_fm_resources"] == {"h200": 1, "cpus": 4, "memory_mib": 32768}
 now = int(time.time())
 if now < d["created_at_epoch"] - 30 or now > d["expires_at_epoch"]:
     raise SystemExit("admission receipt is not fresh at job start")

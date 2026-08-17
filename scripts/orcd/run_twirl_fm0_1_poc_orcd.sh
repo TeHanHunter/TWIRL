@@ -10,13 +10,14 @@ ACTION=""
 ADMISSION_TMP=""
 readonly PROJECT_ROOT="/orcd/data/mki_aryeh/001/twirl"
 readonly PARTITION="pg_mki_aryeh"
+readonly RECLAIMABLE_PARTITION="mit_preemptable"
 readonly GPU_NODE="node4900"
 readonly LOCKED_HOST="tehan@orcd-login.mit.edu"
 readonly CONTROL_PATH="/Users/tehan/.ssh/cm/%r@%h:%p"
 readonly DESIGN_SHA="94c8672a087884bf8a2c70f5d15315e05de602134af0c6c2073ca1c36232d6f7"
 readonly CONFIG_SHA="7de4e8c9e98c0ce27648a21241acc51766e436a537ba932b54f529fbdbf26d8a"
 readonly FREEZE_SHA="75092235978c0b582f569be55770ad2d63368e079a6777da0b1c44547f074c25"
-readonly ORCD_CONFIG_SHA="733a5c65118d6331979a61e7f63b1dfb9b3e63eff0aa2052c98e6c16290f938f"
+readonly ORCD_CONFIG_SHA="582e9e1b47298f23c135f578cc7ddd8e256cea6035a85ea88028030e7b7d96a3"
 
 usage() {
   cat <<'EOF'
@@ -179,7 +180,7 @@ make_and_submit_admitted_run() {
   input_binding; loader_binding; require_socket
   if [[ "${DRY_RUN}" == 1 ]]; then
     echo "+ inspect all ${PARTITION} RUNNING/PENDING jobs and ${GPU_NODE} CfgTRES/AllocTRES"
-    echo "+ reserve 4 x (1 H200, 16 CPU, 384 GiB) for Stage 1 before 1 x (1 H200, 8 CPU, 96 GiB) for FM0.1"
+    echo "+ reserve 4 x (1 H200, 16 CPU, 384 GiB) for Stage 1 before 1 x (1 H200, 4 CPU, 32 GiB) for FM0.1"
     echo "+ publish <=300-second immutable admission receipt and immediately sbatch one non-array H200 ${run_kind} run"
     return
   fi
@@ -201,20 +202,27 @@ make_and_submit_admitted_run() {
   skew=$(( local_epoch > remote_epoch ? local_epoch - remote_epoch : remote_epoch - local_epoch ))
   (( skew <= 30 )) || { echo "Local/ORCD clock skew exceeds 30 seconds." >&2; exit 5; }
   capture "scontrol show partition -o '${PARTITION}'" > "${tmp}/partition.txt"
+  capture "scontrol show partition -o '${RECLAIMABLE_PARTITION}'" > "${tmp}/reclaimable-partition.txt"
+  capture "scontrol show config | grep -E '^Preempt(Type|Mode|Parameters|ExemptTime)'" > "${tmp}/preemption.txt"
   capture "scontrol show node -o '${GPU_NODE}'" > "${tmp}/node.txt"
   capture "squeue -p '${PARTITION}' -h -t RUNNING,PENDING,CONFIGURING,COMPLETING -o '%i|%u|%T|%r|%C|%m|%b|%j|%N|%E'" > "${tmp}/queue.txt"
+  capture "squeue -w '${GPU_NODE}' -h -t RUNNING,CONFIGURING,COMPLETING -o '%i|%P|%u|%T|%r|%C|%m|%b|%j|%N|%E'" > "${tmp}/node-queue.txt"
   admission_path="${RUN_ROOT}/admission/admission-${run_kind}-${remote_epoch}-${TWIRL_FM0_INPUT_RECEIPT_SHA256:0:12}.json"
 
-  python3 - "${tmp}/partition.txt" "${tmp}/node.txt" "${tmp}/queue.txt" "${tmp}/receipt.json" \
+  python3 - "${tmp}/partition.txt" "${tmp}/reclaimable-partition.txt" "${tmp}/preemption.txt" \
+    "${tmp}/node.txt" "${tmp}/queue.txt" "${tmp}/node-queue.txt" "${tmp}/receipt.json" \
     "${remote_epoch}" "${EXPECTED_SHA}" "${TWIRL_FM0_INPUT_RECEIPT}" "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" <<'PY'
 from __future__ import annotations
 import hashlib, json, re, sys
 from pathlib import Path
 
-partition_text, node_text, queue_path, out_path = [Path(x) for x in sys.argv[1:5]]
-now, expected_sha, input_path, input_sha = int(sys.argv[5]), sys.argv[6], sys.argv[7], sys.argv[8]
-partition_raw, node_raw = partition_text.read_text().strip(), node_text.read_text().strip()
-if not partition_raw or not node_raw:
+partition_text, reclaim_partition_text, preemption_text, node_text, queue_path, node_queue_path, out_path = [Path(x) for x in sys.argv[1:8]]
+now, expected_sha, input_path, input_sha = int(sys.argv[8]), sys.argv[9], sys.argv[10], sys.argv[11]
+partition_raw = partition_text.read_text().strip()
+reclaim_partition_raw = reclaim_partition_text.read_text().strip()
+preemption_raw = preemption_text.read_text().strip()
+node_raw = node_text.read_text().strip()
+if not partition_raw or not reclaim_partition_raw or not preemption_raw or not node_raw:
     raise SystemExit("empty scheduler snapshot")
 def field(text, name):
     match = re.search(r"(?:^|\s)" + re.escape(name) + r"=([^\s]+)", text)
@@ -234,6 +242,14 @@ def memory_mib(value):
     return int(float(match.group(1)) * scale)
 if field(partition_raw, "PartitionName") != "pg_mki_aryeh" or field(partition_raw, "State") != "UP":
     raise SystemExit("partition is not the exact live authority")
+if field(reclaim_partition_raw, "PartitionName") != "mit_preemptable" or field(reclaim_partition_raw, "State") != "UP":
+    raise SystemExit("reclaimable partition is not the exact live authority")
+if int(field(partition_raw, "PriorityTier")) <= int(field(reclaim_partition_raw, "PriorityTier")):
+    raise SystemExit("FM partition no longer outranks the reclaimable partition")
+if field(reclaim_partition_raw, "PreemptMode") != "REQUEUE":
+    raise SystemExit("reclaimable partition no longer uses REQUEUE")
+if not re.search(r"^PreemptType\s*=\s*preempt/partition_prio$", preemption_raw, re.MULTILINE):
+    raise SystemExit("partition-priority preemption is not active")
 if field(node_raw, "NodeName") != "node4900": raise SystemExit("wrong GPU node")
 bad_states = {"DOWN", "DRAIN", "DRAINED", "FAIL", "FAILING", "MAINT", "UNKNOWN"}
 node_states = set(field(node_raw, "State").split("+"))
@@ -265,10 +281,31 @@ for line in Path(queue_path).read_text().splitlines():
     else: raise SystemExit(f"unknown Stage-1 scheduler state: {jobid}/{state}")
 if runnable: raise SystemExit("runnable Stage-1 job is pending; FM admission denied")
 if active_h200 > 4 or active_cpu > 78: raise SystemExit("Stage-1 live ceiling already exceeded")
-other_h200, other_cpu, other_mem = alloc_h200-active_h200, alloc_cpu-active_cpu, alloc_mem-active_mem
-if min(other_h200, other_cpu, other_mem) < 0: raise SystemExit("node/queue allocation accounting is inconsistent")
+
+reclaimable, reclaim_h200, reclaim_cpu, reclaim_mem = [], 0, 0, 0
+for line in node_queue_path.read_text().splitlines():
+    fields = line.split("|", 10)
+    if len(fields) != 11: raise SystemExit(f"unparseable GPU-node queue row: {line}")
+    jobid, partition, user, state, reason, cpus, mem, gres, name, nodes, dependency = fields
+    if partition != "mit_preemptable":
+        continue
+    if state not in {"RUNNING", "CONFIGURING", "COMPLETING"} or "node4900" not in nodes:
+        raise SystemExit(f"reclaimable job state/node ambiguity: {jobid}/{state}/{nodes}")
+    match = re.search(r"h200:([0-9]+)", gres.lower())
+    h200 = int(match.group(1)) if match else 0
+    row = {"job_id": jobid, "partition": partition, "user": user, "state": state, "reason": reason, "cpus": int(cpus), "memory": mem, "gres": gres, "name": name, "nodes": nodes, "dependency": dependency}
+    reclaimable.append(row)
+    reclaim_h200 += h200
+    reclaim_cpu += int(cpus)
+    reclaim_mem += memory_mib(mem)
+
+other_h200 = alloc_h200-active_h200-reclaim_h200
+other_cpu = alloc_cpu-active_cpu-reclaim_cpu
+other_mem = alloc_mem-active_mem-reclaim_mem
+if min(other_h200, other_cpu, other_mem) < 0:
+    raise SystemExit("node/queue allocation accounting is inconsistent after reclaimable jobs")
 stage1 = {"lanes": 4, "h200": 4, "cpus": 64, "memory_mib": 1572864}
-fm = {"h200": 1, "cpus": 8, "memory_mib": 98304}
+fm = {"h200": 1, "cpus": 4, "memory_mib": 32768}
 needed = {"h200": other_h200+stage1["h200"]+fm["h200"], "cpus": other_cpu+stage1["cpus"]+fm["cpus"], "memory_mib": other_mem+stage1["memory_mib"]+fm["memory_mib"]}
 capacity = {"h200": cfg_h200, "cpus": cfg_cpu, "memory_mib": real_mem}
 if any(needed[key] > capacity[key] for key in needed):
@@ -281,9 +318,9 @@ payload = {
   "input_receipt": {"path": input_path, "sha256": input_sha},
   "partition": "pg_mki_aryeh", "gpu_node": "node4900",
   "requested_fm_resources": fm, "stage1_reservation": stage1,
-  "derived": {"node_capacity": capacity, "node_allocated": {"h200": alloc_h200, "cpus": alloc_cpu, "memory_mib": alloc_mem}, "non_stage1_allocated": {"h200": other_h200, "cpus": other_cpu, "memory_mib": other_mem}, "capacity_needed": needed, "active_stage1_jobs": active, "dependency_held_stage1_jobs": dependency_held, "runnable_stage1_jobs": runnable},
-  "snapshot_sha256": {"partition": digest(partition_text), "node": digest(node_text), "all_partition_queue": digest(Path(queue_path))},
-  "raw_snapshots": {"partition": partition_raw, "node": node_raw, "all_partition_queue": Path(queue_path).read_text()},
+  "derived": {"node_capacity": capacity, "node_allocated": {"h200": alloc_h200, "cpus": alloc_cpu, "memory_mib": alloc_mem}, "reclaimable_allocated": {"h200": reclaim_h200, "cpus": reclaim_cpu, "memory_mib": reclaim_mem}, "non_reclaimable_non_stage1_allocated": {"h200": other_h200, "cpus": other_cpu, "memory_mib": other_mem}, "capacity_needed": needed, "active_stage1_jobs": active, "dependency_held_stage1_jobs": dependency_held, "runnable_stage1_jobs": runnable, "reclaimable_node_jobs": reclaimable},
+  "snapshot_sha256": {"partition": digest(partition_text), "reclaimable_partition": digest(reclaim_partition_text), "preemption": digest(preemption_text), "node": digest(node_text), "all_partition_queue": digest(Path(queue_path)), "gpu_node_queue": digest(node_queue_path)},
+  "raw_snapshots": {"partition": partition_raw, "reclaimable_partition": reclaim_partition_raw, "preemption": preemption_raw, "node": node_raw, "all_partition_queue": Path(queue_path).read_text(), "gpu_node_queue": node_queue_path.read_text()},
 }
 Path(out_path).write_text(json.dumps(payload, indent=2, sort_keys=True)+"\n")
 PY

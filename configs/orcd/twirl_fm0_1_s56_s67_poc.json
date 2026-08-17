@@ -39,6 +39,7 @@
   },
   "scheduler": {
     "partition": "pg_mki_aryeh",
+    "reclaimable_partition": "mit_preemptable",
     "gpu_node": "node4900",
     "configured_h200": 8,
     "max_walltime": "47:30:00",
@@ -75,8 +76,8 @@
     },
     "fp32_smoke_h200": {
       "h200": 1,
-      "cpus": 8,
-      "memory_mib": 98304,
+      "cpus": 4,
+      "memory_mib": 32768,
       "walltime": "02:00:00",
       "precision": "fp32",
       "array": false,
@@ -96,6 +97,8 @@
     "ttl_seconds": 300,
     "max_clock_skew_seconds": 30,
     "inspect_all_partition_jobs": true,
+    "inspect_all_gpu_node_jobs": true,
+    "verify_partition_priority_preemption": true,
     "reserve_stage1_before_fm": true,
     "unknown_scheduler_state_fails_closed": true,
     "runnable_stage1_pending_blocks": true
