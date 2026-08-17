@@ -1,0 +1,257 @@
+schema_version: twirl_fm0_1_poc_config_v1
+campaign_id: twirl_fm0_1_s56_s67_poc
+model_family: TWIRL-FM0
+campaign_name: TWIRL-FM0.1
+status: frozen_scientific_design
+frozen_on: 2026-08-14
+
+purpose:
+  primary: compare encoder structure and model-visible light-curve views
+  foundation_model_claim: false
+  production_model_claim: false
+  prospective_sector_claim: false
+  discovery_engine_replacement: false
+
+scope:
+  sectors: [56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67]
+  accepted_a2v1_sectors: [56, 57, 58, 59, 60, 61, 62, 63, 64, 65]
+  diagnostic_orcd_complete_deferred_sectors: [66, 67]
+  diagnostic_sector_requirements:
+    - immutable_cell_receipts
+    - hdf5_openability
+    - cadence_authority_join
+    - external_quality_join
+    - fm_channel_numeric_gate
+  tess_cadence_seconds: 200.0
+  pretraining_population: eligible_gaia_selected_twirl_white_dwarfs
+  bls_and_candidate_selection_forbidden: true
+
+identity:
+  physical_source_field: gaia_dr3_source_id
+  physical_source_authority: Gaia_DR3
+  operational_alias_field: tic_id
+  split_field: leakage_component_id
+  leakage_component_definition: connected_gaia_tic_alias_component
+  quarantine_components_with_multiple_gaia_sources: true
+  group_all_visits_of_physical_source: true
+
+source_split:
+  algorithm: sha256_full_digest_big_endian_modulo
+  salt: twirl_fm0_1_source_split_v1
+  modulus: 10000
+  partitions_half_open:
+    poc_train: {start_inclusive: 0, end_exclusive: 8000}
+    poc_development: {start_inclusive: 8000, end_exclusive: 9000}
+    poc_sealed_test: {start_inclusive: 9000, end_exclusive: 10000}
+  assign_before_windows_or_transforms: true
+  sealed_test_used_for_variant_selection: false
+  all_sectors_may_occur_in_each_partition: true
+
+input_release:
+  schema_version: twirl_fm0_1_input_release_v1
+  source: immutable_a2v1_raw_aperture_photometry
+  apertures: [1x1, 3x3]
+  excluded_apertures: [5x5]
+  stored_flux_views:
+    - raw_relative_1x1
+    - raw_relative_3x3
+    - adp_1x1
+    - adp_3x3
+    - adp015_1x1
+    - adp015_3x3
+  raw_relative_definition: (RawFlux - effective_good_median) / adp_robust_scale
+  adp_definition: DET_FLUX_ADP - 1
+  adp015_definition: DET_FLUX_ADP015 - 1
+  uncertainty_views:
+    - raw_flux_error_1x1_over_robust_scale
+    - raw_flux_error_3x3_over_robust_scale
+  preserve_fractional_amplitude: true
+  per_window_unit_variance_normalization: false
+  absolute_detector_unit_flux_model_visible: false
+  model_visible_audit_metadata: false
+  stored_masks:
+    - time_valid
+    - segment_boundary
+    - flux_valid_per_view
+    - error_valid_per_aperture
+    - view_present
+
+time:
+  local_reference: first_valid_time_in_window
+  local_time_units: nominal_200_second_cadences
+  local_delta_time_units: nominal_200_second_cadences
+  host_visit_reference: first_represented_visit_of_physical_source
+  host_visit_offset_units: nominal_200_second_cadences
+  host_visit_gap_units: nominal_200_second_cadences
+  preserve_true_elapsed_gaps: true
+  absolute_bjd_model_visible: false
+  sector_id_model_visible: false
+  camera_ccd_model_visible: false
+
+windowing:
+  length_cadences: 2048
+  nominal_duration_days: 4.7407407407
+  training_start: deterministic_seeded_random
+  evaluation_stride_cadences: 1024
+  never_cross_orbit_boundary: true
+  never_cross_gap_days: 0.2
+  keep_invalid_cadences_in_place: true
+  padding_value: 0.0
+  padding_mask_valid: false
+
+sampling:
+  hierarchy: [physical_source, sector_visit, segment, window]
+  approximately_uniform_physical_sources: true
+  repeated_hosts_receive_equal_source_weight: true
+  high_deviation_oversampling: false
+
+masking:
+  target_fraction: 0.15
+  span_length_cadences: [1, 64]
+  synchronized_across_flux_views: true
+  invalid_cadences_never_targets: true
+  mask_seed_bound_to_run_and_window: true
+
+model:
+  embedding_dim: 256
+  target_parameter_range: [8000000, 12000000]
+  architecture_parameter_match_relative_tolerance: 0.10
+  cadence_local_stem_before_stride_or_patching: true
+  tcn:
+    mask_aware: true
+    residual: true
+    dilation_schedule: exponential
+  conformer:
+    time_aware: true
+    local_convolution: true
+    attention_after_local_stem: true
+    patch_stride_cadences: 4
+    attention_heads: 8
+  learned_host_aggregator: false
+  cross_sector_consistency_loss: false
+
+objective:
+  reconstruction:
+    loss: huber
+    huber_delta_fractional_flux: 0.01
+    average_views_equally: true
+    uncertainty_weighted: false
+  vicreg:
+    total_weight: 0.1
+    invariance_weight: 25.0
+    variance_weight: 25.0
+    covariance_weight: 1.0
+  forbidden_components:
+    - whole_channel_prediction
+    - neighboring_window_prediction
+    - cross_sector_consistency
+    - injection_supervision
+
+variants:
+  TWIRL-FM0.1.1:
+    architecture: tcn
+    flux_views: [adp_1x1, adp_3x3]
+    objective: masked_reconstruction
+  TWIRL-FM0.1.2:
+    architecture: conformer
+    flux_views: [adp_1x1, adp_3x3]
+    objective: masked_reconstruction
+  TWIRL-FM0.1.3:
+    architecture: development_winner_of_0_1_1_and_0_1_2
+    flux_views: [adp_1x1, adp_3x3, adp015_1x1, adp015_3x3]
+    objective: masked_reconstruction
+  TWIRL-FM0.1.4:
+    architecture: same_as_0_1_3
+    flux_views:
+      - raw_relative_1x1
+      - raw_relative_3x3
+      - adp_1x1
+      - adp_3x3
+      - adp015_1x1
+      - adp015_3x3
+    objective: masked_reconstruction
+  TWIRL-FM0.1.5:
+    architecture: same_as_0_1_4
+    flux_views:
+      - raw_relative_1x1
+      - raw_relative_3x3
+      - adp_1x1
+      - adp_3x3
+      - adp015_1x1
+      - adp015_3x3
+    objective: masked_reconstruction_plus_same_window_vicreg
+
+interaction_check:
+  trigger: architecture_ranking_reverses_or_is_unresolved_after_view_addition
+  action: rerun_other_architecture_with_winning_flux_views
+
+optimization:
+  seeds: [560067, 560068]
+  effective_batch_windows: 64
+  max_optimizer_steps: 20000
+  optimizer: adamw
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  scheduler: cosine_with_linear_warmup
+  warmup_steps: 1000
+  precision_sequence: [fp32_smoke, bf16_training_after_smoke_pass]
+  equal_model_visible_cadence_budget: true
+  checkpoint_interval_minutes: 30
+  checkpoint_selection_uses_training_loss_minimum: false
+
+evaluation:
+  variant_selection_partition: poc_development
+  finalist_only_partition: poc_sealed_test
+  repeated_host_tests:
+    - same_source_cross_sector_retrieval
+    - best_single_sector
+    - masked_mean_sector_pooling
+  representation_tests:
+    - effective_rank
+    - paired_view_separation
+    - frozen_linear_morphology_probe
+    - random_encoder_control
+    - masked_reconstruction_baseline
+    - injection_event_retention
+  shortcut_probes_audit_only:
+    - sector
+    - camera
+    - ccd
+    - magnitude
+    - missingness
+  report_source_clustered_uncertainty: true
+
+forbidden_model_visible_fields:
+  - gaia_dr3_source_id
+  - tic_id
+  - absolute_bjd
+  - sector
+  - camera
+  - ccd
+  - ra
+  - dec
+  - pwd
+  - tmag
+  - bls_period
+  - bls_epoch
+  - bls_duration
+  - bls_depth
+  - bls_power
+  - bls_sde
+  - periodogram
+  - candidate_score
+  - human_label
+  - pseudo_label
+  - teacher_score
+  - teacher_embedding
+  - injection_truth
+
+compute:
+  system: orcd
+  partition: pg_mki_aryeh
+  h200_per_fm_job: 1
+  multi_gpu_forbidden: true
+  gpu_array_forbidden: true
+  stage1_has_priority: true
+  gpu_submission_requires_fresh_admission_receipt: true
+  max_slurm_walltime: "47:30:00"

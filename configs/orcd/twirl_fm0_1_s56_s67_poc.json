@@ -1,0 +1,103 @@
+{
+  "schema_version": "twirl_fm0_1_orcd_poc_v1",
+  "campaign_id": "twirl_fm0_1_s56_s67_poc",
+  "science_bindings": {
+    "design": {
+      "path": "doc/foundation_model_design.md",
+      "sha256": "94c8672a087884bf8a2c70f5d15315e05de602134af0c6c2073ca1c36232d6f7"
+    },
+    "config": {
+      "path": "configs/models/twirl_fm0_1_s56_s67_poc.yaml",
+      "sha256": "7de4e8c9e98c0ce27648a21241acc51766e436a537ba932b54f529fbdbf26d8a"
+    },
+    "freeze_receipt": {
+      "path": "reports/stage5_validation/twirl_fm0_1_design_freeze_v1/freeze.json",
+      "sha256": "75092235978c0b582f569be55770ad2d63368e079a6777da0b1c44547f074c25"
+    }
+  },
+  "code_binding": {
+    "source": "TWIRL_EXPECTED_GIT_SHA",
+    "format": "full_lowercase_40_hex",
+    "clean_worktree_required": true,
+    "detached_deployment_required": true
+  },
+  "input_release_binding": {
+    "receipt_path_source": "TWIRL_FM0_INPUT_RECEIPT",
+    "receipt_sha256_source": "TWIRL_FM0_INPUT_RECEIPT_SHA256",
+    "receipt_must_be_nonempty": true,
+    "receipt_must_be_read_only": true,
+    "passed_required": true,
+    "path_prefix": "/orcd/data/mki_aryeh/001/twirl/"
+  },
+  "paths": {
+    "project_root": "/orcd/data/mki_aryeh/001/twirl",
+    "source_repo": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL",
+    "environment_prefix": "/orcd/data/mki_aryeh/001/twirl/envs/twirl-fm0-poc-py3119-torch2110-cu128-v1",
+    "environment_manifest": "/orcd/data/mki_aryeh/001/twirl/envs/twirl-fm0-poc-py3119-torch2110-cu128-v1/build-manifest.json",
+    "run_root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_1_s56_s67_poc",
+    "log_root": "/orcd/data/mki_aryeh/001/twirl/logs"
+  },
+  "scheduler": {
+    "partition": "pg_mki_aryeh",
+    "gpu_node": "node4900",
+    "configured_h200": 8,
+    "max_walltime": "47:30:00",
+    "gpu_array_forbidden": true,
+    "multi_gpu_forbidden": true
+  },
+  "stage1_reservation": {
+    "job_name_regex": "^twirl-s[0-9]+-o[0-9]+-c[1-4]d[1-4]-a2v1(?:-p4)?$",
+    "lanes": 4,
+    "h200_per_lane": 1,
+    "cpus_per_lane": 16,
+    "memory_mib_per_lane": 393216,
+    "live_cpu_ceiling": 78,
+    "dependency_pending_reason": "Dependency"
+  },
+  "jobs": {
+    "registry_cpu": {
+      "cpus": 4,
+      "memory_mib": 65536,
+      "walltime": "06:00:00",
+      "exclude_gpu_node": true
+    },
+    "input_validation_cpu": {
+      "cpus": 4,
+      "memory_mib": 65536,
+      "walltime": "04:00:00",
+      "exclude_gpu_node": true
+    },
+    "loader_smoke_cpu": {
+      "cpus": 4,
+      "memory_mib": 65536,
+      "walltime": "01:00:00",
+      "exclude_gpu_node": true
+    },
+    "fp32_smoke_h200": {
+      "h200": 1,
+      "cpus": 8,
+      "memory_mib": 98304,
+      "walltime": "02:00:00",
+      "precision": "fp32",
+      "array": false,
+      "variant": "TWIRL-FM0.1.1",
+      "seed": 560067,
+      "max_steps": 8
+    },
+    "post_validation_cpu": {
+      "cpus": 2,
+      "memory_mib": 32768,
+      "walltime": "01:00:00",
+      "exclude_gpu_node": true
+    }
+  },
+  "admission": {
+    "receipt_schema_version": "twirl_fm0_1_orcd_admission_receipt_v1",
+    "ttl_seconds": 300,
+    "max_clock_skew_seconds": 30,
+    "inspect_all_partition_jobs": true,
+    "reserve_stage1_before_fm": true,
+    "unknown_scheduler_state_fails_closed": true,
+    "runnable_stage1_pending_blocks": true
+  }
+}

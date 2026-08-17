@@ -1,0 +1,17 @@
+name: twirl-fm0-poc
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11.9
+  - pip=25.1.1
+  - setuptools=75.8.0
+  - wheel=0.45.1
+  - numpy=1.26.4
+  - scipy=1.16.1
+  - pandas=2.3.1
+  - astropy=7.1.0
+  - h5py=3.14.0
+  - matplotlib=3.10.5
+  - pyarrow=19.0.1
+  - pyyaml=6.0.2
+  - pytest=8.4.1
