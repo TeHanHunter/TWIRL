@@ -758,7 +758,7 @@ def run_real_training(
 ) -> dict[str, Any]:
     """Train FM0.1.1--0.1.4 on a checksum-bound real input release."""
 
-    if model.config.variant == "TWIRL-FM0.1.5":
+    if dataset.config.variant == "TWIRL-FM0.1.5":
         raise ValueError("FM0.1.5 real training must explicitly enable VICReg")
     return _run_training(
         model=model,

@@ -105,12 +105,14 @@ def test_controller_admission_uses_all_queue_and_node_tres() -> None:
     assert 'field(node_raw, "AllocTRES")' in script
     assert 'field(node_raw, "CfgTRES")' in script
     assert 'runnable Stage-1 job is pending; FM admission denied' in script
-    assert "another FM0.1 GPU smoke is already live" in script
+    assert "another FM0.1 GPU job is already live" in script
     assert '"expires_at_epoch": now+300' in script
     assert '"memory_mib": 1572864' in script
     assert "sbatch --parsable" in script
     assert '"${LAUNCH_DIR}/fp32-smoke.job"' in script
     assert 'fp32-smoke-${remote_epoch}.job' not in script
+    assert "submit-real-train) make_and_submit_admitted_run real" in script
+    assert '"${LAUNCH_DIR}/real-train-step${TWIRL_FM0_TARGET_STEP}.job"' in script
 
 
 def test_registry_stage_requires_and_exports_admitted_observations() -> None:

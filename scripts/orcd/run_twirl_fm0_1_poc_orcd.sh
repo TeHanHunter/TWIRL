@@ -31,6 +31,8 @@ Actions (run separately; no stage is auto-promoted):
   submit-loader-smoke      Exercise two frozen shards through the official loader.
   submit-fp32-smoke        Create a <=5-minute all-queue admission receipt, then
                            submit exactly one H200 synthetic mechanics smoke.
+  submit-real-train        Create the same fresh Stage-1-safe receipt, then
+                           submit one H200 FM0.1.1 real-release training job.
   submit-post-validation   Independently validate the synthetic mechanics artifacts.
   status                   Read only the named run jobs and receipts.
 
@@ -52,6 +54,8 @@ Required immutable binding for loader and later stages:
 
 Additional bindings:
   submit-fp32-smoke: TWIRL_FM0_LOADER_RECEIPT[_SHA256]
+  submit-real-train: TWIRL_FM0_LOADER_RECEIPT[_SHA256],
+                     TWIRL_FM0_TARGET_STEP (1--20000)
   submit-post-validation: TWIRL_FM0_SMOKE_OUTPUT,
                           TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
 EOF
@@ -164,12 +168,19 @@ submit_once() {
   "
 }
 
-make_and_submit_admitted_smoke() {
+make_and_submit_admitted_run() {
+  local run_kind=$1
+  [[ "${run_kind}" == "synthetic" || "${run_kind}" == "real" ]] || { echo "Unknown admitted run kind." >&2; exit 2; }
+  if [[ "${run_kind}" == "real" ]]; then
+    : "${TWIRL_FM0_TARGET_STEP:?set target optimizer step (1--20000)}"
+    [[ "${TWIRL_FM0_TARGET_STEP}" =~ ^[0-9]+$ ]] || { echo "Real target step must be numeric." >&2; exit 2; }
+    (( TWIRL_FM0_TARGET_STEP >= 1 && TWIRL_FM0_TARGET_STEP <= 20000 )) || { echo "Invalid real target step." >&2; exit 2; }
+  fi
   input_binding; loader_binding; require_socket
   if [[ "${DRY_RUN}" == 1 ]]; then
     echo "+ inspect all ${PARTITION} RUNNING/PENDING jobs and ${GPU_NODE} CfgTRES/AllocTRES"
     echo "+ reserve 4 x (1 H200, 16 CPU, 384 GiB) for Stage 1 before 1 x (1 H200, 8 CPU, 96 GiB) for FM0.1"
-    echo "+ publish <=300-second immutable admission receipt and immediately sbatch one non-array H200 smoke"
+    echo "+ publish <=300-second immutable admission receipt and immediately sbatch one non-array H200 ${run_kind} run"
     return
   fi
 
@@ -181,7 +192,7 @@ make_and_submit_admitted_smoke() {
     '${ENV_PREFIX}/bin/python' -c 'import json,sys; i=json.load(open(sys.argv[1])); l=json.load(open(sys.argv[2])); assert i.get(\"schema_version\")==\"twirl_fm0_1_input_release_receipt_v1\" and i.get(\"passed\") is True; assert l.get(\"schema_version\")==\"twirl_fm0_1_loader_smoke_receipt_v1\" and l.get(\"passed\") is True; assert l[\"input_receipt\"][\"sha256\"]==sys.argv[3]' '${TWIRL_FM0_INPUT_RECEIPT}' '${TWIRL_FM0_LOADER_RECEIPT}' '${TWIRL_FM0_INPUT_RECEIPT_SHA256}'
   " >/dev/null
 
-  local tmp remote_epoch local_epoch skew admission_path admission_sha smoke_output
+  local tmp remote_epoch local_epoch skew admission_path admission_sha run_output
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/twirl-fm0-admission.XXXXXX")
   ADMISSION_TMP="${tmp}"
   trap 'if [[ -n "${ADMISSION_TMP:-}" ]]; then rm -rf -- "${ADMISSION_TMP}"; fi' EXIT
@@ -192,7 +203,7 @@ make_and_submit_admitted_smoke() {
   capture "scontrol show partition -o '${PARTITION}'" > "${tmp}/partition.txt"
   capture "scontrol show node -o '${GPU_NODE}'" > "${tmp}/node.txt"
   capture "squeue -p '${PARTITION}' -h -t RUNNING,PENDING,CONFIGURING,COMPLETING -o '%i|%u|%T|%r|%C|%m|%b|%j|%N|%E'" > "${tmp}/queue.txt"
-  admission_path="${RUN_ROOT}/admission/admission-${remote_epoch}-${TWIRL_FM0_INPUT_RECEIPT_SHA256:0:12}.json"
+  admission_path="${RUN_ROOT}/admission/admission-${run_kind}-${remote_epoch}-${TWIRL_FM0_INPUT_RECEIPT_SHA256:0:12}.json"
 
   python3 - "${tmp}/partition.txt" "${tmp}/node.txt" "${tmp}/queue.txt" "${tmp}/receipt.json" \
     "${remote_epoch}" "${EXPECTED_SHA}" "${TWIRL_FM0_INPUT_RECEIPT}" "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" <<'PY'
@@ -241,8 +252,8 @@ for line in Path(queue_path).read_text().splitlines():
     fields = line.split("|", 9)
     if len(fields) != 10: raise SystemExit(f"unparseable all-partition queue row: {line}")
     jobid, user, state, reason, cpus, mem, gres, name, nodes, dependency = fields
-    if name == "twirl-fm0-fp32-smoke":
-        raise SystemExit(f"another FM0.1 GPU smoke is already live: {jobid}/{state}")
+    if name in {"twirl-fm0-fp32-smoke", "twirl-fm0-1-1-real"}:
+        raise SystemExit(f"another FM0.1 GPU job is already live: {jobid}/{state}")
     if not pattern.fullmatch(name): continue
     row = {"job_id": jobid, "user": user, "state": state, "reason": reason, "cpus": int(cpus), "memory": mem, "gres": gres, "nodes": nodes, "dependency": dependency}
     if state in {"RUNNING", "CONFIGURING", "COMPLETING"}:
@@ -278,14 +289,18 @@ Path(out_path).write_text(json.dumps(payload, indent=2, sort_keys=True)+"\n")
 PY
   admission_sha=$(shasum -a 256 "${tmp}/receipt.json" | awk '{print $1}')
   "${SSH[@]}" "${LOCKED_HOST}" "set -euo pipefail; mkdir -p '${RUN_ROOT}/admission'; test ! -e '${admission_path}'; tmp='${admission_path}.tmp'; cat > \"\${tmp}\"; chmod 0444 \"\${tmp}\"; mv -- \"\${tmp}\" '${admission_path}'" < "${tmp}/receipt.json"
-  smoke_output="${RUN_ROOT}/model_runs/fp32_synthetic_smoke/${remote_epoch}-${admission_sha:0:12}"
-  # One exact-SHA smoke is allowed for this run root.  The fixed claim inside
-  # submit_once closes the race between two controllers that both obtained a
-  # fresh scheduler snapshot before either submitted.
-  submit_once "${LAUNCH_DIR}/fp32-smoke.job" "twirl-fm0-fp32-smoke" \
-    "scripts/orcd/slurm_twirl_fm0_1_fp32_smoke_h200.sbatch" \
-    "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_LOADER_RECEIPT=${TWIRL_FM0_LOADER_RECEIPT},TWIRL_FM0_LOADER_RECEIPT_SHA256=${TWIRL_FM0_LOADER_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${admission_path},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${admission_sha},TWIRL_FM0_SMOKE_OUTPUT=${smoke_output}"
-  printf 'admission=%s\nadmission_sha256=%s\nsmoke_output=%s\n' "${admission_path}" "${admission_sha}" "${smoke_output}"
+  if [[ "${run_kind}" == "synthetic" ]]; then
+    run_output="${RUN_ROOT}/model_runs/fp32_synthetic_smoke/${remote_epoch}-${admission_sha:0:12}"
+    submit_once "${LAUNCH_DIR}/fp32-smoke.job" "twirl-fm0-fp32-smoke" \
+      "scripts/orcd/slurm_twirl_fm0_1_fp32_smoke_h200.sbatch" \
+      "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_LOADER_RECEIPT=${TWIRL_FM0_LOADER_RECEIPT},TWIRL_FM0_LOADER_RECEIPT_SHA256=${TWIRL_FM0_LOADER_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${admission_path},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${admission_sha},TWIRL_FM0_SMOKE_OUTPUT=${run_output}"
+  else
+    run_output="${RUN_ROOT}/model_runs/real_fm0_1_1/${remote_epoch}-${admission_sha:0:12}-step${TWIRL_FM0_TARGET_STEP}"
+    submit_once "${LAUNCH_DIR}/real-train-step${TWIRL_FM0_TARGET_STEP}.job" "twirl-fm0-1-1-real" \
+      "scripts/orcd/slurm_twirl_fm0_1_real_train_h200.sbatch" \
+      "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_LOADER_RECEIPT=${TWIRL_FM0_LOADER_RECEIPT},TWIRL_FM0_LOADER_RECEIPT_SHA256=${TWIRL_FM0_LOADER_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${admission_path},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${admission_sha},TWIRL_FM0_TRAIN_OUTPUT=${run_output},TWIRL_FM0_TARGET_STEP=${TWIRL_FM0_TARGET_STEP}"
+  fi
+  printf 'admission=%s\nadmission_sha256=%s\nrun_output=%s\n' "${admission_path}" "${admission_sha}" "${run_output}"
   rm -rf -- "${tmp}"
   ADMISSION_TMP=""
   trap - EXIT
@@ -330,7 +345,8 @@ case "${ACTION}" in
     input_binding; require_socket
     submit_once "${LAUNCH_DIR}/loader-smoke.job" "twirl-fm0-loader" "scripts/orcd/slurm_twirl_fm0_1_loader_smoke_cpu.sbatch" "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256}"
     ;;
-  submit-fp32-smoke) make_and_submit_admitted_smoke ;;
+  submit-fp32-smoke) make_and_submit_admitted_run synthetic ;;
+  submit-real-train) make_and_submit_admitted_run real ;;
   submit-post-validation)
     : "${TWIRL_FM0_SMOKE_OUTPUT:?set exact smoke output}"; : "${TWIRL_FM0_ADMISSION_RECEIPT:?set admission receipt}"; : "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256:?set admission hash}"
     input_binding; safe_remote_path "${TWIRL_FM0_SMOKE_OUTPUT}" && safe_remote_path "${TWIRL_FM0_ADMISSION_RECEIPT}" || { echo "Unsafe smoke/admission path." >&2; exit 2; }; require_hash 64 "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
