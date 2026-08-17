@@ -94,6 +94,11 @@ def test_environment_builder_binds_current_operational_config() -> None:
 
 def test_controller_admission_uses_all_queue_and_node_tres() -> None:
     script = text("run_twirl_fm0_1_poc_orcd.sh")
+    assert 'i.get(\\"schema_version\\")' in script
+    assert 'l[\\"input_receipt\\"][\\"sha256\\"]' in script
+    assert 'tres(alloc_tres, "gres/gpu:h200", zero_if_absent=True)' in script
+    assert 'ADMISSION_TMP="${tmp}"' in script
+    assert 'ADMISSION_TMP=""' in script
     assert "squeue -p '${PARTITION}'" in script
     assert "-t RUNNING,PENDING,CONFIGURING,COMPLETING" in script
     assert "scontrol show node -o '${GPU_NODE}'" in script
@@ -187,7 +192,9 @@ def test_environment_is_versioned_and_torch_is_pinned() -> None:
     assert 'readonly TORCH_INDEX_URL="https://download.pytorch.org/whl/cu128"' in builder
     assert "prefix exists without a completed manifest" in builder
     assert "status --porcelain=v1 --untracked-files=all" in builder
-    assert '--no-build-isolation "${REPO}"' in builder
+    assert 'git -C "${REPO}" archive "${EXPECTED_SHA}"' in builder
+    assert '--no-build-isolation "${BUILD_SOURCE}"' in builder
+    assert '--no-build-isolation "${REPO}"' not in builder
     assert '--no-build-isolation -e "${REPO}"' not in builder
 
 

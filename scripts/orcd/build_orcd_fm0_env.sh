@@ -88,7 +88,13 @@ fi
 "${CONDA_FRONTEND}" env create --yes --prefix "${ENV_PREFIX}" --file "${ENV_YML}"
 "${ENV_PREFIX}/bin/python" -m pip install --no-cache-dir \
   --index-url "${TORCH_INDEX_URL}" "torch==${TORCH_VERSION}"
-"${ENV_PREFIX}/bin/python" -m pip install --no-deps --no-build-isolation "${REPO}"
+BUILD_SOURCE=$(mktemp -d "${TMPDIR:-/tmp}/twirl-fm0-wheel-source.XXXXXX")
+trap 'rm -rf -- "${BUILD_SOURCE}"' EXIT
+git -C "${REPO}" archive "${EXPECTED_SHA}" README.md pyproject.toml src \
+  | tar -xf - -C "${BUILD_SOURCE}"
+"${ENV_PREFIX}/bin/python" -m pip install --no-deps --no-build-isolation "${BUILD_SOURCE}"
+rm -rf -- "${BUILD_SOURCE}"
+trap - EXIT
 "${CONDA_FRONTEND}" list --explicit --prefix "${ENV_PREFIX}" > "${CONDA_EXPLICIT}"
 "${ENV_PREFIX}/bin/python" -m pip freeze > "${PIP_FREEZE}"
 

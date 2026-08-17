@@ -7,6 +7,7 @@ umask 027
 
 DRY_RUN=1
 ACTION=""
+ADMISSION_TMP=""
 readonly PROJECT_ROOT="/orcd/data/mki_aryeh/001/twirl"
 readonly PARTITION="pg_mki_aryeh"
 readonly GPU_NODE="node4900"
@@ -177,12 +178,13 @@ make_and_submit_admitted_smoke() {
     ${verify_remote_repo}
     [[ \$(sha256sum '${TWIRL_FM0_INPUT_RECEIPT}' | awk '{print \$1}') == '${TWIRL_FM0_INPUT_RECEIPT_SHA256}' ]]
     [[ \$(sha256sum '${TWIRL_FM0_LOADER_RECEIPT}' | awk '{print \$1}') == '${TWIRL_FM0_LOADER_RECEIPT_SHA256}' ]]
-    '${ENV_PREFIX}/bin/python' -c 'import json,sys; i=json.load(open(sys.argv[1])); l=json.load(open(sys.argv[2])); assert i.get("schema_version")=="twirl_fm0_1_input_release_receipt_v1" and i.get("passed") is True; assert l.get("schema_version")=="twirl_fm0_1_loader_smoke_receipt_v1" and l.get("passed") is True; assert l["input_receipt"]["sha256"]==sys.argv[3]' '${TWIRL_FM0_INPUT_RECEIPT}' '${TWIRL_FM0_LOADER_RECEIPT}' '${TWIRL_FM0_INPUT_RECEIPT_SHA256}'
+    '${ENV_PREFIX}/bin/python' -c 'import json,sys; i=json.load(open(sys.argv[1])); l=json.load(open(sys.argv[2])); assert i.get(\"schema_version\")==\"twirl_fm0_1_input_release_receipt_v1\" and i.get(\"passed\") is True; assert l.get(\"schema_version\")==\"twirl_fm0_1_loader_smoke_receipt_v1\" and l.get(\"passed\") is True; assert l[\"input_receipt\"][\"sha256\"]==sys.argv[3]' '${TWIRL_FM0_INPUT_RECEIPT}' '${TWIRL_FM0_LOADER_RECEIPT}' '${TWIRL_FM0_INPUT_RECEIPT_SHA256}'
   " >/dev/null
 
   local tmp remote_epoch local_epoch skew admission_path admission_sha smoke_output
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/twirl-fm0-admission.XXXXXX")
-  trap 'rm -rf -- "${tmp}"' EXIT
+  ADMISSION_TMP="${tmp}"
+  trap 'if [[ -n "${ADMISSION_TMP:-}" ]]; then rm -rf -- "${ADMISSION_TMP}"; fi' EXIT
   remote_epoch=$(capture "date -u +%s")
   local_epoch=$(date -u +%s)
   skew=$(( local_epoch > remote_epoch ? local_epoch - remote_epoch : remote_epoch - local_epoch ))
@@ -207,9 +209,12 @@ def field(text, name):
     match = re.search(r"(?:^|\s)" + re.escape(name) + r"=([^\s]+)", text)
     if not match: raise SystemExit(f"missing scheduler field: {name}")
     return match.group(1)
-def tres(text, name):
+def tres(text, name, *, zero_if_absent=False):
     match = re.search(r"(?:^|,)" + re.escape(name) + r"=([0-9]+)", text)
-    if not match: raise SystemExit(f"missing TRES: {name}")
+    if not match:
+        if zero_if_absent:
+            return 0
+        raise SystemExit(f"missing TRES: {name}")
     return int(match.group(1))
 def memory_mib(value):
     match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([KMGTP]?)", value)
@@ -223,7 +228,8 @@ bad_states = {"DOWN", "DRAIN", "DRAINED", "FAIL", "FAILING", "MAINT", "UNKNOWN"}
 node_states = set(field(node_raw, "State").split("+"))
 if node_states & bad_states: raise SystemExit(f"GPU node is ineligible: {sorted(node_states)}")
 cfg_tres, alloc_tres = field(node_raw, "CfgTRES"), field(node_raw, "AllocTRES")
-cfg_h200, alloc_h200 = tres(cfg_tres, "gres/gpu:h200"), tres(alloc_tres, "gres/gpu:h200")
+cfg_h200 = tres(cfg_tres, "gres/gpu:h200")
+alloc_h200 = tres(alloc_tres, "gres/gpu:h200", zero_if_absent=True)
 cfg_cpu, alloc_cpu = tres(cfg_tres, "cpu"), tres(alloc_tres, "cpu")
 real_mem, alloc_mem = int(field(node_raw, "RealMemory")), int(field(node_raw, "AllocMem"))
 if cfg_h200 != 8: raise SystemExit(f"node4900 H200 count drift: {cfg_h200}")
@@ -280,6 +286,9 @@ PY
     "scripts/orcd/slurm_twirl_fm0_1_fp32_smoke_h200.sbatch" \
     "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_LOADER_RECEIPT=${TWIRL_FM0_LOADER_RECEIPT},TWIRL_FM0_LOADER_RECEIPT_SHA256=${TWIRL_FM0_LOADER_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${admission_path},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${admission_sha},TWIRL_FM0_SMOKE_OUTPUT=${smoke_output}"
   printf 'admission=%s\nadmission_sha256=%s\nsmoke_output=%s\n' "${admission_path}" "${admission_sha}" "${smoke_output}"
+  rm -rf -- "${tmp}"
+  ADMISSION_TMP=""
+  trap - EXIT
 }
 
 case "${ACTION}" in
