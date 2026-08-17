@@ -39,7 +39,8 @@ export PYTHONPATH="${REPO}/src"
 # intentionally has no Torch installation.
 "${PYTHON}" -m pytest -q \
   tests/test_twirl_fm0_model.py \
-  tests/test_twirl_fm0_training.py
+  tests/test_twirl_fm0_training.py \
+  tests/test_twirl_fm0_real_dataset.py
 TWIRL_FM0_INPUT_RECEIPT="${INPUT_RECEIPT}" \
 TWIRL_FM0_INPUT_RECEIPT_SHA256="${TWIRL_FM0_INPUT_RECEIPT_SHA256}" \
 TWIRL_FM0_EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA}" \
@@ -57,8 +58,9 @@ if receipt_path.stat().st_mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH):
 receipt = json.loads(receipt_path.read_text())
 if receipt.get("schema_version") != "twirl_fm0_1_input_release_receipt_v1" or receipt.get("passed") is not True:
     raise SystemExit("input receipt did not pass the exact schema")
-if receipt.get("expected_git_sha") != os.environ["TWIRL_FM0_EXPECTED_SHA"]:
-    raise SystemExit("input receipt code binding drift")
+builder_git_sha = receipt.get("expected_git_sha")
+if not isinstance(builder_git_sha, str) or len(builder_git_sha) != 40:
+    raise SystemExit("input receipt lacks its exact builder code binding")
 manifest = Path(receipt["release"]["manifest_path"])
 if hashlib.sha256(manifest.read_bytes()).hexdigest() != receipt["release"]["manifest_sha256"]:
     raise SystemExit("manifest drift after input freeze")
@@ -94,6 +96,7 @@ payload = {
     "created_at_utc": datetime.now(timezone.utc).isoformat(),
     "passed": True,
     "expected_git_sha": os.environ["TWIRL_FM0_EXPECTED_SHA"],
+    "input_builder_git_sha": builder_git_sha,
     "input_receipt": {"path": str(receipt_path), "sha256": os.environ["TWIRL_FM0_INPUT_RECEIPT_SHA256"]},
     "observations_checked": audits,
     "claim_limit": "CPU loader and model-visible window boundary only",

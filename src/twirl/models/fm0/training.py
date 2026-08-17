@@ -509,6 +509,8 @@ def _run_training(
     precision: str,
     use_vicreg: bool,
     synthetic_only: bool,
+    checkpoint_interval_seconds: float,
+    progress_interval_steps: int,
     resume_checkpoint: str | Path | None = None,
 ) -> dict[str, Any]:
     """Run deterministic FM0 training and write full rotating checkpoints."""
@@ -520,6 +522,8 @@ def _run_training(
         raise ValueError("micro_batch_windows must be positive")
     if optimization.effective_batch_windows % micro_batch_windows:
         raise ValueError("effective batch must be divisible by micro batch")
+    if checkpoint_interval_seconds < 0 or progress_interval_steps <= 0:
+        raise ValueError("checkpoint/progress intervals are invalid")
     resolved_device = torch.device(device)
     if resolved_device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but torch.cuda.is_available() is false")
@@ -542,6 +546,7 @@ def _run_training(
 
     accumulation = optimization.effective_batch_windows // micro_batch_windows
     started = time.monotonic()
+    last_checkpoint_at = started
     model.train()
     while global_step < target_step:
         optimizer.zero_grad(set_to_none=True)
@@ -651,17 +656,33 @@ def _run_training(
         if not all(math.isfinite(value) for value in metrics.values()):
             raise RuntimeError("non-finite FM0 training metric")
         loss_history.append(metrics)
-        payload = checkpoint_payload(
-            model=model,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            global_step=global_step,
-            run_contract=run_contract,
-            optimization=optimization,
-            dataset=dataset,
-            loss_history=loss_history,
-        )
-        save_rotating_checkpoint(output_dir, payload)
+        now = time.monotonic()
+        if global_step == 1 or global_step % progress_interval_steps == 0:
+            print(
+                "[fm0-train] "
+                f"step={global_step}/{target_step} "
+                f"loss={metrics['total']:.8g} "
+                f"lr={metrics['learning_rate']:.8g} "
+                f"elapsed_s={now-started:.1f}",
+                flush=True,
+            )
+        if (
+            synthetic_only
+            or checkpoint_interval_seconds == 0
+            or now - last_checkpoint_at >= checkpoint_interval_seconds
+        ):
+            payload = checkpoint_payload(
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                global_step=global_step,
+                run_contract=run_contract,
+                optimization=optimization,
+                dataset=dataset,
+                loss_history=loss_history,
+            )
+            save_rotating_checkpoint(output_dir, payload)
+            last_checkpoint_at = now
 
     final_payload = checkpoint_payload(
         model=model,
@@ -716,6 +737,8 @@ def run_synthetic_training(
         precision=precision,
         use_vicreg=use_vicreg,
         synthetic_only=True,
+        checkpoint_interval_seconds=0,
+        progress_interval_steps=1,
         resume_checkpoint=resume_checkpoint,
     )
 
@@ -749,5 +772,7 @@ def run_real_training(
         precision=precision,
         use_vicreg=False,
         synthetic_only=False,
+        checkpoint_interval_seconds=1800,
+        progress_interval_steps=10,
         resume_checkpoint=resume_checkpoint,
     )

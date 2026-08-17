@@ -163,6 +163,21 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert '"${PYTHON}" -m pytest -q' in loader
     assert "tests/test_twirl_fm0_model.py" in loader
     assert "tests/test_twirl_fm0_training.py" in loader
+    assert "tests/test_twirl_fm0_real_dataset.py" in loader
+    assert "input_builder_git_sha" in loader
+
+    real = text("slurm_twirl_fm0_1_real_train_h200.sbatch")
+    assert "#SBATCH --gres=gpu:h200:1" in real
+    assert "#SBATCH -c 8" in real
+    assert "#SBATCH --mem=96G" in real
+    assert "#SBATCH -t 47:30:00" in real
+    assert "#SBATCH --array" not in real
+    assert "--variant TWIRL-FM0.1.1" in real
+    assert '--input-release "${RELEASE_ROOT}"' in real
+    assert '--max-steps "${TARGET_STEP}"' in real
+    assert "--synthetic-smoke" not in real
+    assert "scientific_training_eligible" in real
+    assert "TWIRL_FM0_ADMISSION_RECEIPT_SHA256" in real
 
 
 def test_input_gate_uses_correct_local_time_and_exact_shard_allowlist() -> None:
