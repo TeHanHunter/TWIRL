@@ -19,9 +19,6 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
-from twirl.lightcurves.detrend_presets import adp015q_config, adp03q_config
-from twirl.lightcurves.flux_detrend import flux_space_detrend_result
-
 from .registry import (
     FM0ContractError,
     FrozenContract,
@@ -244,6 +241,12 @@ def _derive_aperture(
     error: np.ndarray,
     effective_good: np.ndarray,
 ) -> dict[str, Any]:
+    # Release readers and GPU training need only NumPy.  Keep SciPy-backed
+    # detrending imports local to construction so an immutable finished shard
+    # remains loadable on compute nodes without importing the build stack.
+    from twirl.lightcurves.detrend_presets import adp015q_config, adp03q_config
+    from twirl.lightcurves.flux_detrend import flux_space_detrend_result
+
     aperture_good = effective_good & np.isfinite(flux)
     error_good = aperture_good & np.isfinite(error) & (error > 0)
     if not np.any(aperture_good):
