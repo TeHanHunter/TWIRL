@@ -79,6 +79,11 @@ def test_controller_is_noninteractive_dry_run_by_default() -> None:
     assert "ControlPath=${CONTROL_PATH}" in script
 
 
+def test_environment_builder_binds_current_operational_config() -> None:
+    builder = text("build_orcd_fm0_env.sh")
+    assert f'EXPECTED_ORCD_CONFIG_SHA256="{sha256(OP_CONFIG)}"' in builder
+
+
 def test_controller_admission_uses_all_queue_and_node_tres() -> None:
     script = text("run_twirl_fm0_1_poc_orcd.sh")
     assert "squeue -p '${PARTITION}'" in script
