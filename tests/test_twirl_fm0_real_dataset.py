@@ -127,7 +127,11 @@ def test_release_dataset_rejects_manifest_or_partition_drift(tmp_path: Path) -> 
 
 def test_one_step_real_training_and_strict_validation(tmp_path: Path) -> None:
     torch = pytest.importorskip("torch")
-    from twirl.models.fm0.model import build_fm0_model, count_trainable_parameters
+    from twirl.models.fm0.model import (
+        FM0ModelConfig,
+        build_fm0_model,
+        count_trainable_parameters,
+    )
     from twirl.models.fm0.training import FM0OptimizationConfig, run_real_training
     from twirl.models.fm0.validation import (
         REAL_RUN_CONTRACT_SCHEMA_VERSION,
@@ -183,7 +187,25 @@ def test_one_step_real_training_and_strict_validation(tmp_path: Path) -> None:
         },
     }
     contract_sha = write_json_with_sha256(run_dir / "run_contract.json", contract)
-    model = build_fm0_model("TWIRL-FM0.1.1")
+    model = build_fm0_model(
+        "TWIRL-FM0.1.1",
+        config_override=FM0ModelConfig(
+            architecture="tcn",
+            n_flux_views=2,
+            window_length=64,
+            d_model=16,
+            embedding_dim=16,
+            stem_kernel=5,
+            dropout=0.0,
+            tcn_blocks=2,
+            tcn_dilation_cycle=(1, 2),
+            conformer_heads=4,
+            conformer_conv_kernel=7,
+            minimum_parameters=1,
+            maximum_parameters=10_000_000,
+        ),
+        enforce_parameter_budget=False,
+    )
     result = run_real_training(
         model=model,
         dataset=dataset,
