@@ -801,7 +801,6 @@ def write_a2v1_hdf5_input_release(
     assert_no_search_columns(hdf5_manifest[0].keys(), context="A2v1 HDF5 manifest")
     output = Path(out_dir)
     manifest_rows: list[dict[str, Any]] = []
-    shard_payloads: dict[str, bytes] = {}
     seen: set[str] = set()
     source_components: dict[str, str] = {}
     visit_timing: list[tuple[dict[str, Any], str, float, float]] = []
@@ -864,7 +863,13 @@ def write_a2v1_hdf5_input_release(
         visit_end = float(release.audit["absolute_visit_end"])
         relative_path = f"shards/{key}.npz"
         payload = deterministic_npz_bytes(release)
-        shard_payloads[relative_path] = payload
+        # A full multi-sector release can contain hundreds of thousands of
+        # observations.  Publish each immutable shard immediately instead of
+        # retaining every encoded payload in RAM until the final manifest is
+        # assembled.  A failed build therefore leaves only checksum-safe,
+        # idempotently reusable shards; without manifest.csv it is not a
+        # consumable release.
+        publish_immutable(output / relative_path, payload)
         manifest_rows.append(
             {
                 "input_release_schema_version": INPUT_RELEASE_SCHEMA_VERSION,
@@ -897,6 +902,13 @@ def write_a2v1_hdf5_input_release(
                 visit_end,
             )
         )
+        if len(manifest_rows) % 1000 == 0:
+            print(
+                "FM0_INPUT_PROGRESS "
+                f"observations={len(manifest_rows)} "
+                f"cadences={sum(int(row['n_cadences']) for row in manifest_rows)}",
+                flush=True,
+            )
 
     try:
         adapter_cache.assert_unchanged()
@@ -959,8 +971,6 @@ def write_a2v1_hdf5_input_release(
         "certifies_full_campaign": False,
     }
     summary_payload = (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode("utf-8")
-    for relative_path, payload in shard_payloads.items():
-        publish_immutable(output / relative_path, payload)
     publish_immutable(output / "manifest.csv", manifest_payload)
     publish_immutable(output / "summary.json", summary_payload)
     return summary
