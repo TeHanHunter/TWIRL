@@ -143,6 +143,7 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
         "slurm_twirl_fm0_1_sector_merge_cpu.sbatch",
         "slurm_twirl_fm0_1_sector_input_cpu.sbatch",
         "slurm_twirl_fm0_1_sector_input_merge_cpu.sbatch",
+        "slurm_twirl_fm0_1_release_validation_cpu.sbatch",
         "slurm_twirl_fm0_1_registry_cpu.sbatch",
         "slurm_twirl_fm0_1_input_validation_cpu.sbatch",
         "slurm_twirl_fm0_1_loader_smoke_cpu.sbatch",
@@ -235,6 +236,13 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "#SBATCH -c 4" in input_merge
     assert "#SBATCH --mem=16G" in input_merge
     assert "TWIRL_FM0_ALLOWED_INPUT_REVISIONS" in input_merge
+    release_validation = text("slurm_twirl_fm0_1_release_validation_cpu.sbatch")
+    assert "submit-release-validation)" in controller
+    assert "slurm_twirl_fm0_1_release_validation_cpu.sbatch" in controller
+    assert "validate_twirl_fm0_input_release.py" in release_validation
+    assert "#SBATCH -c 4" in release_validation
+    assert "#SBATCH --mem=16G" in release_validation
+    assert "TWIRL_FM0_MERGED_INPUT_RELEASE" in release_validation
     assert "submit-real-post-validation)" in controller
     assert "slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" in controller
 

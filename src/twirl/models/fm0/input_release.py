@@ -10,10 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from io import BytesIO
 import csv
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 from pathlib import Path
 import re
+import stat
 import zipfile
 from typing import Any, Mapping, Sequence
 
@@ -32,6 +34,7 @@ from .registry import (
 
 INPUT_RELEASE_SCHEMA_VERSION = "twirl_fm0_1_input_release_v1"
 BUILD_SUMMARY_SCHEMA_VERSION = "twirl_fm0_1_input_release_build_summary_v1"
+INPUT_RELEASE_VALIDATION_SCHEMA_VERSION = "twirl_fm0_1_input_release_validation_v1"
 FIXTURE_ADAPTER_NAME = "strict_npz_fixture_v1"
 FLUX_VIEW_NAMES = (
     "raw_relative_1x1",
@@ -997,3 +1000,236 @@ def write_a2v1_hdf5_input_release(
     publish_immutable(output / "manifest.csv", manifest_payload)
     publish_immutable(output / "summary.json", summary_payload)
     return summary
+
+
+def _safe_release_relative_path(value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts or path.parts[:1] != ("shards",):
+        raise FM0ContractError(f"unsafe input-release shard path: {value!r}")
+    return path
+
+
+def _verify_release_shard(
+    *, release_root: Path, row: Mapping[str, str]
+) -> tuple[str, int, int]:
+    """Verify one full model-safe shard without trusting its filename."""
+
+    relative = _safe_release_relative_path(str(row["relative_path"]))
+    path = release_root / relative
+    if not path.is_file():
+        raise FM0ContractError(f"release shard is missing: {relative}")
+    payload = path.read_bytes()
+    if hashlib.sha256(payload).hexdigest() != row["sha256"]:
+        raise FM0ContractError(f"release shard hash mismatch: {relative}")
+    with np.load(BytesIO(payload), allow_pickle=False) as archive:
+        if frozenset(archive.files) != SHARD_ARRAY_KEYS:
+            raise FM0ContractError(f"release shard allowlist drift: {relative}")
+        arrays = {name: archive[name] for name in archive.files}
+    n_cadences = int(row["n_cadences"])
+    expected = {
+        "flux": (n_cadences, 6),
+        "flux_valid": (n_cadences, 6),
+        "flux_error": (n_cadences, 2),
+        "error_valid": (n_cadences, 2),
+        "local_time_cadences": (n_cadences,),
+        "delta_time_cadences": (n_cadences,),
+        "time_valid": (n_cadences,),
+        "segment_boundary": (n_cadences,),
+        "segment_id": (n_cadences,),
+        "view_present": (6,),
+    }
+    for name, shape in expected.items():
+        if arrays[name].shape != shape:
+            raise FM0ContractError(
+                f"release shard shape drift: {relative}:{name}={arrays[name].shape}"
+            )
+    for name in (
+        "flux_valid",
+        "error_valid",
+        "time_valid",
+        "segment_boundary",
+        "view_present",
+    ):
+        if arrays[name].dtype != np.bool_:
+            raise FM0ContractError(f"release mask dtype drift: {relative}:{name}")
+    if not np.isfinite(arrays["flux"][arrays["flux_valid"]]).all():
+        raise FM0ContractError(f"release valid flux is non-finite: {relative}")
+    if not np.isfinite(arrays["flux_error"][arrays["error_valid"]]).all():
+        raise FM0ContractError(f"release valid error is non-finite: {relative}")
+    if not np.isfinite(arrays["local_time_cadences"][arrays["time_valid"]]).all():
+        raise FM0ContractError(f"release valid local time is non-finite: {relative}")
+    if not np.isfinite(arrays["delta_time_cadences"][arrays["time_valid"]]).all():
+        raise FM0ContractError(f"release valid time delta is non-finite: {relative}")
+    try:
+        view_present = json.loads(str(row["view_present_json"]))
+    except json.JSONDecodeError as exc:
+        raise FM0ContractError(f"invalid release view presence: {relative}") from exc
+    if view_present != arrays["view_present"].astype(int).tolist():
+        raise FM0ContractError(f"release view-presence drift: {relative}")
+    observed_segments = int(np.unique(arrays["segment_id"]).size) if n_cadences else 0
+    if observed_segments != int(row["n_segments"]):
+        raise FM0ContractError(f"release segment-count drift: {relative}")
+    return str(row["observation_key"]), n_cadences, observed_segments
+
+
+def _validate_host_visit_timing(
+    manifest_rows: Sequence[Mapping[str, str]], timing_rows: Sequence[Mapping[str, str]]
+) -> None:
+    manifest_by_key = {str(row["observation_key"]): row for row in manifest_rows}
+    if len(manifest_by_key) != len(manifest_rows):
+        raise FM0ContractError("input release contains duplicate observation keys")
+    visits_by_source: dict[str, list[tuple[Mapping[str, str], float, float]]] = {}
+    seen: set[str] = set()
+    for timing in timing_rows:
+        key = str(timing["observation_key"])
+        if key in seen or key not in manifest_by_key:
+            raise FM0ContractError(f"invalid audit timing observation key: {key!r}")
+        seen.add(key)
+        source = str(timing["physical_source_id"]).strip()
+        try:
+            start = float(timing["absolute_visit_start"])
+            end = float(timing["absolute_visit_end"])
+        except (TypeError, ValueError) as exc:
+            raise FM0ContractError(f"invalid visit timing for {key}") from exc
+        if not source or not np.isfinite(start) or not np.isfinite(end) or end < start:
+            raise FM0ContractError(f"invalid absolute visit bounds for {key}")
+        visits_by_source.setdefault(source, []).append((manifest_by_key[key], start, end))
+    if seen != set(manifest_by_key):
+        raise FM0ContractError("audit timing does not cover every release observation")
+    cadence_units_per_day = 86400.0 / CADENCE_SECONDS
+    for source, visits in visits_by_source.items():
+        visits.sort(key=lambda item: (item[1], str(item[0]["observation_key"])))
+        first_start = visits[0][1]
+        prior_start: float | None = None
+        prior_end: float | None = None
+        for row, start, end in visits:
+            if prior_start is not None and start <= prior_start:
+                raise FM0ContractError(
+                    f"non-monotonic absolute visit timing for physical source {source}"
+                )
+            expected_offset = (start - first_start) * cadence_units_per_day
+            expected_gap = 0.0 if prior_end is None else (start - prior_end) * cadence_units_per_day
+            try:
+                observed_offset = float(row["host_visit_offset_cadences"])
+                observed_gap = float(row["host_visit_gap_cadences"])
+            except (TypeError, ValueError) as exc:
+                raise FM0ContractError(
+                    f"invalid derived host timing for {row['observation_key']}"
+                ) from exc
+            if not np.isclose(observed_offset, expected_offset, rtol=0.0, atol=1e-8):
+                raise FM0ContractError(f"host visit offset drift: {row['observation_key']}")
+            if not np.isclose(observed_gap, expected_gap, rtol=0.0, atol=1e-8):
+                raise FM0ContractError(f"host visit gap drift: {row['observation_key']}")
+            if str(row["host_visit_overlaps_previous"]) != str(prior_end is not None and expected_gap < 0):
+                raise FM0ContractError(
+                    f"host visit overlap flag drift: {row['observation_key']}"
+                )
+            prior_start = start
+            prior_end = end
+
+
+def validate_scientific_input_release(
+    release_dir: str | Path,
+    *,
+    contract: FrozenContract | None = None,
+    workers: int = 1,
+) -> dict[str, Any]:
+    """Independently validate every shard in one immutable scientific release."""
+
+    if workers <= 0:
+        raise FM0ContractError("input release validation workers must be positive")
+    contract = contract or load_frozen_contract()
+    root = Path(release_dir).resolve()
+    required = {
+        "manifest": root / "manifest.csv",
+        "summary": root / "summary.json",
+        "timing": root / "visit_timing.csv",
+        "source": root / "a2v1_hdf5_manifest.csv",
+        "merge": root / "merge_summary.json",
+        "ready": root / "READY",
+    }
+    if any(not path.is_file() or not path.stat().st_size for path in required.values()):
+        raise FM0ContractError("input release has incomplete merge artifacts")
+    for path in required.values():
+        if path.stat().st_mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH):
+            raise FM0ContractError(f"input release artifact is writable: {path}")
+    summary = json.loads(required["summary"].read_text(encoding="utf-8"))
+    merge = json.loads(required["merge"].read_text(encoding="utf-8"))
+    if (
+        summary.get("summary_schema_version") != BUILD_SUMMARY_SCHEMA_VERSION
+        or summary.get("input_release_schema_version") != INPUT_RELEASE_SCHEMA_VERSION
+        or summary.get("campaign_id") != contract.config["campaign_id"]
+        or summary.get("design_sha256") != contract.design_sha256
+        or summary.get("config_sha256") != contract.config_sha256
+        or summary.get("freeze_receipt_sha256") != contract.freeze_receipt_sha256
+        or summary.get("input_adapter") != "a2v1_hdf5_quality_aware_v1"
+        or summary.get("scientific_training_eligible") is not True
+        or summary.get("partial_release") is not False
+        or summary.get("certifies_full_campaign") is not False
+    ):
+        raise FM0ContractError("input release summary contract drift")
+    if (
+        merge.get("schema_version") != "twirl_fm0_1_sector_input_merge_v1"
+        or merge.get("summary_sha256") != sha256_file(required["summary"])
+        or merge.get("manifest_sha256") != sha256_file(required["manifest"])
+        or merge.get("visit_timing_sha256") != sha256_file(required["timing"])
+    ):
+        raise FM0ContractError("input release merge binding drift")
+    if not re.fullmatch(r"[0-9a-f]{40}", required["ready"].read_text().strip()):
+        raise FM0ContractError("input release READY revision is invalid")
+
+    manifest_rows = read_rows(required["manifest"])
+    timing_rows = read_rows(required["timing"])
+    source_rows = read_rows(required["source"])
+    if not manifest_rows or tuple(manifest_rows[0]) != MANIFEST_COLUMNS:
+        raise FM0ContractError("input release manifest columns drifted")
+    if not timing_rows or tuple(timing_rows[0]) != VISIT_TIMING_COLUMNS:
+        raise FM0ContractError("input release timing columns drifted")
+    from .a2v1_adapter import A2V1_HDF5_MANIFEST_FIELDS
+
+    if not source_rows or tuple(source_rows[0]) != A2V1_HDF5_MANIFEST_FIELDS:
+        raise FM0ContractError("input release source-manifest columns drifted")
+    if hashlib.sha256(_csv_bytes(manifest_rows, MANIFEST_COLUMNS)).hexdigest() != summary.get("manifest_sha256"):
+        raise FM0ContractError("input release manifest summary hash drift")
+    if hashlib.sha256(_csv_bytes(source_rows, A2V1_HDF5_MANIFEST_FIELDS)).hexdigest() != summary.get("hdf5_manifest_sha256"):
+        raise FM0ContractError("input release source-manifest summary hash drift")
+    manifest_keys = {str(row["observation_key"]) for row in manifest_rows}
+    source_keys = {str(row["observation_key"]) for row in source_rows}
+    if len(manifest_keys) != len(manifest_rows) or manifest_keys != source_keys:
+        raise FM0ContractError("input release source/manifest observation binding drift")
+    if any(
+        row["input_release_schema_version"] != INPUT_RELEASE_SCHEMA_VERSION
+        or row["input_adapter"] != "a2v1_hdf5_quality_aware_v1"
+        or row["scientific_training_eligible"] != "True"
+        for row in manifest_rows
+    ):
+        raise FM0ContractError("input release row scientific eligibility drift")
+    _validate_host_visit_timing(manifest_rows, timing_rows)
+
+    ordered_rows = sorted(manifest_rows, key=lambda row: str(row["observation_key"]))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        checked = list(
+            pool.map(
+                lambda row: _verify_release_shard(release_root=root, row=row),
+                ordered_rows,
+            )
+        )
+    n_cadences = sum(result[1] for result in checked)
+    if int(summary.get("n_observations", -1)) != len(checked) or int(
+        summary.get("n_cadences", -1)
+    ) != n_cadences:
+        raise FM0ContractError("input release aggregate counts drift")
+    return {
+        "schema_version": INPUT_RELEASE_VALIDATION_SCHEMA_VERSION,
+        "passed": True,
+        "release_root": str(root),
+        "manifest_sha256": sha256_file(required["manifest"]),
+        "summary_sha256": sha256_file(required["summary"]),
+        "merge_summary_sha256": sha256_file(required["merge"]),
+        "n_observations": len(checked),
+        "n_cadences": n_cadences,
+        "workers": workers,
+        "input_adapter": "a2v1_hdf5_quality_aware_v1",
+        "scientific_training_eligible": True,
+        "claim_limit": "validated input release only; not a model result",
+    }

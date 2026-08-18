@@ -33,6 +33,8 @@ Actions (run separately; no stage is auto-promoted):
   submit-sector-input      Build one immutable six-view sector input release.
   submit-sector-input-merge
                            Merge completed S56-S64 sector input releases.
+  submit-release-validation
+                           Independently verify every merged input-release shard.
   submit-input-validation  Submit the CPU release build/independent freeze gate.
   submit-loader-smoke      Exercise two frozen shards through the official loader.
   submit-fp32-smoke        Create a <=5-minute all-queue admission receipt, then
@@ -79,6 +81,10 @@ Required for submit-sector-input-merge:
   TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT, and
   TWIRL_FM0_ALLOWED_INPUT_REVISIONS (colon-separated full reviewed revisions).
   TWIRL_FM0_AFTEROK_JOB_ID is optional and should name S64's input job.
+
+Required for submit-release-validation:
+  TWIRL_FM0_MERGED_INPUT_RELEASE. TWIRL_FM0_AFTEROK_JOB_ID is optional and
+  should name the successful sector-input merge job.
 
 Required immutable binding for loader and later stages:
   TWIRL_FM0_INPUT_RECEIPT, TWIRL_FM0_INPUT_RECEIPT_SHA256
@@ -456,6 +462,12 @@ case "${ACTION}" in
     [[ "${TWIRL_FM0_ALLOWED_INPUT_REVISIONS}" =~ ^[0-9a-f]{40}(:[0-9a-f]{40})*$ ]] || { echo "Invalid input revision list." >&2; exit 2; }
     require_socket
     submit_once "${LAUNCH_DIR}/sector-input-merge.job" "twirl-fm0-input-merge" "scripts/orcd/slurm_twirl_fm0_1_sector_input_merge_cpu.sbatch" "$(base_export),TWIRL_FM0_REGISTRY_DIR=${TWIRL_FM0_REGISTRY_DIR},TWIRL_FM0_SECTOR_INPUT_ROOT=${TWIRL_FM0_SECTOR_INPUT_ROOT},TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT=${TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT},TWIRL_FM0_ALLOWED_INPUT_REVISIONS=${TWIRL_FM0_ALLOWED_INPUT_REVISIONS}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
+    ;;
+  submit-release-validation)
+    : "${TWIRL_FM0_MERGED_INPUT_RELEASE:?set immutable merged input release}"
+    safe_remote_path "${TWIRL_FM0_MERGED_INPUT_RELEASE}" || { echo "Unsafe merged input-release path." >&2; exit 2; }
+    require_socket
+    submit_once "${LAUNCH_DIR}/release-validation.job" "twirl-fm0-input-validate" "scripts/orcd/slurm_twirl_fm0_1_release_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_MERGED_INPUT_RELEASE=${TWIRL_FM0_MERGED_INPUT_RELEASE}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   submit-input-validation)
     source_binding

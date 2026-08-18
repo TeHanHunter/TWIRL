@@ -3,10 +3,19 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 from pathlib import Path
 
+import numpy as np
+
 from twirl.models.fm0.a2v1_adapter import A2V1_HDF5_MANIFEST_FIELDS
-from twirl.models.fm0.input_release import MANIFEST_COLUMNS, VISIT_TIMING_COLUMNS
+from twirl.models.fm0.input_release import (
+    MANIFEST_COLUMNS,
+    VISIT_TIMING_COLUMNS,
+    build_observation_release,
+    deterministic_npz_bytes,
+    validate_scientific_input_release,
+)
 from twirl.models.fm0.registry import build_alias_registry, build_observation_registry, write_registry_release
 from twirl.models.fm0.sector_release import merge_sector_input_releases
 
@@ -37,7 +46,21 @@ def _stage(
     (directory / "shards").mkdir(parents=True)
     shard_name = f"shards/{observation['observation_key']}.npz"
     shard = directory / shard_name
-    shard.write_bytes(f"sector-{sector}".encode())
+    n = 80
+    raw = {
+        "time": np.linspace(start, start + 0.01, n),
+        "cadence": np.arange(700000, 700000 + n),
+        "orbit": np.full(n, 2 * sector + 7),
+        "internal_quality": np.zeros(n, dtype=np.int64),
+        "spoc_quality": np.zeros(n, dtype=np.int64),
+        "qlp_quality": np.zeros(n, dtype=np.int64),
+        "authority_excluded": np.zeros(n, dtype=bool),
+        "raw_flux_1x1": np.full(n, 1000.0),
+        "raw_flux_error_1x1": np.ones(n),
+        "raw_flux_3x3": np.full(n, 2000.0),
+        "raw_flux_error_3x3": np.ones(n),
+    }
+    shard.write_bytes(deterministic_npz_bytes(build_observation_release(raw)))
     manifest = {
         "input_release_schema_version": "twirl_fm0_1_input_release_v1",
         "observation_key": observation["observation_key"],
@@ -154,3 +177,9 @@ def test_sector_input_merge_recomputes_cross_sector_host_timing(tmp_path: Path) 
     assert float(rows_by_key[observations_by_sector[57]["observation_key"]]["host_visit_offset_cadences"]) == 30.0 * 86400.0 / 200.0
     assert float(rows_by_key[observations_by_sector[57]["observation_key"]]["host_visit_gap_cadences"]) == 20.0 * 86400.0 / 200.0
     assert (tmp_path / "merged" / "shards" / f"{observations_by_sector[56]['observation_key']}.npz").is_file()
+    for path in (tmp_path / "merged").rglob("*"):
+        if path.is_file():
+            os.chmod(path, 0o444)
+    validation = validate_scientific_input_release(tmp_path / "merged", workers=2)
+    assert validation["passed"] is True
+    assert validation["n_observations"] == 2
