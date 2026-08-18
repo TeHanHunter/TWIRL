@@ -37,6 +37,7 @@ readonly TARGET_STEP="${TWIRL_FM0_TARGET_STEP:-20000}"
 readonly MICRO_BATCH="${TWIRL_FM0_MICRO_BATCH_WINDOWS:-8}"
 readonly PRECISION="${TWIRL_FM0_PRECISION:-bf16}"
 readonly VARIANT="${TWIRL_FM0_VARIANT:-TWIRL-FM0.1.1}"
+readonly SEED="${TWIRL_FM0_SEED:-560067}"
 die() { echo "[fm0-real-train] ERROR: $*" >&2; exit 2; }
 for path in "${RUN_ROOT}" "${INPUT_RECEIPT}" "${LOADER_RECEIPT}" "${ADMISSION_RECEIPT}" "${OUT}"; do
   [[ "${path}" == "${RUN_ROOT}" || "${path}" == "${RUN_ROOT}"/* ]] || die "path escapes run root: ${path}"
@@ -46,6 +47,7 @@ done
 (( MICRO_BATCH > 0 && 64 % MICRO_BATCH == 0 )) || die "micro batch must divide 64"
 [[ "${PRECISION}" == "fp32" || "${PRECISION}" == "bf16" ]] || die "invalid precision"
 [[ "${VARIANT}" == "TWIRL-FM0.1.1" || "${VARIANT}" == "TWIRL-FM0.1.2" ]] || die "invalid FM0.1 variant"
+[[ "${SEED}" == "560067" || "${SEED}" == "560068" ]] || die "invalid frozen FM0.1 seed"
 for value in "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" "${TWIRL_FM0_LOADER_RECEIPT_SHA256}" "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"; do
   [[ "${value}" =~ ^[0-9a-f]{64}$ ]] || die "invalid receipt hash"
 done
@@ -103,10 +105,10 @@ nvidia-smi
   --precision "${PRECISION}" \
   --max-steps "${TARGET_STEP}" \
   --micro-batch-windows "${MICRO_BATCH}" \
-  --seed 560067 \
+  --seed "${SEED}" \
   --expected-git-sha "${TWIRL_EXPECTED_GIT_SHA}"
 for path in run_contract.json checkpoint.pt summary.json; do
   [[ -s "${OUT}/${path}" && -s "${OUT}/${path}.sha256" ]] || die "missing training artifact/sidecar: ${path}"
 done
 chmod -R a-w "${OUT}"
-echo "[fm0-real-train] complete=${OUT} variant=${VARIANT} target_step=${TARGET_STEP} precision=${PRECISION}"
+echo "[fm0-real-train] complete=${OUT} variant=${VARIANT} seed=${SEED} target_step=${TARGET_STEP} precision=${PRECISION}"

@@ -95,7 +95,8 @@ Additional bindings:
   submit-real-train: TWIRL_FM0_LOADER_RECEIPT[_SHA256],
                      TWIRL_FM0_TARGET_STEP (1--20000), and optional
                      TWIRL_FM0_VARIANT (TWIRL-FM0.1.1, default, or
-                     TWIRL-FM0.1.2)
+                     TWIRL-FM0.1.2) and TWIRL_FM0_SEED (560067, default, or
+                     560068)
   submit-post-validation: TWIRL_FM0_SMOKE_OUTPUT,
                           TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
   submit-real-post-validation: TWIRL_FM0_TRAIN_OUTPUT,
@@ -218,7 +219,7 @@ submit_once() {
 
 make_and_submit_admitted_run() {
   local run_kind=$1
-  local real_variant="" real_job_name="" real_dir="" real_record=""
+  local real_variant="" real_seed="" real_job_name="" real_dir="" real_record=""
   [[ "${run_kind}" == "synthetic" || "${run_kind}" == "real" ]] || { echo "Unknown admitted run kind." >&2; exit 2; }
   if [[ "${run_kind}" == "real" ]]; then
     : "${TWIRL_FM0_TARGET_STEP:?set target optimizer step (1--20000)}"
@@ -239,7 +240,15 @@ make_and_submit_admitted_run() {
         exit 2
         ;;
     esac
-    real_record="real-train-${real_dir}-step${TWIRL_FM0_TARGET_STEP}.job"
+    real_seed="${TWIRL_FM0_SEED:-560067}"
+    case "${real_seed}" in
+      560067|560068) ;;
+      *)
+        echo "Real FM0.1 seed must be one of the frozen seeds: 560067 or 560068." >&2
+        exit 2
+        ;;
+    esac
+    real_record="real-train-${real_dir}-seed${real_seed}-step${TWIRL_FM0_TARGET_STEP}.job"
   fi
   input_binding; loader_binding; require_socket
   if [[ "${DRY_RUN}" == 1 ]]; then
@@ -396,10 +405,10 @@ PY
       "scripts/orcd/slurm_twirl_fm0_1_fp32_smoke_h200.sbatch" \
       "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_LOADER_RECEIPT=${TWIRL_FM0_LOADER_RECEIPT},TWIRL_FM0_LOADER_RECEIPT_SHA256=${TWIRL_FM0_LOADER_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${admission_path},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${admission_sha},TWIRL_FM0_SMOKE_OUTPUT=${run_output}"
   else
-    run_output="${RUN_ROOT}/model_runs/${real_dir}/${remote_epoch}-${admission_sha:0:12}-step${TWIRL_FM0_TARGET_STEP}"
+    run_output="${RUN_ROOT}/model_runs/${real_dir}/${remote_epoch}-${admission_sha:0:12}-seed${real_seed}-step${TWIRL_FM0_TARGET_STEP}"
     submit_once "${LAUNCH_DIR}/${real_record}" "${real_job_name}" \
       "scripts/orcd/slurm_twirl_fm0_1_real_train_h200.sbatch" \
-      "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_LOADER_RECEIPT=${TWIRL_FM0_LOADER_RECEIPT},TWIRL_FM0_LOADER_RECEIPT_SHA256=${TWIRL_FM0_LOADER_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${admission_path},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${admission_sha},TWIRL_FM0_TRAIN_OUTPUT=${run_output},TWIRL_FM0_TARGET_STEP=${TWIRL_FM0_TARGET_STEP},TWIRL_FM0_VARIANT=${real_variant}"
+      "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_LOADER_RECEIPT=${TWIRL_FM0_LOADER_RECEIPT},TWIRL_FM0_LOADER_RECEIPT_SHA256=${TWIRL_FM0_LOADER_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${admission_path},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${admission_sha},TWIRL_FM0_TRAIN_OUTPUT=${run_output},TWIRL_FM0_TARGET_STEP=${TWIRL_FM0_TARGET_STEP},TWIRL_FM0_VARIANT=${real_variant},TWIRL_FM0_SEED=${real_seed}"
   fi
   printf 'admission=%s\nadmission_sha256=%s\nrun_output=%s\n' "${admission_path}" "${admission_sha}" "${run_output}"
   rm -rf -- "${tmp}"

@@ -120,8 +120,13 @@ def test_controller_admission_uses_all_queue_and_node_tres() -> None:
     assert "submit-real-train) make_and_submit_admitted_run real" in script
     assert 'TWIRL_FM0_VARIANT (TWIRL-FM0.1.1, default, or' in script
     assert 'TWIRL-FM0.1.2)' in script
+    assert 'TWIRL_FM0_SEED (560067, default, or' in script
+    assert '560068)' in script
     assert 'real_job_name="twirl-fm0-1-1-real"' in script
     assert 'real_job_name="twirl-fm0-1-2-real"' in script
+    assert 'real_seed="${TWIRL_FM0_SEED:-560067}"' in script
+    assert '560067|560068' in script
+    assert 'TWIRL_FM0_SEED=${real_seed}' in script
     assert '"${LAUNCH_DIR}/${real_record}"' in script
 
 
@@ -195,6 +200,9 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert '"${VARIANT}" == "TWIRL-FM0.1.1"' in real
     assert '"${VARIANT}" == "TWIRL-FM0.1.2"' in real
     assert '--variant "${VARIANT}"' in real
+    assert 'readonly SEED="${TWIRL_FM0_SEED:-560067}"' in real
+    assert '"${SEED}" == "560067" || "${SEED}" == "560068"' in real
+    assert '--seed "${SEED}"' in real
     assert '--input-release "${RELEASE_ROOT}"' in real
     assert '--max-steps "${TARGET_STEP}"' in real
     assert "--synthetic-smoke" not in real
