@@ -30,6 +30,9 @@ Actions (run separately; no stage is auto-promoted):
   submit-sector-stage      Expand selected sources from one verified sector tar.
   submit-sector-merge      Merge completed S56-S64 source inventories.
   submit-registry          Submit the CPU leakage-component registry build.
+  submit-sector-input      Build one immutable six-view sector input release.
+  submit-sector-input-merge
+                           Merge completed S56-S64 sector input releases.
   submit-input-validation  Submit the CPU release build/independent freeze gate.
   submit-loader-smoke      Exercise two frozen shards through the official loader.
   submit-fp32-smoke        Create a <=5-minute all-queue admission receipt, then
@@ -65,6 +68,17 @@ Required for submit-sector-merge:
   TWIRL_FM0_SECTOR_STAGE_ROOT, TWIRL_FM0_SECTOR_MERGE_ROOT, and
   TWIRL_FM0_ALLOWED_STAGE_REVISIONS (colon-separated full reviewed revisions).
   TWIRL_FM0_AFTEROK_JOB_ID is optional and should name S64's job.
+
+Required for submit-sector-input:
+  TWIRL_FM0_SECTOR, TWIRL_FM0_REGISTRY_DIR,
+  TWIRL_FM0_A2V1_HDF5_MANIFEST, and TWIRL_FM0_SECTOR_INPUT_ROOT.
+  TWIRL_FM0_AFTEROK_JOB_ID is optional and serializes the next sector.
+
+Required for submit-sector-input-merge:
+  TWIRL_FM0_REGISTRY_DIR, TWIRL_FM0_SECTOR_INPUT_ROOT,
+  TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT, and
+  TWIRL_FM0_ALLOWED_INPUT_REVISIONS (colon-separated full reviewed revisions).
+  TWIRL_FM0_AFTEROK_JOB_ID is optional and should name S64's input job.
 
 Required immutable binding for loader and later stages:
   TWIRL_FM0_INPUT_RECEIPT, TWIRL_FM0_INPUT_RECEIPT_SHA256
@@ -417,7 +431,31 @@ case "${ACTION}" in
     else
       source_exports="TWIRL_FM0_A2V1_HDF5_SOURCE_INVENTORY=${TWIRL_FM0_A2V1_HDF5_SOURCE_INVENTORY}"
     fi
-    submit_once "${LAUNCH_DIR}/registry.job" "twirl-fm0-registry" "scripts/orcd/slurm_twirl_fm0_1_registry_cpu.sbatch" "$(base_export),TWIRL_FM0_ALIASES_TABLE=${TWIRL_FM0_ALIASES_TABLE},TWIRL_FM0_SOURCE_ADAPTER=${TWIRL_FM0_SOURCE_ADAPTER},${source_exports}"
+    submit_once "${LAUNCH_DIR}/registry.job" "twirl-fm0-registry" "scripts/orcd/slurm_twirl_fm0_1_registry_cpu.sbatch" "$(base_export),TWIRL_FM0_ALIASES_TABLE=${TWIRL_FM0_ALIASES_TABLE},TWIRL_FM0_SOURCE_ADAPTER=${TWIRL_FM0_SOURCE_ADAPTER},${source_exports}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
+    ;;
+  submit-sector-input)
+    : "${TWIRL_FM0_SECTOR:?set one sector in S56-S64}"
+    : "${TWIRL_FM0_REGISTRY_DIR:?set fixed registry directory}"
+    : "${TWIRL_FM0_A2V1_HDF5_MANIFEST:?set registry-bound HDF5 manifest}"
+    : "${TWIRL_FM0_SECTOR_INPUT_ROOT:?set immutable sector-input root}"
+    [[ "${TWIRL_FM0_SECTOR}" =~ ^(5[6-9]|6[0-4])$ ]] || { echo "Sector must be S56-S64." >&2; exit 2; }
+    for path in "${TWIRL_FM0_REGISTRY_DIR}" "${TWIRL_FM0_A2V1_HDF5_MANIFEST}" "${TWIRL_FM0_SECTOR_INPUT_ROOT}"; do
+      safe_remote_path "${path}" || { echo "Unsafe sector-input path: ${path}" >&2; exit 2; }
+    done
+    require_socket
+    submit_once "${LAUNCH_DIR}/sector-input-s${TWIRL_FM0_SECTOR}.job" "twirl-fm0-input-s${TWIRL_FM0_SECTOR}" "scripts/orcd/slurm_twirl_fm0_1_sector_input_cpu.sbatch" "$(base_export),TWIRL_FM0_SECTOR=${TWIRL_FM0_SECTOR},TWIRL_FM0_REGISTRY_DIR=${TWIRL_FM0_REGISTRY_DIR},TWIRL_FM0_A2V1_HDF5_MANIFEST=${TWIRL_FM0_A2V1_HDF5_MANIFEST},TWIRL_FM0_SECTOR_INPUT_ROOT=${TWIRL_FM0_SECTOR_INPUT_ROOT}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
+    ;;
+  submit-sector-input-merge)
+    : "${TWIRL_FM0_REGISTRY_DIR:?set fixed registry directory}"
+    : "${TWIRL_FM0_SECTOR_INPUT_ROOT:?set immutable sector-input root}"
+    : "${TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT:?set immutable merged input-release root}"
+    : "${TWIRL_FM0_ALLOWED_INPUT_REVISIONS:?set colon-separated full input revisions}"
+    for path in "${TWIRL_FM0_REGISTRY_DIR}" "${TWIRL_FM0_SECTOR_INPUT_ROOT}" "${TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT}"; do
+      safe_remote_path "${path}" || { echo "Unsafe sector-input merge path: ${path}" >&2; exit 2; }
+    done
+    [[ "${TWIRL_FM0_ALLOWED_INPUT_REVISIONS}" =~ ^[0-9a-f]{40}(:[0-9a-f]{40})*$ ]] || { echo "Invalid input revision list." >&2; exit 2; }
+    require_socket
+    submit_once "${LAUNCH_DIR}/sector-input-merge.job" "twirl-fm0-input-merge" "scripts/orcd/slurm_twirl_fm0_1_sector_input_merge_cpu.sbatch" "$(base_export),TWIRL_FM0_REGISTRY_DIR=${TWIRL_FM0_REGISTRY_DIR},TWIRL_FM0_SECTOR_INPUT_ROOT=${TWIRL_FM0_SECTOR_INPUT_ROOT},TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT=${TWIRL_FM0_SECTOR_INPUT_MERGE_ROOT},TWIRL_FM0_ALLOWED_INPUT_REVISIONS=${TWIRL_FM0_ALLOWED_INPUT_REVISIONS}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   submit-input-validation)
     source_binding
@@ -427,11 +465,11 @@ case "${ACTION}" in
     else
       source_manifest="${RUN_ROOT}/input_build/registry/a2v1_hdf5_manifest.csv"
     fi
-    submit_once "${LAUNCH_DIR}/input-validation.job" "twirl-fm0-input" "scripts/orcd/slurm_twirl_fm0_1_input_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_SOURCE_MANIFEST=${source_manifest},TWIRL_FM0_SOURCE_ADAPTER=${TWIRL_FM0_SOURCE_ADAPTER}"
+    submit_once "${LAUNCH_DIR}/input-validation.job" "twirl-fm0-input" "scripts/orcd/slurm_twirl_fm0_1_input_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_SOURCE_MANIFEST=${source_manifest},TWIRL_FM0_SOURCE_ADAPTER=${TWIRL_FM0_SOURCE_ADAPTER}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   submit-loader-smoke)
     input_binding; require_socket
-    submit_once "${LAUNCH_DIR}/loader-smoke.job" "twirl-fm0-loader" "scripts/orcd/slurm_twirl_fm0_1_loader_smoke_cpu.sbatch" "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256}"
+    submit_once "${LAUNCH_DIR}/loader-smoke.job" "twirl-fm0-loader" "scripts/orcd/slurm_twirl_fm0_1_loader_smoke_cpu.sbatch" "$(base_export),TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   submit-fp32-smoke) make_and_submit_admitted_run synthetic ;;
   submit-real-train) make_and_submit_admitted_run real ;;

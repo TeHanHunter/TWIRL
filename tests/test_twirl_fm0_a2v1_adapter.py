@@ -206,12 +206,26 @@ def test_hdf5_release_is_scientific_eligible_only_when_registry_binding_matches(
         writer.writerow(source_row)
     _install_reference(monkeypatch, table)
     summary = write_a2v1_hdf5_input_release(
-        registry_dir=registry, hdf5_manifest_path=manifest, out_dir=tmp_path / "release"
+        registry_dir=registry,
+        hdf5_manifest_path=manifest,
+        out_dir=tmp_path / "release",
+        visit_timing_path=tmp_path / "release" / "visit_timing.csv",
     )
     assert summary["scientific_training_eligible"] is True
     assert summary["input_adapter"] == A2V1_HDF5_ADAPTER_NAME
     shard = next((tmp_path / "release" / "shards").glob("*.npz"))
     assert load_input_release(shard).flux.shape == (80, 6)
+    timing_rows = list(
+        csv.DictReader((tmp_path / "release" / "visit_timing.csv").open(newline=""))
+    )
+    assert timing_rows == [
+        {
+            "observation_key": observations[0]["observation_key"],
+            "physical_source_id": observations[0]["physical_source_id"],
+            "absolute_visit_start": "2900.0",
+            "absolute_visit_end": "2900.1828703703704",
+        }
+    ]
 
 
 def test_adapter_rejects_a_hdf5_manifest_with_an_unbound_source_hash(

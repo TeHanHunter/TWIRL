@@ -141,6 +141,8 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     cpu_wrappers = (
         "slurm_twirl_fm0_1_sector_stage_cpu.sbatch",
         "slurm_twirl_fm0_1_sector_merge_cpu.sbatch",
+        "slurm_twirl_fm0_1_sector_input_cpu.sbatch",
+        "slurm_twirl_fm0_1_sector_input_merge_cpu.sbatch",
         "slurm_twirl_fm0_1_registry_cpu.sbatch",
         "slurm_twirl_fm0_1_input_validation_cpu.sbatch",
         "slurm_twirl_fm0_1_loader_smoke_cpu.sbatch",
@@ -218,6 +220,21 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "#SBATCH --mem=16G" in merge
     assert "TWIRL_FM0_ALLOWED_STAGE_REVISIONS" in merge
     assert "S${sector} stage is incomplete" in merge
+    sector_input = text("slurm_twirl_fm0_1_sector_input_cpu.sbatch")
+    assert "submit-sector-input)" in controller
+    assert "slurm_twirl_fm0_1_sector_input_cpu.sbatch" in controller
+    assert "build_twirl_fm0_sector_input_release.py" in sector_input
+    assert "#SBATCH -c 4" in sector_input
+    assert "#SBATCH --mem=16G" in sector_input
+    assert "TWIRL_FM0_A2V1_HDF5_MANIFEST" in sector_input
+    assert "twirl-fm0-input-s${TWIRL_FM0_SECTOR}" in controller
+    input_merge = text("slurm_twirl_fm0_1_sector_input_merge_cpu.sbatch")
+    assert "submit-sector-input-merge)" in controller
+    assert "slurm_twirl_fm0_1_sector_input_merge_cpu.sbatch" in controller
+    assert "merge_twirl_fm0_sector_input_releases.py" in input_merge
+    assert "#SBATCH -c 4" in input_merge
+    assert "#SBATCH --mem=16G" in input_merge
+    assert "TWIRL_FM0_ALLOWED_INPUT_REVISIONS" in input_merge
     assert "submit-real-post-validation)" in controller
     assert "slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" in controller
 

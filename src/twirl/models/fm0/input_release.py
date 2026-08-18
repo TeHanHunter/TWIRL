@@ -107,6 +107,12 @@ MANIFEST_COLUMNS = (
     "input_adapter",
     "scientific_training_eligible",
 )
+VISIT_TIMING_COLUMNS = (
+    "observation_key",
+    "physical_source_id",
+    "absolute_visit_start",
+    "absolute_visit_end",
+)
 RAW_MANIFEST_COLUMNS = frozenset(
     {
         "observation_key",
@@ -773,6 +779,7 @@ def write_a2v1_hdf5_input_release(
     hdf5_manifest_path: str | Path,
     out_dir: str | Path,
     contract: FrozenContract | None = None,
+    visit_timing_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Build a scientific-eligible release from bound A2v1 HDF5 inputs.
 
@@ -946,6 +953,22 @@ def write_a2v1_hdf5_input_release(
             )
             previous_start = visit_start
             previous_end = visit_end
+
+    if visit_timing_path is not None:
+        timing_rows = [
+            {
+                "observation_key": row["observation_key"],
+                "physical_source_id": physical_source_id,
+                "absolute_visit_start": repr(visit_start),
+                "absolute_visit_end": repr(visit_end),
+            }
+            for row, physical_source_id, visit_start, visit_end in visit_timing
+        ]
+        timing_rows.sort(key=lambda row: row["observation_key"])
+        publish_immutable(
+            Path(visit_timing_path),
+            _csv_bytes(timing_rows, VISIT_TIMING_COLUMNS),
+        )
 
     manifest_rows.sort(key=lambda row: row["observation_key"])
     manifest_payload = _csv_bytes(manifest_rows, MANIFEST_COLUMNS)
