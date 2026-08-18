@@ -249,9 +249,17 @@ def merge_sector_inventories(
     sectors: Sequence[int],
     out_dir: str | Path,
     producer_git_sha: str,
+    allowed_sector_producer_git_shas: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Merge completed sector inventories without rereading HDF5 payloads."""
 
+    if not re.fullmatch(r"[0-9a-f]{40}", producer_git_sha):
+        raise FM0ContractError("producer_git_sha must be full lowercase hex")
+    allowed_producers = set(allowed_sector_producer_git_shas or (producer_git_sha,))
+    if not allowed_producers or any(
+        not re.fullmatch(r"[0-9a-f]{40}", value) for value in allowed_producers
+    ):
+        raise FM0ContractError("allowed sector producer revisions must be full lowercase hex")
     root = Path(sector_root).resolve()
     output = Path(out_dir)
     rows: list[dict[str, str]] = []
@@ -264,8 +272,17 @@ def merge_sector_inventories(
         ready = sector_dir / "READY"
         if not (inventory.is_file() and summary_path.is_file() and ready.is_file()):
             raise FM0ContractError(f"S{sector} sector stage is incomplete")
-        if ready.read_text(encoding="utf-8").strip() != producer_git_sha:
-            raise FM0ContractError(f"S{sector} sector stage has the wrong code revision")
+        sector_producer = ready.read_text(encoding="utf-8").strip()
+        if sector_producer not in allowed_producers:
+            raise FM0ContractError(f"S{sector} sector stage has an unapproved code revision")
+        sector_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        if (
+            sector_summary.get("schema_version") != SECTOR_STAGE_SCHEMA_VERSION
+            or sector_summary.get("producer_git_sha") != sector_producer
+            or int(sector_summary.get("sector", -1)) != sector
+            or sector_summary.get("source_inventory_sha256") != sha256_file(inventory)
+        ):
+            raise FM0ContractError(f"S{sector} sector-stage summary binding failed")
         sector_rows = _read_csv(inventory)
         if tuple(sector_rows[0]) != A2V1_HDF5_SOURCE_INVENTORY_FIELDS:
             raise FM0ContractError(f"S{sector} source inventory columns drifted")
@@ -276,6 +293,7 @@ def merge_sector_inventories(
             identities.add(identity)
             rows.append(row)
         sector_bindings[str(sector)] = {
+            "producer_git_sha": sector_producer,
             "source_inventory_sha256": sha256_file(inventory),
             "summary_sha256": sha256_file(summary_path),
             "n_observations": len(sector_rows),
@@ -285,6 +303,7 @@ def merge_sector_inventories(
     summary = {
         "schema_version": SECTOR_MERGE_SCHEMA_VERSION,
         "producer_git_sha": producer_git_sha,
+        "allowed_sector_producer_git_shas": sorted(allowed_producers),
         "sectors": sorted({int(value) for value in sectors}),
         "n_observations": len(rows),
         "source_inventory_sha256": hashlib.sha256(payload).hexdigest(),

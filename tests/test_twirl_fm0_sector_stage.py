@@ -87,3 +87,51 @@ def test_sector_stage_extracts_only_selected_files_and_merges(tmp_path):
         producer_git_sha=sha,
     )
     assert merged["n_observations"] == 1
+    assert merged["sector_bindings"]["56"]["producer_git_sha"] == sha
+
+
+def test_sector_merge_permits_only_explicit_reviewed_producers(tmp_path):
+    sector_root = tmp_path / "sectors"
+    sector_dir = sector_root / "s0056"
+    sector_dir.mkdir(parents=True)
+    inventory = sector_dir / "source_inventory.csv"
+    from twirl.models.fm0.a2v1_adapter import A2V1_HDF5_SOURCE_INVENTORY_FIELDS
+
+    _csv(
+        inventory,
+        A2V1_HDF5_SOURCE_INVENTORY_FIELDS,
+        [
+            {
+                "gaia_dr3_source_id": "100",
+                "tic_id": "10",
+                "sector": 56,
+                "a2v1_product_version": "A2v1",
+                "product_state": "A2V1_ACCEPTED",
+                "diagnostic_admission_receipt_path": "",
+                "diagnostic_admission_receipt_sha256": "",
+                "hdf5_paths_json": "[]",
+                "hdf5_sha256_json": "[]",
+                "quality_table_path": "/authority/table",
+                "quality_table_sha256": "a" * 64,
+                "quality_manifest_path": "/authority/manifest",
+                "quality_manifest_sha256": "b" * 64,
+            }
+        ],
+    )
+    sector_sha = "1" * 40
+    summary = {
+        "schema_version": "twirl_fm0_1_sector_stage_v1",
+        "producer_git_sha": sector_sha,
+        "sector": 56,
+        "source_inventory_sha256": hashlib.sha256(inventory.read_bytes()).hexdigest(),
+    }
+    (sector_dir / "summary.json").write_text(json.dumps(summary))
+    (sector_dir / "READY").write_text(sector_sha + "\n")
+    merged = merge_sector_inventories(
+        sector_root=sector_root,
+        sectors=(56,),
+        out_dir=tmp_path / "merged",
+        producer_git_sha="2" * 40,
+        allowed_sector_producer_git_shas=(sector_sha,),
+    )
+    assert merged["allowed_sector_producer_git_shas"] == [sector_sha]
