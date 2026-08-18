@@ -57,7 +57,8 @@ Required for submit-sector-stage:
   TWIRL_FM0_SECTOR, TWIRL_FM0_CORPUS_SELECTION,
   TWIRL_FM0_CORPUS_SELECTION_SHA256, TWIRL_FM0_SECTOR_ARCHIVE_DIR,
   TWIRL_FM0_QUALITY_TABLE, TWIRL_FM0_QUALITY_MANIFEST, and
-  TWIRL_FM0_SECTOR_STAGE_ROOT.
+  TWIRL_FM0_SECTOR_STAGE_ROOT. TWIRL_FM0_AFTEROK_JOB_ID is optional and
+  serializes the sector behind one successful prior Slurm job.
 
 Required immutable binding for loader and later stages:
   TWIRL_FM0_INPUT_RECEIPT, TWIRL_FM0_INPUT_RECEIPT_SHA256
@@ -163,7 +164,12 @@ source_binding() {
   esac
 }
 submit_once() {
-  local record=$1 job_name=$2 wrapper=$3 exports=$4
+  local record=$1 job_name=$2 wrapper=$3 exports=$4 dependency=${5:-}
+  local dependency_option=""
+  if [[ -n "${dependency}" ]]; then
+    [[ "${dependency}" =~ ^[0-9]+$ ]] || { echo "Invalid afterok job ID." >&2; exit 2; }
+    dependency_option="--dependency=afterok:${dependency}"
+  fi
   remote "
     set -euo pipefail
     ${verify_remote_repo}
@@ -172,7 +178,7 @@ submit_once() {
     claim='${record}.claim'
     mkdir -- \"\${claim}\"
     cd '${REMOTE_REPO}'
-    job=\$(sbatch --parsable --job-name='${job_name}' --export='${exports}' '${wrapper}')
+    job=\$(sbatch --parsable ${dependency_option} --job-name='${job_name}' --export='${exports}' '${wrapper}')
     job=\${job%%;*}
     [[ \${job} =~ ^[0-9]+$ ]]
     printf '%s\\n' \"\${job}\" > '${record}.tmp'
@@ -382,7 +388,7 @@ case "${ACTION}" in
       safe_remote_path "${path}" || { echo "Unsafe sector-stage path: ${path}" >&2; exit 2; }
     done
     require_socket
-    submit_once "${LAUNCH_DIR}/sector-stage-s${TWIRL_FM0_SECTOR}.job" "twirl-fm0-stage-s${TWIRL_FM0_SECTOR}" "scripts/orcd/slurm_twirl_fm0_1_sector_stage_cpu.sbatch" "$(base_export),TWIRL_FM0_SECTOR=${TWIRL_FM0_SECTOR},TWIRL_FM0_CORPUS_SELECTION=${TWIRL_FM0_CORPUS_SELECTION},TWIRL_FM0_CORPUS_SELECTION_SHA256=${TWIRL_FM0_CORPUS_SELECTION_SHA256},TWIRL_FM0_SECTOR_ARCHIVE_DIR=${TWIRL_FM0_SECTOR_ARCHIVE_DIR},TWIRL_FM0_QUALITY_TABLE=${TWIRL_FM0_QUALITY_TABLE},TWIRL_FM0_QUALITY_MANIFEST=${TWIRL_FM0_QUALITY_MANIFEST},TWIRL_FM0_SECTOR_STAGE_ROOT=${TWIRL_FM0_SECTOR_STAGE_ROOT}"
+    submit_once "${LAUNCH_DIR}/sector-stage-s${TWIRL_FM0_SECTOR}.job" "twirl-fm0-stage-s${TWIRL_FM0_SECTOR}" "scripts/orcd/slurm_twirl_fm0_1_sector_stage_cpu.sbatch" "$(base_export),TWIRL_FM0_SECTOR=${TWIRL_FM0_SECTOR},TWIRL_FM0_CORPUS_SELECTION=${TWIRL_FM0_CORPUS_SELECTION},TWIRL_FM0_CORPUS_SELECTION_SHA256=${TWIRL_FM0_CORPUS_SELECTION_SHA256},TWIRL_FM0_SECTOR_ARCHIVE_DIR=${TWIRL_FM0_SECTOR_ARCHIVE_DIR},TWIRL_FM0_QUALITY_TABLE=${TWIRL_FM0_QUALITY_TABLE},TWIRL_FM0_QUALITY_MANIFEST=${TWIRL_FM0_QUALITY_MANIFEST},TWIRL_FM0_SECTOR_STAGE_ROOT=${TWIRL_FM0_SECTOR_STAGE_ROOT}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   submit-registry)
     : "${TWIRL_FM0_ALIASES_TABLE:?set staged aliases table}"
