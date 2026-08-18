@@ -40,7 +40,8 @@ export PYTHONPATH="${REPO}/src"
 "${PYTHON}" -m pytest -q \
   tests/test_twirl_fm0_model.py \
   tests/test_twirl_fm0_training.py \
-  tests/test_twirl_fm0_real_dataset.py
+  tests/test_twirl_fm0_real_dataset.py \
+  tests/test_twirl_fm0_representation_health.py
 TWIRL_FM0_INPUT_RECEIPT="${INPUT_RECEIPT}" \
 TWIRL_FM0_INPUT_RECEIPT_SHA256="${TWIRL_FM0_INPUT_RECEIPT_SHA256}" \
 TWIRL_FM0_EXPECTED_SHA="${TWIRL_EXPECTED_GIT_SHA}" \

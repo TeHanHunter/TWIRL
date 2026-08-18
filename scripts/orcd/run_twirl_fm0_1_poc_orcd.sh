@@ -45,6 +45,9 @@ Actions (run separately; no stage is auto-promoted):
   submit-post-validation   Independently validate the synthetic mechanics artifacts.
   submit-real-post-validation
                            Independently validate one immutable real-data run.
+  submit-representation-health
+                           Evaluate one independently validated run only on
+                           the held-out development source partition.
   status                   Read only the named run jobs and receipts.
 
 Default mode only prints the remote commands. --execute is required for any
@@ -102,6 +105,8 @@ Additional bindings:
   submit-real-post-validation: TWIRL_FM0_TRAIN_OUTPUT,
                                TWIRL_FM0_RUN_GIT_SHA,
                                TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
+  submit-representation-health: TWIRL_FM0_TRAIN_OUTPUT,
+                                TWIRL_FM0_REAL_POST_VALIDATION[_SHA256]
 EOF
 }
 
@@ -177,6 +182,12 @@ loader_binding() {
   : "${TWIRL_FM0_LOADER_RECEIPT_SHA256:?set exact loader receipt SHA256}"
   safe_remote_path "${TWIRL_FM0_LOADER_RECEIPT}" && [[ "${TWIRL_FM0_LOADER_RECEIPT}" == "${RUN_ROOT}"/* ]] || { echo "Unsafe loader receipt path." >&2; exit 2; }
   require_hash 64 "${TWIRL_FM0_LOADER_RECEIPT_SHA256}"
+}
+real_post_validation_binding() {
+  : "${TWIRL_FM0_REAL_POST_VALIDATION:?set immutable real post-validation receipt}"
+  : "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256:?set real post-validation receipt SHA256}"
+  safe_remote_path "${TWIRL_FM0_REAL_POST_VALIDATION}" && [[ "${TWIRL_FM0_REAL_POST_VALIDATION}" == "${RUN_ROOT}"/* ]] || { echo "Unsafe real post-validation path." >&2; exit 2; }
+  require_hash 64 "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}"
 }
 source_binding() {
   : "${TWIRL_FM0_SOURCE_ADAPTER:?set staged source adapter}"
@@ -533,6 +544,15 @@ case "${ACTION}" in
     real_validation_name=$(basename "${TWIRL_FM0_TRAIN_OUTPUT}")
     [[ "${real_validation_name}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Unsafe real validation name." >&2; exit 2; }
     submit_once "${LAUNCH_DIR}/real-post-validation-${TWIRL_FM0_RUN_GIT_SHA:0:12}-${real_validation_name}.job" "twirl-fm0-real-validate" "scripts/orcd/slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" "$(base_export),TWIRL_FM0_RUN_GIT_SHA=${TWIRL_FM0_RUN_GIT_SHA},TWIRL_FM0_TRAIN_OUTPUT=${TWIRL_FM0_TRAIN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_ADMISSION_RECEIPT=${TWIRL_FM0_ADMISSION_RECEIPT},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
+    ;;
+  submit-representation-health)
+    : "${TWIRL_FM0_TRAIN_OUTPUT:?set exact real training output}"
+    input_binding; real_post_validation_binding
+    safe_remote_path "${TWIRL_FM0_TRAIN_OUTPUT}" && [[ "${TWIRL_FM0_TRAIN_OUTPUT}" == "${RUN_ROOT}"/* ]] || { echo "Unsafe real training path." >&2; exit 2; }
+    require_socket
+    health_name=$(basename "${TWIRL_FM0_TRAIN_OUTPUT}")
+    [[ "${health_name}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Unsafe representation-health name." >&2; exit 2; }
+    submit_once "${LAUNCH_DIR}/representation-health-${health_name}.job" "twirl-fm0-rep-health" "scripts/orcd/slurm_twirl_fm0_1_representation_health_cpu.sbatch" "$(base_export),TWIRL_FM0_TRAIN_OUTPUT=${TWIRL_FM0_TRAIN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_REAL_POST_VALIDATION=${TWIRL_FM0_REAL_POST_VALIDATION},TWIRL_FM0_REAL_POST_VALIDATION_SHA256=${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   status)
     require_socket

@@ -158,6 +158,7 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
         "slurm_twirl_fm0_1_loader_smoke_cpu.sbatch",
         "slurm_twirl_fm0_1_post_validation_cpu.sbatch",
         "slurm_twirl_fm0_1_real_post_validation_cpu.sbatch",
+        "slurm_twirl_fm0_1_representation_health_cpu.sbatch",
     )
     for name in cpu_wrappers:
         script = text(name)
@@ -187,6 +188,7 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "tests/test_twirl_fm0_model.py" in loader
     assert "tests/test_twirl_fm0_training.py" in loader
     assert "tests/test_twirl_fm0_real_dataset.py" in loader
+    assert "tests/test_twirl_fm0_representation_health.py" in loader
     assert "input_builder_git_sha" in loader
     assert "#SBATCH --mem=16G" in loader
 
@@ -218,6 +220,14 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "TWIRL_FM0_RUN_GIT_SHA" in real_post
     assert '"run_git_sha"' in real_post
 
+    health = text("slurm_twirl_fm0_1_representation_health_cpu.sbatch")
+    assert "evaluate_twirl_fm0_representation_health.py" in health
+    assert "--device cpu" in health
+    assert "--max-components 256" in health
+    assert "--batch-size 8" in health
+    assert "twirl_fm0_1_orcd_real_post_validation_v1" in health
+    assert "poc_development" not in health
+
     controller = text("run_twirl_fm0_1_poc_orcd.sh")
     sector_stage = text("slurm_twirl_fm0_1_sector_stage_cpu.sbatch")
     assert "submit-sector-stage)" in controller
@@ -229,6 +239,9 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "READY_ORCD" in sector_stage
     assert "TWIRL_FM0_AFTEROK_JOB_ID" in controller
     assert "--dependency=afterok:${dependency}" in controller
+    assert "submit-representation-health)" in controller
+    assert "real_post_validation_binding" in controller
+    assert "slurm_twirl_fm0_1_representation_health_cpu.sbatch" in controller
     merge = text("slurm_twirl_fm0_1_sector_merge_cpu.sbatch")
     assert "submit-sector-merge)" in controller
     assert "slurm_twirl_fm0_1_sector_merge_cpu.sbatch" in controller
