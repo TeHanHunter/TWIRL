@@ -70,6 +70,51 @@ def cosine_similarity_rows(left: np.ndarray, right: np.ndarray) -> np.ndarray:
     return result
 
 
+def source_clustered_mean_interval(
+    values: np.ndarray,
+    cluster_ids: Sequence[str],
+    *,
+    seed: int,
+    n_bootstrap: int = 1_000,
+) -> dict[str, Any]:
+    """Return a deterministic percentile interval after source clustering.
+
+    Every physical source can produce many correlated windows or sector visits.
+    We therefore average within a leakage component before resampling components
+    with replacement.  The result is a descriptive 95% interval for the frozen
+    development selection, not a sealed-test significance claim.
+    """
+
+    array = np.asarray(values, dtype=np.float64)
+    identifiers = tuple(str(value) for value in cluster_ids)
+    if array.ndim != 1 or array.shape[0] != len(identifiers):
+        raise ValueError("clustered values and identifiers must align")
+    if n_bootstrap <= 0:
+        raise ValueError("n_bootstrap must be positive")
+    grouped: dict[str, list[float]] = defaultdict(list)
+    for value, identifier in zip(array, identifiers):
+        if math.isfinite(float(value)):
+            grouped[identifier].append(float(value))
+    means = np.asarray(
+        [np.mean(grouped[key]) for key in sorted(grouped) if grouped[key]],
+        dtype=np.float64,
+    )
+    if means.size == 0:
+        raise ValueError("clustered interval has no finite values")
+    rng = np.random.default_rng(int(seed))
+    samples = np.mean(
+        means[rng.integers(0, means.size, size=(n_bootstrap, means.size))], axis=1
+    )
+    return {
+        "n_source_clusters": int(means.size),
+        "mean": _finite_float(np.mean(means)),
+        "confidence_level": 0.95,
+        "bootstrap_replicates": int(n_bootstrap),
+        "lower": _finite_float(np.quantile(samples, 0.025)),
+        "upper": _finite_float(np.quantile(samples, 0.975)),
+    }
+
+
 def summarize_embedding_matrix(embeddings: np.ndarray) -> dict[str, Any]:
     """Summarize rank, variance, and near-duplicate dimensions.
 
@@ -122,6 +167,8 @@ def summarize_embedding_matrix(embeddings: np.ndarray) -> dict[str, Any]:
 def paired_similarity_summary(
     paired_left: np.ndarray,
     paired_right: np.ndarray,
+    *,
+    cluster_ids: Sequence[str],
 ) -> dict[str, Any]:
     """Compare same-window masked pairs with deterministically unrelated rows."""
 
@@ -135,12 +182,26 @@ def paired_similarity_summary(
     if not np.any(valid):
         raise ValueError("paired similarity has no finite comparisons")
     difference = paired[valid] - unrelated[valid]
+    identifiers = tuple(str(value) for value in cluster_ids)
+    if len(identifiers) != left.shape[0]:
+        raise ValueError("paired similarity cluster IDs must align with rows")
     return {
         "n_pairs": int(np.count_nonzero(valid)),
         "paired_cosine_mean": _finite_float(np.mean(paired[valid])),
         "unrelated_cosine_mean": _finite_float(np.mean(unrelated[valid])),
         "paired_minus_unrelated_mean": _finite_float(np.mean(difference)),
         "paired_minus_unrelated_median": _finite_float(np.median(difference)),
+        "paired_minus_unrelated_source_clustered_95_interval": (
+            source_clustered_mean_interval(
+                difference,
+                tuple(
+                    identifier
+                    for identifier, include in zip(identifiers, valid)
+                    if include
+                ),
+                seed=_stable_seed("fm0-paired-separation-bootstrap"),
+            )
+        ),
     }
 
 
@@ -175,12 +236,18 @@ def same_component_retrieval_summary(
         [groups[index] == groups[int(nearest[index])] for index in range(len(groups))],
         dtype=bool,
     )
+    eligible_groups = tuple(
+        group for group, include in zip(groups, eligible) if include
+    )
     return {
         "status": "available",
         "n_visit_embeddings": int(array.shape[0]),
         "n_repeated_component_queries": int(np.count_nonzero(eligible)),
-        "top1_same_component_retrieval": _finite_float(
-            np.mean(recovered[eligible])
+        "top1_same_component_retrieval": _finite_float(np.mean(recovered[eligible])),
+        "top1_source_clustered_95_interval": source_clustered_mean_interval(
+            recovered[eligible].astype(np.float64),
+            eligible_groups,
+            seed=_stable_seed("fm0-same-component-retrieval-bootstrap"),
         ),
     }
 
@@ -368,6 +435,9 @@ def evaluate_representation_health(
         sorted(component_rows, key=lambda row: row["observation_key"])[0]
         for _, component_rows in sorted(by_component.items())
     ]
+    representative_components = [
+        row["leakage_component_id"] for row in representatives
+    ]
     paired_left = [
         _model_window(
             release_root=release_root,
@@ -480,7 +550,9 @@ def evaluate_representation_health(
         "trained_encoder": {
             "embedding_health": summarize_embedding_matrix(left_embeddings),
             "safe_mask_pair_separation": paired_similarity_summary(
-                left_embeddings, right_embeddings
+                left_embeddings,
+                right_embeddings,
+                cluster_ids=representative_components,
             ),
             "same_component_cross_visit_retrieval": same_component_retrieval_summary(
                 visit_embeddings, component_ids
@@ -490,7 +562,9 @@ def evaluate_representation_health(
             "seed": int(random_control_seed),
             "embedding_health": summarize_embedding_matrix(random_left),
             "safe_mask_pair_separation": paired_similarity_summary(
-                random_left, random_right
+                random_left,
+                random_right,
+                cluster_ids=representative_components,
             ),
             "same_component_cross_visit_retrieval": same_component_retrieval_summary(
                 random_visits, component_ids
