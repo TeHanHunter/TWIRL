@@ -27,6 +27,7 @@ Actions (run separately; no stage is auto-promoted):
   probe                    Check the existing user-opened socket and live partition.
   deploy                   Create/reuse a clean detached worktree at the exact SHA.
   build-env                Build/reuse the hash-bound FM0.1 environment.
+  submit-sector-stage      Expand selected sources from one verified sector tar.
   submit-registry          Submit the CPU leakage-component registry build.
   submit-input-validation  Submit the CPU release build/independent freeze gate.
   submit-loader-smoke      Exercise two frozen shards through the official loader.
@@ -51,6 +52,12 @@ Required staged inputs for submit-registry/input-validation:
 TWIRL_FM0_SOURCE_ADAPTER is exactly one of:
   strict_npz_fixture_v1       mechanics-only; never scientific-training eligible
   a2v1_hdf5_quality_aware_v1  checksum-bound A2v1 HDF5 canary/release
+
+Required for submit-sector-stage:
+  TWIRL_FM0_SECTOR, TWIRL_FM0_CORPUS_SELECTION,
+  TWIRL_FM0_CORPUS_SELECTION_SHA256, TWIRL_FM0_SECTOR_ARCHIVE_DIR,
+  TWIRL_FM0_QUALITY_TABLE, TWIRL_FM0_QUALITY_MANIFEST, and
+  TWIRL_FM0_SECTOR_STAGE_ROOT.
 
 Required immutable binding for loader and later stages:
   TWIRL_FM0_INPUT_RECEIPT, TWIRL_FM0_INPUT_RECEIPT_SHA256
@@ -360,6 +367,22 @@ case "${ACTION}" in
   build-env)
     require_socket
     remote "set -euo pipefail; [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]; [[ -z \$(git -C '${REMOTE_REPO}' status --porcelain=v1 --untracked-files=all) ]]; cd '${REMOTE_REPO}'; TWIRL_ORCD_REPO='${REMOTE_REPO}' TWIRL_EXPECTED_GIT_SHA='${EXPECTED_SHA}' bash scripts/orcd/build_orcd_fm0_env.sh"
+    ;;
+  submit-sector-stage)
+    : "${TWIRL_FM0_SECTOR:?set one sector in S56-S65}"
+    : "${TWIRL_FM0_CORPUS_SELECTION:?set the immutable corpus selection}"
+    : "${TWIRL_FM0_CORPUS_SELECTION_SHA256:?set its SHA-256}"
+    : "${TWIRL_FM0_SECTOR_ARCHIVE_DIR:?set the verified sector archive directory}"
+    : "${TWIRL_FM0_QUALITY_TABLE:?set the cadence-quality table}"
+    : "${TWIRL_FM0_QUALITY_MANIFEST:?set the cadence-quality manifest}"
+    : "${TWIRL_FM0_SECTOR_STAGE_ROOT:?set the immutable sector-stage root}"
+    [[ "${TWIRL_FM0_SECTOR}" =~ ^(5[6-9]|6[0-5])$ ]] || { echo "Sector must be S56-S65." >&2; exit 2; }
+    require_hash 64 "${TWIRL_FM0_CORPUS_SELECTION_SHA256}"
+    for path in "${TWIRL_FM0_CORPUS_SELECTION}" "${TWIRL_FM0_SECTOR_ARCHIVE_DIR}" "${TWIRL_FM0_QUALITY_TABLE}" "${TWIRL_FM0_QUALITY_MANIFEST}" "${TWIRL_FM0_SECTOR_STAGE_ROOT}"; do
+      safe_remote_path "${path}" || { echo "Unsafe sector-stage path: ${path}" >&2; exit 2; }
+    done
+    require_socket
+    submit_once "${LAUNCH_DIR}/sector-stage-s${TWIRL_FM0_SECTOR}.job" "twirl-fm0-stage-s${TWIRL_FM0_SECTOR}" "scripts/orcd/slurm_twirl_fm0_1_sector_stage_cpu.sbatch" "$(base_export),TWIRL_FM0_SECTOR=${TWIRL_FM0_SECTOR},TWIRL_FM0_CORPUS_SELECTION=${TWIRL_FM0_CORPUS_SELECTION},TWIRL_FM0_CORPUS_SELECTION_SHA256=${TWIRL_FM0_CORPUS_SELECTION_SHA256},TWIRL_FM0_SECTOR_ARCHIVE_DIR=${TWIRL_FM0_SECTOR_ARCHIVE_DIR},TWIRL_FM0_QUALITY_TABLE=${TWIRL_FM0_QUALITY_TABLE},TWIRL_FM0_QUALITY_MANIFEST=${TWIRL_FM0_QUALITY_MANIFEST},TWIRL_FM0_SECTOR_STAGE_ROOT=${TWIRL_FM0_SECTOR_STAGE_ROOT}"
     ;;
   submit-registry)
     : "${TWIRL_FM0_ALIASES_TABLE:?set staged aliases table}"

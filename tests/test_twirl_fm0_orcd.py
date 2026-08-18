@@ -139,6 +139,7 @@ def test_registry_stage_requires_and_exports_admitted_observations() -> None:
 
 def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     cpu_wrappers = (
+        "slurm_twirl_fm0_1_sector_stage_cpu.sbatch",
         "slurm_twirl_fm0_1_registry_cpu.sbatch",
         "slurm_twirl_fm0_1_input_validation_cpu.sbatch",
         "slurm_twirl_fm0_1_loader_smoke_cpu.sbatch",
@@ -198,6 +199,14 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert '"run_git_sha"' in real_post
 
     controller = text("run_twirl_fm0_1_poc_orcd.sh")
+    sector_stage = text("slurm_twirl_fm0_1_sector_stage_cpu.sbatch")
+    assert "submit-sector-stage)" in controller
+    assert "slurm_twirl_fm0_1_sector_stage_cpu.sbatch" in controller
+    assert "prepare_twirl_fm0_sector_archive.py" in sector_stage
+    assert "#SBATCH -c 4" in sector_stage
+    assert "#SBATCH --mem=32G" in sector_stage
+    assert "TWIRL_FM0_CORPUS_SELECTION_SHA256" in sector_stage
+    assert "READY_ORCD" in sector_stage
     assert "submit-real-post-validation)" in controller
     assert "slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" in controller
 
