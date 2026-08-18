@@ -74,13 +74,12 @@ def source_ready(tag: str) -> bool:
 
 
 def submit(tag: str, item: dict[str, Any]) -> None:
-    submission = json.loads(
-        run([str(GLOBUS), "task", "generate-submission-id", "-F", "json"]).stdout
-    )["value"]
+    submission = str(item["submission_id"])
     result = run(
         [
-            str(GLOBUS), "transfer", BLACKHOLE_ID, ORCD_ID,
-            f"{SOURCE_ROOT}/{tag}.partial/", f"{DEST_ROOT}/{tag}/",
+            str(GLOBUS), "transfer",
+            f"{BLACKHOLE_ID}:{SOURCE_ROOT}/{tag}.partial/",
+            f"{ORCD_ID}:{DEST_ROOT}/{tag}/",
             "--recursive", "--submission-id", submission,
             "--label", f"twirl-fm0-{tag}-tar-ingress",
             "--sync-level", "checksum", "--verify-checksum", "--encrypt",
@@ -89,7 +88,6 @@ def submit(tag: str, item: dict[str, Any]) -> None:
     )
     item.update(
         {
-            "submission_id": submission,
             "task_id": json.loads(result.stdout)["task_id"],
             "submitted_at": utc_now(),
         }
@@ -159,6 +157,14 @@ def main() -> int:
         item = state["items"].setdefault(tag, {})
         while not source_ready(tag):
             time.sleep(args.poll_seconds)
+        if "submission_id" not in item:
+            item["submission_id"] = json.loads(
+                run(
+                    [str(GLOBUS), "task", "generate-submission-id", "-F", "json"]
+                ).stdout
+            )["value"]
+            item["submission_id_persisted_at"] = utc_now()
+            atomic_json(STATE_PATH, state)
         if "task_id" not in item:
             submit(tag, item)
             atomic_json(STATE_PATH, state)
