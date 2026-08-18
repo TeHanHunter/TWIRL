@@ -68,8 +68,11 @@ done
 mkdir -p "$output"
 cd "$repo"
 export PYTHONPATH=$repo/src
+export LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib:/pdo/app/anaconda/anaconda2-4.4.0/lib:${LD_LIBRARY_PATH:-}
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+
+"$python_bin" -c 'import astropy, numpy, pandas; print("FM0 cadence Python import preflight OK")'
 
 "$python_bin" scripts/stage1_lightcurves/build_a2v1_spoc_quality_table.py \
   --sector "$sector" --expected-orbit "$orbit1" --expected-orbit "$orbit2" \
