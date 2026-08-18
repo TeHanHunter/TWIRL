@@ -118,7 +118,11 @@ def test_controller_admission_uses_all_queue_and_node_tres() -> None:
     assert '"${LAUNCH_DIR}/fp32-smoke.job"' in script
     assert 'fp32-smoke-${remote_epoch}.job' not in script
     assert "submit-real-train) make_and_submit_admitted_run real" in script
-    assert '"${LAUNCH_DIR}/real-train-step${TWIRL_FM0_TARGET_STEP}.job"' in script
+    assert 'TWIRL_FM0_VARIANT (TWIRL-FM0.1.1, default, or' in script
+    assert 'TWIRL-FM0.1.2)' in script
+    assert 'real_job_name="twirl-fm0-1-1-real"' in script
+    assert 'real_job_name="twirl-fm0-1-2-real"' in script
+    assert '"${LAUNCH_DIR}/${real_record}"' in script
 
 
 def test_registry_stage_requires_and_exports_admitted_observations() -> None:
@@ -179,6 +183,7 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "tests/test_twirl_fm0_training.py" in loader
     assert "tests/test_twirl_fm0_real_dataset.py" in loader
     assert "input_builder_git_sha" in loader
+    assert "#SBATCH --mem=16G" in loader
 
     real = text("slurm_twirl_fm0_1_real_train_h200.sbatch")
     assert "#SBATCH --gres=gpu:h200:1" in real
@@ -186,7 +191,10 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "#SBATCH --mem=32G" in real
     assert "#SBATCH -t 47:30:00" in real
     assert "#SBATCH --array" not in real
-    assert "--variant TWIRL-FM0.1.1" in real
+    assert 'readonly VARIANT="${TWIRL_FM0_VARIANT:-TWIRL-FM0.1.1}"' in real
+    assert '"${VARIANT}" == "TWIRL-FM0.1.1"' in real
+    assert '"${VARIANT}" == "TWIRL-FM0.1.2"' in real
+    assert '--variant "${VARIANT}"' in real
     assert '--input-release "${RELEASE_ROOT}"' in real
     assert '--max-steps "${TARGET_STEP}"' in real
     assert "--synthetic-smoke" not in real

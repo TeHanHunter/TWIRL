@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-H200 real-release training for TWIRL-FM0.1.1.
+# One-H200 real-release training for one controlled TWIRL-FM0.1 candidate.
 #SBATCH -p pg_mki_aryeh
 #SBATCH --job-name=twirl-fm0-1-1-real
 #SBATCH -N 1
@@ -36,6 +36,7 @@ readonly PYTHON="${PROJECT_ROOT}/envs/twirl-fm0-poc-py3119-torch2110-cu128-v1/bi
 readonly TARGET_STEP="${TWIRL_FM0_TARGET_STEP:-20000}"
 readonly MICRO_BATCH="${TWIRL_FM0_MICRO_BATCH_WINDOWS:-8}"
 readonly PRECISION="${TWIRL_FM0_PRECISION:-bf16}"
+readonly VARIANT="${TWIRL_FM0_VARIANT:-TWIRL-FM0.1.1}"
 die() { echo "[fm0-real-train] ERROR: $*" >&2; exit 2; }
 for path in "${RUN_ROOT}" "${INPUT_RECEIPT}" "${LOADER_RECEIPT}" "${ADMISSION_RECEIPT}" "${OUT}"; do
   [[ "${path}" == "${RUN_ROOT}" || "${path}" == "${RUN_ROOT}"/* ]] || die "path escapes run root: ${path}"
@@ -44,6 +45,7 @@ done
 [[ "${MICRO_BATCH}" =~ ^[0-9]+$ ]] || die "micro batch must be numeric"
 (( MICRO_BATCH > 0 && 64 % MICRO_BATCH == 0 )) || die "micro batch must divide 64"
 [[ "${PRECISION}" == "fp32" || "${PRECISION}" == "bf16" ]] || die "invalid precision"
+[[ "${VARIANT}" == "TWIRL-FM0.1.1" || "${VARIANT}" == "TWIRL-FM0.1.2" ]] || die "invalid FM0.1 variant"
 for value in "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" "${TWIRL_FM0_LOADER_RECEIPT_SHA256}" "${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"; do
   [[ "${value}" =~ ^[0-9a-f]{64}$ ]] || die "invalid receipt hash"
 done
@@ -93,7 +95,7 @@ nvidia-smi
 "${PYTHON}" scripts/stage5_validation/train_twirl_fm0.py \
   --config "${REPO}/configs/models/twirl_fm0_1_s56_s67_poc.yaml" \
   --freeze-receipt "${REPO}/reports/stage5_validation/twirl_fm0_1_design_freeze_v1/freeze.json" \
-  --variant TWIRL-FM0.1.1 \
+  --variant "${VARIANT}" \
   --input-release "${RELEASE_ROOT}" \
   --input-release-receipt "${INPUT_RECEIPT}" \
   --output-dir "${OUT}" \
@@ -107,4 +109,4 @@ for path in run_contract.json checkpoint.pt summary.json; do
   [[ -s "${OUT}/${path}" && -s "${OUT}/${path}.sha256" ]] || die "missing training artifact/sidecar: ${path}"
 done
 chmod -R a-w "${OUT}"
-echo "[fm0-real-train] complete=${OUT} target_step=${TARGET_STEP} precision=${PRECISION}"
+echo "[fm0-real-train] complete=${OUT} variant=${VARIANT} target_step=${TARGET_STEP} precision=${PRECISION}"
