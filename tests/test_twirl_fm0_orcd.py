@@ -204,7 +204,7 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "slurm_twirl_fm0_1_sector_stage_cpu.sbatch" in controller
     assert "prepare_twirl_fm0_sector_archive.py" in sector_stage
     assert "#SBATCH -c 4" in sector_stage
-    assert "#SBATCH --mem=32G" in sector_stage
+    assert "#SBATCH --mem=16G" in sector_stage
     assert "TWIRL_FM0_CORPUS_SELECTION_SHA256" in sector_stage
     assert "READY_ORCD" in sector_stage
     assert "submit-real-post-validation)" in controller
