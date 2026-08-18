@@ -28,6 +28,7 @@ Actions (run separately; no stage is auto-promoted):
   deploy                   Create/reuse a clean detached worktree at the exact SHA.
   build-env                Build/reuse the hash-bound FM0.1 environment.
   submit-sector-stage      Expand selected sources from one verified sector tar.
+  submit-sector-merge      Merge completed S56-S64 source inventories.
   submit-registry          Submit the CPU leakage-component registry build.
   submit-input-validation  Submit the CPU release build/independent freeze gate.
   submit-loader-smoke      Exercise two frozen shards through the official loader.
@@ -59,6 +60,11 @@ Required for submit-sector-stage:
   TWIRL_FM0_QUALITY_TABLE, TWIRL_FM0_QUALITY_MANIFEST, and
   TWIRL_FM0_SECTOR_STAGE_ROOT. TWIRL_FM0_AFTEROK_JOB_ID is optional and
   serializes the sector behind one successful prior Slurm job.
+
+Required for submit-sector-merge:
+  TWIRL_FM0_SECTOR_STAGE_ROOT, TWIRL_FM0_SECTOR_MERGE_ROOT, and
+  TWIRL_FM0_ALLOWED_STAGE_REVISIONS (colon-separated full reviewed revisions).
+  TWIRL_FM0_AFTEROK_JOB_ID is optional and should name S64's job.
 
 Required immutable binding for loader and later stages:
   TWIRL_FM0_INPUT_RECEIPT, TWIRL_FM0_INPUT_RECEIPT_SHA256
@@ -389,6 +395,17 @@ case "${ACTION}" in
     done
     require_socket
     submit_once "${LAUNCH_DIR}/sector-stage-s${TWIRL_FM0_SECTOR}.job" "twirl-fm0-stage-s${TWIRL_FM0_SECTOR}" "scripts/orcd/slurm_twirl_fm0_1_sector_stage_cpu.sbatch" "$(base_export),TWIRL_FM0_SECTOR=${TWIRL_FM0_SECTOR},TWIRL_FM0_CORPUS_SELECTION=${TWIRL_FM0_CORPUS_SELECTION},TWIRL_FM0_CORPUS_SELECTION_SHA256=${TWIRL_FM0_CORPUS_SELECTION_SHA256},TWIRL_FM0_SECTOR_ARCHIVE_DIR=${TWIRL_FM0_SECTOR_ARCHIVE_DIR},TWIRL_FM0_QUALITY_TABLE=${TWIRL_FM0_QUALITY_TABLE},TWIRL_FM0_QUALITY_MANIFEST=${TWIRL_FM0_QUALITY_MANIFEST},TWIRL_FM0_SECTOR_STAGE_ROOT=${TWIRL_FM0_SECTOR_STAGE_ROOT}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
+    ;;
+  submit-sector-merge)
+    : "${TWIRL_FM0_SECTOR_STAGE_ROOT:?set the immutable S56-S64 stage root}"
+    : "${TWIRL_FM0_SECTOR_MERGE_ROOT:?set the immutable merged-inventory root}"
+    : "${TWIRL_FM0_ALLOWED_STAGE_REVISIONS:?set colon-separated full stage revisions}"
+    for path in "${TWIRL_FM0_SECTOR_STAGE_ROOT}" "${TWIRL_FM0_SECTOR_MERGE_ROOT}"; do
+      safe_remote_path "${path}" || { echo "Unsafe sector-merge path: ${path}" >&2; exit 2; }
+    done
+    [[ "${TWIRL_FM0_ALLOWED_STAGE_REVISIONS}" =~ ^[0-9a-f]{40}(:[0-9a-f]{40})*$ ]] || { echo "Invalid stage revision list." >&2; exit 2; }
+    require_socket
+    submit_once "${LAUNCH_DIR}/sector-merge.job" "twirl-fm0-merge" "scripts/orcd/slurm_twirl_fm0_1_sector_merge_cpu.sbatch" "$(base_export),TWIRL_FM0_SECTOR_STAGE_ROOT=${TWIRL_FM0_SECTOR_STAGE_ROOT},TWIRL_FM0_SECTOR_MERGE_ROOT=${TWIRL_FM0_SECTOR_MERGE_ROOT},TWIRL_FM0_ALLOWED_STAGE_REVISIONS=${TWIRL_FM0_ALLOWED_STAGE_REVISIONS}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   submit-registry)
     : "${TWIRL_FM0_ALIASES_TABLE:?set staged aliases table}"

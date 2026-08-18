@@ -140,6 +140,7 @@ def test_registry_stage_requires_and_exports_admitted_observations() -> None:
 def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     cpu_wrappers = (
         "slurm_twirl_fm0_1_sector_stage_cpu.sbatch",
+        "slurm_twirl_fm0_1_sector_merge_cpu.sbatch",
         "slurm_twirl_fm0_1_registry_cpu.sbatch",
         "slurm_twirl_fm0_1_input_validation_cpu.sbatch",
         "slurm_twirl_fm0_1_loader_smoke_cpu.sbatch",
@@ -209,6 +210,14 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "READY_ORCD" in sector_stage
     assert "TWIRL_FM0_AFTEROK_JOB_ID" in controller
     assert "--dependency=afterok:${dependency}" in controller
+    merge = text("slurm_twirl_fm0_1_sector_merge_cpu.sbatch")
+    assert "submit-sector-merge)" in controller
+    assert "slurm_twirl_fm0_1_sector_merge_cpu.sbatch" in controller
+    assert "merge_twirl_fm0_sector_inventories.py" in merge
+    assert "#SBATCH -c 4" in merge
+    assert "#SBATCH --mem=16G" in merge
+    assert "TWIRL_FM0_ALLOWED_STAGE_REVISIONS" in merge
+    assert "S${sector} stage is incomplete" in merge
     assert "submit-real-post-validation)" in controller
     assert "slurm_twirl_fm0_1_real_post_validation_cpu.sbatch" in controller
 
