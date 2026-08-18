@@ -31,6 +31,22 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def _read_selected_sector(path: Path, *, sector: int) -> list[dict[str, str]]:
+    """Stream the corpus table and retain only one sector's observations."""
+
+    selected: list[dict[str, str]] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != CORPUS_SELECTION_FIELDS:
+            raise FM0ContractError("corpus selection columns differ from the contract")
+        for row in reader:
+            if int(row["sector"]) == sector:
+                selected.append(row)
+    if not selected:
+        raise FM0ContractError(f"selection contains no S{sector} observations")
+    return selected
+
+
 def _csv_bytes(rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> bytes:
     from io import StringIO
 
@@ -99,12 +115,11 @@ def stage_sector_archive(
     selection = Path(selection_path).resolve()
     if sha256_file(selection) != selection_sha256:
         raise FM0ContractError("corpus selection hash mismatch")
-    rows = _read_csv(selection)
-    if tuple(rows[0]) != CORPUS_SELECTION_FIELDS:
-        raise FM0ContractError("corpus selection columns differ from the contract")
-    selected = [row for row in rows if int(row["sector"]) == sector]
-    if not selected:
-        raise FM0ContractError(f"selection contains no S{sector} observations")
+    selected = _read_selected_sector(selection, sector=sector)
+    print(
+        f"[fm0-sector-stage] S{sector}: selected {len(selected):,} source visits",
+        flush=True,
+    )
 
     tag = f"s{sector:04d}"
     archive_root = Path(archive_dir).resolve()
@@ -115,6 +130,10 @@ def stage_sector_archive(
     archive_sha = _declared_archive_hash(sidecar)
     if sha256_file(archive) != archive_sha:
         raise FM0ContractError(f"S{sector} archive hash mismatch")
+    print(
+        f"[fm0-sector-stage] S{sector}: verified archive {archive_sha[:12]}",
+        flush=True,
+    )
 
     quality_table_path = Path(quality_table).resolve()
     quality_manifest_path = Path(quality_manifest).resolve()
@@ -144,6 +163,10 @@ def stage_sector_archive(
     if len(requested) != len(set(requested)):
         raise FM0ContractError("selected visits reuse an HDF5 member")
     requested.sort(key=str)
+    print(
+        f"[fm0-sector-stage] S{sector}: extracting {len(requested):,} selected HDF5 members",
+        flush=True,
+    )
     files_path = partial / "selected_hdf5_files.txt"
     files_path.write_text("".join(f"{path}\n" for path in requested), encoding="utf-8")
     subprocess.run(
@@ -153,6 +176,10 @@ def stage_sector_archive(
     extracted = [(str(path), partial / path) for path in requested]
     if any(not path.is_file() for _, path in extracted):
         raise FM0ContractError("sector tar omitted one or more selected HDF5 members")
+    print(
+        f"[fm0-sector-stage] S{sector}: extraction complete; hashing selected members",
+        flush=True,
+    )
     with ThreadPoolExecutor(max_workers=workers) as pool:
         hashed = dict(
             (relative, (size, digest))
@@ -209,6 +236,10 @@ def stage_sector_archive(
     )
     publish_immutable(partial / "READY", (producer_git_sha + "\n").encode("utf-8"))
     os.replace(partial, final)
+    print(
+        f"[fm0-sector-stage] S{sector}: immutable source stage published at {final}",
+        flush=True,
+    )
     return summary
 
 
