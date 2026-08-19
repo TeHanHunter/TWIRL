@@ -258,8 +258,32 @@ def _derive_aperture(
 
     aperture_good = effective_good & np.isfinite(flux)
     error_good = aperture_good & np.isfinite(error) & (error > 0)
+
+    # The frozen contract carries per-aperture, per-view masks explicitly.
+    # A blank 1x1 aperture must not erase a healthy 3x3 aperture (or vice
+    # versa).  It is represented with finite neutral values and false masks;
+    # a variant that needs the absent view is filtered by the sampler.
+    def unavailable(*, reason: str) -> dict[str, Any]:
+        neutral = np.zeros(flux.size, dtype=np.float64)
+        invalid = np.zeros(flux.size, dtype=np.bool_)
+        return {
+            "values": (neutral.copy(), neutral.copy(), neutral.copy()),
+            "validity": (invalid.copy(), invalid.copy(), invalid.copy()),
+            "error": neutral.copy(),
+            "error_good": invalid.copy(),
+            "median": None,
+            "scale": None,
+            "scale_source": reason,
+            "fit_count": 0,
+            "available": False,
+            "n_aperture_good": int(np.count_nonzero(aperture_good)),
+            "n_error_good": int(np.count_nonzero(error_good)),
+        }
+
     if not np.any(aperture_good):
-        raise FM0ContractError("aperture has no effective-good finite flux")
+        return unavailable(reason="no_effective_good_finite_flux")
+    if not np.any(error_good):
+        return unavailable(reason="no_effective_good_finite_positive_error")
     median = float(np.median(flux[aperture_good]))
     fit_quality = (~error_good).astype(np.uint8)
     adp = flux_space_detrend_result(
@@ -270,7 +294,7 @@ def _derive_aperture(
     )
     scale = float(adp.scale)
     if not np.isfinite(median) or not np.isfinite(scale) or scale <= 0:
-        raise FM0ContractError(f"invalid aperture median/ADP scale: m={median}, s={scale}")
+        return unavailable(reason="invalid_median_or_adp_scale")
     raw_relative = (flux - median) / scale
     error_relative = error / scale
     values = (raw_relative, adp.det_flux - 1.0, adp015.det_flux - 1.0)
@@ -284,6 +308,9 @@ def _derive_aperture(
         "scale": scale,
         "scale_source": adp.scale_source,
         "fit_count": adp.fit_count,
+        "available": True,
+        "n_aperture_good": int(np.count_nonzero(aperture_good)),
+        "n_error_good": int(np.count_nonzero(error_good)),
     }
 
 
@@ -374,6 +401,12 @@ def build_observation_release(
         audit={
             "external_quality_formula": "spoc_quality | (qlp_quality << 30)",
             "n_effective_good": int(np.sum(effective_good)),
+            "aperture_available_1x1": bool(small["available"]),
+            "aperture_available_3x3": bool(large["available"]),
+            "n_aperture_good_1x1": small["n_aperture_good"],
+            "n_aperture_good_3x3": large["n_aperture_good"],
+            "n_error_good_1x1": small["n_error_good"],
+            "n_error_good_3x3": large["n_error_good"],
             "median_1x1": small["median"],
             "median_3x3": large["median"],
             "scale_1x1": small["scale"],

@@ -12,6 +12,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import csv
 import hashlib
+import json
 import math
 from pathlib import Path
 from typing import Any
@@ -75,6 +76,28 @@ def variant_view_indices(variant: str) -> tuple[int, ...]:
         return VARIANT_VIEW_INDICES[str(variant)]
     except KeyError as exc:
         raise ValueError(f"unknown TWIRL-FM0.1 variant: {variant!r}") from exc
+
+
+def _manifest_view_presence(row: Mapping[str, str]) -> np.ndarray:
+    """Read the six-view availability declaration before sampling a shard.
+
+    The model variant, not the release builder, decides whether a visit with a
+    wholly absent aperture is usable.  This keeps a healthy aperture available
+    to a reduced-view sensitivity while preventing a model that requires both
+    apertures from encountering a missing channel mid-training.
+    """
+
+    try:
+        parsed = json.loads(str(row["view_present_json"]))
+    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("FM0 release row has invalid view_present_json") from exc
+    if (
+        not isinstance(parsed, list)
+        or len(parsed) != len(VIEW_NAMES)
+        or any(type(value) is not int or value not in {0, 1} for value in parsed)
+    ):
+        raise ValueError("FM0 release row has invalid view_present_json")
+    return np.asarray(parsed, dtype=bool)
 
 
 def deterministic_window_start(
@@ -482,6 +505,8 @@ class FM0ReleaseDataset:
             raise ValueError("FM0 release manifest is empty")
 
         grouped: dict[str, list[dict[str, str]]] = {}
+        required_views = np.asarray(variant_view_indices(config.variant), dtype=int)
+        excluded_missing_required_views = 0
         for row in rows:
             if row["input_release_schema_version"] != INPUT_RELEASE_SCHEMA_VERSION:
                 raise ValueError("FM0 release row has the wrong schema")
@@ -489,6 +514,10 @@ class FM0ReleaseDataset:
                 continue
             if row["scientific_training_eligible"] != "True":
                 raise ValueError("FM0 release contains a training-ineligible selected row")
+            present = _manifest_view_presence(row)
+            if not np.all(present[required_views]):
+                excluded_missing_required_views += 1
+                continue
             relative = Path(row["relative_path"])
             if relative.is_absolute() or ".." in relative.parts:
                 raise ValueError("FM0 release shard path escapes the release root")
@@ -504,6 +533,7 @@ class FM0ReleaseDataset:
             source: tuple(sorted(grouped[source], key=lambda row: row["observation_key"]))
             for source in self._source_ids
         }
+        self._n_excluded_missing_required_views = excluded_missing_required_views
         self._cache: OrderedDict[str, ObservationRelease] = OrderedDict()
 
     @property
@@ -519,6 +549,7 @@ class FM0ReleaseDataset:
             "window_length": self.config.window_length,
             "n_sources": len(self._source_ids),
             "n_observations": sum(len(rows) for rows in self._visits.values()),
+            "n_excluded_missing_required_views": self._n_excluded_missing_required_views,
         }
 
     def __len__(self) -> int:

@@ -125,6 +125,51 @@ def test_release_dataset_rejects_manifest_or_partition_drift(tmp_path: Path) -> 
         )
 
 
+def test_release_dataset_excludes_missing_variant_views_without_dropping_healthy_visits(
+    tmp_path: Path,
+) -> None:
+    manifest_sha = _write_release(tmp_path)
+    manifest = tmp_path / "manifest.csv"
+    with manifest.open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    missing = _release()
+    missing.flux[:, (0, 2, 4)] = 0.0
+    missing.flux_valid[:, (0, 2, 4)] = False
+    missing.view_present[[0, 2, 4]] = False
+    missing_shard = tmp_path / "shards" / "observation_missing_1x1.npz"
+    missing_shard.write_bytes(deterministic_npz_bytes(missing))
+    missing_row = dict(rows[0])
+    missing_row.update(
+        {
+            "observation_key": "observation_missing_1x1",
+            "relative_path": "shards/observation_missing_1x1.npz",
+            "sha256": _sha(missing_shard),
+            "view_present_json": "[0,1,0,1,0,1]",
+        }
+    )
+    rows.append(missing_row)
+    with manifest.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=MANIFEST_COLUMNS, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+    manifest_sha = _sha(manifest)
+
+    dataset = FM0ReleaseDataset(
+        FM0ReleaseDatasetConfig(
+            release_root=str(tmp_path),
+            manifest_sha256=manifest_sha,
+            variant="TWIRL-FM0.1.1",
+            windows_per_epoch=2,
+        )
+    )
+
+    assert dataset.contract["n_sources"] == 1
+    assert dataset.contract["n_observations"] == 1
+    assert dataset.contract["n_excluded_missing_required_views"] == 1
+    assert dataset.sample(0)["flux"].shape == (2, 2048)
+
+
 def test_one_step_real_training_and_strict_validation(tmp_path: Path) -> None:
     torch = pytest.importorskip("torch")
     from twirl.models.fm0.model import (

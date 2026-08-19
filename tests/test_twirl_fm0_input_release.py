@@ -117,6 +117,24 @@ def test_six_view_quality_error_time_and_window_contract(tmp_path) -> None:
     assert np.array_equal(loaded.local_time_cadences, release.local_time_cadences)
 
 
+def test_one_missing_aperture_uses_explicit_masks_without_erasing_the_other() -> None:
+    raw = _raw_fixture()
+    raw["raw_flux_1x1"][:] = np.nan
+    raw["raw_flux_error_1x1"][:] = np.nan
+
+    release = build_observation_release(raw)
+
+    assert np.array_equal(release.view_present, [False, True, False, True, False, True])
+    assert not release.flux_valid[:, (0, 2, 4)].any()
+    assert release.flux_valid[:, (1, 3, 5)].any()
+    assert not release.error_valid[:, 0].any()
+    assert release.error_valid[:, 1].any()
+    assert np.all(release.flux[:, (0, 2, 4)] == 0.0)
+    assert np.all(release.flux_error[:, 0] == 0.0)
+    assert release.audit["aperture_available_1x1"] is False
+    assert release.audit["aperture_available_3x3"] is True
+
+
 def test_raw_array_allowlist_rejects_bls() -> None:
     raw = _raw_fixture(120)
     raw["bls_period"] = np.ones(120)
