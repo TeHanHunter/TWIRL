@@ -86,8 +86,9 @@ def test_controller_rolls_back_a_submission_claim_when_sbatch_rejects() -> None:
     script = text("run_twirl_fm0_1_poc_orcd.sh")
     assert "cleanup_failed_claim()" in script
     assert 'rm -rf -- \\\"\\${claim}\\\"' in script
-    assert "trap cleanup_failed_claim ERR" in script
-    assert "trap - ERR" in script
+    assert "if job=\\$(sbatch --parsable" in script
+    assert "status=\\$?" in script
+    assert "cleanup_failed_claim" in script
 
 
 def test_deploy_materializes_the_frozen_receipt_in_sparse_worktrees() -> None:
