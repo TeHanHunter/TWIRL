@@ -218,12 +218,21 @@ submit_once() {
     test ! -e '${record}'
     claim='${record}.claim'
     mkdir -- \"\${claim}\"
+    # Keep the claim only after an actual Slurm ID is atomically published.
+    # A scheduler-side rejection must remain retryable after inspection.
+    cleanup_failed_claim() {
+      local status=\$?
+      rm -rf -- \"\${claim}\"
+      exit \"\${status}\"
+    }
+    trap cleanup_failed_claim ERR
     cd '${REMOTE_REPO}'
     job=\$(sbatch --parsable ${dependency_option} --job-name='${job_name}' --export='${exports}' '${wrapper}')
     job=\${job%%;*}
     [[ \${job} =~ ^[0-9]+$ ]]
     printf '%s\\n' \"\${job}\" > '${record}.tmp'
     mv -- '${record}.tmp' '${record}'
+    trap - ERR
     cat '${record}'
   "
 }
