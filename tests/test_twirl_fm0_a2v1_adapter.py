@@ -31,9 +31,17 @@ from twirl.models.fm0.registry import (
 )
 
 
-def _write_hdf5(path: Path, *, tic: int = 42, sector: int = 56, orbit: int = 119) -> None:
-    n = 80
-    cadence = np.arange(700000, 700000 + n, dtype=np.int64)
+def _write_hdf5(
+    path: Path,
+    *,
+    tic: int = 42,
+    sector: int = 56,
+    orbit: int = 119,
+    cadence_start: int = 700000,
+    n_cadences: int = 80,
+) -> None:
+    n = n_cadences
+    cadence = np.arange(cadence_start, cadence_start + n, dtype=np.int64)
     time = 2900.0 + np.arange(n, dtype=np.float64) * 200.0 / 86400.0
     with h5py.File(path, "w") as handle:
         handle.attrs["TIC ID"] = tic
@@ -72,15 +80,39 @@ class _Reference:
     def assert_unchanged(self) -> None:
         return None
 
-    def apply(self, *, cadenceno, internal_quality, **_kwargs):
+    def apply(
+        self,
+        *,
+        cadenceno,
+        internal_quality,
+        orbitid,
+        orbitid_policy="strict",
+        **_kwargs,
+    ):
         table = pd.read_csv(self.table_path).set_index("cadenceno")
         cadence = np.asarray(cadenceno, dtype=np.int64)
+        input_orbitid = np.asarray(orbitid, dtype=np.int64)
         spoc = np.asarray([table.loc[int(value), "spoc_quality"] for value in cadence], dtype=np.int64)
         qlp = np.asarray([table.loc[int(value), "qlp_quality"] for value in cadence], dtype=np.int64)
+        reference_orbitid = np.asarray(
+            [
+                table.loc[int(value), "reference_orbitid"]
+                if "reference_orbitid" in table.columns
+                else input_orbitid[index]
+                for index, value in enumerate(cadence)
+            ],
+            dtype=np.int64,
+        )
+        correction = input_orbitid != reference_orbitid
+        if correction.any() and orbitid_policy == "strict":
+            raise ValueError("strict test reference rejects an orbit mismatch")
+        resolved = reference_orbitid if orbitid_policy == "reference_by_cadence" else input_orbitid
         external = spoc | (qlp << 30)
         internal = np.asarray(internal_quality, dtype=np.int64)
         return SimpleNamespace(
             external_quality=external,
+            resolved_orbitid=resolved,
+            orbitid_reference_correction_mask=correction,
             counts={
                 "n_cad_total": int(cadence.size),
                 "n_cad_internal_bad": int(np.count_nonzero(internal)),
@@ -150,6 +182,107 @@ def test_adapter_binds_real_hdf5_content_and_quality_components(
     assert loaded.raw_arrays["raw_flux_1x1"].shape == (80,)
     assert loaded.raw_arrays["spoc_quality"][-1] == 4
     assert not loaded.raw_arrays["authority_excluded"].any()
+
+
+def test_adapter_reconciles_only_the_bounded_s62_orbit_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hdf5 = tmp_path / "s62_source.h5"
+    _write_hdf5(
+        hdf5,
+        sector=62,
+        orbit=132,
+        cadence_start=766048,
+        n_cadences=89,
+    )
+    table = tmp_path / "quality.csv"
+    pd.DataFrame(
+        {
+            "sector": 62,
+            "camera": 4,
+            "ccd": 1,
+            "cadenceno": np.arange(766048, 766137),
+            "spoc_quality": 0,
+            "qlp_quality": 0,
+            "reference_orbitid": 131,
+        }
+    ).to_csv(table, index=False)
+    quality_manifest = tmp_path / "quality.json"
+    quality_manifest.write_text("{}\n", encoding="utf-8")
+    hdf5_hash = hashlib.sha256(hdf5.read_bytes()).hexdigest()
+    source_hash = a2v1_source_sha256(
+        sector=62,
+        tic_id="42",
+        hdf5_sha256s=[hdf5_hash],
+        quality_table_sha256=hashlib.sha256(table.read_bytes()).hexdigest(),
+        quality_manifest_sha256=hashlib.sha256(quality_manifest.read_bytes()).hexdigest(),
+    )
+    _install_reference(monkeypatch, table)
+
+    loaded = load_a2v1_hdf5_observation(
+        _manifest_row(hdf5, table, quality_manifest, source_sha=source_hash),
+        manifest_dir=tmp_path,
+        sector=62,
+        tic_id="42",
+    )
+
+    assert np.array_equal(loaded.raw_arrays["orbit"], np.full(89, 131))
+    reconciliation = loaded.audit["orbitid_reconciliation"]
+    assert reconciliation["policy"] == "reference_by_cadence"
+    assert reconciliation["n_cadences_reconciled"] == 89
+    assert reconciliation["sources"] == [
+        {
+            "source_file": "s62_source.h5",
+            "n_cadences": 89,
+            "cadence_min": 766048,
+            "cadence_max": 766136,
+            "input_orbitid": 132,
+            "resolved_orbitid": 131,
+        }
+    ]
+
+
+def test_adapter_rejects_an_unbounded_s62_reference_orbit_correction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hdf5 = tmp_path / "s62_out_of_bounds.h5"
+    _write_hdf5(
+        hdf5,
+        sector=62,
+        orbit=132,
+        cadence_start=766137,
+    )
+    table = tmp_path / "quality.csv"
+    pd.DataFrame(
+        {
+            "sector": 62,
+            "camera": 4,
+            "ccd": 1,
+            "cadenceno": np.arange(766137, 766217),
+            "spoc_quality": 0,
+            "qlp_quality": 0,
+            "reference_orbitid": 131,
+        }
+    ).to_csv(table, index=False)
+    quality_manifest = tmp_path / "quality.json"
+    quality_manifest.write_text("{}\n", encoding="utf-8")
+    hdf5_hash = hashlib.sha256(hdf5.read_bytes()).hexdigest()
+    source_hash = a2v1_source_sha256(
+        sector=62,
+        tic_id="42",
+        hdf5_sha256s=[hdf5_hash],
+        quality_table_sha256=hashlib.sha256(table.read_bytes()).hexdigest(),
+        quality_manifest_sha256=hashlib.sha256(quality_manifest.read_bytes()).hexdigest(),
+    )
+    _install_reference(monkeypatch, table)
+
+    with pytest.raises(FM0ContractError, match="bounded 132->131"):
+        load_a2v1_hdf5_observation(
+            _manifest_row(hdf5, table, quality_manifest, source_sha=source_hash),
+            manifest_dir=tmp_path,
+            sector=62,
+            tic_id="42",
+        )
 
 
 def test_hdf5_release_is_scientific_eligible_only_when_registry_binding_matches(

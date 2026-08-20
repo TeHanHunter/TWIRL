@@ -24,6 +24,9 @@ import pandas as pd
 from twirl.lightcurves.external_quality import (
     AUTHORITY_EXCLUSION_EXTERNAL_BIT,
     ExternalQualityReference,
+    ORBITID_POLICY_REFERENCE,
+    ORBITID_POLICY_STRICT,
+    ORBITID_RECONCILIATION_CONTRACT_VERSION,
     load_external_quality_reference,
 )
 from twirl.lightcurves.tglc_h5_reader import read_tglc_h5
@@ -70,6 +73,15 @@ A2V1_HDF5_SOURCE_INVENTORY_COLUMNS = frozenset(
     A2V1_HDF5_SOURCE_INVENTORY_FIELDS
 )
 
+# The native S62 orbit-132 source products contain the first 89 valid
+# cadences of orbit 131.  The checksum-bound cadence authority is the
+# scientific source of truth for these labels.  This is deliberately a narrow
+# adapter reconciliation rather than a permissive fallback for any mismatch.
+S62_ORBIT_RECONCILIATION_CADENCE_MIN = 766_048
+S62_ORBIT_RECONCILIATION_CADENCE_MAX = 766_136
+S62_ORBIT_RECONCILIATION_INPUT_ORBIT = 132
+S62_ORBIT_RECONCILIATION_REFERENCE_ORBIT = 131
+
 
 @dataclass(frozen=True)
 class A2V1RawObservation:
@@ -100,6 +112,53 @@ class A2V1AdapterCache:
     def assert_unchanged(self) -> None:
         for reference in self.references.values():
             reference.assert_unchanged()
+
+
+def _orbitid_policy_for_sector(sector: int) -> str:
+    """Return the only sector-specific orbit-label policy admitted by FM0.1."""
+
+    return ORBITID_POLICY_REFERENCE if int(sector) == 62 else ORBITID_POLICY_STRICT
+
+
+def _validate_orbitid_reconciliation(
+    *,
+    sector: int,
+    path: Path,
+    cadenceno: np.ndarray,
+    input_orbitid: np.ndarray,
+    resolved_orbitid: np.ndarray,
+    correction_mask: np.ndarray,
+) -> np.ndarray:
+    """Fail closed unless an orbit correction is the known S62 boundary case."""
+
+    cadences = np.asarray(cadenceno, dtype=np.int64)
+    input_orbits = np.asarray(input_orbitid, dtype=np.int64)
+    resolved_orbits = np.asarray(resolved_orbitid, dtype=np.int64)
+    corrected = np.asarray(correction_mask, dtype=bool)
+    if len({len(cadences), len(input_orbits), len(resolved_orbits), len(corrected)}) != 1:
+        raise FM0ContractError(f"orbit reconciliation lengths differ for {path}")
+    mismatch = input_orbits != resolved_orbits
+    if not np.array_equal(mismatch, corrected):
+        raise FM0ContractError(
+            f"orbit reconciliation did not correct all and only authority mismatches for {path}"
+        )
+    if not mismatch.any():
+        return corrected
+    if int(sector) != 62:
+        raise FM0ContractError(
+            f"unexpected orbit reconciliation outside S62 for {path}"
+        )
+    corrected_cadences = cadences[corrected]
+    if (
+        np.any(input_orbits[corrected] != S62_ORBIT_RECONCILIATION_INPUT_ORBIT)
+        or np.any(resolved_orbits[corrected] != S62_ORBIT_RECONCILIATION_REFERENCE_ORBIT)
+        or int(np.min(corrected_cadences)) < S62_ORBIT_RECONCILIATION_CADENCE_MIN
+        or int(np.max(corrected_cadences)) > S62_ORBIT_RECONCILIATION_CADENCE_MAX
+    ):
+        raise FM0ContractError(
+            f"S62 orbit reconciliation exceeds the bounded 132->131 authority case for {path}"
+        )
+    return corrected
 
 
 def _sha256_text(value: str, *, name: str) -> str:
@@ -422,7 +481,10 @@ def load_a2v1_hdf5_observation(
         "n_cad_internal_bad": 0,
         "n_cad_external_bad": 0,
         "n_cad_authority_excluded": 0,
+        "n_cad_orbitid_reconciled": 0,
     }
+    orbit_reconciliations: list[dict[str, Any]] = []
+    orbitid_policy = _orbitid_policy_for_sector(int(sector))
     for path in hdf5_paths:
         try:
             lightcurve = read_tglc_h5(path)
@@ -443,17 +505,52 @@ def load_a2v1_hdf5_observation(
         ].flux_was_synthesized:
             raise FM0ContractError("legacy magnitude-derived flux is not admissible for FM0.1")
         try:
+            input_orbitid = np.full(
+                lightcurve.cadence.size, lightcurve.orbit, dtype=np.int64
+            )
             overlay = reference.apply(
                 sector=sector,
                 camera=lightcurve.cam,
                 ccd=lightcurve.ccd,
                 cadenceno=lightcurve.cadence,
-                orbitid=np.full(lightcurve.cadence.size, lightcurve.orbit, dtype=np.int64),
+                orbitid=input_orbitid,
                 internal_quality=lightcurve.quality,
                 context=f"FM0.1 {path.name}",
+                orbitid_policy=orbitid_policy,
             )
         except Exception as exc:
             raise FM0ContractError(f"external-quality join failed for {path}") from exc
+        resolved_orbitid = np.asarray(
+            getattr(overlay, "resolved_orbitid", input_orbitid), dtype=np.int64
+        )
+        correction_mask = np.asarray(
+            getattr(
+                overlay,
+                "orbitid_reference_correction_mask",
+                input_orbitid != resolved_orbitid,
+            ),
+            dtype=bool,
+        )
+        corrected = _validate_orbitid_reconciliation(
+            sector=int(sector),
+            path=path,
+            cadenceno=np.asarray(lightcurve.cadence, dtype=np.int64),
+            input_orbitid=input_orbitid,
+            resolved_orbitid=resolved_orbitid,
+            correction_mask=correction_mask,
+        )
+        if corrected.any():
+            corrected_cadences = np.asarray(lightcurve.cadence, dtype=np.int64)[corrected]
+            orbit_reconciliations.append(
+                {
+                    "source_file": path.name,
+                    "n_cadences": int(np.count_nonzero(corrected)),
+                    "cadence_min": int(np.min(corrected_cadences)),
+                    "cadence_max": int(np.max(corrected_cadences)),
+                    "input_orbitid": S62_ORBIT_RECONCILIATION_INPUT_ORBIT,
+                    "resolved_orbitid": S62_ORBIT_RECONCILIATION_REFERENCE_ORBIT,
+                }
+            )
         component_key = (int(sector), quality_table, lightcurve.cam, lightcurve.ccd)
         components = None if cache is None else cache.components.get(component_key)
         if components is None:
@@ -491,9 +588,7 @@ def load_a2v1_hdf5_observation(
         # feature.
         arrays["time"].append(lightcurve.time)
         arrays["cadence"].append(lightcurve.cadence)
-        arrays["orbit"].append(
-            np.full(lightcurve.cadence.size, lightcurve.orbit, dtype=np.int64)
-        )
+        arrays["orbit"].append(resolved_orbitid)
         arrays["internal_quality"].append(lightcurve.quality)
         arrays["spoc_quality"].append(spoc)
         arrays["qlp_quality"].append(qlp)
@@ -507,7 +602,10 @@ def load_a2v1_hdf5_observation(
             lightcurve.apertures["Primary"].raw_flux_err
         )
         for key in quality_counts:
-            quality_counts[key] += int(overlay.counts[key])
+            if key == "n_cad_orbitid_reconciled":
+                quality_counts[key] += int(np.count_nonzero(corrected))
+            else:
+                quality_counts[key] += int(overlay.counts[key])
     if cache is None:
         reference.assert_unchanged()
     raw_arrays = {
@@ -539,6 +637,14 @@ def load_a2v1_hdf5_observation(
             "hdf5_sha256s": normalized_hashes,
             "quality_reference": reference.provenance,
             "quality_counts": quality_counts,
+            "orbitid_reconciliation": {
+                "contract_version": ORBITID_RECONCILIATION_CONTRACT_VERSION,
+                "policy": orbitid_policy,
+                "n_cadences_reconciled": quality_counts[
+                    "n_cad_orbitid_reconciled"
+                ],
+                "sources": orbit_reconciliations,
+            },
         },
     )
 
