@@ -11,6 +11,7 @@ import pytest
 from twirl.models.fm0.dataset import (
     FM0ReleaseDataset,
     FM0ReleaseDatasetConfig,
+    deterministic_window_start,
 )
 from twirl.models.fm0.input_release import (
     INPUT_RELEASE_SCHEMA_VERSION,
@@ -44,10 +45,16 @@ def _release(n: int = 3000) -> ObservationRelease:
     )
 
 
-def _write_release(root: Path, *, partition: str = "poc_train") -> str:
+def _write_release(
+    root: Path,
+    *,
+    partition: str = "poc_train",
+    release: ObservationRelease | None = None,
+) -> str:
+    release = _release() if release is None else release
     shard = root / "shards" / "observation_test.npz"
     shard.parent.mkdir(parents=True)
-    shard.write_bytes(deterministic_npz_bytes(_release()))
+    shard.write_bytes(deterministic_npz_bytes(release))
     row = {
         "input_release_schema_version": INPUT_RELEASE_SCHEMA_VERSION,
         "observation_key": "observation_test",
@@ -59,8 +66,8 @@ def _write_release(root: Path, *, partition: str = "poc_train") -> str:
         "relative_path": "shards/observation_test.npz",
         "sha256": _sha(shard),
         "input_source_sha256": "a" * 64,
-        "n_cadences": "3000",
-        "n_segments": "1",
+        "n_cadences": str(release.flux.shape[0]),
+        "n_segments": str(np.unique(release.segment_id).size),
         "view_present_json": "[1,1,1,1,1,1]",
         "host_visit_offset_cadences": "0.0",
         "host_visit_gap_cadences": "0.0",
@@ -168,6 +175,37 @@ def test_release_dataset_excludes_missing_variant_views_without_dropping_healthy
     assert dataset.contract["n_observations"] == 1
     assert dataset.contract["n_excluded_missing_required_views"] == 1
     assert dataset.sample(0)["flux"].shape == (2, 2048)
+
+
+def test_release_dataset_replaces_an_ineligible_window_with_a_valid_one(
+    tmp_path: Path,
+) -> None:
+    release = _release()
+    # This observation has healthy ADP data, but its early quality-masked
+    # stretch is longer than a training window.  The ordinary deterministic
+    # start below lands wholly inside it; the dataset must retain the host and
+    # select an eligible window later in the same segment.
+    release.flux[:2500, (2, 3)] = 0.0
+    release.flux_valid[:2500, (2, 3)] = False
+    manifest_sha = _write_release(tmp_path, release=release)
+    config = FM0ReleaseDatasetConfig(
+        release_root=str(tmp_path),
+        manifest_sha256=manifest_sha,
+        variant="TWIRL-FM0.1.1",
+        windows_per_epoch=1024,
+    )
+    bad_index = next(
+        index
+        for index in range(1024)
+        if deterministic_window_start(
+            3000, sample_index=index, epoch=0, seed=config.seed
+        ) <= 452
+    )
+    dataset = FM0ReleaseDataset(config)
+
+    sample = dataset.sample(bad_index)
+
+    assert np.all(np.any(sample["flux_valid"], axis=1))
 
 
 def test_one_step_real_training_and_strict_validation(tmp_path: Path) -> None:

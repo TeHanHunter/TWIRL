@@ -574,36 +574,110 @@ class FM0ReleaseDataset:
             self._cache.popitem(last=False)
         return release
 
-    def _selection(self, index: int) -> tuple[dict[str, str], ObservationRelease, np.ndarray]:
+    def _window_start_if_eligible(
+        self,
+        release: ObservationRelease,
+        segment_indices: np.ndarray,
+        *,
+        sample_index: int,
+    ) -> int | None:
+        """Return a deterministic start that exposes every required view.
+
+        ``view_present`` is an observation-level declaration.  A valid
+        observation can nevertheless contain a long quality-masked interval,
+        so its first randomly selected window need not contain usable samples
+        from every view.  Such an interval is not a model example.  We keep
+        the host/visit sampling decision unchanged and, only when its initial
+        start is ineligible, deterministically select another valid start in
+        the same chronological segment.
+        """
+
+        n_cadences = int(segment_indices.size)
+        if n_cadences == 0:
+            return None
+        required = np.asarray(variant_view_indices(self.config.variant), dtype=int)
+        valid = release.flux_valid[segment_indices][:, required]
+        if valid.shape != (n_cadences, required.size):  # defensive schema check
+            raise ValueError("FM0 release required-view mask has an invalid shape")
+
+        initial = deterministic_window_start(
+            n_cadences,
+            sample_index=sample_index,
+            epoch=self.epoch,
+            seed=self.config.seed,
+            window_length=self.config.window_length,
+        )
+        stop = min(n_cadences, initial + self.config.window_length)
+        if np.all(np.any(valid[initial:stop], axis=0)):
+            return initial
+
+        # A vectorized prefix sum finds every usable start without fabricating
+        # observations or changing cadence order.  This slower path is used
+        # only after the ordinary deterministic choice lands in an invalid
+        # quality-masked interval.
+        starts = np.arange(max(1, n_cadences - self.config.window_length + 1))
+        stops = np.minimum(starts + self.config.window_length, n_cadences)
+        cumulative = np.vstack(
+            [np.zeros((1, required.size), dtype=np.int64), np.cumsum(valid, axis=0)]
+        )
+        counts = cumulative[stops] - cumulative[starts]
+        eligible = starts[np.all(counts > 0, axis=1)]
+        if eligible.size == 0:
+            return None
+        offset = int(
+            _stable_seed(
+                "fm0-eligible-window",
+                self.config.seed,
+                self.epoch,
+                sample_index,
+            )
+            % eligible.size
+        )
+        return int(eligible[offset])
+
+    def _selection(
+        self, index: int
+    ) -> tuple[dict[str, str], ObservationRelease, np.ndarray, int]:
         rng = np.random.default_rng(
             _stable_seed("fm0-release-host-first", self.config.seed, self.epoch, index)
         )
         source = self._source_ids[int(rng.integers(0, len(self._source_ids)))]
         visits = self._visits[source]
-        row = visits[int(rng.integers(0, len(visits)))]
-        release = self._load_visit(row)
-        segment_ids = np.unique(release.segment_id)
-        if segment_ids.size == 0:
-            raise ValueError("FM0 release visit has no chronological segment")
-        segment_id = int(segment_ids[int(rng.integers(0, segment_ids.size))])
-        indices = np.flatnonzero(release.segment_id == segment_id)
-        if indices.size == 0 or np.any(np.diff(indices) != 1):
-            raise ValueError("FM0 release segment is empty or non-contiguous")
-        return row, release, indices
+        visit_offset = int(rng.integers(0, len(visits)))
+        # A whole visit may legitimately be quality-masked, even when its
+        # observation-level view flags are present.  Try every visit/segment
+        # of the selected host before failing; never quietly substitute an
+        # unrelated host, which would bias host-first sampling.
+        for visit_step in range(len(visits)):
+            row = visits[(visit_offset + visit_step) % len(visits)]
+            release = self._load_visit(row)
+            segment_ids = np.unique(release.segment_id)
+            if segment_ids.size == 0:
+                continue
+            segment_offset = int(rng.integers(0, segment_ids.size))
+            for segment_step in range(segment_ids.size):
+                segment_id = int(
+                    segment_ids[(segment_offset + segment_step) % segment_ids.size]
+                )
+                indices = np.flatnonzero(release.segment_id == segment_id)
+                if indices.size == 0 or np.any(np.diff(indices) != 1):
+                    raise ValueError("FM0 release segment is empty or non-contiguous")
+                start = self._window_start_if_eligible(
+                    release, indices, sample_index=index
+                )
+                if start is not None:
+                    return row, release, indices, start
+        raise ValueError(
+            "FM0 release source has no window with valid cadences for every "
+            f"required view: {source}"
+        )
 
     def sample(self, index: int, *, mask_view: int = 0) -> dict[str, np.ndarray]:
         if index < 0:
             index += len(self)
         if not 0 <= index < len(self):
             raise IndexError(index)
-        _row, release, segment_indices = self._selection(index)
-        start = deterministic_window_start(
-            int(segment_indices.size),
-            sample_index=index,
-            epoch=self.epoch,
-            seed=self.config.seed,
-            window_length=self.config.window_length,
-        )
+        _row, release, segment_indices, start = self._selection(index)
         selected = segment_indices[start : start + self.config.window_length]
         local_time = release.local_time_cadences[selected].astype(np.float32, copy=True)
         time_valid = release.time_valid[selected]
