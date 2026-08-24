@@ -1,0 +1,80 @@
+{
+  "claim_limit": "Evaluator-only sector authority; no model input, sealed metric, production use, or foundation-model claim.",
+  "construction": "per_sector_manifest_to_merged_manifest_one_to_one_join_v1",
+  "merge_summary": {
+    "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2/merge_summary.json",
+    "sha256": "ffb02bc308fd5be6931ce2fed3a54bc99936b85bf93c127aaba539121084bec6"
+  },
+  "merged_manifest": {
+    "n_observations": 342721,
+    "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2/manifest.csv",
+    "sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a"
+  },
+  "model_visible": false,
+  "output_authority": {
+    "path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/evaluations/observation_sector_authority_v1/observation_sector_authority.csv",
+    "sha256": "bdd3e8039b312aeb21557662226a8a11b761dd1da031742be42ee9b0d1c6edc5"
+  },
+  "output_columns": [
+    "observation_key",
+    "leakage_component_id",
+    "source_partition",
+    "sector"
+  ],
+  "output_rows": 308494,
+  "partition_counts": {
+    "poc_development": 34623,
+    "poc_sealed_test": 34227,
+    "poc_train": 273871
+  },
+  "passed": true,
+  "schema_version": "twirl_fm0_2_observation_sector_authority_receipt_v1",
+  "sealed_rows_emitted": 0,
+  "sector_manifests": {
+    "56": {
+      "n_observations": 31242,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0056/manifest.csv",
+      "sha256": "d6d7df2c12e42b9be38b66b5375bb434218c760f8d9af8063534568795e80827"
+    },
+    "57": {
+      "n_observations": 27043,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0057/manifest.csv",
+      "sha256": "a668697ca063b52ae0526a439a590e80be129dee4c4a29ddad88611b021c4cc1"
+    },
+    "58": {
+      "n_observations": 22974,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0058/manifest.csv",
+      "sha256": "aeb5650cdb65a41706fe32f50690aaf01b6465d840bc7f1917007a4c6b8a082e"
+    },
+    "59": {
+      "n_observations": 21924,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0059/manifest.csv",
+      "sha256": "aec578437e0447ada4f97c0b7ae8c94a5ac54b16428bf1370486c1f1c4509641"
+    },
+    "60": {
+      "n_observations": 26872,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0060/manifest.csv",
+      "sha256": "69dc8495d1439c06be73708afb8899b31de65c44496aeaabd00853b60f99fbf2"
+    },
+    "61": {
+      "n_observations": 40873,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0061/manifest.csv",
+      "sha256": "eb465a04987b34a018dbcb65d72e2d1135bd4336330e6f29132e88cff3c7fb89"
+    },
+    "62": {
+      "n_observations": 39669,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0062/manifest.csv",
+      "sha256": "917b82d416934f9b9736073b48cd8965ab64c913daf09f281f91d510affdf53c"
+    },
+    "63": {
+      "n_observations": 52875,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0063/manifest.csv",
+      "sha256": "6ac9d07d8735e7976d765069bdf68a4fe91428f6b16646d18991640982c49cca"
+    },
+    "64": {
+      "n_observations": 79249,
+      "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2/s0064/manifest.csv",
+      "sha256": "9cc6978491bca03d8fd9fc6519f5f5833d8d8de11bb657478725a474bf99d397"
+    }
+  }
+}

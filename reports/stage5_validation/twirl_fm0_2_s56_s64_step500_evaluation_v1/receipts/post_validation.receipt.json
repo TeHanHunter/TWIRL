@@ -1,0 +1,28 @@
+{
+  "admission_receipt_sha256": "21f751a39aabcd1464a493df7e30973504c262e3595fb0023691aa5532139f51",
+  "artifacts_sha256": {
+    "checkpoint.pt": "f7dfa247ca524fe0695f3c5aebceb31347a657133f4c324bda799f5fafe1051b",
+    "checkpoint_step_00000000.pt": "92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c",
+    "checkpoint_step_00000064.pt": "34438f30c0aed96c3873d75adab08f3384b70bae89f00aee4d5c3f936733ba5e",
+    "checkpoint_step_00000500.pt": "529a17772e0734c44ec6e50c7e4ec5ca338170c1878326afc054dc0f92fb18dd",
+    "run_contract.json": "58159980fe1e644b0a9c86e4c9459f927a0ca81920cc74db367d8bea920f5f02",
+    "summary.json": "a9938923c2f64429c19ee4381f66088736455054295bf34102b8f3ea053d2fba"
+  },
+  "created_at_utc": "2026-08-24T20:48:16.573713+00:00",
+  "foundation_model_claim_authorized": false,
+  "independent_run_validation_sha256": "006a6519313e977617dfc8c700bd929b1dd2f9455d6ae2fa337a2e951c1cf18b",
+  "input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7",
+  "input_reuse_receipt_sha256": "46faed954e6758dfea71f7754670611fab03af63613dad3be433af71dd38e641",
+  "passed": true,
+  "production_authorized": false,
+  "run_contract_target_step": 20000,
+  "run_git_sha": "ddf442aafb8f62966e549e2287abad3474dd556a",
+  "run_kind": "real_canary",
+  "schema_version": "twirl_fm0_2_milestone_post_validation_v1",
+  "scientific_result": false,
+  "sealed_test_access_count": 0,
+  "seed": 560067,
+  "stop_after_step": 500,
+  "validator_git_sha": "ddf442aafb8f62966e549e2287abad3474dd556a",
+  "variant": "TWIRL-FM0.2.1"
+}

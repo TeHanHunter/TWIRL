@@ -1,0 +1,103 @@
+Mon Aug 24 11:24:42 2026
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 590.48.01              Driver Version: 590.48.01      CUDA Version: 13.1     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H200                    On  |   00000000:9B:00.0 Off |                    0 |
+| N/A   37C    P0             77W /  700W |       0MiB / 143771MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+2.11.0+cu128 NVIDIA H200
+[fm0-train] step=70/500 loss=0.012260797 lr=2.13e-05 elapsed_s=28.6
+[fm0-train] step=80/500 loss=0.011665104 lr=2.43e-05 elapsed_s=81.8
+[fm0-train] step=90/500 loss=0.011466775 lr=2.73e-05 elapsed_s=136.3
+[fm0-train] step=100/500 loss=0.01127939 lr=3.03e-05 elapsed_s=191.8
+[fm0-train] step=110/500 loss=0.010761733 lr=3.33e-05 elapsed_s=246.3
+[fm0-train] step=120/500 loss=0.011278678 lr=3.63e-05 elapsed_s=292.9
+[fm0-train] step=130/500 loss=0.010505621 lr=3.93e-05 elapsed_s=342.5
+[fm0-train] step=140/500 loss=0.010354272 lr=4.23e-05 elapsed_s=389.8
+[fm0-train] step=150/500 loss=0.010249697 lr=4.53e-05 elapsed_s=438.0
+[fm0-train] step=160/500 loss=0.010344297 lr=4.83e-05 elapsed_s=490.9
+[fm0-train] step=170/500 loss=0.0096360376 lr=5.13e-05 elapsed_s=544.6
+[fm0-train] step=180/500 loss=0.010059212 lr=5.43e-05 elapsed_s=600.3
+[fm0-train] step=190/500 loss=0.010058496 lr=5.73e-05 elapsed_s=647.8
+[fm0-train] step=200/500 loss=0.010189817 lr=6.03e-05 elapsed_s=694.1
+[fm0-train] step=210/500 loss=0.010034824 lr=6.33e-05 elapsed_s=741.4
+[fm0-train] step=220/500 loss=0.0098051756 lr=6.63e-05 elapsed_s=786.8
+[fm0-train] step=230/500 loss=0.0096393257 lr=6.93e-05 elapsed_s=836.1
+[fm0-train] step=240/500 loss=0.0093016582 lr=7.23e-05 elapsed_s=890.0
+[fm0-train] step=250/500 loss=0.009260931 lr=7.53e-05 elapsed_s=943.8
+[fm0-train] step=260/500 loss=0.0091355954 lr=7.83e-05 elapsed_s=1000.1
+[fm0-train] step=270/500 loss=0.0090799109 lr=8.13e-05 elapsed_s=1045.4
+[fm0-train] step=280/500 loss=0.0090476549 lr=8.43e-05 elapsed_s=1090.0
+[fm0-train] step=290/500 loss=0.0088828315 lr=8.73e-05 elapsed_s=1135.9
+[fm0-train] step=300/500 loss=0.0089321603 lr=9.03e-05 elapsed_s=1182.8
+[fm0-train] step=310/500 loss=0.00892178 lr=9.33e-05 elapsed_s=1231.7
+[fm0-train] step=320/500 loss=0.008927271 lr=9.63e-05 elapsed_s=1284.0
+[fm0-train] step=330/500 loss=0.0084574631 lr=9.93e-05 elapsed_s=1339.9
+[fm0-train] step=340/500 loss=0.0088076338 lr=0.0001023 elapsed_s=1390.3
+[fm0-train] step=350/500 loss=0.0087689118 lr=0.0001053 elapsed_s=1435.5
+[fm0-train] step=360/500 loss=0.0083761321 lr=0.0001083 elapsed_s=1479.9
+[fm0-train] step=370/500 loss=0.008693254 lr=0.0001113 elapsed_s=1522.9
+[fm0-train] step=380/500 loss=0.0089212601 lr=0.0001143 elapsed_s=1569.6
+[fm0-train] step=390/500 loss=0.0087668325 lr=0.0001173 elapsed_s=1617.8
+[fm0-train] step=400/500 loss=0.0085635764 lr=0.0001203 elapsed_s=1672.9
+[fm0-train] step=410/500 loss=0.008926284 lr=0.0001233 elapsed_s=1725.2
+[fm0-train] step=420/500 loss=0.0088730304 lr=0.0001263 elapsed_s=1774.6
+[fm0-train] step=430/500 loss=0.0087760359 lr=0.0001293 elapsed_s=1822.7
+[fm0-train] step=440/500 loss=0.0086546274 lr=0.0001323 elapsed_s=1876.5
+[fm0-train] step=450/500 loss=0.0085220951 lr=0.0001353 elapsed_s=1950.2
+[fm0-train] step=460/500 loss=0.0081934357 lr=0.0001383 elapsed_s=2050.7
+[fm0-train] step=470/500 loss=0.0086978459 lr=0.0001413 elapsed_s=2109.8
+[fm0-train] step=480/500 loss=0.0082504176 lr=0.0001443 elapsed_s=2169.8
+[fm0-train] step=490/500 loss=0.0083985477 lr=0.0001473 elapsed_s=2230.1
+[fm0-train] step=500/500 loss=0.0086042174 lr=0.0001503 elapsed_s=2280.8
+{
+  "architecture": "tcn",
+  "artifact_sha256": {
+    "checkpoint.pt": "f7dfa247ca524fe0695f3c5aebceb31347a657133f4c324bda799f5fafe1051b",
+    "run_contract.json": "58159980fe1e644b0a9c86e4c9459f927a0ca81920cc74db367d8bea920f5f02",
+    "summary.json": "a9938923c2f64429c19ee4381f66088736455054295bf34102b8f3ea053d2fba"
+  },
+  "checkpoint_inspected": true,
+  "checkpoint_tensor_count": 754,
+  "global_step": 500,
+  "immutable_milestone_checkpoints": [
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000000.pt",
+      "sha256": "92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000000.pt.sha256",
+      "step": 0
+    },
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000064.pt",
+      "sha256": "34438f30c0aed96c3873d75adab08f3384b70bae89f00aee4d5c3f936733ba5e",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000064.pt.sha256",
+      "step": 64
+    },
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000500.pt",
+      "sha256": "529a17772e0734c44ec6e50c7e4ec5ca338170c1878326afc054dc0f92fb18dd",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000500.pt.sha256",
+      "step": 500
+    }
+  ],
+  "passed": true,
+  "real_data_consumed": true,
+  "run_dir": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067",
+  "schema_version": "twirl_fm0_1_real_run_validation_v1",
+  "synthetic_only": false,
+  "variant": "TWIRL-FM0.2.1"
+}
+[fm0.2-canary] complete=/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/invocations/step_00000500.receipt.json; stopped_at=500; no sealed access or model claim

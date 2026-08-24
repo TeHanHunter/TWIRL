@@ -1,0 +1,55 @@
+{
+  "architecture": "tcn",
+  "checkpoint_sha256": "f7dfa247ca524fe0695f3c5aebceb31347a657133f4c324bda799f5fafe1051b",
+  "device": "cuda",
+  "elapsed_seconds_this_invocation": 2281.982921889052,
+  "final_metrics": {
+    "embedding_projection_gradient_norm": 0.0005838532233610749,
+    "learning_rate": 0.0001503,
+    "masked_views_seen": 64000.0,
+    "reconstruction": 0.005053595639765263,
+    "reconstruction_first": 0.005053595639765263,
+    "reconstruction_mean": 0.005075505934655666,
+    "reconstruction_second": 0.005097416287753731,
+    "step": 500.0,
+    "total": 0.008604217435419559,
+    "vicreg": 17.753108978271484,
+    "vicreg_covariance": 2.4060046672821045,
+    "vicreg_invariance": 0.0008392261806875467,
+    "vicreg_variance": 0.6130449771881104,
+    "vicreg_weighted": 0.003550621795654297,
+    "window_draws_seen": 32000.0
+  },
+  "global_step": 500,
+  "immutable_milestone_checkpoints": [
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000000.pt",
+      "sha256": "92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000000.pt.sha256",
+      "step": 0
+    },
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000064.pt",
+      "sha256": "34438f30c0aed96c3873d75adab08f3384b70bae89f00aee4d5c3f936733ba5e",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000064.pt.sha256",
+      "step": 64
+    },
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000500.pt",
+      "sha256": "529a17772e0734c44ec6e50c7e4ec5ca338170c1878326afc054dc0f92fb18dd",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000500.pt.sha256",
+      "step": 500
+    }
+  ],
+  "objective": "masked_reconstruction_plus_same_window_vicreg",
+  "parameter_count": 8825602,
+  "passed": true,
+  "precision": "bf16",
+  "real_data_consumed": true,
+  "requested_stop_after_step": 500,
+  "run_contract_sha256": "58159980fe1e644b0a9c86e4c9459f927a0ca81920cc74db367d8bea920f5f02",
+  "schema_version": "twirl_fm0_1_real_run_summary_v1",
+  "scientific_result": false,
+  "synthetic_only": false,
+  "variant": "TWIRL-FM0.2.1"
+}

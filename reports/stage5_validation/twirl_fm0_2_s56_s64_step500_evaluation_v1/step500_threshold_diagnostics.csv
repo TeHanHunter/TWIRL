@@ -1,0 +1,7 @@
+quantity,step_500_value,future_step_2000_rule,would_meet_threshold_now,formal_gate_applied
+z_window_effective_rank,6.446815204262647,>= 26,False,False
+z_window_zero_or_constant_dimensions,0,<= 0,True,False
+z_window_paired_minus_unrelated_ci_lower,0.0150441566627786,> 0,True,False
+z_window_trained_minus_random_ci_lower,-0.006449904036251338,> 0,False,False
+development_masked_huber,0.004888106603175402,<= 0.004864579067,False,False
+sealed_test_access_count,0,== 0,True,False
