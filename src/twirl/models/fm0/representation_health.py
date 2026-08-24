@@ -346,7 +346,7 @@ def _eligible_model_window_spec(
                 _stable_seed(
                     "fm0-representation-eligible-window",
                     observation_key,
-                    variant,
+                    tuple(int(value) for value in required),
                     segment_id,
                 )
                 % eligible.size
@@ -420,6 +420,7 @@ def _encode(
         raise ValueError("batch_size must be positive")
     embeddings: list[np.ndarray] = []
     losses: list[np.ndarray] = []
+    baseline_losses: list[np.ndarray] = []
     model.eval()
     with torch.no_grad():
         for start in range(0, len(samples), batch_size):
@@ -440,18 +441,44 @@ def _encode(
                     delta=float(huber_delta),
                     reduction="none",
                 )
-                for item, item_mask in zip(loss, mask):
+                baseline_loss = functional.huber_loss(
+                    torch.zeros_like(output["reconstruction"]),
+                    batch["flux"],
+                    delta=float(huber_delta),
+                    reduction="none",
+                )
+                for item, baseline_item, item_mask in zip(loss, baseline_loss, mask):
                     valid = item[item_mask]
                     if valid.numel():
                         losses.append(valid.detach().cpu().numpy())
+                        baseline_losses.append(
+                            baseline_item[item_mask].detach().cpu().numpy()
+                        )
     merged = np.concatenate(embeddings, axis=0)
     if not with_reconstruction:
         return merged, None
     all_losses = np.concatenate(losses) if losses else np.empty(0, dtype=np.float32)
+    all_baseline_losses = (
+        np.concatenate(baseline_losses)
+        if baseline_losses
+        else np.empty(0, dtype=np.float32)
+    )
+    model_mean = _finite_float(np.mean(all_losses)) if all_losses.size else None
+    baseline_mean = (
+        _finite_float(np.mean(all_baseline_losses))
+        if all_baseline_losses.size
+        else None
+    )
     return merged, {
         "masked_valid_target_count": int(all_losses.size),
-        "masked_huber_mean": (
-            _finite_float(np.mean(all_losses)) if all_losses.size else None
+        "masked_huber_mean": model_mean,
+        "zero_prediction_masked_huber_mean": baseline_mean,
+        "model_to_zero_baseline_ratio": (
+            _finite_float(float(model_mean) / float(baseline_mean))
+            if model_mean is not None
+            and baseline_mean is not None
+            and baseline_mean > 0.0
+            else None
         ),
     }
 
@@ -598,6 +625,12 @@ def evaluate_representation_health(
         huber_delta=huber_delta,
     )
     component_ids = [row["leakage_component_id"] for row in rows]
+    selected_component_sha256 = hashlib.sha256(
+        "\n".join(sorted(by_component)).encode("utf-8")
+    ).hexdigest()
+    selected_observation_sha256 = hashlib.sha256(
+        "\n".join(sorted(row["observation_key"] for row in rows)).encode("utf-8")
+    ).hexdigest()
     return {
         "schema_version": REPRESENTATION_HEALTH_SCHEMA_VERSION,
         "passed": True,
@@ -617,6 +650,8 @@ def evaluate_representation_health(
             "source_partition": "poc_development",
             "selected_leakage_components": int(len(by_component)),
             "selected_observation_visits": int(len(rows)),
+            "selected_leakage_components_sha256": selected_component_sha256,
+            "selected_observation_keys_sha256": selected_observation_sha256,
             "selection": "stable SHA-256 ordering of leakage components",
             "one_deterministic_window_per_selected_visit": True,
             "quality_mask_fallback": (

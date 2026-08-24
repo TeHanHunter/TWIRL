@@ -94,3 +94,9 @@ def test_representation_window_retains_visit_after_masked_interval() -> None:
     assert np.all(
         np.any(release.flux_valid[selected.start_offset:selected_stop, (2, 3)], axis=0)
     )
+    conformer_selected = _eligible_model_window_spec(
+        release,
+        observation_key="masked-development-visit",
+        variant="TWIRL-FM0.1.2",
+    )
+    assert conformer_selected == selected
