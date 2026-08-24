@@ -135,7 +135,7 @@ make_admission_and_submit() {
     echo "+ publish a <=300-second receipt and immediately submit one H200 ${kind} job"
     return
   fi
-  capture "set -euo pipefail; ${verify_remote_repo}; [[ \$(sha256sum '${TWIRL_FM0_LOADER_RESTART_RECEIPT}' | awk '{print \$1}') == '${TWIRL_FM0_LOADER_RESTART_RECEIPT_SHA256}' ]]; '${ENV_PREFIX}/bin/python' -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p[\"schema_version\"]==\"twirl_fm0_2_loader_restart_receipt_v1\" and p[\"passed\"] is True and p[\"expected_git_sha\"]==sys.argv[2] and p[\"sealed_test_access_count\"]==0 and p[\"gpu_requested\"] is False' '${TWIRL_FM0_LOADER_RESTART_RECEIPT}' '${EXPECTED_SHA}'" >/dev/null
+  capture "set -euo pipefail; ${verify_remote_repo} [[ \$(sha256sum '${TWIRL_FM0_LOADER_RESTART_RECEIPT}' | awk '{print \$1}') == '${TWIRL_FM0_LOADER_RESTART_RECEIPT_SHA256}' ]]; '${ENV_PREFIX}/bin/python' -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p[\"schema_version\"]==\"twirl_fm0_2_loader_restart_receipt_v1\" and p[\"passed\"] is True and p[\"expected_git_sha\"]==sys.argv[2] and p[\"sealed_test_access_count\"]==0 and p[\"gpu_requested\"] is False' '${TWIRL_FM0_LOADER_RESTART_RECEIPT}' '${EXPECTED_SHA}'" >/dev/null
 
   local tmp remote_epoch local_epoch skew admission admission_sha record
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/twirl-fm0-2-admission.XXXXXX")
@@ -178,7 +178,7 @@ case "${ACTION}" in
     ;;
   deploy)
     require_socket
-    remote "set -euo pipefail; test -d '${REMOTE_SOURCE}/.git'; git -C '${REMOTE_SOURCE}' cat-file -e '${EXPECTED_SHA}^{commit}'; if [[ -e '${REMOTE_REPO}' ]]; then [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]; else git -C '${REMOTE_SOURCE}' worktree add --detach '${REMOTE_REPO}' '${EXPECTED_SHA}'; fi; if git -C '${REMOTE_REPO}' sparse-checkout list >/dev/null 2>&1; then git -C '${REMOTE_REPO}' sparse-checkout add reports/stage5_validation/twirl_fm0_2_design_freeze_v1 reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1; fi; ${verify_remote_repo}; git -C '${REMOTE_REPO}' rev-parse HEAD"
+    remote "set -euo pipefail; test -d '${REMOTE_SOURCE}/.git'; git -C '${REMOTE_SOURCE}' cat-file -e '${EXPECTED_SHA}^{commit}'; if [[ -e '${REMOTE_REPO}' ]]; then [[ \$(git -C '${REMOTE_REPO}' rev-parse HEAD) == '${EXPECTED_SHA}' ]]; else git -C '${REMOTE_SOURCE}' worktree add --detach '${REMOTE_REPO}' '${EXPECTED_SHA}'; fi; if git -C '${REMOTE_REPO}' sparse-checkout list >/dev/null 2>&1; then git -C '${REMOTE_REPO}' sparse-checkout add reports/stage5_validation/twirl_fm0_2_design_freeze_v1 reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1; fi; ${verify_remote_repo} git -C '${REMOTE_REPO}' rev-parse HEAD"
     ;;
   submit-loader-restart)
     require_socket
