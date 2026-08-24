@@ -17,6 +17,8 @@ readonly PROJECT_ROOT="/orcd/data/mki_aryeh/001/twirl"
 : "${TWIRL_ORCD_REPO:?missing detached repository}"
 : "${TWIRL_EXPECTED_GIT_SHA:?missing exact evaluator SHA}"
 : "${TWIRL_FM0_RUN_ROOT:?missing run root}"
+: "${TWIRL_FM0_ARTIFACT_GIT_SHA:?missing exact training-artifact SHA}"
+: "${TWIRL_FM0_ARTIFACT_RUN_ROOT:?missing training-artifact run root}"
 : "${TWIRL_FM0_TRAIN_OUTPUT:?missing exact real training output}"
 : "${TWIRL_FM0_INPUT_RECEIPT:?missing exact input receipt}"
 : "${TWIRL_FM0_INPUT_RECEIPT_SHA256:?missing input receipt hash}"
@@ -24,6 +26,7 @@ readonly PROJECT_ROOT="/orcd/data/mki_aryeh/001/twirl"
 : "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256:?missing post-validation receipt hash}"
 readonly REPO="$(realpath -m -- "${TWIRL_ORCD_REPO}")"
 readonly RUN_ROOT="$(realpath -m -- "${TWIRL_FM0_RUN_ROOT}")"
+readonly ARTIFACT_RUN_ROOT="$(realpath -m -- "${TWIRL_FM0_ARTIFACT_RUN_ROOT}")"
 readonly TRAIN="$(realpath -m -- "${TWIRL_FM0_TRAIN_OUTPUT}")"
 readonly INPUT_RECEIPT="$(realpath -m -- "${TWIRL_FM0_INPUT_RECEIPT}")"
 readonly POST_VALIDATION="$(realpath -m -- "${TWIRL_FM0_REAL_POST_VALIDATION}")"
@@ -31,14 +34,15 @@ readonly PYTHON="${PROJECT_ROOT}/envs/twirl-fm0-poc-py3119-torch2110-cu128-v1/bi
 readonly OUT="${RUN_ROOT}/evaluations/representation_health-$(basename "${TRAIN}").json"
 die() { echo "[fm0-representation-health] ERROR: $*" >&2; exit 2; }
 for path in "${TRAIN}" "${INPUT_RECEIPT}" "${POST_VALIDATION}"; do
-  [[ "${path}" == "${RUN_ROOT}"/* ]] || die "authority path escapes run root: ${path}"
+  [[ "${path}" == "${ARTIFACT_RUN_ROOT}"/* ]] || die "authority path escapes artifact run root: ${path}"
 done
-[[ "${TWIRL_EXPECTED_GIT_SHA}" =~ ^[0-9a-f]{40}$ && "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" =~ ^[0-9a-f]{64}$ && "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "invalid hash"
+[[ "${TWIRL_EXPECTED_GIT_SHA}" =~ ^[0-9a-f]{40}$ && "${TWIRL_FM0_ARTIFACT_GIT_SHA}" =~ ^[0-9a-f]{40}$ && "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" =~ ^[0-9a-f]{64}$ && "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "invalid hash"
+[[ "${ARTIFACT_RUN_ROOT}" == "${PROJECT_ROOT}/reports/stage5_validation/twirl_fm0_1_s56_s67_poc/${TWIRL_FM0_ARTIFACT_GIT_SHA:0:12}" ]] || die "artifact run root does not match training revision"
 [[ "$(git -C "${REPO}" rev-parse HEAD)" == "${TWIRL_EXPECTED_GIT_SHA}" && -z "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]] || die "repository is not exact and clean"
 [[ "$(sha256sum "${INPUT_RECEIPT}" | awk '{print $1}')" == "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" ]] || die "input receipt drift"
 [[ "$(sha256sum "${POST_VALIDATION}" | awk '{print $1}')" == "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}" ]] || die "post-validation receipt drift"
 [[ ! -e "${OUT}" ]] || die "refusing to overwrite representation-health output"
-"${PYTHON}" - "${POST_VALIDATION}" "${TRAIN}" "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" <<'PY'
+"${PYTHON}" - "${POST_VALIDATION}" "${TRAIN}" "${TWIRL_FM0_INPUT_RECEIPT_SHA256}" "${TWIRL_FM0_ARTIFACT_GIT_SHA}" <<'PY'
 import json, sys
 from pathlib import Path
 post_path = Path(sys.argv[1])
@@ -49,11 +53,15 @@ if post.get("schema_version") != "twirl_fm0_1_orcd_real_post_validation_v1" or p
     raise SystemExit("post-validation receipt did not pass")
 if post.get("input_receipt_sha256") != input_sha:
     raise SystemExit("post-validation input binding drift")
+if post.get("run_git_sha") != sys.argv[4]:
+    raise SystemExit("post-validation training revision drift")
 contract = json.loads((train_path / "run_contract.json").read_text())
 if contract.get("input_release", {}).get("receipt_sha256") != input_sha:
     raise SystemExit("training input binding drift")
 if contract.get("synthetic_smoke") or contract.get("real_data_consumed") is not True:
     raise SystemExit("representation health requires a real-data run")
+if contract.get("expected_git_sha") != sys.argv[4]:
+    raise SystemExit("training contract revision drift")
 PY
 mkdir -p "$(dirname "${OUT}")"
 cd "${REPO}"

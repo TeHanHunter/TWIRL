@@ -23,9 +23,12 @@ from .dataset import (
     collate_fm0_samples,
     move_batch_to_device,
     prepare_model_window,
+    variant_view_indices,
 )
 from .input_release import (
     MANIFEST_COLUMNS,
+    ObservationRelease,
+    WindowSpec,
     deterministic_training_window,
     extract_window,
     load_input_release,
@@ -290,6 +293,78 @@ def _read_development_rows(
     return result
 
 
+def _eligible_model_window_spec(
+    release: ObservationRelease,
+    *,
+    observation_key: str,
+    variant: str,
+) -> WindowSpec:
+    """Return a deterministic window containing every required flux view.
+
+    The ordinary data-independent window remains the first choice.  A valid
+    visit can, however, contain a quality-masked interval longer than one
+    2,048-cadence window.  If the ordinary choice lands entirely inside such
+    an interval, search only within the same visit and select a deterministic
+    eligible start.  This preserves the frozen component/visit selection and
+    never substitutes a more convenient source.
+    """
+
+    initial = deterministic_training_window(
+        release,
+        observation_key=observation_key,
+        epoch=0,
+        draw_index=0,
+    )
+    required = np.asarray(variant_view_indices(variant), dtype=int)
+    segments = tuple(int(value) for value in np.unique(release.segment_id))
+    ordered_segments = (initial.segment_id,) + tuple(
+        value for value in segments if value != initial.segment_id
+    )
+    for segment_id in ordered_segments:
+        indices = np.flatnonzero(release.segment_id == segment_id)
+        if indices.size == 0 or np.any(np.diff(indices) != 1):
+            raise ValueError("FM0 release segment is empty or non-contiguous")
+        valid = (
+            release.time_valid[indices, None]
+            & release.flux_valid[indices][:, required]
+        )
+        initial_start = initial.start_offset if segment_id == initial.segment_id else None
+        if initial_start is not None:
+            initial_stop = min(indices.size, initial_start + WINDOW_LENGTH)
+            if np.all(np.any(valid[initial_start:initial_stop], axis=0)):
+                return initial
+
+        starts = np.arange(max(1, indices.size - WINDOW_LENGTH + 1))
+        stops = np.minimum(starts + WINDOW_LENGTH, indices.size)
+        cumulative = np.vstack(
+            [np.zeros((1, required.size), dtype=np.int64), np.cumsum(valid, axis=0)]
+        )
+        counts = cumulative[stops] - cumulative[starts]
+        eligible = starts[np.all(counts > 0, axis=1)]
+        if eligible.size:
+            offset = int(
+                _stable_seed(
+                    "fm0-representation-eligible-window",
+                    observation_key,
+                    variant,
+                    segment_id,
+                )
+                % eligible.size
+            )
+            start = int(eligible[offset])
+            observed = min(WINDOW_LENGTH, int(indices.size) - start)
+            return WindowSpec(
+                segment_id=segment_id,
+                start_offset=start,
+                n_observed=observed,
+                n_padded=WINDOW_LENGTH - observed,
+            )
+    raise ValueError(
+        "FM0 development visit has no window with valid cadences for every "
+        f"required view: {observation_key}"
+    )
+
+
 def _model_window(
     *,
     release_root: Path,
@@ -305,11 +380,10 @@ def _model_window(
     if release_root not in shard.parents or sha256_file(shard) != row["sha256"]:
         raise ValueError("release shard is unavailable or differs from its manifest")
     release = load_input_release(shard)
-    spec = deterministic_training_window(
+    spec = _eligible_model_window_spec(
         release,
         observation_key=row["observation_key"],
-        epoch=0,
-        draw_index=0,
+        variant=variant,
     )
     window = extract_window(
         release, segment_id=spec.segment_id, start_offset=spec.start_offset
@@ -535,6 +609,7 @@ def evaluate_representation_health(
             "run_dir": str(root),
             "variant": variant,
             "architecture": contract.get("architecture"),
+            "run_git_sha": contract.get("expected_git_sha"),
             "global_step": int(run_validation["global_step"]),
             "checkpoint_sha256": run_validation["artifact_sha256"]["checkpoint.pt"],
         },
@@ -544,6 +619,10 @@ def evaluate_representation_health(
             "selected_observation_visits": int(len(rows)),
             "selection": "stable SHA-256 ordering of leakage components",
             "one_deterministic_window_per_selected_visit": True,
+            "quality_mask_fallback": (
+                "retain the selected visit and deterministically choose an eligible "
+                "window only when the ordinary window has no required-view cadences"
+            ),
             "model_visible_identifiers": False,
         },
         "masked_reconstruction": reconstruction,

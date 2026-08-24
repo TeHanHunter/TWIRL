@@ -236,6 +236,10 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "--batch-size 8" in health
     assert "twirl_fm0_1_orcd_real_post_validation_v1" in health
     assert "poc_development" not in health
+    assert "TWIRL_FM0_ARTIFACT_GIT_SHA" in health
+    assert "TWIRL_FM0_ARTIFACT_RUN_ROOT" in health
+    assert 'post.get("run_git_sha") != sys.argv[4]' in health
+    assert 'contract.get("expected_git_sha") != sys.argv[4]' in health
 
     controller = text("run_twirl_fm0_1_poc_orcd.sh")
     sector_stage = text("slurm_twirl_fm0_1_sector_stage_cpu.sbatch")
@@ -251,6 +255,8 @@ def test_slurm_wrappers_enforce_cpu_gpu_separation_and_claim_limit() -> None:
     assert "submit-representation-health)" in controller
     assert "real_post_validation_binding" in controller
     assert "slurm_twirl_fm0_1_representation_health_cpu.sbatch" in controller
+    assert 'artifact_git_sha="${TWIRL_FM0_ARTIFACT_GIT_SHA:-${EXPECTED_SHA}}"' in controller
+    assert "TWIRL_FM0_ARTIFACT_RUN_ROOT=${artifact_run_root}" in controller
     merge = text("slurm_twirl_fm0_1_sector_merge_cpu.sbatch")
     assert "submit-sector-merge)" in controller
     assert "slurm_twirl_fm0_1_sector_merge_cpu.sbatch" in controller

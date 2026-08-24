@@ -47,6 +47,7 @@ def main() -> int:
         batch_size=args.batch_size,
         random_control_seed=args.random_control_seed,
     )
+    payload["evaluator_git_sha"] = args.expected_git_sha
     write_json_with_sha256(args.output, payload)
     os.chmod(args.output, 0o444)
     os.chmod(args.output.with_name(args.output.name + ".sha256"), 0o444)

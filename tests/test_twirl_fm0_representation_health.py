@@ -3,10 +3,15 @@ from __future__ import annotations
 import numpy as np
 
 from twirl.models.fm0.representation_health import (
+    _eligible_model_window_spec,
     paired_similarity_summary,
     same_component_retrieval_summary,
     source_clustered_mean_interval,
     summarize_embedding_matrix,
+)
+from twirl.models.fm0.input_release import (
+    ObservationRelease,
+    deterministic_training_window,
 )
 
 
@@ -51,3 +56,41 @@ def test_source_clustered_interval_uses_components_not_raw_row_count() -> None:
     )
     assert interval["n_source_clusters"] == 2
     assert interval["mean"] == 0.5
+
+
+def test_representation_window_retains_visit_after_masked_interval() -> None:
+    n_cadences = 5_000
+    release = ObservationRelease(
+        flux=np.zeros((n_cadences, 6), dtype=np.float32),
+        flux_valid=np.ones((n_cadences, 6), dtype=bool),
+        flux_error=np.ones((n_cadences, 2), dtype=np.float32),
+        error_valid=np.ones((n_cadences, 2), dtype=bool),
+        local_time_cadences=np.arange(n_cadences, dtype=np.float32),
+        delta_time_cadences=np.r_[
+            np.float32(0), np.ones(n_cadences - 1, dtype=np.float32)
+        ],
+        time_valid=np.ones(n_cadences, dtype=bool),
+        segment_boundary=np.r_[True, np.zeros(n_cadences - 1, dtype=bool)],
+        segment_id=np.zeros(n_cadences, dtype=np.int32),
+        view_present=np.ones(6, dtype=bool),
+    )
+    initial = deterministic_training_window(
+        release,
+        observation_key="masked-development-visit",
+        epoch=0,
+        draw_index=0,
+    )
+    initial_stop = initial.start_offset + initial.n_observed
+    release.flux_valid[initial.start_offset:initial_stop, (2, 3)] = False
+
+    selected = _eligible_model_window_spec(
+        release,
+        observation_key="masked-development-visit",
+        variant="TWIRL-FM0.1.1",
+    )
+
+    assert selected.start_offset != initial.start_offset
+    selected_stop = selected.start_offset + selected.n_observed
+    assert np.all(
+        np.any(release.flux_valid[selected.start_offset:selected_stop, (2, 3)], axis=0)
+    )

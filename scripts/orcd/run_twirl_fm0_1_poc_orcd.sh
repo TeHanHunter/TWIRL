@@ -106,7 +106,9 @@ Additional bindings:
                                TWIRL_FM0_RUN_GIT_SHA,
                                TWIRL_FM0_ADMISSION_RECEIPT[_SHA256]
   submit-representation-health: TWIRL_FM0_TRAIN_OUTPUT,
-                                TWIRL_FM0_REAL_POST_VALIDATION[_SHA256]
+                                TWIRL_FM0_REAL_POST_VALIDATION[_SHA256], and
+                                optional TWIRL_FM0_ARTIFACT_GIT_SHA when a
+                                newer exact evaluator audits an older run
 EOF
 }
 
@@ -574,12 +576,22 @@ case "${ACTION}" in
     ;;
   submit-representation-health)
     : "${TWIRL_FM0_TRAIN_OUTPUT:?set exact real training output}"
-    input_binding; real_post_validation_binding
-    safe_remote_path "${TWIRL_FM0_TRAIN_OUTPUT}" && [[ "${TWIRL_FM0_TRAIN_OUTPUT}" == "${RUN_ROOT}"/* ]] || { echo "Unsafe real training path." >&2; exit 2; }
+    : "${TWIRL_FM0_INPUT_RECEIPT:?set exact immutable input receipt}"
+    : "${TWIRL_FM0_INPUT_RECEIPT_SHA256:?set exact input receipt SHA256}"
+    : "${TWIRL_FM0_REAL_POST_VALIDATION:?set immutable real post-validation receipt}"
+    : "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256:?set real post-validation receipt SHA256}"
+    artifact_git_sha="${TWIRL_FM0_ARTIFACT_GIT_SHA:-${EXPECTED_SHA}}"
+    require_hash 40 "${artifact_git_sha}"
+    artifact_run_root="${PROJECT_ROOT}/reports/stage5_validation/twirl_fm0_1_s56_s67_poc/${artifact_git_sha:0:12}"
+    for path in "${TWIRL_FM0_TRAIN_OUTPUT}" "${TWIRL_FM0_INPUT_RECEIPT}" "${TWIRL_FM0_REAL_POST_VALIDATION}"; do
+      safe_remote_path "${path}" && [[ "${path}" == "${artifact_run_root}"/* ]] || { echo "Unsafe representation-health artifact path." >&2; exit 2; }
+    done
+    require_hash 64 "${TWIRL_FM0_INPUT_RECEIPT_SHA256}"
+    require_hash 64 "${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}"
     require_socket
     health_name=$(basename "${TWIRL_FM0_TRAIN_OUTPUT}")
     [[ "${health_name}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "Unsafe representation-health name." >&2; exit 2; }
-    submit_once "${LAUNCH_DIR}/representation-health-${health_name}.job" "twirl-fm0-rep-health" "scripts/orcd/slurm_twirl_fm0_1_representation_health_cpu.sbatch" "$(base_export),TWIRL_FM0_TRAIN_OUTPUT=${TWIRL_FM0_TRAIN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_REAL_POST_VALIDATION=${TWIRL_FM0_REAL_POST_VALIDATION},TWIRL_FM0_REAL_POST_VALIDATION_SHA256=${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
+    submit_once "${LAUNCH_DIR}/representation-health-${artifact_git_sha:0:12}-${health_name}.job" "twirl-fm0-rep-health" "scripts/orcd/slurm_twirl_fm0_1_representation_health_cpu.sbatch" "$(base_export),TWIRL_FM0_ARTIFACT_GIT_SHA=${artifact_git_sha},TWIRL_FM0_ARTIFACT_RUN_ROOT=${artifact_run_root},TWIRL_FM0_TRAIN_OUTPUT=${TWIRL_FM0_TRAIN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${TWIRL_FM0_INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${TWIRL_FM0_INPUT_RECEIPT_SHA256},TWIRL_FM0_REAL_POST_VALIDATION=${TWIRL_FM0_REAL_POST_VALIDATION},TWIRL_FM0_REAL_POST_VALIDATION_SHA256=${TWIRL_FM0_REAL_POST_VALIDATION_SHA256}" "${TWIRL_FM0_AFTEROK_JOB_ID:-}"
     ;;
   status)
     require_socket
