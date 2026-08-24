@@ -555,7 +555,10 @@ def test_checkpoint_resume_rejects_schedule_optimizer_and_dataset_drift(
 
     drifted_contract = dict(contract)
     drifted_contract["immutable_milestone_steps"] = [0, 1, 3]
-    with pytest.raises(ValueError, match="run contract mismatch"):
+    with pytest.raises(
+        ValueError,
+        match="immutable milestone schedule exceeds optimizer horizon",
+    ):
         run_synthetic_training(
             model=_tiny_model(),
             dataset=SyntheticFM0Dataset(dataset_config),
