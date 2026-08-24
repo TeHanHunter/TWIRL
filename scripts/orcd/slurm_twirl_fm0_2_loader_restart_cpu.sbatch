@@ -77,9 +77,11 @@ from twirl.models.fm0.input_release import extract_window, load_input_release
 
 input_path = Path(os.environ["TWIRL_FM0_INPUT_RECEIPT"])
 reuse_path = Path(os.environ["TWIRL_FM0_REUSE_RECEIPT"])
-for path in (input_path, reuse_path):
-    if path.stat().st_mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH):
-        raise SystemExit(f"authority is writable: {path}")
+if input_path.stat().st_mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH):
+    raise SystemExit(f"external upstream authority is writable: {input_path}")
+# The reuse receipt is a tracked file inside the already verified clean,
+# exact-SHA worktree.  Its frozen SHA-256 is checked by the shell wrapper; its
+# ordinary Git mode is therefore not an authority weakness.
 upstream = json.loads(input_path.read_text())
 reuse = json.loads(reuse_path.read_text())
 if upstream.get("schema_version") != "twirl_fm0_1_input_release_receipt_v1" or upstream.get("passed") is not True:
