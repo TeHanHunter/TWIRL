@@ -1,0 +1,19 @@
+{
+  "admission_receipt_sha256": "7d93ff719833e9cb74d2a5344d46ff3de990add82a320f0b4ef05f471e952dcf",
+  "artifacts_sha256": {
+    "checkpoint.pt": "e7c8a2ea71d9ab5d3b74bc241d4a39656f7cc54ab0985e35801b19e375fc10e9",
+    "run_contract.json": "2c26772a7b156b8f10de9455d70de785be408672def8cec82bfc2fd41c883edc",
+    "summary.json": "4e2989dd51beb1a37e838314e4aadd50f9c198f3f8f8bb6836fde79a06260735"
+  },
+  "created_at_utc": "2026-08-24T03:41:19.051321+00:00",
+  "foundation_model_claim_authorized": false,
+  "independent_run_validation_sha256": "d2085673c6af639844e3b3ce72c3d7cbd99752caa9772722388d1bf444dabe15",
+  "input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7",
+  "passed": true,
+  "production_authorized": false,
+  "real_data_consumed": true,
+  "run_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb",
+  "schema_version": "twirl_fm0_1_orcd_real_post_validation_v1",
+  "scientific_result": false,
+  "validator_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb"
+}

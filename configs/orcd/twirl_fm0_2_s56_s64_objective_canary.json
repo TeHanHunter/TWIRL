@@ -1,0 +1,109 @@
+{
+  "admission": {
+    "all_partition_jobs_inspected": true,
+    "gpu_node_allocated_tres_inspected": true,
+    "stage1_capacity_reserved_before_fm": true,
+    "ttl_seconds": 300
+  },
+  "campaign_id": "twirl_fm0_2_s56_s64_objective_canary",
+  "code_binding": {
+    "clean_detached_worktree_required": true,
+    "format": "full_lowercase_40_hex",
+    "source": "TWIRL_EXPECTED_GIT_SHA"
+  },
+  "environment": {
+    "reuse_fm0_pinned_environment": true,
+    "remote_prefix": "/orcd/data/mki_aryeh/001/twirl/envs/twirl-fm0-poc-py3119-torch2110-cu128-v1"
+  },
+  "jobs": {
+    "canary_h200": {
+      "array_forbidden": true,
+      "cpus": 4,
+      "h200": 1,
+      "memory_mib": 32768,
+      "precision": "bf16",
+      "seed": 560067,
+      "variant": "TWIRL-FM0.2.1"
+    },
+    "fp32_smoke_h200": {
+      "array_forbidden": true,
+      "cpus": 4,
+      "h200": 1,
+      "memory_mib": 32768,
+      "steps": 8
+    },
+    "post_validation_cpu": {
+      "cpus": 4,
+      "gpu_forbidden": true,
+      "memory_mib": 16384
+    }
+  },
+  "milestone_execution": {
+    "authorized_stop_after_steps": [
+      64,
+      500,
+      1000,
+      2000
+    ],
+    "checkpoint_name_template": "checkpoint_step_{step:08d}.pt",
+    "exact_resume_required": true,
+    "immutable_steps": [
+      0,
+      64,
+      500,
+      1000,
+      2000
+    ],
+    "run_contract_target_step": 20000,
+    "scheduler_horizon_steps": 20000,
+    "sha256_sidecar_required": true
+  },
+  "prestart_gate_inputs": {
+    "development_evaluator_contract": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/development_evaluator_v2.contract.json",
+    "development_event_contract": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/development_event_retention.contract.json",
+    "eight_step_smoke_post_validation_required": true,
+    "input_reuse_receipt": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/input_reuse.receipt.json",
+    "upstream_input_manifest_sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a",
+    "upstream_input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7"
+  },
+  "scheduler": {
+    "gpu_array_forbidden": true,
+    "gpu_node": "node4900",
+    "multi_gpu_forbidden": true,
+    "partition": "pg_mki_aryeh",
+    "reclaimable_partition": "mit_preemptable"
+  },
+  "schema_version": "twirl_fm0_2_orcd_config_v1",
+  "science_bindings": {
+    "config": {
+      "path": "configs/models/twirl_fm0_2_s56_s64_objective_canary.yaml",
+      "sha256": "394a0340f9f8518423e39a1c83bc32acde4e2ebff95c4837b0edb5399bd50801"
+    },
+    "development_evaluator_contract": {
+      "path": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/development_evaluator_v2.contract.json",
+      "sha256": "ed8004180b28c7e2bd85911d0128f9180eddd3c35bdaae299e2f7edba6e5baac"
+    },
+    "development_event_contract": {
+      "path": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/development_event_retention.contract.json",
+      "sha256": "eb84f27866e42bbf942256abe8fa7a532eaa8584e6800ce012aa0552c08a6630"
+    },
+    "freeze_receipt": {
+      "path": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/freeze.json",
+        "sha256": "900264edabe13aa77dfffe3c87f5fe0c4967cbcf693b9a68020ab29ff85e691e"
+    },
+    "input_reuse_receipt": {
+      "path": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/input_reuse.receipt.json",
+      "sha256": "46faed954e6758dfea71f7754670611fab03af63613dad3be433af71dd38e641"
+    }
+  },
+  "sealed_test": {
+    "access_authorized": false,
+    "access_count_required": 0
+  },
+  "stage1_reservation": {
+    "cpus": 64,
+    "h200": 4,
+    "lanes": 4,
+    "memory_mib": 1572864
+  }
+}

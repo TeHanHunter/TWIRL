@@ -1,0 +1,122 @@
+{
+  "claim_limit": "development-only representation-health evidence; no morphology, injection-retention, sealed-test, or foundation-model claim",
+  "evaluation_population": {
+    "model_visible_identifiers": false,
+    "one_deterministic_window_per_selected_visit": true,
+    "quality_mask_fallback": "retain the selected visit and deterministically choose an eligible window only when the ordinary window has no required-view cadences",
+    "selected_leakage_components": 256,
+    "selected_leakage_components_sha256": "50e0b59e1bc80ded61e30c1a6c07a56eee6306b03c3bd52e1f30ebdc43f5c72f",
+    "selected_observation_keys_sha256": "9ffdc49e042cf4e8dccbe53e70fd849723abf96625c36a00adea8f4fde20546a",
+    "selected_observation_visits": 383,
+    "selection": "stable SHA-256 ordering of leakage components",
+    "source_partition": "poc_development"
+  },
+  "evaluator_git_sha": "9cb8c960ff2e4dd6ad0a7b7e3bfea6ced7d67bee",
+  "masked_reconstruction": {
+    "masked_huber_mean": 0.004780041053891182,
+    "masked_valid_target_count": 136570,
+    "model_to_zero_baseline_ratio": 0.9826217208960921,
+    "zero_prediction_masked_huber_mean": 0.004864579066634178
+  },
+  "not_evaluated": {
+    "frozen_linear_morphology_probe": "requires separately frozen label registry",
+    "injection_event_retention": "requires separately frozen development injection canary",
+    "sealed_test": "not opened by this development-only evaluator",
+    "shortcut_probes": "requires separately frozen audit metadata registry"
+  },
+  "passed": true,
+  "random_encoder_control": {
+    "embedding_health": {
+      "effective_rank": 2.365059220415595,
+      "embedding_dim": 256,
+      "leading_principal_component_share": 0.7162613518204134,
+      "n_embeddings": 256,
+      "near_duplicate_dimension_pairs": 0,
+      "per_dimension_variance_max": 0.15236755135415597,
+      "per_dimension_variance_median": 0.010761346406945763,
+      "per_dimension_variance_min": 0.000694251470791919,
+      "zero_or_constant_dimensions": 0
+    },
+    "safe_mask_pair_separation": {
+      "n_pairs": 256,
+      "paired_cosine_mean": 0.9999576896877602,
+      "paired_minus_unrelated_mean": 0.05781540080987668,
+      "paired_minus_unrelated_median": 0.026758361187954216,
+      "paired_minus_unrelated_source_clustered_95_interval": {
+        "bootstrap_replicates": 1000,
+        "confidence_level": 0.95,
+        "lower": 0.04944072215384714,
+        "mean": 0.05781540080987668,
+        "n_source_clusters": 256,
+        "upper": 0.06654690420269878
+      },
+      "unrelated_cosine_mean": 0.9421422888778834
+    },
+    "same_component_cross_visit_retrieval": {
+      "n_repeated_component_queries": 199,
+      "n_visit_embeddings": 383,
+      "status": "available",
+      "top1_same_component_retrieval": 0.03015075376884422,
+      "top1_source_clustered_95_interval": {
+        "bootstrap_replicates": 1000,
+        "confidence_level": 0.95,
+        "lower": 0.004629629629629629,
+        "mean": 0.022685185185185183,
+        "n_source_clusters": 72,
+        "upper": 0.047222222222222214
+      }
+    },
+    "seed": 0
+  },
+  "run": {
+    "architecture": "conformer",
+    "checkpoint_sha256": "e7c8a2ea71d9ab5d3b74bc241d4a39656f7cc54ab0985e35801b19e375fc10e9",
+    "global_step": 20000,
+    "run_dir": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_1_s56_s67_poc/ece8619fd72f/model_runs/real_fm0_1_2/1787462972-7d93ff719833-seed560067-step20000",
+    "run_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb",
+    "variant": "TWIRL-FM0.1.2"
+  },
+  "schema_version": "twirl_fm0_1_representation_health_v1",
+  "trained_encoder": {
+    "embedding_health": {
+      "effective_rank": 8.5792017002464,
+      "embedding_dim": 256,
+      "leading_principal_component_share": 0.3742852182847715,
+      "n_embeddings": 256,
+      "near_duplicate_dimension_pairs": 0,
+      "per_dimension_variance_max": 0.004099393460604529,
+      "per_dimension_variance_median": 0.000909113991226771,
+      "per_dimension_variance_min": 0.00015678850559248806,
+      "zero_or_constant_dimensions": 0
+    },
+    "safe_mask_pair_separation": {
+      "n_pairs": 256,
+      "paired_cosine_mean": 0.9995551636218865,
+      "paired_minus_unrelated_mean": 0.0034700897661524115,
+      "paired_minus_unrelated_median": 0.00216560570936708,
+      "paired_minus_unrelated_source_clustered_95_interval": {
+        "bootstrap_replicates": 1000,
+        "confidence_level": 0.95,
+        "lower": 0.002969138163180469,
+        "mean": 0.0034700897661524115,
+        "n_source_clusters": 256,
+        "upper": 0.004013209387839219
+      },
+      "unrelated_cosine_mean": 0.9960850738557341
+    },
+    "same_component_cross_visit_retrieval": {
+      "n_repeated_component_queries": 199,
+      "n_visit_embeddings": 383,
+      "status": "available",
+      "top1_same_component_retrieval": 0.05025125628140704,
+      "top1_source_clustered_95_interval": {
+        "bootstrap_replicates": 1000,
+        "confidence_level": 0.95,
+        "lower": 0.017361111111111112,
+        "mean": 0.050694444444444445,
+        "n_source_clusters": 72,
+        "upper": 0.09029513888888888
+      }
+    }
+  }
+}

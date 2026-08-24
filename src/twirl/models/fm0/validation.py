@@ -75,26 +75,71 @@ def validate_frozen_authorities(
     design_path: str | Path,
     config_path: str | Path,
     freeze_receipt_path: str | Path,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     receipt_path = Path(freeze_receipt_path).resolve(strict=True)
     receipt = read_json(receipt_path)
+    receipt_schema = receipt.get(
+        "receipt_schema_version", receipt.get("freeze_schema_version")
+    )
     if receipt.get("scientific_contract_status") != "frozen":
-        raise ValueError("FM0.1 scientific contract is not frozen")
-    if receipt.get("implementation_status") != "authorized_not_started":
-        raise ValueError("unexpected FM0.1 implementation authorization state")
+        raise ValueError("FM0 scientific contract is not frozen")
+    if receipt_schema == "twirl_fm0_1_design_freeze_receipt_v1":
+        if receipt.get("implementation_status") != "authorized_not_started":
+            raise ValueError("unexpected FM0.1 implementation authorization state")
+    elif receipt_schema == "twirl_fm0_2_design_freeze_receipt_v1":
+        if receipt.get("implementation_status") != "authorized_gated_not_started":
+            raise ValueError("unexpected FM0.2 implementation authorization state")
+        authorization = receipt.get("authorization")
+        if (
+            not isinstance(authorization, Mapping)
+            or authorization.get("gated_orcd_canary") is not True
+            or authorization.get("gpu_submission_requires_all_prestart_gates")
+            is not True
+            or authorization.get("sealed_test_access") is not False
+        ):
+            raise ValueError("FM0.2 freeze receipt does not authorize only the gated canary")
+    else:
+        raise ValueError("unsupported FM0 design-freeze receipt schema")
     design = Path(design_path).resolve(strict=True)
     config = Path(config_path).resolve(strict=True)
     design_hash = sha256_file(design)
     config_hash = sha256_file(config)
     if design_hash != receipt.get("design_document", {}).get("sha256"):
-        raise ValueError("FM0.1 design hash differs from freeze receipt")
+        raise ValueError("FM0 design hash differs from freeze receipt")
     if config_hash != receipt.get("scientific_config", {}).get("sha256"):
-        raise ValueError("FM0.1 config hash differs from freeze receipt")
-    return {
+        raise ValueError("FM0 config hash differs from freeze receipt")
+    repo_root = design.parent.parent.resolve(strict=True)
+    for field, actual in (("design_document", design), ("scientific_config", config)):
+        binding = receipt.get(field)
+        if not isinstance(binding, Mapping):
+            raise ValueError(f"FM0 freeze receipt lacks {field}")
+        bound_path = (repo_root / str(binding.get("path", ""))).resolve(strict=True)
+        if bound_path != actual:
+            raise ValueError(f"FM0 freeze receipt {field} path differs")
+
+    result: dict[str, Any] = {
         "design_sha256": design_hash,
         "config_sha256": config_hash,
-        "freeze_receipt_sha256": sha256_file(receipt_path),
+        "freeze_receipt_sha256": _verify_sidecar(receipt_path),
     }
+    if receipt_schema == "twirl_fm0_2_design_freeze_receipt_v1":
+        supporting = receipt.get("supporting_authorities")
+        if not isinstance(supporting, Mapping) or not supporting:
+            raise ValueError("FM0.2 freeze receipt lacks supporting authorities")
+        verified_supporting: dict[str, dict[str, str]] = {}
+        for name, value in sorted(supporting.items()):
+            if not isinstance(name, str) or not isinstance(value, Mapping):
+                raise ValueError("FM0.2 supporting-authority binding is malformed")
+            path = (repo_root / str(value.get("path", ""))).resolve(strict=True)
+            digest = _verify_sidecar(path)
+            if digest != value.get("sha256"):
+                raise ValueError(f"FM0.2 supporting authority hash differs: {name}")
+            verified_supporting[name] = {
+                "path": str(path),
+                "sha256": digest,
+            }
+        result["supporting_authorities"] = verified_supporting
+    return result
 
 
 def require_clean_git_revision(repo: str | Path, expected_sha: str) -> str:
@@ -187,6 +232,29 @@ def _inspect_trusted_checkpoint(
     checkpoint_step = progress.get("global_step")
     summary_step = summary.get("global_step")
     target_step = contract.get("target_step")
+    if target_step is None:
+        target_step = summary.get("requested_stop_after_step")
+        horizon = contract.get("training_horizon_step")
+        if (
+            isinstance(horizon, bool)
+            or not isinstance(horizon, int)
+            or horizon != contract.get("optimization", {}).get("max_optimizer_steps")
+            or isinstance(target_step, bool)
+            or not isinstance(target_step, int)
+            or target_step <= 0
+            or target_step > horizon
+        ):
+            raise ValueError("FM0 invocation stop is outside the invariant horizon")
+        if contract.get("synthetic_smoke"):
+            if target_step != contract.get("synthetic_smoke_step"):
+                raise ValueError("FM0 synthetic invocation stop differs from its contract")
+        else:
+            allowed_stops = contract.get("authorized_stop_after_steps")
+            if (
+                not isinstance(allowed_stops, list)
+                or target_step not in allowed_stops
+            ):
+                raise ValueError("FM0 real invocation stop was not preauthorized")
     if (
         isinstance(checkpoint_step, bool)
         or not isinstance(checkpoint_step, int)
@@ -355,6 +423,55 @@ def _inspect_trusted_checkpoint(
     }
 
 
+def _validate_immutable_milestones(
+    root: Path,
+    *,
+    contract: Mapping[str, Any],
+    summary: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Validate every milestone that must exist at the reported stop."""
+
+    raw_steps = contract.get("immutable_milestone_steps", [])
+    if not isinstance(raw_steps, list):
+        raise ValueError("FM0 immutable milestone schedule is malformed")
+    if not raw_steps:
+        return []
+    if any(
+        isinstance(step, bool) or not isinstance(step, int) or step < 0
+        for step in raw_steps
+    ) or raw_steps != sorted(set(raw_steps)):
+        raise ValueError("FM0 immutable milestone schedule is invalid")
+    global_step = summary.get("global_step")
+    if isinstance(global_step, bool) or not isinstance(global_step, int):
+        raise ValueError("FM0 summary has no valid global step")
+    expected_steps = [step for step in raw_steps if step <= global_step]
+    reported = summary.get("immutable_milestone_checkpoints")
+    if not isinstance(reported, list) or len(reported) != len(expected_steps):
+        raise ValueError("FM0 summary milestone inventory is incomplete")
+    verified: list[dict[str, Any]] = []
+    for expected_step, item in zip(expected_steps, reported):
+        if not isinstance(item, Mapping) or item.get("step") != expected_step:
+            raise ValueError("FM0 summary milestone inventory is out of order")
+        checkpoint = root / f"checkpoint_step_{expected_step:08d}.pt"
+        if Path(str(item.get("checkpoint", ""))).resolve(strict=True) != checkpoint:
+            raise ValueError("FM0 milestone checkpoint path differs from its summary")
+        sidecar = checkpoint.with_name(checkpoint.name + ".sha256")
+        if Path(str(item.get("sha256_sidecar", ""))).resolve(strict=True) != sidecar:
+            raise ValueError("FM0 milestone sidecar path differs from its summary")
+        digest = _verify_sidecar(checkpoint)
+        if item.get("sha256") != digest:
+            raise ValueError("FM0 milestone hash differs from its summary")
+        verified.append(
+            {
+                "step": expected_step,
+                "checkpoint": str(checkpoint),
+                "sha256_sidecar": str(sidecar),
+                "sha256": digest,
+            }
+        )
+    return verified
+
+
 def validate_run_release(
     run_dir: str | Path,
     *,
@@ -387,6 +504,9 @@ def validate_run_release(
         raise ValueError("summary does not bind the checkpoint")
     if not summary.get("passed") or int(summary.get("global_step", 0)) <= 0:
         raise ValueError("FM0 synthetic smoke did not complete")
+    immutable_milestones = _validate_immutable_milestones(
+        root, contract=contract, summary=summary
+    )
     checkpoint_inspection = None
     if inspect_checkpoint:
         checkpoint_inspection = _inspect_trusted_checkpoint(
@@ -403,6 +523,7 @@ def validate_run_release(
         "architecture": summary.get("architecture"),
         "global_step": int(summary["global_step"]),
         "artifact_sha256": hashes,
+        "immutable_milestone_checkpoints": immutable_milestones,
         "checkpoint_inspected": bool(inspect_checkpoint),
         "checkpoint_tensor_count": (
             checkpoint_inspection["tensor_count"]
@@ -457,12 +578,35 @@ def validate_real_run_release(
         != release.get("manifest_sha256")
     ):
         raise ValueError("real-data input receipt does not authorize training")
+    reuse_binding = contract.get("input_release_reuse")
+    if str(contract.get("campaign_id", "")).startswith("twirl_fm0_2_"):
+        if not isinstance(reuse_binding, Mapping):
+            raise ValueError("FM0.2 real-data run lacks its reuse-receipt binding")
+        reuse_path = Path(str(reuse_binding.get("path", ""))).resolve(strict=True)
+        if sha256_file(reuse_path) != reuse_binding.get("sha256"):
+            raise ValueError("FM0.2 input-reuse receipt changed after training")
+        reuse_receipt = read_json(reuse_path)
+        if (
+            reuse_receipt.get("schema_version")
+            != "twirl_fm0_2_input_reuse_receipt_v1"
+            or reuse_receipt.get("passed") is not True
+            or reuse_receipt.get("scientific_training_eligible") is not True
+            or reuse_receipt.get("release", {}).get("manifest_sha256")
+            != release.get("manifest_sha256")
+            or reuse_receipt.get("upstream_fm0_1_input_receipt", {}).get("sha256")
+            != release.get("receipt_sha256")
+            or reuse_receipt.get("sealed_test", {}).get("access_count") != 0
+        ):
+            raise ValueError("FM0.2 input-reuse receipt does not authorize training")
     if summary.get("run_contract_sha256") != hashes["run_contract.json"]:
         raise ValueError("summary does not bind the real run contract")
     if summary.get("checkpoint_sha256") != hashes["checkpoint.pt"]:
         raise ValueError("summary does not bind the real checkpoint")
     if not summary.get("passed") or int(summary.get("global_step", 0)) <= 0:
         raise ValueError("FM0 real-data training did not complete")
+    immutable_milestones = _validate_immutable_milestones(
+        root, contract=contract, summary=summary
+    )
     checkpoint_inspection = None
     if inspect_checkpoint:
         checkpoint_inspection = _inspect_trusted_checkpoint(
@@ -480,6 +624,7 @@ def validate_real_run_release(
         "architecture": summary.get("architecture"),
         "global_step": int(summary["global_step"]),
         "artifact_sha256": hashes,
+        "immutable_milestone_checkpoints": immutable_milestones,
         "checkpoint_inspected": bool(inspect_checkpoint),
         "checkpoint_tensor_count": (
             checkpoint_inspection["tensor_count"]

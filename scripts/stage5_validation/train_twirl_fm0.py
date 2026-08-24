@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run an explicitly synthetic TWIRL-FM0.1 numerical smoke."""
+"""Run one checksum-bound synthetic or real TWIRL-FM0 training invocation."""
 from __future__ import annotations
 
 import argparse
@@ -63,9 +63,21 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--synthetic-smoke", action="store_true")
     parser.add_argument("--input-release", type=Path)
     parser.add_argument("--input-release-receipt", type=Path)
+    parser.add_argument("--input-reuse-receipt", type=Path)
     parser.add_argument("--expected-git-sha")
     parser.add_argument("--seed", type=int, required=True)
-    parser.add_argument("--target-step", "--max-steps", dest="target_step", type=int, default=1)
+    parser.add_argument(
+        "--stop-after-step",
+        "--target-step",
+        "--max-steps",
+        dest="target_step",
+        type=int,
+        default=1,
+        help=(
+            "runtime-only invocation stop; FM0.2 keeps the frozen 20,000-step "
+            "optimizer horizon in the invariant run contract"
+        ),
+    )
     parser.add_argument("--micro-batch-windows", type=int, default=2)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--precision", choices=("fp32", "bf16"), default="fp32")
@@ -76,9 +88,12 @@ def _parser() -> argparse.ArgumentParser:
 def _load_config(path: Path) -> dict[str, object]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("FM0.1 config must be a YAML mapping")
-    if payload.get("schema_version") != "twirl_fm0_1_poc_config_v1":
-        raise ValueError("FM0.1 config schema mismatch")
+        raise ValueError("FM0 config must be a YAML mapping")
+    if payload.get("schema_version") not in {
+        "twirl_fm0_1_poc_config_v1",
+        "twirl_fm0_2_objective_canary_config_v1",
+    }:
+        raise ValueError("FM0 config schema mismatch")
     return payload
 
 
@@ -94,9 +109,62 @@ def main() -> int:
         freeze_receipt_path=args.freeze_receipt,
     )
     config = _load_config(args.config)
+    is_fm0_2 = (
+        config.get("schema_version")
+        == "twirl_fm0_2_objective_canary_config_v1"
+    )
+    if is_fm0_2:
+        authorization = config.get("authorization")
+        if (
+            config.get("status") != "frozen_gated_canary_authorized_not_started"
+            or not isinstance(authorization, dict)
+            or authorization.get("scientific_contract_frozen") is not True
+            or authorization.get("gpu_training_authorized") is not True
+            or authorization.get("gpu_submission_requires_all_prestart_gates")
+            is not True
+            or authorization.get("sealed_test_access_authorized") is not False
+            or authorization.get("production_model_claim") is not False
+            or authorization.get("foundation_model_claim") is not False
+        ):
+            raise ValueError("FM0.2 config does not authorize only the gated canary")
+        if args.variant != authorization.get("authorized_variant"):
+            raise ValueError("only the frozen FM0.2.1 canary variant is authorized")
+        maximum_stop = authorization.get("authorized_max_stop_after_step")
+        if (
+            isinstance(maximum_stop, bool)
+            or not isinstance(maximum_stop, int)
+            or args.target_step > maximum_stop
+        ):
+            raise ValueError("FM0.2 invocation exceeds the authorized canary stop")
     variants = config.get("variants", {})
     if not isinstance(variants, dict) or args.variant not in variants:
         raise ValueError("requested variant is absent from the frozen config")
+    variant_payload = variants[args.variant]
+    if not isinstance(variant_payload, dict):
+        raise ValueError("requested FM0 variant is malformed")
+    objective_name = str(variant_payload.get("objective", ""))
+    if objective_name == "masked_reconstruction":
+        use_vicreg = False
+    elif objective_name in {
+        "masked_reconstruction_plus_same_window_vicreg",
+        "dual_mask_reconstruction_plus_same_window_vicreg",
+    }:
+        use_vicreg = True
+    else:
+        raise ValueError(f"unsupported FM0 objective: {objective_name!r}")
+    if config.get("schema_version") == "twirl_fm0_1_poc_config_v1":
+        reconstruct_second_view = use_vicreg
+    else:
+        reconstruction_payload = config.get("objective", {}).get("reconstruction", {})
+        if not isinstance(reconstruction_payload, dict):
+            raise ValueError("FM0.2 reconstruction objective is malformed")
+        optimized_masks = reconstruction_payload.get("optimized_mask_views")
+        if optimized_masks == ["first"]:
+            reconstruct_second_view = False
+        elif optimized_masks == ["first", "second"]:
+            reconstruct_second_view = True
+        else:
+            raise ValueError("FM0.2 optimized mask-view declaration is invalid")
     optimization_payload = config.get("optimization", {})
     if not isinstance(optimization_payload, dict):
         raise ValueError("frozen optimization config is malformed")
@@ -118,6 +186,31 @@ def main() -> int:
         vicreg_variance_weight=float(config["objective"]["vicreg"]["variance_weight"]),
         vicreg_covariance_weight=float(config["objective"]["vicreg"]["covariance_weight"]),
     )
+    canary_payload: dict[str, object] = {}
+    if is_fm0_2:
+        raw_canary = config.get("canary")
+        if not isinstance(raw_canary, dict):
+            raise ValueError("FM0.2 config lacks its canary execution contract")
+        canary_payload = raw_canary
+        if int(raw_canary.get("run_contract_target_step", -1)) != (
+            optimization.max_optimizer_steps
+        ):
+            raise ValueError("FM0.2 optimizer horizon differs from its run contract")
+        if args.synthetic_smoke:
+            if args.target_step != int(raw_canary["fp32_synthetic_smoke_steps"]):
+                raise ValueError("FM0.2 synthetic smoke must stop at the frozen step")
+            if args.precision != "fp32":
+                raise ValueError("FM0.2 synthetic smoke must use FP32")
+        else:
+            allowed_stops = tuple(
+                int(value) for value in raw_canary["authorized_stop_after_steps"]
+            )
+            if args.target_step not in allowed_stops:
+                raise ValueError("FM0.2 real-data stop is not preauthorized")
+            if args.precision != "bf16":
+                raise ValueError("FM0.2 real-data canary must use BF16")
+        if not str(args.device).startswith("cuda"):
+            raise ValueError("FM0.2 training invocations require one CUDA device")
 
     git_sha = None
     if args.expected_git_sha:
@@ -141,6 +234,27 @@ def main() -> int:
     if not args.synthetic_smoke and input_receipt is None:
         raise ValueError("real-data training requires an input-release receipt")
 
+    input_reuse_receipt = None
+    input_reuse_payload = None
+    reuse_argument = args.input_reuse_receipt
+    if reuse_argument is None and os.environ.get("TWIRL_FM0_INPUT_REUSE_RECEIPT"):
+        reuse_argument = Path(os.environ["TWIRL_FM0_INPUT_REUSE_RECEIPT"])
+    if reuse_argument is not None:
+        reuse_path = reuse_argument.resolve(strict=True)
+        expected_reuse_hash = os.environ.get(
+            "TWIRL_FM0_INPUT_REUSE_RECEIPT_SHA256"
+        )
+        observed_reuse_hash = sha256_file(reuse_path)
+        if expected_reuse_hash and observed_reuse_hash != expected_reuse_hash:
+            raise ValueError("input-reuse receipt differs from expected environment hash")
+        input_reuse_receipt = {
+            "path": str(reuse_path),
+            "sha256": observed_reuse_hash,
+        }
+        input_reuse_payload = read_json(reuse_path)
+    if is_fm0_2 and not args.synthetic_smoke and input_reuse_receipt is None:
+        raise ValueError("FM0.2 real-data training requires its reuse receipt")
+
     release_dataset = None
     release_binding = None
     if not args.synthetic_smoke:
@@ -153,14 +267,62 @@ def main() -> int:
             or receipt_payload.get("scientific_training_eligible") is not True
         ):
             raise ValueError("real-data input receipt does not authorize training")
-        if receipt_payload.get("science_bindings") != authorities:
-            raise ValueError("input receipt differs from the frozen science authorities")
+        if config.get("schema_version") == "twirl_fm0_1_poc_config_v1":
+            if receipt_payload.get("science_bindings") != authorities:
+                raise ValueError(
+                    "input receipt differs from the frozen science authorities"
+                )
+        else:
+            reuse = config.get("input_release_reuse")
+            if not isinstance(reuse, dict):
+                raise ValueError("FM0.2 config lacks its input-release reuse binding")
+            if reuse.get("fm0_1_input_receipt_sha256") != input_receipt["sha256"]:
+                raise ValueError("FM0.2 config does not bind the upstream input receipt")
+            if (
+                input_reuse_receipt is None
+                or input_reuse_payload is None
+                or input_reuse_payload.get("schema_version")
+                != "twirl_fm0_2_input_reuse_receipt_v1"
+                or input_reuse_payload.get("passed") is not True
+                or input_reuse_payload.get("scientific_training_eligible") is not True
+                or input_reuse_payload.get("sealed_test", {}).get("access_count") != 0
+                or input_reuse_payload.get("upstream_fm0_1_input_receipt", {}).get(
+                    "sha256"
+                )
+                != input_receipt["sha256"]
+            ):
+                raise ValueError("FM0.2 input-reuse receipt does not authorize training")
+            supporting = authorities.get("supporting_authorities")
+            bound_reuse = (
+                supporting.get("input_reuse_receipt")
+                if isinstance(supporting, dict)
+                else None
+            )
+            if (
+                not isinstance(bound_reuse, dict)
+                or bound_reuse.get("sha256") != input_reuse_receipt["sha256"]
+            ):
+                raise ValueError("FM0.2 freeze does not bind the input-reuse receipt")
         release_root = args.input_release.resolve(strict=True)
         manifest_path = (release_root / "manifest.csv").resolve(strict=True)
         receipt_release = receipt_payload.get("release")
         if not isinstance(receipt_release, dict):
             raise ValueError("input receipt release binding is malformed")
         manifest_sha = sha256_file(manifest_path)
+        if config.get("schema_version") == "twirl_fm0_2_objective_canary_config_v1":
+            reuse = config["input_release_reuse"]
+            if reuse.get("manifest_sha256") != manifest_sha:
+                raise ValueError("FM0.2 config does not bind the reused manifest")
+            if (
+                input_reuse_payload is None
+                or input_reuse_payload.get("release", {}).get("id")
+                != reuse.get("release_id")
+                or input_reuse_payload.get("release", {}).get("manifest_sha256")
+                != manifest_sha
+                or input_reuse_payload.get("release", {}).get("sectors")
+                != reuse.get("sectors")
+            ):
+                raise ValueError("FM0.2 reuse receipt differs from the frozen release")
         if (
             Path(str(receipt_release.get("manifest_path", ""))).resolve(strict=True)
             != manifest_path
@@ -208,21 +370,48 @@ def main() -> int:
         "campaign_id": config["campaign_id"],
         "variant": args.variant,
         "architecture": resolved_architecture,
+        "objective": objective_name,
+        "use_vicreg": use_vicreg,
+        "reconstruct_second_view": reconstruct_second_view,
         "seed": args.seed,
         "synthetic_smoke": bool(args.synthetic_smoke),
         "real_data_consumed": not args.synthetic_smoke,
         "precision": args.precision,
         "device_request": args.device,
-        "target_step": args.target_step,
         "micro_batch_windows": args.micro_batch_windows,
         "authorities": authorities,
         "input_release_receipt_precondition": (
             input_receipt if args.synthetic_smoke else None
         ),
         "input_release": release_binding,
+        "input_release_reuse": (
+            input_reuse_receipt if is_fm0_2 and not args.synthetic_smoke else None
+        ),
         "expected_git_sha": git_sha,
         "optimization": asdict(optimization),
     }
+    if is_fm0_2:
+        run_contract.update(
+            {
+                "training_horizon_step": optimization.max_optimizer_steps,
+                "immutable_milestone_steps": [
+                    int(value)
+                    for value in canary_payload["immutable_milestone_steps"]
+                ],
+                "authorized_stop_after_steps": [
+                    int(value)
+                    for value in canary_payload["authorized_stop_after_steps"]
+                ],
+                "synthetic_smoke_step": int(
+                    canary_payload["fp32_synthetic_smoke_steps"]
+                ),
+            }
+        )
+    else:
+        # Preserve the byte-level FM0.1 run/checkpoint contract. FM0.2 moves
+        # the invocation stop out of this invariant structure so exact resume
+        # can advance 64 -> 500 -> 1000 -> 2000 without changing science.
+        run_contract["target_step"] = args.target_step
     contract_path = output / "run_contract.json"
     if contract_path.exists():
         if read_json(contract_path) != run_contract:
@@ -252,7 +441,8 @@ def main() -> int:
             micro_batch_windows=args.micro_batch_windows,
             device=args.device,
             precision=args.precision,
-            use_vicreg=args.variant == "TWIRL-FM0.1.5",
+            use_vicreg=use_vicreg,
+            reconstruct_second_view=reconstruct_second_view,
             resume_checkpoint=args.resume_checkpoint,
         )
     else:
@@ -268,6 +458,8 @@ def main() -> int:
             micro_batch_windows=args.micro_batch_windows,
             device=args.device,
             precision=args.precision,
+            use_vicreg=use_vicreg,
+            reconstruct_second_view=reconstruct_second_view,
             resume_checkpoint=args.resume_checkpoint,
         )
     checkpoint_path = output / "checkpoint.pt"
@@ -284,14 +476,19 @@ def main() -> int:
         "scientific_result": False,
         "variant": args.variant,
         "architecture": model.config.architecture,
+        "objective": objective_name,
         "parameter_count": parameter_count,
         "global_step": result["global_step"],
+        "requested_stop_after_step": args.target_step if is_fm0_2 else None,
         "final_metrics": result["final_metrics"],
         "precision": result["precision"],
         "device": result["device"],
         "elapsed_seconds_this_invocation": result["elapsed_seconds_this_invocation"],
         "run_contract_sha256": contract_sha,
         "checkpoint_sha256": checkpoint_sha,
+        "immutable_milestone_checkpoints": result.get(
+            "immutable_milestone_checkpoints", []
+        ),
     }
     write_json_with_sha256(output / "summary.json", summary)
     validation = (

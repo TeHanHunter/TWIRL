@@ -1,0 +1,97 @@
+{
+  "campaign_id": "twirl_fm0_2_s56_s64_objective_canary",
+  "claim_limit": "Development-only model-input event-retention diagnostic. This is not a detrending, search, vetting, candidate-merging, completeness, prospective-sector, production, or foundation-model result.",
+  "contract_status": "frozen_before_gpu_submission",
+  "created_at_utc": "2026-08-24T00:00:00Z",
+  "data_authority": {
+    "input_release_id": "twirl_fm0_1_s56_s64_v2",
+    "manifest_sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a",
+    "model_visible_flux_views": [
+      "adp_1x1",
+      "adp_3x3"
+    ],
+    "upstream_input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7"
+  },
+  "event_injection": {
+    "apply_identically_to_both_flux_views": true,
+    "depth_fraction_grid": [
+      0.01,
+      0.03,
+      0.1,
+      0.3
+    ],
+    "duration_cadences_grid": [
+      1,
+      3,
+      9,
+      27
+    ],
+    "errors_times_and_masks_unchanged": true,
+    "formula": "injected_flux=(1+original_flux)*(1-depth_profile)-1",
+    "shape": "symmetric_trapezoid",
+    "trapezoid_ingress_egress_fraction": 0.3333333333333333,
+    "truth_model_visible": false
+  },
+  "metric": {
+    "baseline": {
+      "description": "maximum negative two-view-median running-mean dip statistic over the four frozen duration widths",
+      "fit_partition": "poc_train",
+      "threshold_false_positive_fraction": 0.01
+    },
+    "embedding_probe": {
+      "classifier": "l2_logistic_regression",
+      "feature": "z_window",
+      "feature_standardization": "poc_train_mean_and_positive_standard_deviation_only",
+      "fit_partition": "poc_train",
+      "intercept": true,
+      "inverse_regularization_strength_c": 1.0,
+      "labels": [
+        "original",
+        "injected"
+      ],
+      "threshold_false_positive_fraction": 0.01,
+      "tuning_or_hyperparameter_sweep": false
+    },
+    "primary": "injected_event_recovery_fraction_at_one_percent_original_window_false_positive_fraction",
+    "reported": [
+      "overall_embedding_probe_recovery",
+      "overall_robust_scalar_recovery",
+      "embedding_minus_baseline_recovery",
+      "recovery_by_depth_duration_stratum",
+      "source_clustered_95_percent_interval"
+    ],
+    "source_clustered_bootstrap_draws": 2000,
+    "source_clustered_bootstrap_seed": 56006702
+  },
+  "promotion_tolerances": {
+    "minimum_injections_per_reported_stratum": 20,
+    "overall_embedding_minus_baseline_recovery_minimum": -0.05,
+    "per_stratum_embedding_minus_baseline_recovery_minimum": -0.1,
+    "sealed_test_access_count": 0
+  },
+  "resolved_inventory_receipt_required_before_result": true,
+  "sampling": {
+    "candidate_window_length_cadences": 2048,
+    "candidate_window_stride_cadences": 1024,
+    "development_components": 512,
+    "development_partition": "poc_development",
+    "event_center_edge_margin_cadences": 64,
+    "fit_components": 512,
+    "fit_partition": "poc_train",
+    "maximum_windows_per_leakage_component": 1,
+    "minimum_valid_fraction_per_required_view": 0.8,
+    "parameter_assignment": "round_robin_over_sha256_order_to_balance_all_16_depth_duration_strata",
+    "selection_order": "ascending_sha256(salt:leakage_component_id:observation_key:segment_id:start_index)",
+    "selection_salt": "twirl_fm0_2_development_event_retention_v1",
+    "source_unit": "leakage_component_id"
+  },
+  "schema_version": "twirl_fm0_2_development_event_retention_contract_v1",
+  "sealed_boundary": {
+    "allowed_partitions": [
+      "poc_train",
+      "poc_development"
+    ],
+    "forbidden_partition": "poc_sealed_test",
+    "sealed_rows_allowed": 0
+  }
+}

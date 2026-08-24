@@ -25,6 +25,16 @@ def test_default_tcn_and_conformer_are_in_frozen_matched_budget() -> None:
     assert parameter_match_fraction(tcn, conformer) <= 0.10
 
 
+def test_fm0_2_objective_variants_reuse_the_exact_fm0_1_backbones() -> None:
+    fm01_tcn = build_fm0_model("TWIRL-FM0.1.1")
+    fm02_tcn = build_fm0_model("TWIRL-FM0.2.1")
+    fm01_conformer = build_fm0_model("TWIRL-FM0.1.2")
+    fm02_conformer = build_fm0_model("TWIRL-FM0.2.2")
+
+    assert fm01_tcn.config == fm02_tcn.config
+    assert fm01_conformer.config == fm02_conformer.config
+
+
 @pytest.mark.parametrize(
     ("variant", "architecture"),
     (("TWIRL-FM0.1.1", "tcn"), ("TWIRL-FM0.1.2", "conformer")),
@@ -63,8 +73,13 @@ def test_tiny_models_preserve_shapes_and_ignore_invalid_fill(
         changed["flux"][~changed["flux_valid"]] = 1.0e6
         second = model(changed)
     assert first["reconstruction"].shape == (2, 2, 64)
+    assert first["h_window"].shape == (2, 16)
     assert first["z_window"].shape == (2, 16)
+    assert torch.equal(
+        first["z_window"], model.embedding_projection(first["h_window"])
+    )
     assert torch.equal(first["reconstruction"], second["reconstruction"])
+    assert torch.equal(first["h_window"], second["h_window"])
     assert torch.equal(first["z_window"], second["z_window"])
 
 

@@ -1,0 +1,111 @@
+{
+  "authorization": {
+    "foundation_model_claim": false,
+    "gated_orcd_canary": true,
+    "gpu_submission_requires_all_prestart_gates": true,
+    "max_stop_after_step": 2000,
+    "production_use": false,
+    "sealed_test_access": false,
+    "variant": "TWIRL-FM0.2.1"
+  },
+  "binding_method": "direct_file_sha256",
+  "campaign_id": "twirl_fm0_2_s56_s64_objective_canary",
+  "campaign_name": "TWIRL-FM0.2",
+  "code_binding": {
+    "clean_detached_worktree_required": true,
+    "exact_git_revision_supplied_at_execution": true
+  },
+  "evidence_bindings": {
+    "fm0_1_comparison_metrics": {
+      "path": "reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/comparison_metrics.csv",
+      "sha256": "5c87a777e059426aa4b0acf5e76492b8ad62c312c5727b05b11782e121feeb1b"
+    },
+    "fm0_1_comparison_provenance": {
+      "path": "reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/comparison.provenance.json",
+      "sha256": "04d9aad8b6d6272d7fbada9fe20840b7fd51572f0d5c739f14c1e90e6fa2c98d"
+    }
+  },
+  "freeze_schema_version": "twirl_fm0_2_design_freeze_receipt_v1",
+  "frozen_at_utc": "2026-08-24T00:00:00Z",
+  "frozen_scope": {
+    "architecture": "tcn",
+    "flux_views": [
+      "adp_1x1",
+      "adp_3x3"
+    ],
+    "immutable_milestone_steps": [
+      0,
+      64,
+      500,
+      1000,
+      2000
+    ],
+    "input_release_id": "twirl_fm0_1_s56_s64_v2",
+    "scheduler_horizon_steps": 20000,
+    "sectors": [
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64
+    ],
+    "seed": 560067,
+    "variant": "TWIRL-FM0.2.1"
+  },
+  "implementation_status": "authorized_gated_not_started",
+  "model_family": "TWIRL-FM0",
+  "not_certified_by_this_receipt": [
+    "prestart_gate_results",
+    "orcd_admission",
+    "training_job",
+    "checkpoint",
+    "development_evaluation_result",
+    "sealed_test_result",
+    "production_promotion",
+    "foundation_model_status"
+  ],
+  "prestart_gates": {
+    "all_required": true,
+    "eight_step_fp32_gradient_and_replay_smoke": true,
+    "evaluator_v2_contract_bound": true,
+    "fresh_stage1_safe_admission_per_h200_invocation": true,
+    "input_release_and_manifest_reverified": true,
+    "milestone_and_exact_resume_tests": true,
+    "no_environment_override": true
+  },
+  "resources": {
+    "cpus": 4,
+    "gpus": {
+      "h200": 1
+    },
+    "memory_gib": 32,
+    "multi_gpu_forbidden": true
+  },
+  "scientific_config": {
+    "path": "configs/models/twirl_fm0_2_s56_s64_objective_canary.yaml",
+    "sha256": "394a0340f9f8518423e39a1c83bc32acde4e2ebff95c4837b0edb5399bd50801"
+  },
+  "scientific_contract_status": "frozen",
+  "supporting_authorities": {
+    "development_evaluator_contract": {
+      "path": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/development_evaluator_v2.contract.json",
+      "sha256": "ed8004180b28c7e2bd85911d0128f9180eddd3c35bdaae299e2f7edba6e5baac"
+    },
+    "development_event_contract": {
+      "path": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/development_event_retention.contract.json",
+      "sha256": "eb84f27866e42bbf942256abe8fa7a532eaa8584e6800ce012aa0552c08a6630"
+    },
+    "input_reuse_receipt": {
+      "path": "reports/stage5_validation/twirl_fm0_2_design_freeze_v1/input_reuse.receipt.json",
+      "sha256": "46faed954e6758dfea71f7754670611fab03af63613dad3be433af71dd38e641"
+    }
+  },
+  "design_document": {
+    "path": "doc/foundation_model_design.md",
+    "sha256": "94c8672a087884bf8a2c70f5d15315e05de602134af0c6c2073ca1c36232d6f7"
+  }
+}

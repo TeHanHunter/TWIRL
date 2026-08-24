@@ -1,466 +1,278 @@
 # TWIRL survey and software plan
 
-This is the single forward-looking plan for the standalone TWIRL pipeline.
-Detailed execution history belongs in [the progress log](twirl_progress_log.md),
-unresolved questions belong in [ideas](ideas.md), and operational commands
-belong in the relevant runbook. Report-level plans and status files are dated
-evidence, not project authority.
+This is the single forward-looking plan for the standalone TWIRL pipeline. It
+contains current milestones, locked decisions, stage gates, and priorities.
+Read [the documentation guide](README.md) to find task-specific protocols.
+Detailed results belong in [the progress log](twirl_progress_log.md), and
+unresolved choices belong in [ideas](ideas.md).
 
-Last reconciled: `2026-08-06`.
+Last reconciled: `2026-08-24`.
 
-## Current status
+## Milestone dashboard
 
-- The survey uses `200 s` TESS FFIs from `Sector >= 56`, with Gaia DR3
-  `source_id` as the scientific identifier and TIC as operational metadata.
-- `A2v1` is the active Stage 1 product family: no TIC-magnitude science cap,
-  saturated-pixel ePSF masking, and sector-level ADP/ADP015 FITS products for
-  the `1x1`, `3x3`, and `5x5` apertures. S56 (`31,450` FITS), S57
-  (`27,213` FITS), and S58-S64 pass their edge-aware HDF5/FITS product gates.
-  S65 stopped after one orbit-138 detector hit a CuPy out-of-memory error;
-  resume that one CCD with safer GPU concurrency before continuing S66-S69.
-  See [Stage 1 history](twirl_progress_log.md#stage-1).
-- S56 passes the current **Tier-0 integrity/benchmark QA**, including WD 1856
-  recovery in both active ADP apertures. Tier 0 verifies product integrity and
-  benchmark behavior; it is not the Tier-1 science QA needed for survey
-  release. The bounded S56-only Tier-1 code path is implemented and fail-
-  closed around the authoritative external-quality overlay, exact target/BLS
-  provenance, fixed injections, and an independent TESSCut route. The exact
-  `31,450`-target v2 audit exposed that a detector-level usable-fraction review
-  would veto otherwise searchable data: cam1/ccd1 retains thousands of usable
-  cadences per target despite a `0.743` median. Tier-1 therefore now treats
-  population, flag-fraction, scatter, and aperture-disagreement reviews as
-  sensitivity warnings. The checksum-locked v4 audit passes for bounded
-  enrichment: `31,446/31,450` targets are paired-teacher eligible,
-  `31,449/31,450` retain at least one searchable aperture, and no target is
-  excluded from flagged fraction alone. It remains `science_ready=false`.
-  The `s56_harmonic_cnn_v1` architecture remains the active-learning model
-  family. `teacher_v3` is its frozen S56--S62 dataset/training release. Its
-  five-fold run, pooled development-OOF calibration, uncertain-label
-  sensitivity, clustered intervals, and single fixed-test opening are
-  complete. On the shared `528`-row real non-uncertain fixed-test support it
-  improves balanced accuracy from `0.720` to `0.779` and macro F1 from
-  `0.744` to `0.809` over metadata only; Planet-like recall is only `8/14`
-  and remains descriptive. Teacher v3 is frozen for enrichment only:
-  automatic promotion is disabled and student training is blocked.
-  The development-only full-pool **Teacher v4-SSL** experiment is also
-  complete. It used `175,347` eligible S56--S62 observations after whole-TIC
-  fixed-test and S63 exclusions and passed its corrected BTJD/effective-
-  quality numerical contract. On matched development OOF support, fine-tuned
-  SSL did not show a decisive improvement over Teacher v3: uncertain-as-other
-  balanced accuracy/macro F1 are `0.775/0.789` versus `0.801/0.789`, while
-  uncertain-masked values are `0.821/0.808` versus `0.822/0.802`. The
-  uncertain-masked Planet-like average precision is lower (`0.614` versus
-  `0.763`). The frozen linear probe is substantially worse. Teacher v4-SSL is
-  therefore archived as useful representation-learning evidence, not
-  promoted or carried into the primary S63 test. Teacher v3 remains the
-  operational enrichment model. Teacher v2 likewise remains a rejected
-  exploratory comparison. See
-  [Stage 2 history](twirl_progress_log.md#stage-2).
-- LC-level injection/recovery, two-aperture vetting, and pixel-injection smokes
-  exist, but there is not yet a frozen survey-wide completeness product. The
-  transparent non-periodic dip branch, multi-sector search, stable archive
-  index, and representative pixel-level calibration remain open.
-- The active framework manuscript is *TWIRL I: A Systematic TESS Search for
-  Transiting Planetary Remnants around White Dwarfs* in the separate sibling
-  repo `/Users/tehan/PycharmProjects/twirl-survey-paper`. This repo remains the
-  executable survey pipeline and must not absorb the paper or proposal repo.
+| Workstream | Current milestone | Next gate |
+| --- | --- | --- |
+| Stage 1 light curves | A2v1 S56--S65 accepted; S66--S72 retained ORCD compute checkpoints; S73 active and S74 resident/queued | Restore the active-plus-three resident buffer, continue the frozen campaign, and gate an isolated S94 shared-QLP reuse smoke |
+| Stage 2 search | Transparent periodic BLS exists; Teacher v3 is frozen for enrichment | Complete the sealed S63 test while independently implementing the dip branch and multi-sector merging |
+| Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
+| Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
+| Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
+| TWIRL-FM0 | FM0.1 found an untrained pooled-projection path and failed the rank gate; the frozen FM0.2.1 objective canary isolates that repair | Pass the exact-code CPU loader/restart gate, then advance one-H200 milestones only through steps 64, 500, 1000, and 2000 with independent validation |
+
+The exact current run state and historical metrics are recorded in the
+[progress log](twirl_progress_log.md). Reports are evidence snapshots, not
+project authority.
+
+## Active workstreams
+
+### A2v1 production
+
+- S56--S65 are accepted A2v1 sectors. Do not replay them.
+- S66--S72 completed their authorized ORCD compute path and are retained as
+  deferred checkpoints. They are not accepted products until returned to PDO
+  and passed through the unchanged HDF5, FITS, schema, and QA gates.
+- The S66--S93 campaign is active in S73, with S74 resident, verified, and
+  dependency-queued behind it. S75--S77 are still entering the transport
+  buffer, so the active-plus-three-future residency target is not yet met. The
+  campaign follows the single frozen
+  scientific recipe and the campaign resource profile in the
+  [A2v1 protocol](a2v1_production_protocol.md). Stop on any failed scientific
+  or provenance gate. Maintain the active sector plus three complete future
+  sectors in the resident ORCD source buffer whenever capacity permits.
+- S94+ will use the same frozen product recipe through a separate PDO reuse
+  lane: shared QLP source/ePSF trees remain read-only, reusable empty-mask
+  ePSFs are copied into a user-owned attempt, and only masked cutouts are
+  refit. A fail-closed, read-only-by-default pilot wrapper is locally tested;
+  no remote run has started. Start with one S94 `orbit-195/cam1/ccd1` smoke;
+  full scaling waits for its unchanged gates and a variable-orbit queue for
+  four-orbit sectors.
+
+### Teacher v3 prospective use
+
+- Teacher v3 is the frozen supervised morphology-enrichment baseline. It may
+  rank a score-hidden human-review queue; it is not an automatic classifier or
+  discovery engine.
+- S63 is the sealed prospective sector. Primary hosts absent from the training
+  corpus and repeated hosts are reported separately. Pre-score BLS failures
+  remain in cohort accounting and never receive fabricated candidates.
+- Teacher v4-SSL is complete and archived as representation-learning evidence.
+  Its frozen linear probe was poor and its fine-tuned model did not decisively
+  improve on Teacher v3, so it is not used for S63 or pseudo-labeling.
+
+### TWIRL-FM0.1 proof of concept
+
+- FM0.1 starts a new model family rather than extending the Teacher/CNN naming
+  sequence. Its purpose is to expose mistakes and compare representations, not
+  to claim a finished foundation model.
+- The byte-exact scientific contract is the
+  [frozen design](foundation_model_design.md),
+  [configuration](../configs/models/twirl_fm0_1_s56_s67_poc.yaml), and
+  [freeze receipt](../reports/stage5_validation/twirl_fm0_1_design_freeze_v1/freeze.json).
+- The S56--S67 proof of concept is BLS-free. Gaia DR3 `source_id` is the
+  scientific identity, but the fixed `80/10/10` train/development/sealed-test
+  assignment is made by the connected Gaia--TIC `leakage_component_id`;
+  ambiguous multi-Gaia components are quarantined. The release stores six views:
+  `{raw-relative, ADP, ADP015} x {1x1, 3x3}`. It compares a TCN and Conformer
+  through the frozen FM0.1.1--FM0.1.5 ladder. Repeated-sector hosts are an
+  explicit consistency and aggregation experiment; their visits are not
+  averaged into one light curve or counted as independent stars. Local elapsed
+  time and deltas in nominal `200 s` units enter the window encoder; cross-visit
+  offsets and gaps are retained only for audit and higher-level aggregation.
+  Absolute BJD and explicit sector identifiers are not encoder inputs.
+- S66--S67 may enter only as separately reported diagnostic checkpoints after
+  FM-specific input gates. The first multi-sector release currently contains
+  S56--S64: `342,721` immutable BLS-free shards and `3,764,787,143` cadences,
+  each bound to the quality-aware A2v1 adapter and the fixed Gaia-component
+  split. Its independent CPU release validation, pinned-environment loader and
+  restart gate, fresh Stage-1-safe admission, and eight-step one-H200 FP32
+  synthetic `FM0.1.1` mechanics test all passed with strict checkpoint and
+  post-validation checks. The separately authorized real `FM0.1.1` TCN and
+  `FM0.1.2` Conformer runs then completed 20,000 BF16 steps with one H200 each.
+  Their [matched development comparison](../reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/README.md)
+  found an optimization tie but effective ranks of only `6.20` and `8.58`
+  against the provisional gate of `26`. Neither architecture is promoted,
+  FM0.1.3 remains blocked, and the sealed test stays closed. The
+  [FM0.2 objective-canary contract](../configs/models/twirl_fm0_2_s56_s64_objective_canary.yaml)
+  keeps the exact S56--S64 release, split, TCN, ADP `1x1+3x3` views, masks,
+  context, and optimizer while adding a scale-matched same-window VICReg loss
+  directly to `z_window`. It is frozen for the single `FM0.2.1` TCN canary
+  through step 2,000 only. Every H200 invocation requires a fresh Stage-1-safe
+  admission and uses one H200, four CPUs, and 32 GiB. The sealed test,
+  FM0.2.2, a 20,000-step extension, production use, and a foundation-model
+  claim remain unauthorized.
+- S63 may appear as unlabeled FM pretraining data, so it is never prospective
+  FM evidence. The Teacher-v3 S63 test remains prospective only while no FM
+  embedding, score, queue, threshold, or review decision influences it.
 
 ## Locked survey decisions
 
-- Seed catalog: Gentile Fusillo et al. (2021) Gaia EDR3 main catalog, kept as
-  a local external input.
-- High-confidence reference sample: `Pwd > 0.75`.
-- Light-curve gathering: all reachable Gaia-first WD targets; magnitude cuts
-  may define QA slices or a later statistical denominator but must not gate
-  TGLC production.
-- Statistical denominator: not yet frozen. The final `twirl_parent_sample`
-  must be fixed before publication-grade end-to-end completeness or occurrence
-  inference.
-- Mandatory benchmark: WD 1856+534 in S56, orbits `119` and `120`,
-  `cam4/ccd1`. Do not substitute another benchmark without an explicit user
-  decision.
-- Discovery engine: transparent periodic and non-periodic searches first.
-  Machine learning may rank or triage candidates only after its inputs,
-  provenance, and held-out behavior are auditable.
-- Compute boundary: PDO remains the authoritative TGLC input and accepted
-  Stage-1 product home. ORCD normally consumes compact exports for downstream
-  search, injections, features, and models. A bounded A2v1 H200 production
-  pilot is now authorized using immutable prepared source-pickle cells staged
-  through Blackhole/Globus; do not transfer raw FFIs as well or rebuild PDO
-  catalogs/cutouts on ORCD. The pilot is capped at two H200s and 78 live ORCD
-  CPUs, and no ORCD result is accepted until ePSF/HDF5 products return to PDO
-  and pass the unchanged sector gates there.
+- **Scope:** search `200 s` TESS FFIs from `Sector >= 56` for transiting or
+  occulting objects around white dwarfs.
+- **Scientific identity:** Gaia DR3 `source_id`. TIC is operational metadata;
+  ambiguous Gaia--TIC components remain grouped for leakage control.
+- **Seed catalog:** Gentile Fusillo et al. (2021) Gaia EDR3 main catalog,
+  retained as a local external input.
+- **Reference sample:** `Pwd > 0.75`. The final statistical denominator and
+  release sector cutoff are not yet frozen.
+- **Benchmark:** WD 1856+534 in S56, orbits 119 and 120, camera 4/CCD 1.
+- **Stage 1 product:** A2v1: no science magnitude cap, saturated-pixel ePSF
+  masking, and ADP/ADP015 `1x1`, `3x3`, and `5x5` products.
+- **Discovery policy:** transparent periodic and non-periodic searches precede
+  machine-learning triage. A model score is not a detection, label, physical
+  class, or completeness measurement.
+- **Compute boundary:** PDO owns authoritative Stage 1 inputs and accepted
+  products. ORCD may run the authorized source-only A2v1 compute campaign and
+  downstream compact-data workflows. Deferred ORCD outputs are checkpoints,
+  not accepted sectors.
+- **Repository boundary:** the survey paper remains in the sibling
+  `twirl-survey-paper` repository; proposal material is not vendored here.
 
-## Product and interface contracts
+## Stable product and interface rules
 
-### Master catalog
+### Catalog and sample
 
-- One row per Gaia DR3 source, preserving seed-catalog columns and explicit
-  sample-membership flags.
-- Observation table is one row per target/sector/orbit/camera/CCD hit.
-- All releases record seed provenance, selection recipe, crossmatch version,
-  and build version. Gaia-only/no-TIC targets remain visible rather than being
-  silently removed.
-- Before the TWIRL I survey run, freeze a machine-readable release manifest
-  that names the last included sector, accepted sector products and checksums,
-  parent-sample/catalog versions, QA state, and exact search/injection
-  contracts. `Sector >= 56` is the eligibility floor, not an indefinitely
-  expanding publication release.
+- The master catalog has one row per Gaia DR3 source and keeps the original
+  seed columns plus explicit sample-membership flags.
+- Observation products retain sector, orbit, camera, CCD, TIC aliases,
+  product/schema version, and source provenance without redefining the
+  scientific identity.
+- Gaia-only and ambiguous bridge cases remain visible. They are characterized
+  before the survey denominator is frozen rather than silently dropped.
+- The final release manifest names the sector cutoff, accepted product hashes,
+  catalog and parent-sample versions, QA state, search configuration, and
+  injection contract.
 
-### A2v1 light curves
+### Light curves
 
-The operational contract is defined in the
-[A2v1 protocol](a2v1_production_protocol.md):
+- The [A2v1 protocol](a2v1_production_protocol.md) and
+  [machine-readable lock](../configs/a2v1_production_lock_v1.json) are the
+  product authorities.
+- HDF5 extraction is an intermediate checkpoint. A production sector becomes
+  accepted only after sector FITS and the full edge-aware validation gates.
+- Changing target selection, hooks, masks, apertures, detrending, schema, or
+  scientific gates requires a new named product version. Hardware and
+  concurrency may change only under the protocol's parity rules.
 
-- requested TICs come from observation-table `source_tic` overlays;
-- prepared source pickles are reused without rewriting raw pixel payloads;
-- ePSFs are reused only for empty saturated-pixel masks and otherwise refit;
-- HDF5 extraction is an intermediate checkpoint;
-- accepted sectors require ADP/ADP015-only FITS plus edge-aware full validation;
-- compact exports and derived indices retain Gaia/TIC IDs, sector/orbit/
-  detector provenance, cadence/quality information, product/schema version,
-  and source checksums.
+### Search, labels, and models
 
-### Candidate and label provenance
+- Search tables preserve branch/config version, aperture, cadence cleaning,
+  retained peaks, ephemeris, and cross-aperture evidence.
+- Injection truth, BLS recovery, automated vetting, human morphology,
+  morphology fold factor, pseudo-labels, and model scores remain distinct
+  fields with distinct provenance.
+- The legacy Teacher v3 release is grouped by TIC; it does not certify that
+  distinct TIC aliases of one Gaia source stayed together. FM0.1 and future
+  releases group the Gaia physical source and any unresolved Gaia--TIC leakage
+  component before visits, windows, or augmentations are created. Evaluation
+  and uncertainty follow the declared scientific unit.
+- Calibration, subgroup behavior, and a transparent baseline accompany any
+  model result used beyond exploratory development.
+- Teacher and FM experiments may proceed as isolated research lanes, but they
+  cannot enter production triage, discovery, or completeness claims before the
+  transparent periodic and dip contracts are frozen.
 
-- Search tables record branch/config version, aperture, all retained peaks,
-  cadence cleaning, ephemeris, and cross-aperture evidence.
-- Keep injection truth, BLS recovery, automated-vetter output, human
-  morphology, reviewed fold factor, pseudo-labels, and model scores as
-  separate fields. None may silently overwrite another.
-- `morphology_fold_factor` is an evidence-view choice, not automatically a
-  physical orbital-period claim.
+## Stage gates
 
-## Stage 1: catalog, extraction, products, and QA (...)
+### Stage 1 — catalog, extraction, products, and QA (...)
 
-### Implemented
+Implemented: Gaia-first catalogs, TIC bridge, detector tables, A2v1 production,
+FITS export, compact export, edge-aware validation, WD 1856 benchmark paths,
+and bounded S56 QA.
 
-- Gaia-first master catalog, TIC bridge, TESS coverage products, detector job
-  tables, reusable TGLC wrappers, A2v1 source overlays, masked ePSF path,
-  ADP/ADP015 FITS writer, compact export, and edge-aware validator.
-- S56--S64 are complete through required HDF5/FITS validation. S56 also
-  passes the replacement quality-aware Tier-0 integrity/benchmark QA. Its
-  full-population bounded Tier-1 gate now authorizes enrichment under the
-  conservative exact-BLS paired-input contract.
+Exit requires:
 
-### Current gate
+- validated HDF5 and FITS coverage for every admitted sector, with only
+  declared edge omissions;
+- a stable index joining identity, visits, paths, versions, checksums, cadence
+  retention, scatter metrics, and QA state;
+- a frozen release manifest and explicit sector cutoff;
+- characterization of Gaia-only/no-TIC targets and the S94+ data boundary;
+- Tier-1 science QA for population scatter, flags and gaps, aperture behavior,
+  signal preservation, benchmark timing, and an independent extraction.
 
-S58-S64 completed their gated HDF5/FITS production on `pdogpu5`. The S65
-queue stopped after orbit 137 and `15/16` orbit-138 CCDs completed; orbit 138
-`cam4/ccd1` failed during ePSF construction on a small CuPy allocation. Resume
-only the missing CCD with reduced GPU concurrency, re-enter the unchanged
-stop-on-failure gates, and then continue S66-S69. Do not create sector-specific
-production logic unless the sector is a documented exception.
+### Stage 2 — transparent search and candidate generation (...)
 
-The Blackhole/Globus-to-ORCD A2v1 pilot is a parallel infrastructure lane, not
-a relaxed product gate. The first transport probe reached only `30.8 MB/s`,
-far below the expected near-`1 GB/s` rate; diagnose that endpoint path and
-prove the exact TGLC/CuPy parity smoke before using ORCD for the missing S65
-cell. Stream prepared `(orbit, camera, CCD)` source cells, not both source
-pickles and raw FFIs, and retain HDF5 on both systems only after returned PDO
-hash and schema validation.
+Implemented: per-sector multi-aperture BLS, retained peaks, candidate
+consolidation, review tools, heuristic/LEO/centroid diagnostics, and the frozen
+Teacher v3 enrichment workflow. The separate close-DWD public-TGLC diagnostic
+is complete and remains outside the survey denominator.
 
-### Exit criteria
+Exit requires:
 
-- Every production sector has validated HDF5 and FITS coverage, with only
-  explicit `edge_warn` omissions.
-- A stable light-curve index joins Gaia/TIC identity, paths, product/schema
-  versions, detector visits, cadence retention, scatter metrics, and QA state.
-- A frozen release manifest records the sector cutoff and accepted product,
-  catalog, QA, search, and injection versions used by TWIRL I.
-- Gaia-only/no-TIC support and the S94+ QLP-ingestion choice are characterized.
-- Tier-1 science QA covers RMS/MAD versus magnitude with regression limits,
-  missing cadences, quality flags, aperture outliers, WD 1856 timing, a fixed
-  injection-preservation test, and a genuinely independent extraction
-  comparison. A Tier-0 pass alone does not promote a sector for science use.
-  The bounded ADP-pair scope can authorize enrichment only; release promotion
-  requires the future full six-channel scope.
+- reproducible periodic and dip-search baselines with versioned configuration;
+- WD 1856 and deterministic synthetic smokes;
+- multi-sector candidate objects and branch-aware false-alarm statistics;
+- any promoted ranker to pass grouped, calibrated, source-separated tests and
+  a declared transparent baseline comparison.
 
-## Stage 2: transparent search and candidate generation (...)
+### Stage 3 — injection-recovery and completeness (...)
 
-### Implemented
+Implemented: pre-detrend LC injections, aperture/detrending/BLS audits,
+candidate-retention diagnostics, and a pixel/source-pickle smoke.
 
-- A transparent per-sector multi-aperture BLS algorithmic baseline, retained
-  peak tables, cross-aperture consolidation, heuristic vetting, LEO
-  comparison, centroid diagnostics, human-review tooling, and an ADP-only S56
-  active-learning teacher. The generic baseline still uses the quality field
-  stored in the input product; only the separate S56 enrichment builder is
-  currently bound to the authoritative external-quality overlay.
+Exit requires:
 
-### Current gate
+- recovery through extraction calibration, search, any production ranker,
+  automated vetting, and candidate merging;
+- supported completeness surfaces over magnitude, period, event size/depth,
+  duration, sector count, crowding, and other declared nuisance dimensions;
+- a measured LC-level versus representative pixel-level difference;
+- explicit parent sample, product, and search versions for every result.
 
-The focused S56 compact revisit is complete (`407/407` sheets, including `11`
-new Planet-like labels from the `400` model-selected compact rows), but the
-separate blinded S56 `1,000`-TIC enrichment batch remains only partially
-labeled (`177/1,000` at the preserved checkpoint). Franklin completed the
-bounded `3,000`-row S57--S59 handoff (`1,000` per sector). The return contains
-`15` Planet-like, `121` Eclipse/contact, and `106` Broad-isolated-dip labels,
-but these remain morphology decisions rather than confirmed astrophysical
-classes. The user inspected the `347`-row special-case queue and accepted the
-return at the batch-level morphology layer. The exact queue and returned CSV
-are now frozen with a normalized `3,000`-row training artifact. This acceptance
-does not validate astrophysical class, period factor, or ephemeris.
+### Stage 4 — frozen full-survey inference
 
-The handoff rows are fresh sector observations, not all fresh targets: `133`
-TICs overlap the active real S56 training corpus, with `42` sector-to-sector
-label differences (`23` against explicitly final S56 adjudications). The
-training unit remains a sector observation, while every split must be
-TIC-grouped so repeated hosts never cross train/validation/test boundaries.
-The frozen teacher-v1 ranker was used only to enrich review: every displayed
-ephemeris is ADP-small BLS rank one, and model scores and selection buckets
-remained hidden. S57 is no longer a pristine external holdout.
+Stage 4 begins only after the Stage 1 index/release, Stage 2 periodic and dip
+contracts, and Stage 3 recovery chain are frozen. It will use thin drivers in
+`scripts/stage4_search/` to run approved branches across accepted sectors,
+merge multi-sector evidence, and publish one versioned candidate catalog.
 
-The model still receives all seven folds (`P/4`, `P/3`, `P/2`, `P`, `2P`,
-`3P`, `4P`) for every row. Franklin's standalone app preselected `P` and saved
-factor/status together with each morphology click, so those fields are retained
-only as audit metadata. All S57--S59 harmonic targets are explicitly masked
-unless a later factor-only review verifies them; injection truth and the
-existing explicitly verified S56 period decisions remain valid supervision.
-The complete S60--S62 return is frozen against the exact `3,000`-row handoff.
-TeHan then completed the uniform current-ADP Planet-like/EB pass over all `509`
-selected observations. The immutable decision snapshot contains `22` explicit
-changes and `487` suggestions accepted unchanged after the declared full pass,
-yielding `70` Planet-like, `419` Eclipse/contact, `10` Broad-isolated-dip, `7`
-stellar-variability, `2` uncertain, and `1` instrumental/systematic decisions.
-It preserves `64` explicitly verified S56 harmonic targets; all Franklin
-factor choices remain audit-only.
+### Stage 5 — validation and follow-up
 
-The frozen `teacher_v3` corpus contains `8,181` observation rows (`7,724` real
-and `457` injections), of which `8,163` are active training rows. It includes
-all accepted labels from S56--S62, not only the final Planet-like/EB queue. The
-fixed split registry assigns all `7,903` TIC groups once to a `20%` test
-population or one of five development folds with zero TIC leakage. S63 remains
-reserved as a prospective external evaluation rather than being consumed for
-this training release.
+Exit requires reproducible aperture/pixel localization, crowding and neighbor
+checks, odd-even and secondary-event checks, multi-sector consistency,
+independent re-extraction, and appropriate archival or new follow-up. Periodic
+and irregular events follow different confirmation paths. Facility access,
+cadence, sensitivity, and lead time must be verified before a route is called
+ready.
 
-The split-bound per-sector mappings, seven observation-keyed native files,
-native registry, H200 training, single fixed-test opening, and dependent
-performance figure are complete. The
-[performance report](../reports/stage5_validation/teacher_v3_s56_s62_a2v1_current_adp/performance/)
-supports Teacher v3 as an enrichment tool, not an automatic classifier. Its
-primary improvement over metadata only is useful but not decisive, and the
-strong uncertain-masked control identifies label policy as the next
-model-development question. Keep the small ADP aperture as the search channel
-and the primary ADP aperture as contamination evidence unless later injection
-and real-data tests justify a change. Defer the non-periodic dip detector,
-multi-sector aggregation, and false-alarm/background calibration until the
-periodic enrichment and prospective S63 evaluation are frozen. Those
-capabilities remain mandatory before the full survey search or a science-ready
-candidate catalog.
+## Sample freeze and claim boundary
 
-The frozen review now supports two sibling products:
-an immutable observation-level `(sector, TIC, candidate_key)` morphology
-corpus and a browsable enrichment-candidate table with a separate TIC roll-up.
-The roll-up may summarize repeated hosts but must not merge detection
-statistics or imply multi-sector confirmation. Both products retain target
-QA, aperture evidence, displayed ephemeris, harmonic-review status, label
-source, and exact input provenance.
+Freeze `twirl_parent_sample` only after coverage and Gaia-to-TIC losses are
+characterized, the periodic and dip searches are fixed, the full recovery
+contract is fixed, and every exclusion is encoded. Occurrence posteriors or
+upper limits must be restricted to that declared sample, event class, support
+region, and validated completeness surface.
 
-The next model use is the sealed prospective S63 enrichment run. Its primary
-cohort is every validated, model-ready S63 TIC absent from the frozen Teacher
-v3 corpus; repeated Teacher-v3 hosts form a separately reported side cohort.
-The exact-commit S63 compact/model-ready gate has now frozen `53,249` usable
-TICs: `52,487` are disjoint from the Teacher-v3 corpus and `762` are repeated
-hosts. A further `263` reserved TICs are documented Stage-1 edge omissions and
-are excluded from model input. The transparent BLS gate leaves `53,160`
-successful two-aperture rank-one candidates: `89` model-ready primary-cohort
-TICs have an explicit pre-score BLS failure, while all `762` repeated hosts
-remain candidate-eligible. Retain those failures in cohort accounting but do
-not fabricate candidates or pass them to native input, scoring, or review. The
-corrected exact-commit candidate build is complete and independently verifies
-`53,160` unique, duplicate-free rows; the next gate is the authoritative PDO
-raw-source export followed by ORCD native-input preparation.
-Use the original
-Teacher-v3 current-ADP/native contract for the primary test; the corrected SSL
-tensor contract would be a separately preregistered sensitivity, not a silent
-input substitution. Freeze all hashes, the rank-one two-aperture BLS rule,
-queue quotas, random/control design, metrics, and stopping rule before opening
-S63 model scores. Scores enrich a reviewer-safe, score-hidden human-review
-queue and never become labels. The queue withholds explicit cohort and
-selection annotations, but visible TIC identity remains technically joinable
-to the frozen Teacher-v3 corpus; do not describe that boundary as
-cryptographic blinding. The growing positive class is explicitly
-**human-confirmed Planet-like transit morphology**, not a sample of confirmed
-exoplanets.
+TWIRL I is a framework and survey-method paper, not yet an occurrence-rate,
+null-result, or discovery paper. A benchmark recovery, classifier metric,
+embedding, or candidate-retention fraction cannot support those claims alone.
 
-### Model gate
+## Collaboration boundary
 
-- Use `teacher_v3` for the frozen S56--S62 training release of the
-  `s56_harmonic_cnn_v1` architecture. Do not apply its native-v1 checkpoint to
-  quality-aware native-v2 inputs and do not interpret the release name as an
-  automatic production promotion.
-- The observation-keyed preparation table, immutable TIC split, seven native
-  inputs, and `(sector, TIC)` native registry are frozen and validated.
-  Repeated TICs may contribute sector observations but may never collide in
-  storage or cross a train/validation/test boundary.
-- Apply a bounded training-input gate to S57--S62: validate each A2v1 source,
-  regenerate quality-aware BLS/native inputs, and compare the reviewed
-  ephemeris with the current search result. Preserve a label automatically
-  only when the candidate identity remains compatible, including declared
-  harmonic-equivalent matches; route changed or ambiguous rows to a small
-  re-review queue.
-- Freeze one immutable TIC split registry before tensor construction and bind
-  the label corpus, target masks, cadence manifests, native-HDF5 registry,
-  training config, and checkpoint by checksum. Fit one calibration transform
-  from concatenated out-of-fold development logits before evaluating the
-  locked test set.
-- Treat the small real training set as the limiting resource: improve the
-  versioned data/label manifest, TIC-grouped splits, source-separated
-  evaluation, probability calibration, and bootstrap uncertainty before
-  changing model architecture.
-- Archive **Teacher v4-SSL full-pool** as a completed development-only
-  representation experiment. Its fine-tuned matched-OOF result does not beat
-  Teacher v3 decisively and its frozen linear probe fails badly; do not use it
-  for S63 ranking, student labels, or automatic classification. Any corrected-
-  input S63 sensitivity must be declared separately after the primary
-  Teacher-v3 prospective result is frozen.
-- Report a label-policy sensitivity check for the dominant S57--S59
-  `uncertain` return (`2,106/3,000` rows): compare the accepted
-  uncertain-as-other mapping with masking those rows.
-- The current reviewed set reaches `65` unique human-confirmed Planet-like
-  morphology TICs, but that count alone does not authorize student
-  pseudo-labeling. Require the locked grouped real-data performance,
-  calibration, and prospective-enrichment gates as well.
-- Teacher v2 is an exploratory completed comparison that missed its external-
-  retention and morphology-promotion gates. Do not promote or iterate it on
-  the critical path. Any future model iteration requires the rare-factor and
-  predicted-factor-versus-oracle-factor design in [ideas](ideas.md), plus a
-  predeclared advantage over the v1 baseline.
-
-### Exit criteria
-
-- Reproducible periodic and dip baselines with versioned configs.
-- WD 1856 recovery and deterministic synthetic smokes pass.
-- Multi-sector candidate objects and branch-aware false-alarm statistics are
-  defined before the full survey search.
-- Any model used beyond enrichment has target-grouped splits, source-separated
-  metrics, calibration, provenance-safe inputs, and a documented baseline
-  comparison.
-
-## Stage 3: injection-recovery and completeness (...)
-
-### Implemented
-
-- Raw-flux pre-detrend BATMAN injections, balanced and all-host samples,
-  aperture/detrending/BLS audits, compact ORCD products, peak-recall/ranking
-  diagnostics, and a working pixel/source-pickle full-chain smoke.
-
-### Current gate
-
-Run frozen LC-level candidate-retention recovery against the accepted A2v1 ADP
-pair and the same Stage 2 search/vetting contract intended for Stage 4. Add a
-representative pixel-level calibration subset spanning magnitude, crowding,
-aperture disagreement, and detector-edge behavior. Reserve "end-to-end
-completeness" for the later measurement that traverses extraction calibration,
-search, any production ranker, automated vetting, and candidate merging.
-
-### Exit criteria
-
-- Recovery passes through search, any production ranker, automated vetting,
-  and candidate merging.
-- Completeness surfaces are reported by magnitude, period, radius/depth,
-  duration, sector count, and crowding, with support boundaries shown.
-- The LC-level/pixel-level delta is quantified before occurrence claims.
-- Every result names the parent sample and exact search/product versions.
-
-## Stage 4: frozen full-survey inference
-
-Stage 4 begins only after the Stage 1 archive/index, Stage 2 periodic+dip
-contracts, and Stage 3 recovery gates are frozen.
-
-### Required implementation
-
-- Add `scripts/stage4_search/` thin drivers over reusable package APIs.
-- Run periodic and dip branches across all accepted sectors, merge multi-sector
-  evidence, apply only approved rankers, and emit one versioned candidate
-  catalog with diagnostic references.
-- Keep broader exploratory discoveries separate from the locked statistical
-  sample and occurrence denominator.
-
-## Stage 5: validation and follow-up
-
-### Implemented foundation
-
-- Heuristic/LEO checks, two-aperture sheets, human-label schema and
-  adjudication, scalar centroid diagnostics, and a WD 1856 pixel-map
-  diagnostic.
-
-### Required implementation
-
-- Promote pixel-level on-target/off-target evidence to a reproducible candidate
-  check and add image/crowding, odd-even, secondary-event, multi-sector, and
-  independent-reduction checks.
-- Use ZTF/ATLAS archival time-domain checks before new telescope requests.
-- For periodic candidates, require a follow-up-ready ephemeris, contamination
-  review, independent re-extraction, and facility-compatible cadence/depth.
-  Irregular events use a separate monitoring/classification path.
-- Treat Magellan as the current primary MIT-affiliated planning path and MMT as
-  backup/collaborator-driven. Other facilities mentioned in meetings remain
-  unverified until access, cadence, depth, and lead time are checked.
-
-## Sample freeze and occurrence analysis
-
-Freeze `twirl_parent_sample` only after:
-
-1. Stage 1 coverage/QA and Gaia-to-TIC losses are characterized;
-2. the production periodic and dip definitions are fixed;
-3. the full extraction-to-candidate injection contract is fixed; and
-4. exclusions and exploratory-only targets are encoded in catalog metadata.
-
-Occurrence posteriors or upper limits must be limited to the declared sample,
-event class, support region, and validated end-to-end completeness surface. A
-benchmark recovery, BLS-to-teacher retention fraction, or classifier score is
-never a completeness measurement.
-
-## Collaboration and publication boundaries
-
-- TWIRL is a Schwamb-group collaboration. Te Han owns the pipeline/data-product
-  stewardship; detailed contributor ownership and paper leadership must be
-  confirmed in writing rather than inferred from code contributions.
-- TWIRL I is a framework/overview paper, not a final occurrence-rate or
-  discovery paper. Discovery, catalog, methods, and occurrence-paper leadership
-  remain separate decisions where not already explicitly agreed.
-- Julien participates in comparison and follow-up planning. Instrument ideas
-  from meetings are hypotheses until independently verified.
-- Keep only agreed roles and open decisions in this repository. Private
-  negotiation tactics and career-planning notes do not belong in the live
-  public plan.
+TWIRL is a Schwamb-group collaboration. Te Han owns pipeline and data-product
+stewardship. Contributor roles, paper leadership, and discovery-response
+responsibilities must be confirmed explicitly rather than inferred from code
+or telescope access. Keep agreed roles and open project decisions here; private
+negotiation or career-planning notes do not belong in the public plan.
 
 ## Immediate implementation priorities
 
-Resume S65 from its single failed CCD and continue S66--S69 as a parallel
-Stage-1 lane. Its stop-on-failure gates remain mandatory, but gathering every
-later sector does not block the sealed S63 model test. The authorized ORCD
-pilot may accelerate this lane only after the transfer-rate diagnosis and a
-one-cell A2v1 parity smoke; cap it at two H200s and 78 live ORCD CPUs.
+1. Continue the frozen S66--S93 A2v1 deferred-return campaign in sector order;
+   restore the active-plus-three resident buffer, stop on failed gates, and
+   preserve Stage 1 priority over exploratory GPU work. In parallel, prepare
+   only the isolated low-priority S94 shared-QLP reuse smoke described in the
+   protocol; do not release a full S94+ queue before its gates pass.
+2. Run the two isolated model experiments: complete the sealed Teacher-v3 S63
+   score-hidden review, and keep its isolation rule. For FM work, advance only
+   the frozen FM0.2.1 objective canary: pass the exact-code CPU gate and FP32
+   smoke, then stop and validate at steps 64, 500, 1000, and 2000. Apply the
+   development representation and event-retention gates at step 2000. Do not
+   advance FM0.1.3 or FM0.2.2, extend to 20,000 steps, rerun a second seed, or
+   open the sealed FM test.
+3. Advance the transparent survey path independently: implement the dip branch
+   and multi-sector merging, freeze the archive/index and release boundary
+   (including no-TIC and S94+ decisions), then complete the recovery chain
+   required before Stage 4.
 
-1. Complete the exact-commit run of the implemented checksum-bound Teacher-v3
-   prospective S63 lane. The accepted receipt, cadence authority, compact
-   current-ADP export, model-ready allowlist, and disjoint/repeated cohorts are
-   frozen and hash-verified on PDO and ORCD, and the locked rank-one
-   two-aperture BLS table and corrected candidate table are complete. Finish
-   the raw-source/native path with the `89` pre-score BLS failures retained
-   explicitly, then score with the unchanged frozen five-fold Teacher-v3
-   ensemble. Select a
-   deterministic annotation-withheld enrichment queue plus a preregistered
-   control sample; do not inspect scores before the contract is frozen or use
-   probabilities as labels.
-2. Complete annotation-withheld human review and then unblind once. Report
-   Planet-like morphology yield/precision and top-K lift versus the control,
-   with primary TIC-disjoint hosts and repeated hosts separated. Do not claim
-   sector-wide recall or balanced accuracy from an enrichment-biased queue.
-   Only accepted human morphology decisions may enlarge the next training corpus.
-3. Publish the frozen Teacher-v3 release and reviewed S56--S62 morphology
-   corpus/candidate TIC index, while archiving Teacher v4-SSL as a completed
-   non-promoted development experiment. In parallel, repair S65 and continue
-   the gated later-sector light-curve queue.
-4. After the periodic/enrichment path is robust, add the dip branch,
-   multi-sector merging, and branch-aware false-alarm calibration; then rerun
-   frozen-chain candidate-retention and representative pixel-level recovery
-   before survey-wide enrichment or science claims.
-5. Freeze the compact-export/index schema, release cutoff/manifest, and parent-
-   sample criteria; characterize the `764` no-TIC-bridge WDs and the S94+ QLP
-   boundary before the survey release is locked.
-
-When a priority completes, record details in the progress log and retain only
-one to three milestone-level status bullets here.
+When a milestone changes, update this page briefly and place the dated details
+in the progress log. Do not add detector/job diaries or full metric tables here.

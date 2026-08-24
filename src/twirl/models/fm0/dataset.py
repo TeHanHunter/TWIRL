@@ -47,6 +47,10 @@ VARIANT_VIEW_INDICES = {
     "TWIRL-FM0.1.3": (2, 3, 4, 5),
     "TWIRL-FM0.1.4": (0, 1, 2, 3, 4, 5),
     "TWIRL-FM0.1.5": (0, 1, 2, 3, 4, 5),
+    # FM0.2 first changes only the representation objective.  Its two initial
+    # architecture arms therefore retain the exact FM0.1.1/0.1.2 ADP views.
+    "TWIRL-FM0.2.1": (2, 3),
+    "TWIRL-FM0.2.2": (2, 3),
 }
 
 MODEL_WINDOW_KEYS = (
@@ -70,12 +74,12 @@ def _stable_seed(*parts: object) -> int:
 
 
 def variant_view_indices(variant: str) -> tuple[int, ...]:
-    """Return the frozen six-view indices exposed by one FM0.1 variant."""
+    """Return the declared six-view indices exposed by one FM0 variant."""
 
     try:
         return VARIANT_VIEW_INDICES[str(variant)]
     except KeyError as exc:
-        raise ValueError(f"unknown TWIRL-FM0.1 variant: {variant!r}") from exc
+        raise ValueError(f"unknown TWIRL-FM0 variant: {variant!r}") from exc
 
 
 def _manifest_view_presence(row: Mapping[str, str]) -> np.ndarray:

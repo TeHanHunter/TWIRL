@@ -1,0 +1,6 @@
+attempt_id,job_id,variant,evaluator_git_sha,state,elapsed,resources,comparison_use,issue,resolution
+initial_evaluator,21073701,TWIRL-FM0.1.1,ece8619fd72f,FAILED,00:00:23,4_CPU_16_GiB_no_GPU,none,Ordinary deterministic window contained no valid required-view cadences,Retain the same selected visit and deterministically choose an eligible window only when required
+first_repair_tcn,21074410,TWIRL-FM0.1.1,1d4f036a8b91,COMPLETED,00:21:58,4_CPU_16_GiB_no_GPU,diagnostic_only,Fallback hash included the variant name so architecture runs were not guaranteed identical windows,Superseded by matched evaluator 9cb8c960
+first_repair_conformer,21074420,TWIRL-FM0.1.2,1d4f036a8b91,COMPLETED,00:16:57,4_CPU_16_GiB_no_GPU,diagnostic_only,Fallback hash included the variant name so architecture runs were not guaranteed identical windows,Superseded by matched evaluator 9cb8c960
+matched_tcn,21074800,TWIRL-FM0.1.1,9cb8c960ff2e,COMPLETED,00:22:37,4_CPU_16_GiB_no_GPU,primary_development_evidence,Matched component and observation hashes with view-index-bound fallback,Used in the comparison report
+matched_conformer,21074819,TWIRL-FM0.1.2,9cb8c960ff2e,COMPLETED,00:11:42,4_CPU_16_GiB_no_GPU,primary_development_evidence,Matched component and observation hashes with view-index-bound fallback,Used in the comparison report

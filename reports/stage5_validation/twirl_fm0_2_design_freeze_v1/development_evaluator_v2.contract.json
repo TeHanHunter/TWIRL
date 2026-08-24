@@ -1,0 +1,169 @@
+{
+  "campaign_id": "twirl_fm0_2_s56_s64_objective_canary",
+  "claim_limit": "Development-only representation and reconstruction diagnostics. This contract authorizes no sealed-test access, architecture promotion, production use, science claim, or foundation-model claim.",
+  "contract_status": "frozen_before_gpu_submission",
+  "created_at_utc": "2026-08-24T00:00:00Z",
+  "data_access": {
+    "allowed_source_partitions": [
+      "poc_train",
+      "poc_development"
+    ],
+    "development_metrics_partition": "poc_development",
+    "forbidden_source_partition": "poc_sealed_test",
+    "input_manifest_sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a",
+    "poc_sealed_test_unique_shards": 0,
+    "poc_sealed_test_window_reads": 0,
+    "sealed_test_access_count": 0,
+    "upstream_input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7"
+  },
+  "evaluator_cli": {
+    "batch_size": 8,
+    "device": "cpu",
+    "max_components": 256,
+    "max_pca_train_components": 512,
+    "observation_sector_authority_required": true,
+    "observation_sector_authority_sha256_required": true,
+    "pca_components": 32,
+    "random_control_seed": 0,
+        "required_arguments": [
+            "--run-dir",
+            "--output",
+            "--observation-sector-authority",
+            "--observation-sector-authority-sha256",
+            "--expected-git-sha"
+        ]
+  },
+  "metrics": {
+    "baselines": {
+      "pca": {
+        "fit_partition": "poc_train",
+        "maximum_fit_leakage_components": 512,
+        "n_components": 32,
+        "sealed_test_fit_rows": 0
+      },
+      "required_output": [
+        "baselines.pca.fit",
+        "baselines.pca.development_evaluation.embedding_health",
+        "baselines.pca.development_evaluation.safe_mask_pair_separation",
+        "baselines.pca.development_evaluation.query_sector_excluded_cross_visit_retrieval",
+        "baselines.robust_scalar.fit",
+        "baselines.robust_scalar.development_evaluation.embedding_health",
+        "baselines.robust_scalar.development_evaluation.safe_mask_pair_separation",
+        "baselines.robust_scalar.development_evaluation.query_sector_excluded_cross_visit_retrieval"
+      ],
+      "robust_scalar": {
+        "fit_partition": "poc_train",
+        "sealed_test_fit_rows": 0
+      }
+    },
+    "projection_spectrum": "trained_encoder.projection_spectrum",
+    "random_encoder_control": {
+      "architecture_and_parameter_geometry_identical": true,
+      "evaluated_windows_identical": true,
+      "representations": [
+        "h_window",
+        "z_window"
+      ],
+      "seed": 0
+    },
+    "reconstruction": {
+      "required_output": [
+        "masked_reconstruction.masked_huber_mean",
+        "masked_reconstruction.zero_prediction_masked_huber_mean",
+        "masked_reconstruction.model_to_zero_baseline_ratio",
+        "masked_reconstruction.masked_valid_target_count"
+      ],
+      "zero_prediction_masked_huber_reference": 0.004864579067
+    },
+    "representations": {
+      "required": [
+        "h_window",
+        "z_window"
+      ],
+      "required_per_representation": [
+        "embedding_health",
+        "safe_mask_pair_separation",
+        "query_sector_excluded_cross_visit_retrieval"
+      ]
+    },
+    "source_paired_trained_minus_random": {
+      "bootstrap_draws": 2000,
+      "bootstrap_seed": 56006701,
+      "representations": [
+        "h_window",
+        "z_window"
+      ],
+      "required_output_suffix": "trained_minus_random_source_clustered_95_interval"
+    }
+  },
+    "observation_sector_authority": {
+        "construction": "deterministic one-to-one join of the nine immutable per-sector input manifests onto the immutable merged input manifest, followed by projection to the exact declared columns and the poc_train plus poc_development partitions",
+        "exact_column_order": [
+            "observation_key",
+            "leakage_component_id",
+            "source_partition",
+            "sector"
+        ],
+        "exact_manifest_coverage_required": true,
+        "input_manifest_sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a",
+        "join_cardinality": "one_to_one_by_observation_key",
+        "model_visible": false,
+        "partitions": [
+            "poc_train",
+            "poc_development"
+        ],
+        "merge_summary": {
+            "path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2/merge_summary.json",
+            "sha256": "ffb02bc308fd5be6931ce2fed3a54bc99936b85bf93c127aaba539121084bec6"
+        },
+        "per_sector_manifest_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_staging/a2v1_s56_s64_fm0_1_v2",
+        "per_sector_manifest_sha256": {
+            "56": "d6d7df2c12e42b9be38b66b5375bb434218c760f8d9af8063534568795e80827",
+            "57": "a668697ca063b52ae0526a439a590e80be129dee4c4a29ddad88611b021c4cc1",
+            "58": "aeb5650cdb65a41706fe32f50690aaf01b6465d840bc7f1917007a4c6b8a082e",
+            "59": "aec578437e0447ada4f97c0b7ae8c94a5ac54b16428bf1370486c1f1c4509641",
+            "60": "69dc8495d1439c06be73708afb8899b31de65c44496aeaabd00853b60f99fbf2",
+            "61": "eb465a04987b34a018dbcb65d72e2d1135bd4336330e6f29132e88cff3c7fb89",
+            "62": "917b82d416934f9b9736073b48cd8965ab64c913daf09f281f91d510affdf53c",
+            "63": "6ac9d07d8735e7976d765069bdf68a4fe91428f6b16646d18991640982c49cca",
+            "64": "9cc6978491bca03d8fd9fc6519f5f5833d8d8de11bb657478725a474bf99d397"
+        },
+        "sealed_rows_allowed": 0,
+        "sha256_bound_runtime_artifact_required": true
+    },
+  "output_schema_version": "twirl_fm0_representation_health_v2",
+  "query_sector_excluded_retrieval": {
+    "gallery_rule": "exclude every visit whose sector equals the query sector before nearest-neighbor ranking",
+    "identity_for_success": "leakage_component_id",
+    "minimum_distinct_sectors_per_component": 2,
+    "same_visit_or_same_sector_fallback_forbidden": true,
+    "sector_is_audit_only_not_model_visible": true
+  },
+  "schema_version": "twirl_fm0_2_development_evaluator_contract_v2",
+  "step_2000_gate_paths": {
+    "development_masked_huber_maximum": {
+      "maximum": 0.004864579067,
+      "path": "masked_reconstruction.masked_huber_mean"
+    },
+    "paired_minus_unrelated_clustered_lower": {
+      "exclusive_minimum": 0.0,
+      "path": "trained_encoder.representations.z_window.safe_mask_pair_separation.paired_minus_unrelated_source_clustered_95_interval.lower"
+    },
+    "sealed_test_access_count": {
+      "exact": 0,
+      "path": "data_access.sealed_test_access_count"
+    },
+    "trained_minus_random_clustered_lower": {
+      "exclusive_minimum": 0.0,
+      "path": "source_paired_trained_minus_random.z_window.trained_minus_random_source_clustered_95_interval.lower"
+    },
+    "z_window_constant_dimensions": {
+      "maximum": 0,
+      "path": "trained_encoder.representations.z_window.embedding_health.zero_or_constant_dimensions"
+    },
+    "z_window_effective_rank": {
+      "minimum": 26.0,
+      "path": "trained_encoder.representations.z_window.embedding_health.effective_rank"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "architecture": "conformer",
+  "checkpoint_sha256": "e7c8a2ea71d9ab5d3b74bc241d4a39656f7cc54ab0985e35801b19e375fc10e9",
+  "device": "cuda",
+  "elapsed_seconds_this_invocation": 70992.61351855,
+  "final_metrics": {
+    "learning_rate": 0.0,
+    "reconstruction": 0.004643722728360444,
+    "step": 20000.0,
+    "total": 0.004643722728360444,
+    "vicreg": 0.0
+  },
+  "global_step": 20000,
+  "parameter_count": 9345282,
+  "passed": true,
+  "precision": "bf16",
+  "real_data_consumed": true,
+  "run_contract_sha256": "2c26772a7b156b8f10de9455d70de785be408672def8cec82bfc2fd41c883edc",
+  "schema_version": "twirl_fm0_1_real_run_summary_v1",
+  "scientific_result": false,
+  "synthetic_only": false,
+  "variant": "TWIRL-FM0.1.2"
+}

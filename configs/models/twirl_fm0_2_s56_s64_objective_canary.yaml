@@ -1,0 +1,250 @@
+schema_version: twirl_fm0_2_objective_canary_config_v1
+campaign_id: twirl_fm0_2_s56_s64_objective_canary
+model_family: TWIRL-FM0
+campaign_name: TWIRL-FM0.2
+status: frozen_gated_canary_authorized_not_started
+prepared_on: 2026-08-24
+
+authorization:
+  scientific_contract_frozen: true
+  gpu_training_authorized: true
+  gpu_submission_requires_all_prestart_gates: true
+  authorized_variant: TWIRL-FM0.2.1
+  authorized_max_stop_after_step: 2000
+  sealed_test_access_authorized: false
+  production_model_claim: false
+  foundation_model_claim: false
+
+purpose:
+  primary: repair_and_test_the_low_rank_pooled_window_representation
+  fm0_1_failure_being_addressed:
+    tcn_effective_rank: 6.200319324
+    conformer_effective_rank: 8.5792017
+    required_effective_rank: 26
+  causal_hypothesis: >-
+    Reconstruction trains cadence-level hidden states but does not place a loss
+    on the mean-pooled and linearly projected z_window representation.
+  one_changed_mechanism: explicit_same_window_noncollapse_loss_on_z_window
+
+evidence_bindings:
+  fm0_1_comparison_provenance:
+    relative_path: reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/comparison.provenance.json
+    sha256: 04d9aad8b6d6272d7fbada9fe20840b7fd51572f0d5c739f14c1e90e6fa2c98d
+  fm0_1_comparison_metrics:
+    relative_path: reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/comparison_metrics.csv
+    sha256: 5c87a777e059426aa4b0acf5e76492b8ad62c312c5727b05b11782e121feeb1b
+
+input_release_reuse:
+  rebuild_shards: false
+  release_id: twirl_fm0_1_s56_s64_v2
+  sectors: [56, 57, 58, 59, 60, 61, 62, 63, 64]
+  manifest_sha256: f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a
+  fm0_1_input_receipt_sha256: a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7
+  required_new_artifact: reports/stage5_validation/twirl_fm0_2_design_freeze_v1/input_reuse.receipt.json
+  admitted_product_states: [A2V1_ACCEPTED]
+  diagnostic_sectors_admitted: []
+
+identity_and_split:
+  physical_source_field: gaia_dr3_source_id
+  split_field: leakage_component_id
+  split_salt: twirl_fm0_1_source_split_v1
+  train_partition: poc_train
+  development_partition: poc_development
+  sealed_partition: poc_sealed_test
+  reuse_assignments_byte_exactly: true
+  sealed_partition_opened: false
+
+held_fixed:
+  architecture_geometry: TWIRL-FM0.1.1_TCN
+  parameter_count: 8825602
+  embedding_dim: 256
+  pooling: masked_mean
+  embedding_projection: single_linear_256_to_256
+  flux_views: [adp_1x1, adp_3x3]
+  excluded_flux_views:
+    - raw_relative_1x1
+    - raw_relative_3x3
+    - adp015_1x1
+    - adp015_3x3
+  excluded_apertures: [5x5]
+  window_length_cadences: 2048
+  host_first_sampling: true
+  effective_batch_unique_windows: 64
+  mask_target_fraction: 0.15
+  mask_span_length_cadences: [1, 64]
+  synchronized_mask_across_apertures: true
+  absolute_bjd_model_visible: false
+  sector_camera_ccd_model_visible: false
+  bls_labels_candidates_injections_model_visible: false
+  learned_host_aggregator: false
+  cross_sector_consistency_loss: false
+  dedicated_ssl_projector: false
+
+objective:
+  name: masked_reconstruction_plus_same_window_vicreg
+  first_mask:
+    deterministic: true
+    independent_of_second_mask: true
+  second_mask:
+    deterministic: true
+    independent_of_first_mask: true
+  reconstruction:
+    definition: first_mask_reconstruction_only
+    optimized_mask_views: [first]
+    second_mask_reconstruction_is_diagnostic_only: true
+    loss: huber
+    huber_delta_fractional_flux: 0.01
+    equal_view_weight: true
+  vicreg:
+    acts_on: z_window
+    begins_at_optimizer_step: 1
+    total_weight: 0.0002
+    invariance_weight: 25.0
+    variance_weight: 25.0
+    covariance_weight: 1.0
+    hidden_weight_sweep_forbidden: true
+    scale_rationale: >-
+      At a collapsed initialization the weighted variance component is about
+      24.75. Multiplying by 0.0002 contributes about 0.00495, comparable to the
+      observed 0.0047 reconstruction loss instead of roughly 500 times larger.
+  total: >-
+    Huber(mask_A) +
+    0.0002 * (25 * invariance + 25 * variance + 1 * covariance)
+
+variants:
+  TWIRL-FM0.2.1:
+    status: initial_objective_canary
+    architecture: tcn
+    flux_views: [adp_1x1, adp_3x3]
+    objective: masked_reconstruction_plus_same_window_vicreg
+  TWIRL-FM0.2.2:
+    status: blocked_until_0_2_1_canary_passes
+    architecture: parameter_matched_conformer
+    flux_views: [adp_1x1, adp_3x3]
+    objective: masked_reconstruction_plus_same_window_vicreg
+  TWIRL-FM0.2.3:
+    status: reserved_not_authorized
+    change: add_adp015_both_apertures_after_architecture_selection
+  TWIRL-FM0.2.4:
+    status: reserved_not_authorized
+    change: add_raw_relative_both_apertures_after_0_2_3
+
+optimization:
+  seeds: [560067]
+  seed_for_canary: 560067
+  second_seed_blocked_until_canary_passes: 560068
+  optimizer: adamw
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  scheduler: cosine_with_linear_warmup
+  max_optimizer_steps: 20000
+  scheduler_horizon_steps: 20000
+  warmup_steps: 1000
+  effective_batch_windows: 64
+  effective_batch_unique_windows: 64
+  numerical_precision: bf16_after_fp32_smoke
+  checkpoint_interval_minutes: 30
+  minimum_training_loss_is_selection_metric: false
+
+canary:
+  fp32_synthetic_smoke_steps: 8
+  bf16_real_throughput_and_restart_step: 64
+  immutable_milestone_steps: [0, 64, 500, 1000, 2000]
+  run_contract_target_step: 20000
+  authorized_stop_after_steps: [64, 500, 1000, 2000]
+  stop_after_step_is_execution_state_not_scientific_contract: true
+  representation_evaluation_steps: [0, 500, 1000, 2000]
+  primary_go_no_go_step: 2000
+  extension_beyond_step_2000_authorized: false
+  one_h200_only: true
+  cpus: 4
+  memory_gib: 32
+  stage1_safe_admission_required: true
+  fresh_admission_required_for_every_h200_invocation: true
+  required_logging:
+    - reconstruction_first
+    - reconstruction_second
+    - reconstruction_mean
+    - vicreg_unweighted
+    - vicreg_weighted
+    - vicreg_invariance
+    - vicreg_variance
+    - vicreg_covariance
+    - total_loss
+    - learning_rate
+    - embedding_projection_gradient_norm
+    - window_draws_seen
+    - masked_views_seen
+    - elapsed_seconds
+
+matched_development_panel:
+  selected_leakage_components: 256
+  selected_observation_visits: 383
+  selected_leakage_components_sha256: 50e0b59e1bc80ded61e30c1a6c07a56eee6306b03c3bd52e1f30ebdc43f5c72f
+  selected_observation_keys_sha256: 9ffdc49e042cf4e8dccbe53e70fd849723abf96625c36a00adea8f4fde20546a
+  model_visible_identifiers: false
+  sealed_rows_allowed: 0
+
+required_diagnostics:
+  - preprojection_h_window_embedding_health
+  - postprojection_z_window_embedding_health
+  - embedding_projection_singular_spectrum
+  - source_paired_trained_minus_random_separation_interval
+  - query_sector_excluded_cross_visit_retrieval
+  - train_fit_pca_baseline
+  - robust_scalar_baseline
+  - masked_reconstruction_zero_prediction_baseline
+  - development_event_retention
+
+step_2000_go_no_go_gates:
+  strict_provenance_and_restart_passed: true
+  all_parameters_optimizer_states_gradients_and_loss_components_finite: true
+  embedding_projection_gradient_nonzero: true
+  embedding_projection_changed_from_initialization: true
+  z_window_effective_rank_minimum: 26
+  z_window_constant_dimensions_maximum: 0
+  paired_minus_unrelated_clustered_95_lower_strictly_greater_than: 0.0
+  trained_minus_random_separation_clustered_95_lower_strictly_greater_than: 0.0
+  development_masked_huber_maximum: 0.004864579067
+  development_event_retention_receipt_passed: true
+  sealed_test_access_count: 0
+
+prestart_gate_contract:
+  fail_closed: true
+  required_before_first_real_data_h200_submission:
+    - frozen_config_and_freeze_receipt_hashes_match
+    - tracked_input_reuse_receipt_passes
+    - upstream_fm0_1_input_receipt_and_manifest_hashes_match
+    - evaluator_v2_contract_is_checksum_bound
+    - development_event_retention_contract_is_checksum_bound
+    - immutable_milestone_and_exact_resume_tests_pass
+    - eight_step_fp32_gradient_and_replay_smoke_post_validation_passes
+    - fresh_stage1_safe_admission_receipt_passes
+  result_gates_run_only_after_step_2000:
+    - evaluator_v2_development_representation_health
+    - development_event_retention_result
+  may_not_be_bypassed_by_environment_override: true
+
+explicitly_not_changed_in_fm0_2_1:
+  - input_release_bytes
+  - source_split
+  - model_width_depth_or_pooling
+  - context_length
+  - flux_views_or_apertures
+  - window_sampler_or_mask_fraction
+  - time_coordinates
+  - architecture
+  - metadata_inputs
+  - host_aggregation
+  - raw_flux_exposure
+  - bls_or_supervision_boundary
+
+later_policy:
+  failed_seed_560067_canary_may_not_be_rescued_by_seed_560068: true
+  full_20000_step_run_requires_step_2000_gate: true
+  conformer_run_requires_step_2000_gate: true
+  architecture_selection_requires_both_frozen_seeds: true
+  simpler_tcn_wins_if_conformer_gain_is_within_source_clustered_uncertainty: true
+  add_adp015_only_after_architecture_selection: true
+  add_raw_relative_only_after_adp015_test: true
+  sealed_test_opened_once_for_frozen_finalist_only: true

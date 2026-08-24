@@ -1,0 +1,43 @@
+{
+  "architecture": "conformer",
+  "authorities": {
+    "config_sha256": "7de4e8c9e98c0ce27648a21241acc51766e436a537ba932b54f529fbdbf26d8a",
+    "design_sha256": "94c8672a087884bf8a2c70f5d15315e05de602134af0c6c2073ca1c36232d6f7",
+    "freeze_receipt_sha256": "75092235978c0b582f569be55770ad2d63368e079a6777da0b1c44547f074c25"
+  },
+  "campaign_id": "twirl_fm0_1_s56_s67_poc",
+  "device_request": "cuda",
+  "expected_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb",
+  "input_release": {
+    "certifies_full_campaign": false,
+    "manifest_path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2/manifest.csv",
+    "manifest_sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a",
+    "n_observations": 273766,
+    "n_sources": 185797,
+    "receipt_path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_1_s56_s67_poc/ece8619fd72f/frozen/input_release_validation/input_release.receipt.json",
+    "receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7",
+    "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2",
+    "source_partition": "poc_train"
+  },
+  "input_release_receipt_precondition": null,
+  "micro_batch_windows": 8,
+  "optimization": {
+    "effective_batch_windows": 64,
+    "huber_delta": 0.01,
+    "learning_rate": 0.0003,
+    "max_optimizer_steps": 20000,
+    "vicreg_covariance_weight": 1.0,
+    "vicreg_invariance_weight": 25.0,
+    "vicreg_total_weight": 0.1,
+    "vicreg_variance_weight": 25.0,
+    "warmup_steps": 1000,
+    "weight_decay": 0.01
+  },
+  "precision": "bf16",
+  "real_data_consumed": true,
+  "schema_version": "twirl_fm0_1_real_run_contract_v1",
+  "seed": 560067,
+  "synthetic_smoke": false,
+  "target_step": 20000,
+  "variant": "TWIRL-FM0.1.2"
+}

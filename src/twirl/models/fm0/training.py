@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass
+import hashlib
 import math
 import os
 from pathlib import Path
@@ -29,6 +30,99 @@ except ImportError:  # pragma: no cover - local base environment omits Torch
 
 
 CHECKPOINT_SCHEMA_VERSION = "twirl_fm0_1_checkpoint_v1"
+
+
+def _objective_state(
+    *,
+    use_vicreg: bool,
+    reconstruct_second_view: bool,
+) -> dict[str, bool]:
+    """Return the checkpoint-bound objective switches for one invocation."""
+
+    if type(use_vicreg) is not bool or type(reconstruct_second_view) is not bool:
+        raise ValueError("FM0 objective switches must be boolean")
+    if reconstruct_second_view and not use_vicreg:
+        raise ValueError("a second reconstruction view requires paired VICReg input")
+    return {
+        "use_vicreg": use_vicreg,
+        "reconstruct_second_view": reconstruct_second_view,
+    }
+
+
+def _validated_objective_state(
+    value: Any,
+    *,
+    label: str,
+) -> dict[str, bool]:
+    """Validate the exact, intentionally small objective-state schema."""
+
+    expected_keys = {"use_vicreg", "reconstruct_second_view"}
+    if not isinstance(value, Mapping) or set(value) != expected_keys:
+        raise ValueError(f"{label} must contain exactly {sorted(expected_keys)}")
+    if any(type(value[name]) is not bool for name in expected_keys):
+        raise ValueError(f"{label} switches must be boolean")
+    return _objective_state(
+        use_vicreg=value["use_vicreg"],
+        reconstruct_second_view=value["reconstruct_second_view"],
+    )
+
+
+def _legacy_objective_state(payload: Mapping[str, Any]) -> dict[str, bool] | None:
+    """Infer objective switches for trusted checkpoints predating the field.
+
+    The frozen FM0.1 ladder makes this inference unambiguous.  Unknown ad-hoc
+    checkpoints fail closed instead of being resumed under a possibly different
+    loss.
+    """
+
+    contract = payload.get("run_contract")
+    if not isinstance(contract, Mapping):
+        return None
+    if type(contract.get("use_vicreg")) is bool and type(
+        contract.get("reconstruct_second_view")
+    ) is bool:
+        return _objective_state(
+            use_vicreg=contract["use_vicreg"],
+            reconstruct_second_view=contract["reconstruct_second_view"],
+        )
+    variant = contract.get("variant")
+    if variant == "TWIRL-FM0.1.5":
+        return _objective_state(use_vicreg=True, reconstruct_second_view=True)
+    if variant in {
+        "TWIRL-FM0.1.1",
+        "TWIRL-FM0.1.2",
+        "TWIRL-FM0.1.3",
+        "TWIRL-FM0.1.4",
+    }:
+        return _objective_state(use_vicreg=False, reconstruct_second_view=False)
+    return None
+
+
+def _optional_contract_bool(
+    contract: Mapping[str, Any], name: str
+) -> bool | None:
+    if name not in contract:
+        return None
+    value = contract[name]
+    if type(value) is not bool:
+        raise ValueError(f"FM0 run contract {name} must be boolean")
+    return value
+
+
+def _immutable_milestone_steps(contract: Mapping[str, Any]) -> tuple[int, ...]:
+    raw = contract.get("immutable_milestone_steps", ())
+    if not isinstance(raw, (list, tuple)):
+        raise ValueError("FM0 immutable milestone steps must be a sequence")
+    steps: list[int] = []
+    for value in raw:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                "FM0 immutable milestone steps must be nonnegative integers"
+            )
+        steps.append(value)
+    if len(set(steps)) != len(steps) or steps != sorted(steps):
+        raise ValueError("FM0 immutable milestone steps must be unique and sorted")
+    return tuple(steps)
 
 
 def _dataset_contract(dataset: Any) -> dict[str, Any]:
@@ -59,6 +153,16 @@ class FM0OptimizationConfig:
             raise ValueError("invalid scheduler step counts")
         if self.effective_batch_windows <= 0 or self.huber_delta <= 0:
             raise ValueError("batch size and Huber delta must be positive")
+        if any(
+            not math.isfinite(value) or value < 0
+            for value in (
+                self.vicreg_total_weight,
+                self.vicreg_invariance_weight,
+                self.vicreg_variance_weight,
+                self.vicreg_covariance_weight,
+            )
+        ):
+            raise ValueError("VICReg weights must be nonnegative")
 
 
 def seed_everything(seed: int, *, deterministic: bool = True) -> None:
@@ -168,6 +272,7 @@ def fm0_objective(
     *,
     second_batch: dict[str, Any] | None,
     config: FM0OptimizationConfig,
+    reconstruct_second_view: bool = True,
 ) -> tuple[Any, dict[str, Any]]:
     """Compute masked reconstruction and optional same-window VICReg.
 
@@ -201,7 +306,10 @@ def fm0_objective(
         second_batch["reconstruction_mask"],
         delta=config.huber_delta,
     )
-    reconstruction = 0.5 * (reconstruction + second_reconstruction)
+    reconstruction_mean = 0.5 * (reconstruction + second_reconstruction)
+    optimized_reconstruction = (
+        reconstruction_mean if reconstruct_second_view else reconstruction
+    )
     if first_output["z_window"].shape[0] != config.effective_batch_windows:
         raise ValueError(
             "VICReg variance and covariance require the complete effective batch"
@@ -213,11 +321,12 @@ def fm0_objective(
         variance_weight=config.vicreg_variance_weight,
         covariance_weight=config.vicreg_covariance_weight,
     )
-    total = reconstruction + config.vicreg_total_weight * vicreg
+    total = optimized_reconstruction + config.vicreg_total_weight * vicreg
     diagnostics.update(
         {
-            "reconstruction": reconstruction,
+            "reconstruction": optimized_reconstruction,
             "reconstruction_second": second_reconstruction,
+            "reconstruction_mean": reconstruction_mean,
             "vicreg": vicreg,
             "vicreg_invariance": vicreg_stats["invariance"],
             "vicreg_variance": vicreg_stats["variance"],
@@ -281,6 +390,38 @@ def _atomic_torch_save(payload: Mapping[str, Any], path: Path) -> None:
     os.replace(temporary, path)
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _atomic_write_sha256_sidecar(path: Path) -> str:
+    digest = _sha256_file(path)
+    sidecar = path.with_name(path.name + ".sha256")
+    temporary = sidecar.with_name(f".{sidecar.name}.tmp-{os.getpid()}")
+    temporary.write_text(f"{digest}  {path.name}\n", encoding="utf-8")
+    os.replace(temporary, sidecar)
+    return digest
+
+
+def _verify_sha256_sidecar(path: Path, *, required: bool) -> str | None:
+    sidecar = path.with_name(path.name + ".sha256")
+    if not sidecar.is_file():
+        if required:
+            raise ValueError(f"missing FM0 checkpoint SHA256 sidecar: {sidecar}")
+        return None
+    fields = sidecar.read_text(encoding="utf-8").strip().split()
+    if len(fields) != 2 or fields[1] != path.name:
+        raise ValueError(f"malformed FM0 checkpoint SHA256 sidecar: {sidecar}")
+    observed = _sha256_file(path)
+    if fields[0] != observed:
+        raise ValueError(f"FM0 checkpoint SHA256 mismatch: {path}")
+    return observed
+
+
 def checkpoint_payload(
     *,
     model: Any,
@@ -291,6 +432,7 @@ def checkpoint_payload(
     optimization: FM0OptimizationConfig,
     dataset: Any,
     loss_history: list[dict[str, float]],
+    objective_state: Mapping[str, bool],
 ) -> dict[str, Any]:
     """Capture every state needed for exact optimizer-step continuation."""
 
@@ -316,6 +458,10 @@ def checkpoint_payload(
             asdict(dataset.config) if isinstance(dataset, SyntheticFM0Dataset) else None
         ),
         "run_contract": dict(run_contract),
+        "objective_state": _validated_objective_state(
+            objective_state,
+            label="FM0 checkpoint objective state",
+        ),
         "loss_history": list(loss_history),
     }
 
@@ -333,6 +479,59 @@ def save_rotating_checkpoint(
     return latest
 
 
+def save_immutable_milestone_checkpoint(
+    output_dir: str | Path,
+    payload: Mapping[str, Any],
+) -> Path:
+    """Write one step-addressed checkpoint without replacing an existing file."""
+
+    progress = payload.get("progress")
+    raw_step = progress.get("global_step") if isinstance(progress, Mapping) else None
+    if isinstance(raw_step, bool) or not isinstance(raw_step, int) or raw_step < 0:
+        raise ValueError("FM0 milestone checkpoint has no valid global step")
+    step = raw_step
+    destination = Path(output_dir) / f"checkpoint_step_{step:08d}.pt"
+    sidecar = destination.with_name(destination.name + ".sha256")
+    if destination.exists() or sidecar.exists():
+        raise FileExistsError(
+            "refusing to replace immutable FM0 milestone or sidecar: "
+            f"{destination}"
+        )
+    _atomic_torch_save(payload, destination)
+    _atomic_write_sha256_sidecar(destination)
+    return destination
+
+
+def _immutable_milestone_artifacts(
+    output_dir: str | Path,
+    milestone_steps: tuple[int, ...],
+    *,
+    global_step: int,
+) -> list[dict[str, Any]]:
+    """Return verified bindings for every declared milestone already reached."""
+
+    output = Path(output_dir)
+    artifacts: list[dict[str, Any]] = []
+    for step in milestone_steps:
+        if step > global_step:
+            break
+        checkpoint = output / f"checkpoint_step_{step:08d}.pt"
+        if not checkpoint.is_file():
+            raise ValueError(f"missing reached FM0 milestone checkpoint: {checkpoint}")
+        digest = _verify_sha256_sidecar(checkpoint, required=True)
+        artifacts.append(
+            {
+                "step": step,
+                "checkpoint": str(checkpoint.resolve()),
+                "sha256_sidecar": str(
+                    checkpoint.with_name(checkpoint.name + ".sha256").resolve()
+                ),
+                "sha256": digest,
+            }
+        )
+    return artifacts
+
+
 def load_checkpoint(
     path: str | Path,
     *,
@@ -341,12 +540,18 @@ def load_checkpoint(
     scheduler: Any,
     expected_run_contract: Mapping[str, Any],
     expected_optimization: FM0OptimizationConfig,
+    expected_objective_state: Mapping[str, bool],
     dataset: Any,
 ) -> tuple[int, list[dict[str, float]]]:
     """Load and validate a full FM0 checkpoint, including RNG and sampler state."""
 
     require_torch()
-    payload = torch.load(Path(path), map_location="cpu", weights_only=False)
+    checkpoint_path = Path(path)
+    _verify_sha256_sidecar(
+        checkpoint_path,
+        required=checkpoint_path.name.startswith("checkpoint_step_"),
+    )
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     if not isinstance(payload, Mapping):
         raise ValueError("FM0 checkpoint is not a mapping")
     if payload.get("schema_version") != CHECKPOINT_SCHEMA_VERSION:
@@ -355,6 +560,22 @@ def load_checkpoint(
         raise ValueError("FM0 checkpoint run contract mismatch")
     if payload.get("optimization_config") != asdict(expected_optimization):
         raise ValueError("FM0 checkpoint optimization contract mismatch")
+    expected_objective = _validated_objective_state(
+        expected_objective_state,
+        label="expected FM0 objective state",
+    )
+    raw_objective = payload.get("objective_state")
+    if raw_objective is None:
+        observed_objective = _legacy_objective_state(payload)
+    else:
+        observed_objective = _validated_objective_state(
+            raw_objective,
+            label="FM0 checkpoint objective state",
+        )
+    if observed_objective is None:
+        raise ValueError("FM0 checkpoint lacks a provable objective state")
+    if observed_objective != expected_objective:
+        raise ValueError("FM0 checkpoint objective state mismatch")
     if payload.get("model_config") != asdict(model.config):
         raise ValueError("FM0 checkpoint model configuration mismatch")
     observed_dataset_contract = payload.get("dataset_contract")
@@ -373,7 +594,11 @@ def load_checkpoint(
     global_step = int(progress.get("global_step", -1))
     if global_step < 0:
         raise ValueError("FM0 checkpoint has invalid global step")
-    dataset.set_epoch(int(progress.get("epoch", 0)))
+    progress_epoch = int(progress.get("epoch", 0))
+    sampler_epoch = int(payload.get("sampler_state", {}).get("dataset_epoch", -1))
+    if sampler_epoch != progress_epoch:
+        raise ValueError("FM0 checkpoint dataset epoch is inconsistent")
+    dataset.set_epoch(progress_epoch)
     expected_sample = global_step * expected_optimization.effective_batch_windows
     if int(payload.get("sampler_state", {}).get("next_absolute_sample", -1)) != expected_sample:
         raise ValueError("FM0 checkpoint sampler state is inconsistent")
@@ -417,6 +642,21 @@ def _restore_forward_rng_state(state: Mapping[str, Any], device: Any) -> None:
     torch.set_rng_state(state["cpu"])
     if device.type == "cuda":
         torch.cuda.set_rng_state(state["cuda"], device=device)
+
+
+def _embedding_projection_gradient_norm(model: Any) -> float:
+    """Return the L2 norm of the gradient that actually reaches ``z_window``."""
+
+    require_torch()
+    squared = None
+    for parameter in model.embedding_projection.parameters():
+        if parameter.grad is None:
+            continue
+        value = parameter.grad.detach().float().pow(2).sum()
+        squared = value if squared is None else squared + value
+    if squared is None:
+        return 0.0
+    return float(torch.sqrt(squared).cpu())
 
 
 def _backprop_effective_batch_vicreg(
@@ -471,21 +711,24 @@ def _backprop_effective_batch_vicreg(
         for record in replay_records:
             count = int(record["batch_windows"])
             _restore_forward_rng_state(record["first_rng"], device)
+            scale = float(config.vicreg_total_weight)
             with _autocast_context(device, precision):
                 first_z = model(record["first_batch"])["z_window"]
+            first_z.backward(
+                (first_gradient[offset : offset + count] * scale).to(
+                    first_z.dtype
+                )
+            )
+            del first_z
             _restore_forward_rng_state(record["second_rng"], device)
             with _autocast_context(device, precision):
                 second_z = model(record["second_batch"])["z_window"]
-            scale = float(config.vicreg_total_weight)
-            torch.autograd.backward(
-                (first_z, second_z),
-                (
-                    first_gradient[offset : offset + count].to(first_z.dtype)
-                    * scale,
-                    second_gradient[offset : offset + count].to(second_z.dtype)
-                    * scale,
-                ),
+            second_z.backward(
+                (second_gradient[offset : offset + count] * scale).to(
+                    second_z.dtype
+                )
             )
+            del second_z
             offset += count
     finally:
         _restore_forward_rng_state(post_forward_rng, device)
@@ -508,6 +751,7 @@ def _run_training(
     device: str,
     precision: str,
     use_vicreg: bool,
+    reconstruct_second_view: bool,
     synthetic_only: bool,
     checkpoint_interval_seconds: float,
     progress_interval_steps: int,
@@ -516,8 +760,26 @@ def _run_training(
     """Run deterministic FM0 training and write full rotating checkpoints."""
 
     require_torch()
+    invocation_objective = _objective_state(
+        use_vicreg=use_vicreg,
+        reconstruct_second_view=reconstruct_second_view,
+    )
+    contract_use_vicreg = _optional_contract_bool(run_contract, "use_vicreg")
+    if contract_use_vicreg is not None and contract_use_vicreg != use_vicreg:
+        raise ValueError("FM0 run contract and objective path disagree")
+    contract_reconstruct_second = _optional_contract_bool(
+        run_contract, "reconstruct_second_view"
+    )
+    if (
+        contract_reconstruct_second is not None
+        and contract_reconstruct_second != reconstruct_second_view
+    ):
+        raise ValueError("FM0 run contract and reconstruction path disagree")
+    milestone_steps = _immutable_milestone_steps(run_contract)
     if target_step <= 0 or target_step > optimization.max_optimizer_steps:
         raise ValueError("target_step is outside the frozen optimizer budget")
+    if milestone_steps and milestone_steps[-1] > optimization.max_optimizer_steps:
+        raise ValueError("immutable milestone schedule exceeds optimizer horizon")
     if micro_batch_windows <= 0:
         raise ValueError("micro_batch_windows must be positive")
     if optimization.effective_batch_windows % micro_batch_windows:
@@ -539,6 +801,7 @@ def _run_training(
             scheduler=scheduler,
             expected_run_contract=run_contract,
             expected_optimization=optimization,
+            expected_objective_state=invocation_objective,
             dataset=dataset,
         )
     if global_step > target_step:
@@ -548,6 +811,21 @@ def _run_training(
     started = time.monotonic()
     last_checkpoint_at = started
     model.train()
+    if global_step == 0 and resume_checkpoint is None and 0 in milestone_steps:
+        save_immutable_milestone_checkpoint(
+            output_dir,
+            checkpoint_payload(
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                global_step=global_step,
+                run_contract=run_contract,
+                optimization=optimization,
+                dataset=dataset,
+                loss_history=loss_history,
+                objective_state=invocation_objective,
+            ),
+        )
     while global_step < target_step:
         optimizer.zero_grad(set_to_none=True)
         metric_sums: dict[str, float] = {}
@@ -590,15 +868,36 @@ def _run_training(
                         delta=optimization.huber_delta,
                     )
                     second_rng = _capture_forward_rng_state(resolved_device)
-                    second_output = model(second_batch)
-                    second_reconstruction, _ = masked_huber_reconstruction_loss(
-                        second_output["reconstruction"],
-                        second_batch["flux"].float(),
-                        second_batch["reconstruction_mask"],
-                        delta=optimization.huber_delta,
-                    )
-                    reconstruction = 0.5 * (
+                    if reconstruct_second_view:
+                        second_output = model(second_batch)
+                        second_reconstruction, _ = masked_huber_reconstruction_loss(
+                            second_output["reconstruction"],
+                            second_batch["flux"].float(),
+                            second_batch["reconstruction_mask"],
+                            delta=optimization.huber_delta,
+                        )
+                    else:
+                        # FM0.2 uses the second mask only to define the paired
+                        # representation view. Its reconstruction remains a
+                        # no-gradient diagnostic, which avoids retaining a
+                        # decoder graph that is never optimized.
+                        with torch.no_grad():
+                            second_output = model(second_batch)
+                            second_reconstruction, _ = (
+                                masked_huber_reconstruction_loss(
+                                    second_output["reconstruction"],
+                                    second_batch["flux"].float(),
+                                    second_batch["reconstruction_mask"],
+                                    delta=optimization.huber_delta,
+                                )
+                            )
+                    reconstruction_mean = 0.5 * (
                         first_reconstruction + second_reconstruction
+                    )
+                    reconstruction = (
+                        reconstruction_mean
+                        if reconstruct_second_view
+                        else first_reconstruction
                     )
                 (reconstruction / accumulation).backward()
                 first_embeddings.append(first_output["z_window"].detach())
@@ -616,6 +915,15 @@ def _run_training(
                 metric_sums["reconstruction"] = metric_sums.get(
                     "reconstruction", 0.0
                 ) + float(reconstruction.detach().cpu()) / accumulation
+                metric_sums["reconstruction_first"] = metric_sums.get(
+                    "reconstruction_first", 0.0
+                ) + float(first_reconstruction.detach().cpu()) / accumulation
+                metric_sums["reconstruction_second"] = metric_sums.get(
+                    "reconstruction_second", 0.0
+                ) + float(second_reconstruction.detach().cpu()) / accumulation
+                metric_sums["reconstruction_mean"] = metric_sums.get(
+                    "reconstruction_mean", 0.0
+                ) + float(reconstruction_mean.detach().cpu()) / accumulation
             else:
                 with _autocast_context(resolved_device, precision):
                     loss, diagnostics = fm0_objective(
@@ -631,7 +939,7 @@ def _run_training(
                         diagnostics[name].detach().cpu()
                     ) / accumulation
         if use_vicreg:
-            vicreg, _ = _backprop_effective_batch_vicreg(
+            vicreg, vicreg_diagnostics = _backprop_effective_batch_vicreg(
                 model=model,
                 replay_records=replay_records,
                 first_embeddings=first_embeddings,
@@ -641,22 +949,55 @@ def _run_training(
                 precision=precision,
             )
             metric_sums["vicreg"] = float(vicreg.cpu())
+            metric_sums["vicreg_weighted"] = (
+                optimization.vicreg_total_weight * metric_sums["vicreg"]
+            )
+            for name in ("invariance", "variance", "covariance"):
+                metric_sums[f"vicreg_{name}"] = float(
+                    vicreg_diagnostics[name].cpu()
+                )
             metric_sums["total"] = (
                 metric_sums["reconstruction"]
-                + optimization.vicreg_total_weight * metric_sums["vicreg"]
+                + metric_sums["vicreg_weighted"]
             )
+        metric_sums["embedding_projection_gradient_norm"] = (
+            _embedding_projection_gradient_norm(model)
+        )
         optimizer.step()
         scheduler.step()
         global_step += 1
         metrics = {
             "step": float(global_step),
             "learning_rate": float(optimizer.param_groups[0]["lr"]),
+            "window_draws_seen": float(
+                global_step * optimization.effective_batch_windows
+            ),
+            "masked_views_seen": float(
+                global_step
+                * optimization.effective_batch_windows
+                * (2 if use_vicreg else 1)
+            ),
             **metric_sums,
         }
         if not all(math.isfinite(value) for value in metrics.values()):
             raise RuntimeError("non-finite FM0 training metric")
         loss_history.append(metrics)
         now = time.monotonic()
+        if global_step in milestone_steps:
+            save_immutable_milestone_checkpoint(
+                output_dir,
+                checkpoint_payload(
+                    model=model,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    global_step=global_step,
+                    run_contract=run_contract,
+                    optimization=optimization,
+                    dataset=dataset,
+                    loss_history=loss_history,
+                    objective_state=invocation_objective,
+                ),
+            )
         if global_step == 1 or global_step % progress_interval_steps == 0:
             print(
                 "[fm0-train] "
@@ -680,6 +1021,7 @@ def _run_training(
                 optimization=optimization,
                 dataset=dataset,
                 loss_history=loss_history,
+                objective_state=invocation_objective,
             )
             save_rotating_checkpoint(output_dir, payload)
             last_checkpoint_at = now
@@ -693,15 +1035,22 @@ def _run_training(
         optimization=optimization,
         dataset=dataset,
         loss_history=loss_history,
+        objective_state=invocation_objective,
     )
     final_checkpoint = Path(output_dir) / "checkpoint.pt"
     _atomic_torch_save(final_payload, final_checkpoint)
+    milestone_artifacts = _immutable_milestone_artifacts(
+        output_dir,
+        milestone_steps,
+        global_step=global_step,
+    )
     elapsed = time.monotonic() - started
     return {
         "global_step": global_step,
         "loss_history": loss_history,
         "final_metrics": loss_history[-1] if loss_history else {},
         "checkpoint": str(final_checkpoint.resolve()),
+        "immutable_milestone_checkpoints": milestone_artifacts,
         "elapsed_seconds_this_invocation": elapsed,
         "precision": precision,
         "device": str(resolved_device),
@@ -721,10 +1070,16 @@ def run_synthetic_training(
     device: str,
     precision: str,
     use_vicreg: bool,
+    reconstruct_second_view: bool | None = None,
     resume_checkpoint: str | Path | None = None,
 ) -> dict[str, Any]:
     """Run an explicitly synthetic numerical smoke."""
 
+    resolved_reconstruct_second = (
+        bool(use_vicreg)
+        if reconstruct_second_view is None
+        else bool(reconstruct_second_view)
+    )
     return _run_training(
         model=model,
         dataset=dataset,
@@ -736,6 +1091,7 @@ def run_synthetic_training(
         device=device,
         precision=precision,
         use_vicreg=use_vicreg,
+        reconstruct_second_view=resolved_reconstruct_second,
         synthetic_only=True,
         checkpoint_interval_seconds=0,
         progress_interval_steps=1,
@@ -754,12 +1110,16 @@ def run_real_training(
     micro_batch_windows: int,
     device: str,
     precision: str,
+    use_vicreg: bool = False,
+    reconstruct_second_view: bool | None = None,
     resume_checkpoint: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Train FM0.1.1--0.1.4 on a checksum-bound real input release."""
-
-    if dataset.config.variant == "TWIRL-FM0.1.5":
-        raise ValueError("FM0.1.5 real training must explicitly enable VICReg")
+    """Train one declared FM0 objective on a checksum-bound input release."""
+    resolved_reconstruct_second = (
+        bool(use_vicreg)
+        if reconstruct_second_view is None
+        else bool(reconstruct_second_view)
+    )
     return _run_training(
         model=model,
         dataset=dataset,
@@ -770,7 +1130,8 @@ def run_real_training(
         micro_batch_windows=micro_batch_windows,
         device=device,
         precision=precision,
-        use_vicreg=False,
+        use_vicreg=use_vicreg,
+        reconstruct_second_view=resolved_reconstruct_second,
         synthetic_only=False,
         checkpoint_interval_seconds=1800,
         progress_interval_steps=10,

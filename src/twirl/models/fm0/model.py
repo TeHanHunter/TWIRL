@@ -1,4 +1,4 @@
-"""Small, parameter-matched TWIRL-FM0.1 TCN and Conformer encoders."""
+"""Small, parameter-matched TWIRL-FM0 TCN and Conformer encoders."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -58,7 +58,7 @@ class FM0ModelConfig:
         if self.architecture not in ("tcn", "conformer"):
             raise ValueError(f"unsupported architecture: {self.architecture!r}")
         if self.n_flux_views not in (2, 4, 6):
-            raise ValueError("FM0.1 exposes exactly 2, 4, or 6 flux views")
+            raise ValueError("FM0 exposes exactly 2, 4, or 6 flux views")
         if self.window_length <= 0 or self.d_model <= 0:
             raise ValueError("window_length and d_model must be positive")
         if self.embedding_dim != 256 and self.d_model == 256:
@@ -271,7 +271,7 @@ class _ContinuousTimeEncoding(_ModuleBase):
 
 
 class TWIRLFM0(_ModuleBase):
-    """Window encoder and per-view reconstruction head for one FM0.1 variant."""
+    """Window encoder and per-view reconstruction head for one FM0 variant."""
 
     def __init__(self, config: FM0ModelConfig) -> None:
         require_torch()
@@ -440,13 +440,16 @@ class TWIRLFM0(_ModuleBase):
             # patch to share one decoded state and erase sub-patch events.
             full_hidden = (upsampled + hidden) * token_valid[:, None, :]
 
-        embedding = self.embedding_projection(
-            self._masked_mean(token_hidden, output_valid)
-        )
+        h_window = self._masked_mean(token_hidden, output_valid)
+        embedding = self.embedding_projection(h_window)
         reconstruction = self.reconstruction_head(full_hidden)
         reconstruction = reconstruction * token_valid[:, None, :]
         return {
             "reconstruction": reconstruction,
+            # This output-only diagnostic localizes whether low rank originates
+            # before or after the projection.  It adds no parameter or model
+            # input and remains compatible with existing FM0.1 checkpoints.
+            "h_window": h_window,
             "z_window": embedding,
             "token_valid": output_valid,
         }
@@ -460,6 +463,10 @@ def architecture_for_variant(
     if variant == "TWIRL-FM0.1.1":
         return "tcn"
     if variant == "TWIRL-FM0.1.2":
+        return "conformer"
+    if variant == "TWIRL-FM0.2.1":
+        return "tcn"
+    if variant == "TWIRL-FM0.2.2":
         return "conformer"
     variant_view_indices(variant)
     if development_winner not in ("tcn", "conformer"):
@@ -476,7 +483,7 @@ def build_fm0_model(
     config_override: FM0ModelConfig | None = None,
     enforce_parameter_budget: bool = True,
 ) -> TWIRLFM0:
-    """Build one frozen-ladder model and enforce its production parameter range."""
+    """Build one declared FM0 model and enforce its parameter range."""
 
     indices = variant_view_indices(variant)
     architecture = architecture_for_variant(

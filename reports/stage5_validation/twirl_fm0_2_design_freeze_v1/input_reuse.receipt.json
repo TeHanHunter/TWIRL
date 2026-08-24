@@ -1,0 +1,51 @@
+{
+  "campaign_id": "twirl_fm0_2_s56_s64_objective_canary",
+  "claim_limit": "This receipt authorizes byte-exact reuse of the validated FM0.1 S56-S64 input release only. It is not a new input validation, model result, production authorization, or foundation-model claim.",
+  "created_at_utc": "2026-08-24T00:00:00Z",
+  "input_release_rebuilt": false,
+  "passed": true,
+  "release": {
+    "diagnostic_sectors_admitted": [],
+    "id": "twirl_fm0_1_s56_s64_v2",
+    "manifest_path": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2/manifest.csv",
+    "manifest_sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a",
+    "n_observations": 273766,
+    "n_sources": 185797,
+    "root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2",
+    "sectors": [
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64
+    ]
+  },
+  "schema_version": "twirl_fm0_2_input_reuse_receipt_v1",
+  "scientific_training_eligible": true,
+  "sealed_test": {
+    "access_authorized": false,
+    "access_count": 0,
+    "gradient_rows_allowed": 0,
+    "metric_rows_allowed_before_finalist_freeze": 0,
+    "partition": "poc_sealed_test"
+  },
+  "source_split": {
+    "assignment_recomputed": false,
+    "development_partition": "poc_development",
+    "gradient_partition": "poc_train",
+    "grouping_field": "leakage_component_id",
+    "physical_source_field": "gaia_dr3_source_id",
+    "reused_byte_exactly": true,
+    "salt": "twirl_fm0_1_source_split_v1"
+  },
+  "upstream_fm0_1_input_receipt": {
+    "builder_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb",
+    "path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_1_s56_s67_poc/ece8619fd72f/frozen/input_release_validation/input_release.receipt.json",
+    "schema_version": "twirl_fm0_1_input_release_receipt_v1",
+    "sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7"
+  }
+}

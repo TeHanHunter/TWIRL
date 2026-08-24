@@ -1,0 +1,67 @@
+{
+  "architecture_parameter_match": {
+    "counts": {
+      "TWIRL-FM0.1.1": 8825602,
+      "TWIRL-FM0.1.2": 9345282
+    },
+    "passed": true,
+    "relative_difference_against_larger_model": 0.055608808808551735,
+    "relative_tolerance": 0.1
+  },
+  "artifacts": {
+    "comparison_metrics_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/comparison_metrics.csv",
+    "comparison_metrics_csv_sha256": "5c87a777e059426aa4b0acf5e76492b8ad62c312c5727b05b11782e121feeb1b",
+    "pdf": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/fm0_1_1_vs_fm0_1_2_development.pdf",
+    "pdf_sha256": "50e04afeb3f6f358e3b4439b5a78984930fc5993a7d74c234553ee9966316dbd",
+    "png": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/fm0_1_1_vs_fm0_1_2_development.png",
+    "png_sha256": "f2a95f85e3a5c89153d6fdce3bbf063166a46e88800e39461b35874c886bd6e7",
+    "training_curve_bins_csv": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/training_curve_bins.csv",
+    "training_curve_bins_csv_sha256": "66842cfefc6a607346db8c7e64349c619f3884e6aca9a8a4f7fd7014b614d2d2"
+  },
+  "claim_limit": "training loss is diagnostic only; cross-visit retrieval is not a cross-sector test; no sealed-test, science, or foundation-model claim",
+  "created_utc": "2026-08-24T04:36:15.695312+00:00",
+  "effective_rank_gate": 26.0,
+  "matched_evaluation_binding": {
+    "evaluator_git_sha": "9cb8c960ff2e4dd6ad0a7b7e3bfea6ced7d67bee",
+    "run_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb",
+    "selected_leakage_components": 256,
+    "selected_leakage_components_sha256": "50e0b59e1bc80ded61e30c1a6c07a56eee6306b03c3bd52e1f30ebdc43f5c72f",
+    "selected_observation_keys_sha256": "9ffdc49e042cf4e8dccbe53e70fd849723abf96625c36a00adea8f4fde20546a",
+    "selected_observation_visits": 383,
+    "source_partition": "poc_development"
+  },
+  "schema_version": "twirl_fm0_1_development_comparison_v1",
+  "scope": "matched development-only FM0.1 architecture comparison",
+  "sources": {
+    "TWIRL-FM0.1.1": {
+      "representation_health": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/receipts/fm0_1_1.representation_health.json",
+      "representation_health_sha256": "4a679da7f35f04f14661f730a4b1bf58b2a06aab7040f5da70e05c5bb77b87e6",
+      "run_summary": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/receipts/fm0_1_1.summary.json",
+      "run_summary_sha256": "5ad1e9b001bee55ce4480d747d156c9e34df88ddf97655b977f75251597411c7",
+      "training_log": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/receipts/fm0_1_1.training.log",
+      "training_log_sha256": "b26b551f8315f393761619790de815d111a580262ef6bdc2d69a34347e67e26d"
+    },
+    "TWIRL-FM0.1.2": {
+      "representation_health": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/receipts/fm0_1_2.representation_health.json",
+      "representation_health_sha256": "bbd4e13c5d07cc134171bf4ca276a432132cd676fa3a68046612d49717539d88",
+      "run_summary": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/receipts/fm0_1_2.summary.json",
+      "run_summary_sha256": "4e2989dd51beb1a37e838314e4aadd50f9c198f3f8f8bb6836fde79a06260735",
+      "training_log": "/Users/tehan/PycharmProjects/TWIRL/reports/stage5_validation/twirl_fm0_1_s56_s64_development_comparison_v1/receipts/fm0_1_2.training.log",
+      "training_log_sha256": "3f1665c32d22cb044b414df7baccf91c252922b3acd1486d9e43d194f2a51e7c"
+    }
+  },
+  "training_curve_contract": {
+    "effective_batch_windows": 64,
+    "expected_logged_records_per_model": 2001,
+    "final_diagnostic_window_steps": 1000,
+    "logged_steps": "step 1 plus every 10th step through 20000",
+    "minimum_training_loss_is_model_selection_metric": false,
+    "nonoverlapping_bin_width_steps": 100,
+    "statistics": [
+      "median",
+      "10th percentile",
+      "90th percentile"
+    ],
+    "target_step": 20000
+  }
+}

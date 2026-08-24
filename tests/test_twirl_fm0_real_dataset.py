@@ -107,7 +107,25 @@ def test_release_dataset_is_deterministic_source_first_and_model_safe(tmp_path: 
     assert first["flux"].shape == (2, 2048)
     assert np.array_equal(first["flux"], repeated["flux"])
     assert np.array_equal(first["reconstruction_mask"], repeated["reconstruction_mask"])
+    for name in (
+        "flux",
+        "flux_valid",
+        "flux_error",
+        "error_valid",
+        "local_time_cadences",
+        "delta_time_cadences",
+        "time_valid",
+        "segment_boundary",
+        "view_present",
+    ):
+        assert np.array_equal(first[name], second_mask[name]), name
+    assert not np.array_equal(first["temporal_mask"], second_mask["temporal_mask"])
     assert not np.array_equal(first["reconstruction_mask"], second_mask["reconstruction_mask"])
+    for sample in (first, second_mask):
+        assert np.array_equal(
+            sample["reconstruction_mask"],
+            sample["flux_valid"] & sample["temporal_mask"][None, :],
+        )
     assert first["local_time_cadences"][np.flatnonzero(first["time_valid"])[0]] == 0
 
 

@@ -1,0 +1,19 @@
+{
+  "admission_receipt_sha256": "69133e1d8d2fa6b34b89203ca742a95be19b380eec9f2c990ce8778777b8d48f",
+  "artifacts_sha256": {
+    "checkpoint.pt": "b9a7447b654b3cee881e3965db1a72ac69ef57fd395f65f795b0377226b04ab7",
+    "run_contract.json": "f473e15eff278e193593de91c7833267e25582b53b209293b925c2334abab488",
+    "summary.json": "5ad1e9b001bee55ce4480d747d156c9e34df88ddf97655b977f75251597411c7"
+  },
+  "created_at_utc": "2026-08-23T05:25:43.374312+00:00",
+  "foundation_model_claim_authorized": false,
+  "independent_run_validation_sha256": "9203034b92a8d1820217820b2608c48768f841ef331913c2f91a45f708861057",
+  "input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7",
+  "passed": true,
+  "production_authorized": false,
+  "real_data_consumed": true,
+  "run_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb",
+  "schema_version": "twirl_fm0_1_orcd_real_post_validation_v1",
+  "scientific_result": false,
+  "validator_git_sha": "ece8619fd72fbb7fc0d993cf6422a3f58fb880cb"
+}
