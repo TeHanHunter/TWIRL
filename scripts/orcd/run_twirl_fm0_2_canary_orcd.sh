@@ -31,6 +31,8 @@ Actions:
   submit-loader-restart    Submit the 4-CPU/16-GiB exact-code gate; no GPU.
   submit-fp32-smoke        Fresh admission + one-H200 eight-step FP32 smoke.
   submit-post-validation   CPU-validate one exact smoke/canary milestone.
+  submit-representation-evaluation
+                           CPU-evaluate one validated development milestone.
   submit-canary            Fresh admission + one-H200 FM0.2.1 milestone.
   status                   Read this exact-SHA run root and matching jobs.
 
@@ -45,6 +47,11 @@ milestone checkpoint and post-validation receipt bindings used by the wrapper.
 
 submit-post-validation requires TWIRL_FM0_RUN_KIND, TWIRL_FM0_STOP_AFTER_STEP,
 TWIRL_FM0_RUN_OUTPUT, and TWIRL_FM0_ADMISSION_RECEIPT plus its SHA256.
+
+submit-representation-evaluation requires TWIRL_FM0_STOP_AFTER_STEP,
+TWIRL_FM0_RUN_OUTPUT, TWIRL_FM0_RESUME_CHECKPOINT, the matching
+TWIRL_FM0_PREVIOUS_POST_VALIDATION plus its SHA256, and
+TWIRL_FM0_ARTIFACT_GIT_SHA for the immutable training artifacts.
 EOF
 }
 
@@ -217,6 +224,32 @@ case "${ACTION}" in
     submit_once "${LAUNCH_DIR}/post-${TWIRL_FM0_RUN_KIND}-step${TWIRL_FM0_STOP_AFTER_STEP}-$(date -u +%s).job" "twirl-fm0-2-validate" \
       "scripts/orcd/slurm_twirl_fm0_2_post_validation_cpu.sbatch" \
       "$(base_export),TWIRL_FM0_RUN_GIT_SHA=${EXPECTED_SHA},TWIRL_FM0_RUN_KIND=${TWIRL_FM0_RUN_KIND},TWIRL_FM0_STOP_AFTER_STEP=${TWIRL_FM0_STOP_AFTER_STEP},TWIRL_FM0_RUN_OUTPUT=${TWIRL_FM0_RUN_OUTPUT},TWIRL_FM0_INPUT_RECEIPT=${INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${INPUT_RECEIPT_SHA},TWIRL_FM0_INPUT_REUSE_RECEIPT=${REUSE_RECEIPT},TWIRL_FM0_INPUT_REUSE_RECEIPT_SHA256=${REUSE_SHA},TWIRL_FM0_ADMISSION_RECEIPT=${TWIRL_FM0_ADMISSION_RECEIPT},TWIRL_FM0_ADMISSION_RECEIPT_SHA256=${TWIRL_FM0_ADMISSION_RECEIPT_SHA256}"
+    ;;
+  submit-representation-evaluation)
+    : "${TWIRL_FM0_STOP_AFTER_STEP:?set exact representation milestone}"
+    case "${TWIRL_FM0_STOP_AFTER_STEP}" in 500|1000|2000) ;; *) echo "Unauthorized representation milestone." >&2; exit 2 ;; esac
+    : "${TWIRL_FM0_RUN_OUTPUT:?set exact run output}"
+    : "${TWIRL_FM0_RESUME_CHECKPOINT:?set exact immutable milestone checkpoint}"
+    : "${TWIRL_FM0_PREVIOUS_POST_VALIDATION:?set matching post-validation receipt}"
+    : "${TWIRL_FM0_PREVIOUS_POST_VALIDATION_SHA256:?set matching post-validation hash}"
+    : "${TWIRL_FM0_ARTIFACT_GIT_SHA:?set exact training-artifact commit}"
+    require_hash 40 "${TWIRL_FM0_ARTIFACT_GIT_SHA}"
+    require_hash 64 "${TWIRL_FM0_PREVIOUS_POST_VALIDATION_SHA256}"
+    artifact_root="${PROJECT_ROOT}/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/${TWIRL_FM0_ARTIFACT_GIT_SHA:0:12}"
+    expected_output="${artifact_root}/model_runs/fm0_2_1_canary/seed560067"
+    printf -v padded_step '%08d' "${TWIRL_FM0_STOP_AFTER_STEP}"
+    expected_checkpoint="${expected_output}/checkpoint_step_${padded_step}.pt"
+    expected_post="${artifact_root}/validations/seed560067-real_canary-step${padded_step}/post_validation.receipt.json"
+    [[ "${TWIRL_FM0_RUN_OUTPUT}" == "${expected_output}" ]] || { echo "Run output is not the frozen FM0.2.1 canary path." >&2; exit 2; }
+    [[ "${TWIRL_FM0_RESUME_CHECKPOINT}" == "${expected_checkpoint}" ]] || { echo "Checkpoint is not the requested immutable milestone." >&2; exit 2; }
+    [[ "${TWIRL_FM0_PREVIOUS_POST_VALIDATION}" == "${expected_post}" ]] || { echo "Post-validation receipt does not match the requested milestone." >&2; exit 2; }
+    for path in "${TWIRL_FM0_RUN_OUTPUT}" "${TWIRL_FM0_RESUME_CHECKPOINT}" "${TWIRL_FM0_PREVIOUS_POST_VALIDATION}"; do
+      safe_remote_path "${path}" || { echo "Unsafe representation-evaluation path." >&2; exit 2; }
+    done
+    require_socket
+    submit_once "${LAUNCH_DIR}/representation-evaluation-${TWIRL_FM0_ARTIFACT_GIT_SHA:0:12}-step${TWIRL_FM0_STOP_AFTER_STEP}.job" "twirl-fm0-2-eval" \
+      "scripts/orcd/slurm_twirl_fm0_2_representation_health_cpu.sbatch" \
+      "$(base_export),TWIRL_FM0_ARTIFACT_GIT_SHA=${TWIRL_FM0_ARTIFACT_GIT_SHA},TWIRL_FM0_ARTIFACT_RUN_ROOT=${artifact_root},TWIRL_FM0_STOP_AFTER_STEP=${TWIRL_FM0_STOP_AFTER_STEP},TWIRL_FM0_RUN_OUTPUT=${TWIRL_FM0_RUN_OUTPUT},TWIRL_FM0_RESUME_CHECKPOINT=${TWIRL_FM0_RESUME_CHECKPOINT},TWIRL_FM0_INPUT_RECEIPT=${INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${INPUT_RECEIPT_SHA},TWIRL_FM0_PREVIOUS_POST_VALIDATION=${TWIRL_FM0_PREVIOUS_POST_VALIDATION},TWIRL_FM0_PREVIOUS_POST_VALIDATION_SHA256=${TWIRL_FM0_PREVIOUS_POST_VALIDATION_SHA256}"
     ;;
   status)
     require_socket

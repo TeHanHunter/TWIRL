@@ -96,3 +96,29 @@ def test_fm0_2_vicreg_scale_and_canary_gate_are_predeclared() -> None:
         1000,
         2000,
     ]
+
+
+def test_fm0_2_representation_evaluation_is_cpu_only_and_fail_closed() -> None:
+    controller = (
+        ROOT / "scripts" / "orcd" / "run_twirl_fm0_2_canary_orcd.sh"
+    ).read_text(encoding="utf-8")
+    wrapper = (
+        ROOT
+        / "scripts"
+        / "orcd"
+        / "slurm_twirl_fm0_2_representation_health_cpu.sbatch"
+    ).read_text(encoding="utf-8")
+
+    assert "submit-representation-evaluation)" in controller
+    assert "slurm_twirl_fm0_2_representation_health_cpu.sbatch" in controller
+    assert "500|1000|2000" in controller
+    assert "#SBATCH -c 4" in wrapper
+    assert "#SBATCH --mem=16G" in wrapper
+    assert "#SBATCH --exclude=node4900" in wrapper
+    assert "#SBATCH --gres" not in wrapper
+    assert "build_twirl_fm0_observation_sector_authority.py" in wrapper
+    assert "evaluate_twirl_fm0_representation_health.py" in wrapper
+    assert '--checkpoint "${CHECKPOINT}"' in wrapper
+    assert '--observation-sector-authority "${AUTHORITY_CSV}"' in wrapper
+    assert 'get("sealed_test_access_count") == 0' in wrapper
+    assert '"scientific_go_no_go_applied": False' in wrapper
