@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "product": "A2v1",
+  "status": "frozen",
+  "frozen_utc": "2026-08-07T18:30:00Z",
+  "runtime_reconciled_utc": "2026-08-07T20:31:03Z",
+  "change_policy": "Any scientific or product-setting change requires a new product version. Hardware, paths, scheduler concurrency, and the host-specific CuPy wheel may change only with exact TGLC/settings/effective-runtime parity, real-input and accelerator gates, and the unchanged product validation. Cross-hardware numerical equivalence must not be claimed without a dedicated reference comparison.",
+  "accepted_reference": {
+    "sector": 64,
+    "orbits": [135, 136],
+    "validation_report": "/pdo/users/tehan/tglc-gpu-production-A2v1/twirl_logs/s64_A2v1_validation_full_schema.json",
+    "hdf5_present": 159781,
+    "hdf5_expected": 160656,
+    "fits_present": 79842,
+    "fits_expected": 80254,
+    "non_edge_missing": 0,
+    "zero_byte_or_unreadable_hdf5": 0,
+    "bad_fits_schema": 0
+  },
+  "target_authority": {
+    "path_on_pdo": "/pdo/users/tehan/TWIRL/data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits",
+    "sha256": "2f42698420a5e2d945a3fd60d3ddc057c06f3fd19c2b9882829ea0c26e5280d9",
+    "selection": "all positive TIC IDs assigned to the selected orbit/camera/CCD; detector-edge omissions remain explicit edge_warn records",
+    "science_magnitude_cap": null,
+    "catalog_policy_equivalent_max_magnitude": 99.0
+  },
+  "tglc": {
+    "repository": "https://github.com/TeHanHunter/TESS_Gaia_Light_Curve.git",
+    "branch": "twirl/preserve-negative-flux",
+    "commit": "1a41d26a312b129e62b657edaa4093226dc9a4d0",
+    "required_hooks": {
+      "tglc/scripts/light_curves.py": {
+        "sha256": "da1970ce1ae23f761df719452db8031a0e9da3ea753d7a64c05b041f9e6afb92",
+        "required_text": "_source_tic_overlay_path"
+      },
+      "tglc/scripts/epsfs.py": {
+        "sha256": "f74f5d4d0fad0c9e4e0c967a24865f5b3a775697d1531c36bd5415c524117a16",
+        "required_text": "source.mask.mask"
+      }
+    }
+  },
+  "prepared_input_contract": {
+    "unit": "orbit-camera-ccd cell",
+    "source_pickles_per_cell": 196,
+    "source_tic_overlays_per_cell": 196,
+    "reuse_prepared_source_pickles": true,
+    "transfer_raw_ffi": false,
+    "overlay_source": "observation-table detector coordinates",
+    "legacy_epsf_policy": "Reuse only for an empty saturated-pixel mask when all 196 legacy ePSFs exist; refit all when none exist; reject partial trees. S64 and later prepared cells currently use refit-all.",
+    "orcd_pickle_preflight": {
+      "required_count": 196,
+      "process_isolation": "fresh child interpreter per pickle",
+      "max_concurrent_children": 2,
+      "required_type": "tglc.ffi.Source",
+      "required_attributes": ["wcs", "gaia", "mask"]
+    },
+    "retry_policy": "Use a fresh attempt directory; never trust or overwrite a partial NPY or HDF5 output."
+  },
+  "tglc_settings": {
+    "stages": ["epsfs", "lightcurves"],
+    "catalogs": false,
+    "cutouts": false,
+    "epsfs_nprocs": 2,
+    "lightcurves_nprocs": 16,
+    "blas_threads_per_process": 1,
+    "hdf5_file_locking": false,
+    "gpu_per_cell": 1,
+    "apertures": ["1x1", "3x3", "5x5"]
+  },
+  "accepted_pdo_runtime": {
+    "python": "3.11.9",
+    "numpy": "1.26.4",
+    "scipy": "1.16.1",
+    "pandas": "2.3.1",
+    "astropy": "7.1.0",
+    "h5py": "3.14.0",
+    "matplotlib": "3.10.5",
+    "numba": "0.61.2",
+    "tqdm": "4.67.1",
+    "rich": "14.1.0",
+    "toml": "0.10.2",
+    "pyyaml": "6.0.2",
+    "packaging": "25.0",
+    "pyerfa": "2.0.1.5",
+    "tesswcs": "1.7.1",
+    "cupy_cuda11x": "13.6.0",
+    "fastrlock": "0.8.3"
+  },
+  "accepted_pdo_runtime_provenance": {
+    "contract": "effective import stack, not the bare twirl-gpu-venv package set",
+    "python_executable": "/pdo/users/tehan/twirl-gpu-venv/bin/python",
+    "effective_pythonpath_order": [
+      "/pdo/users/tehan/tess-gaia-light-curve-twirl",
+      "/sw/qlp-environment/.venv/lib/python3.11/site-packages"
+    ],
+    "resolution_rule": "run_tglc_orbit_pipeline.py prepends the reviewed TGLC fork to the shared QLP site-packages path; the executable's own twirl-gpu-venv site-packages follow those PYTHONPATH entries and supply the CUDA-11 CuPy wheel plus fastrlock.",
+    "version_evidence": "The accepted versions are the modules and distributions resolved under this effective ordering. They are not a pip-freeze claim for the bare GPU venv."
+  },
+  "orcd_runtime_exception": {
+    "cuda_family": "12.x",
+    "cupy_distribution": "cupy-cuda12x",
+    "cupy_version": "13.6.0",
+    "rule": "The CUDA wheel name may follow the host CUDA family; all effective scientific Python versions, TGLC code, and science settings remain pinned. Promotion requires real-input compatibility, accelerator validation, and the unchanged product gates."
+  },
+  "twirl_code_hashes": {
+    "scripts/stage1_lightcurves/build_source_tic_overlays.py": "80fc134c66f6bce5585d71c118b47f9b7da95239181059c511c79477b8c731d1",
+    "scripts/stage1_lightcurves/prefill_epsfs_for_empty_masks.py": "d853074d9d2ffd795593ef0a056887c392c30a4233055b450cf71bad35c5f450",
+    "scripts/stage1_lightcurves/run_tglc_orbit_pipeline.py": "2fb400d41b193a39445eba10cb9b9a744c537b9501e8174d25f2806fa5e97233",
+    "scripts/stage1_lightcurves/run_a2v1_reproduction_pdo.sh": "79dfbc3804b79485c94f688f6d9cce1f3d30b31face70acf5e57ee805868fcfb",
+    "scripts/stage1_lightcurves/run_a2v1_hlsp_pdo.sh": "a0115ef1d2d3d809890c437b8a40863e677421e0c06fd7e106c465c625a80277",
+    "scripts/stage1_lightcurves/build_twirl_hlsp.py": "35742d1f11bc9687c851a5258235da44ffc8d64d9152af0b032ff317d7700a11",
+    "scripts/stage1_lightcurves/validate_a2v1_product.py": "700b6642b353a26676468dc4ca7d00ab25f50d3b955a5bd0802524383515dd38",
+    "src/twirl/lightcurves/flux_detrend.py": "a89c1e26f93a18c539357b7bcb8a24a949f9f34b8ddf287bd83cbbaf587e13a3",
+    "src/twirl/lightcurves/hlsp_writer.py": "828161c7ef86428d48234553b75cd4a3bc0717efdeb603cb1779621c19637c00",
+    "src/twirl/lightcurves/tglc_h5_reader.py": "ea367198f20992ae1e6ecbb3922063214863882180daebda1e93c2587ac902e7"
+  },
+  "final_product_contract": {
+    "hdf5_retention": ["PDO", "ORCD"],
+    "fits_build_location": "PDO",
+    "fits_family": "ADP and ADP015 only",
+    "fits_apertures": ["1x1", "3x3", "5x5"],
+    "hlsp_workers": 8,
+    "max_build_failures": 0,
+    "minimum_success_fraction": 1.0,
+    "required_gates": [
+      "196 readable ePSF NPY files per completed cell",
+      "all non-edge expected HDF5 files present, nonzero, and openable",
+      "zero non-edge HDF5 omissions",
+      "zero missing non-edge sector FITS targets",
+      "zero bad checked FITS schemas"
+    ]
+  }
+}

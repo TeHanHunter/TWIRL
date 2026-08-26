@@ -4,6 +4,18 @@ This is a migration snapshot for the completed development-only
 `TWIRL-FM0.2.1` step-2000 canary. It records evidence and the next bounded
 task; it does not create new scientific or compute authorization.
 
+## Machine and task boundary
+
+- Move only the FM work to the new Mac. Start a fresh local Codex task from a
+  clean checkout of the branch below so local tests run on the new Mac.
+- Keep A2v1 white-dwarf light-curve production on the original Mac under the
+  existing Codex task named `WD LC production`. It may be observed or
+  controlled through Codex remote access, but this FM task must not poll,
+  modify, or assume ownership of that production workflow.
+- The Git handoff carries the durable FM state. Chat visibility or remote
+  access does not change which Mac executes commands, so confirm the new task
+  is attached to the new-Mac checkout before running local tests.
+
 Read [`AGENTS.md`](../../../AGENTS.md), the
 [documentation guide](../../../doc/README.md), and the
 [project plan](../../../doc/twirl_plan.md) before acting. The project plan
@@ -12,9 +24,11 @@ remains the sole forward-looking authority.
 ## Git continuation
 
 - remote: `git@github.com:TeHanHunter/TWIRL.git`
-- branch: `codex/fm0-1-poc`
-- handoff commit: the remote branch tip with subject
+- branch: `codex/fm0-2-new-mac-handoff`
+- handoff base commit: `8e958a7a` with subject
   `Checkpoint FM0.2 step-2000 handoff`
+- handoff tip: the remote branch tip with subject
+  `Finalize FM0.2 new-Mac handoff`
 - immutable training revision:
   `ddf442aafb8f62966e549e2287abad3474dd556a`
 - immutable evaluator revision:
@@ -28,7 +42,7 @@ If the new Mac has a clean checkout:
 
 ```bash
 git fetch origin
-git switch codex/fm0-1-poc
+git switch codex/fm0-2-new-mac-handoff
 git pull --ff-only
 git log -1 --oneline
 ```
@@ -41,14 +55,29 @@ fallback and make a clean sibling clone instead:
 ```bash
 cd /Users/tehan/Projects
 mv TWIRL TWIRL_rsync_snapshot_20260826
-git clone --branch codex/fm0-1-poc git@github.com:TeHanHunter/TWIRL.git TWIRL
+git clone --branch codex/fm0-2-new-mac-handoff git@github.com:TeHanHunter/TWIRL.git TWIRL
 cd TWIRL
 git status --short --branch
 ```
 
 The scoped Git handoff deliberately excludes unrelated dirty Stage-1,
 Stage-2, collaborator, and generated-output work from the old Mac. Keep the
-rsync snapshot until those changes receive their own reviewed checkpoint.
+rsync snapshot until those changes receive their own reviewed checkpoint. It
+does include the already-referenced frozen A2v1 lock file needed to trace the
+FM input-product contract; that static provenance file does not transfer
+ownership of the live A2v1 campaign.
+
+Open a fresh local Codex task from this checkout and begin with:
+
+```text
+Read AGENTS.md, doc/README.md, doc/twirl_plan.md, and
+reports/stage5_validation/
+twirl_fm0_2_s56_s64_step2000_evaluation_v1/HANDOFF.md. Continue only the
+bounded FM0.2 exact same-seed step-0 CPU representation-evaluation task.
+First review and test the checksum-bound implementation locally. Do not touch
+A2v1 production, submit more training, open the sealed test, run development
+event retention, or apply the formal step-2000 gate.
+```
 
 ## Result and interpretation
 
