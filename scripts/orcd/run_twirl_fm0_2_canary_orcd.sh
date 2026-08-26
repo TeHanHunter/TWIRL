@@ -18,6 +18,12 @@ readonly REUSE_SHA="46faed954e6758dfea71f7754670611fab03af63613dad3be433af71dd38
 readonly EVENT_SHA="eb84f27866e42bbf942256abe8fa7a532eaa8584e6800ce012aa0552c08a6630"
 readonly EVALUATOR_SHA="ed8004180b28c7e2bd85911d0128f9180eddd3c35bdaae299e2f7edba6e5baac"
 readonly ORCD_CONFIG_SHA="a100514e8c83a4d17bab7924a5733015fddbf2a97cadf96cafcfab22cf92cc61"
+readonly FM0_2_TRAINING_GIT_SHA="ddf442aafb8f62966e549e2287abad3474dd556a"
+readonly FM0_2_EVALUATOR_GIT_SHA="83816d07975eebe3825d76dfe7096d22b70376f5"
+readonly FM0_2_EVALUATOR_ENTRY_SHA="2ad38165d0d89acb08970e9bdf2a07df54022bf020b6a72e310e4cb4eb3f014e"
+readonly FM0_2_EVALUATOR_MODULE_SHA="573335ee9e2e9f3a7cc4aedf42dec76a584f0a72cdebacbf9f0e805a81d489f8"
+readonly FM0_2_STEP2000_POST_VALIDATION_SHA="80d678c4621a22258c5d0e8f0be6f7e08ffa5bf93841c315abf42e9bb006b110"
+readonly FM0_2_STEP2000_REPRESENTATION_RECEIPT_SHA="616ef9a100b7b7a3a1923f81ac19a272cab8b6f4657a4a58c2815688ee6d1191"
 readonly INPUT_RECEIPT="${PROJECT_ROOT}/reports/stage5_validation/twirl_fm0_1_s56_s67_poc/ece8619fd72f/frozen/input_release_validation/input_release.receipt.json"
 readonly INPUT_RECEIPT_SHA="a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7"
 
@@ -33,6 +39,8 @@ Actions:
   submit-post-validation   CPU-validate one exact smoke/canary milestone.
   submit-representation-evaluation
                            CPU-evaluate one validated development milestone.
+  submit-initialization-representation-evaluation
+                           CPU-evaluate the exact seed-560067 step-0 checkpoint.
   submit-canary            Fresh admission + one-H200 FM0.2.1 milestone.
   status                   Read this exact-SHA run root and matching jobs.
 
@@ -52,6 +60,12 @@ submit-representation-evaluation requires TWIRL_FM0_STOP_AFTER_STEP,
 TWIRL_FM0_RUN_OUTPUT, TWIRL_FM0_RESUME_CHECKPOINT, the matching
 TWIRL_FM0_PREVIOUS_POST_VALIDATION plus its SHA256, and
 TWIRL_FM0_ARTIFACT_GIT_SHA for the immutable training artifacts.
+
+submit-initialization-representation-evaluation is a separate step-0 path. It
+requires TWIRL_FM0_RUN_OUTPUT, TWIRL_FM0_INITIALIZATION_CHECKPOINT, the passed
+TWIRL_FM0_STEP2000_POST_VALIDATION plus its SHA256, the passed
+TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT plus its SHA256, and the exact
+TWIRL_FM0_ARTIFACT_GIT_SHA. It does not authorize another training run.
 EOF
 }
 
@@ -250,6 +264,48 @@ case "${ACTION}" in
     submit_once "${LAUNCH_DIR}/representation-evaluation-${TWIRL_FM0_ARTIFACT_GIT_SHA:0:12}-step${TWIRL_FM0_STOP_AFTER_STEP}.job" "twirl-fm0-2-eval" \
       "scripts/orcd/slurm_twirl_fm0_2_representation_health_cpu.sbatch" \
       "$(base_export),TWIRL_FM0_ARTIFACT_GIT_SHA=${TWIRL_FM0_ARTIFACT_GIT_SHA},TWIRL_FM0_ARTIFACT_RUN_ROOT=${artifact_root},TWIRL_FM0_STOP_AFTER_STEP=${TWIRL_FM0_STOP_AFTER_STEP},TWIRL_FM0_RUN_OUTPUT=${TWIRL_FM0_RUN_OUTPUT},TWIRL_FM0_RESUME_CHECKPOINT=${TWIRL_FM0_RESUME_CHECKPOINT},TWIRL_FM0_INPUT_RECEIPT=${INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${INPUT_RECEIPT_SHA},TWIRL_FM0_PREVIOUS_POST_VALIDATION=${TWIRL_FM0_PREVIOUS_POST_VALIDATION},TWIRL_FM0_PREVIOUS_POST_VALIDATION_SHA256=${TWIRL_FM0_PREVIOUS_POST_VALIDATION_SHA256}"
+    ;;
+  submit-initialization-representation-evaluation)
+    : "${TWIRL_FM0_RUN_OUTPUT:?set exact run output}"
+    : "${TWIRL_FM0_INITIALIZATION_CHECKPOINT:?set exact seed-560067 initialization checkpoint}"
+    : "${TWIRL_FM0_STEP2000_POST_VALIDATION:?set passed step-2000 post-validation receipt}"
+    : "${TWIRL_FM0_STEP2000_POST_VALIDATION_SHA256:?set step-2000 post-validation hash}"
+    : "${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT:?set passed step-2000 representation receipt}"
+    : "${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT_SHA256:?set step-2000 representation receipt hash}"
+    : "${TWIRL_FM0_ARTIFACT_GIT_SHA:?set exact training-artifact commit}"
+    require_hash 40 "${TWIRL_FM0_ARTIFACT_GIT_SHA}"
+    require_hash 64 "${TWIRL_FM0_STEP2000_POST_VALIDATION_SHA256}"
+    require_hash 64 "${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT_SHA256}"
+    [[ "${TWIRL_FM0_ARTIFACT_GIT_SHA}" == "${FM0_2_TRAINING_GIT_SHA}" ]] || {
+      echo "Initialization evaluation is bound to the frozen FM0.2.1 training revision." >&2
+      exit 2
+    }
+    [[ "${TWIRL_FM0_STEP2000_POST_VALIDATION_SHA256}" == "${FM0_2_STEP2000_POST_VALIDATION_SHA}" ]] || {
+      echo "Step-2000 post-validation hash is not the frozen receipt." >&2
+      exit 2
+    }
+    [[ "${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT_SHA256}" == "${FM0_2_STEP2000_REPRESENTATION_RECEIPT_SHA}" ]] || {
+      echo "Step-2000 representation hash is not the frozen receipt." >&2
+      exit 2
+    }
+    artifact_root="${PROJECT_ROOT}/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/${TWIRL_FM0_ARTIFACT_GIT_SHA:0:12}"
+    expected_output="${artifact_root}/model_runs/fm0_2_1_canary/seed560067"
+    expected_checkpoint="${expected_output}/checkpoint_step_00000000.pt"
+    expected_post="${artifact_root}/validations/seed560067-real_canary-step00002000/post_validation.receipt.json"
+    expected_reference="${artifact_root}/evaluations/step_00002000/representation_health.receipt.json"
+    [[ "${TWIRL_FM0_RUN_OUTPUT}" == "${expected_output}" ]] || { echo "Run output is not the frozen FM0.2.1 canary path." >&2; exit 2; }
+    [[ "${TWIRL_FM0_INITIALIZATION_CHECKPOINT}" == "${expected_checkpoint}" ]] || { echo "Checkpoint is not the exact seed-560067 initialization." >&2; exit 2; }
+    [[ "${TWIRL_FM0_STEP2000_POST_VALIDATION}" == "${expected_post}" ]] || { echo "Step-2000 post-validation receipt path is not authoritative." >&2; exit 2; }
+    [[ "${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT}" == "${expected_reference}" ]] || { echo "Step-2000 representation receipt path is not authoritative." >&2; exit 2; }
+    for path in "${TWIRL_FM0_RUN_OUTPUT}" "${TWIRL_FM0_INITIALIZATION_CHECKPOINT}" "${TWIRL_FM0_STEP2000_POST_VALIDATION}" "${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT}"; do
+      safe_remote_path "${path}" || { echo "Unsafe initialization-evaluation path." >&2; exit 2; }
+    done
+    require_socket
+    evaluator_repo="${PROJECT_ROOT}/code/TWIRL_fm0_2_${FM0_2_EVALUATOR_GIT_SHA:0:12}"
+    remote "set -euo pipefail; test -d '${REMOTE_SOURCE}/.git'; git -C '${REMOTE_SOURCE}' cat-file -e '${FM0_2_EVALUATOR_GIT_SHA}^{commit}'; if [[ -e '${evaluator_repo}' ]]; then [[ \$(git -C '${evaluator_repo}' rev-parse HEAD) == '${FM0_2_EVALUATOR_GIT_SHA}' ]]; else git -C '${REMOTE_SOURCE}' worktree add --detach '${evaluator_repo}' '${FM0_2_EVALUATOR_GIT_SHA}'; fi; [[ -z \$(git -C '${evaluator_repo}' status --porcelain=v1 --untracked-files=all) ]]; [[ \$(sha256sum '${evaluator_repo}/scripts/stage5_validation/evaluate_twirl_fm0_representation_health.py' | awk '{print \$1}') == '${FM0_2_EVALUATOR_ENTRY_SHA}' ]]; [[ \$(sha256sum '${evaluator_repo}/src/twirl/models/fm0/representation_health.py' | awk '{print \$1}') == '${FM0_2_EVALUATOR_MODULE_SHA}' ]]"
+    submit_once "${LAUNCH_DIR}/representation-initialization-${TWIRL_FM0_ARTIFACT_GIT_SHA:0:12}-step0.job" "twirl-fm0-2-eval-init" \
+      "scripts/orcd/slurm_twirl_fm0_2_initialization_representation_health_cpu.sbatch" \
+      "$(base_export),TWIRL_FM0_ARTIFACT_GIT_SHA=${TWIRL_FM0_ARTIFACT_GIT_SHA},TWIRL_FM0_ARTIFACT_RUN_ROOT=${artifact_root},TWIRL_FM0_RUN_OUTPUT=${TWIRL_FM0_RUN_OUTPUT},TWIRL_FM0_INITIALIZATION_CHECKPOINT=${TWIRL_FM0_INITIALIZATION_CHECKPOINT},TWIRL_FM0_INPUT_RECEIPT=${INPUT_RECEIPT},TWIRL_FM0_INPUT_RECEIPT_SHA256=${INPUT_RECEIPT_SHA},TWIRL_FM0_STEP2000_POST_VALIDATION=${TWIRL_FM0_STEP2000_POST_VALIDATION},TWIRL_FM0_STEP2000_POST_VALIDATION_SHA256=${TWIRL_FM0_STEP2000_POST_VALIDATION_SHA256},TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT=${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT},TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT_SHA256=${TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT_SHA256}"
     ;;
   status)
     require_socket

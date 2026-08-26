@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "configs" / "models" / "twirl_fm0_2_s56_s64_objective_canary.yaml"
+CONTROLLER = ROOT / "scripts" / "orcd" / "run_twirl_fm0_2_canary_orcd.sh"
+PROJECT_ROOT = "/orcd/data/mki_aryeh/001/twirl"
+TRAINING_SHA = "ddf442aafb8f62966e549e2287abad3474dd556a"
+POST_SHA = "80d678c4621a22258c5d0e8f0be6f7e08ffa5bf93841c315abf42e9bb006b110"
+REFERENCE_SHA = "616ef9a100b7b7a3a1923f81ac19a272cab8b6f4657a4a58c2815688ee6d1191"
 
 
 def _sha256(path: Path) -> str:
@@ -18,6 +25,34 @@ def _config() -> dict:
     payload = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
     return payload
+
+
+def _initialization_environment() -> dict[str, str]:
+    artifact_root = (
+        f"{PROJECT_ROOT}/reports/stage5_validation/"
+        f"twirl_fm0_2_s56_s64_objective_canary/{TRAINING_SHA[:12]}"
+    )
+    run_output = f"{artifact_root}/model_runs/fm0_2_1_canary/seed560067"
+    return {
+        **os.environ,
+        "TWIRL_EXPECTED_GIT_SHA": "1" * 40,
+        "TWIRL_FM0_ARTIFACT_GIT_SHA": TRAINING_SHA,
+        "TWIRL_FM0_RUN_OUTPUT": run_output,
+        "TWIRL_FM0_INITIALIZATION_CHECKPOINT": (
+            f"{run_output}/checkpoint_step_00000000.pt"
+        ),
+        "TWIRL_FM0_STEP2000_POST_VALIDATION": (
+            f"{artifact_root}/validations/"
+            "seed560067-real_canary-step00002000/"
+            "post_validation.receipt.json"
+        ),
+        "TWIRL_FM0_STEP2000_POST_VALIDATION_SHA256": POST_SHA,
+        "TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT": (
+            f"{artifact_root}/evaluations/step_00002000/"
+            "representation_health.receipt.json"
+        ),
+        "TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT_SHA256": REFERENCE_SHA,
+    }
 
 
 def test_fm0_2_freeze_authorizes_only_the_gated_canary() -> None:
@@ -63,9 +98,7 @@ def test_fm0_2_1_changes_only_the_embedding_objective() -> None:
     assert objective["vicreg"]["acts_on"] == "z_window"
     assert objective["vicreg"]["begins_at_optimizer_step"] == 1
     assert objective["vicreg"]["hidden_weight_sweep_forbidden"] is True
-    assert config["variants"]["TWIRL-FM0.2.1"]["status"] == (
-        "initial_objective_canary"
-    )
+    assert config["variants"]["TWIRL-FM0.2.1"]["status"] == ("initial_objective_canary")
     assert config["variants"]["TWIRL-FM0.2.2"]["status"] == (
         "blocked_until_0_2_1_canary_passes"
     )
@@ -103,10 +136,7 @@ def test_fm0_2_representation_evaluation_is_cpu_only_and_fail_closed() -> None:
         ROOT / "scripts" / "orcd" / "run_twirl_fm0_2_canary_orcd.sh"
     ).read_text(encoding="utf-8")
     wrapper = (
-        ROOT
-        / "scripts"
-        / "orcd"
-        / "slurm_twirl_fm0_2_representation_health_cpu.sbatch"
+        ROOT / "scripts" / "orcd" / "slurm_twirl_fm0_2_representation_health_cpu.sbatch"
     ).read_text(encoding="utf-8")
 
     assert "submit-representation-evaluation)" in controller
@@ -122,3 +152,143 @@ def test_fm0_2_representation_evaluation_is_cpu_only_and_fail_closed() -> None:
     assert '--observation-sector-authority "${AUTHORITY_CSV}"' in wrapper
     assert 'get("sealed_test_access_count") == 0' in wrapper
     assert '"scientific_go_no_go_applied": False' in wrapper
+
+
+def test_fm0_2_initialization_evaluation_is_a_separate_pinned_cpu_path() -> None:
+    controller = CONTROLLER.read_text(encoding="utf-8")
+    wrapper = (
+        ROOT
+        / "scripts"
+        / "orcd"
+        / "slurm_twirl_fm0_2_initialization_representation_health_cpu.sbatch"
+    ).read_text(encoding="utf-8")
+
+    assert "submit-initialization-representation-evaluation)" in controller
+    assert "slurm_twirl_fm0_2_initialization_representation_health_cpu.sbatch" in (
+        controller
+    )
+    assert "checkpoint_step_00000000.pt" in controller
+    assert TRAINING_SHA in controller
+    assert POST_SHA in controller
+    assert REFERENCE_SHA in controller
+    assert 'case "${TWIRL_FM0_STOP_AFTER_STEP}" in 500|1000|2000)' in controller
+
+    assert "#SBATCH -c 4" in wrapper
+    assert "#SBATCH --mem=16G" in wrapper
+    assert "#SBATCH --exclude=node4900" in wrapper
+    assert "#SBATCH --gres" not in wrapper
+    assert "--device cpu" in wrapper
+    assert "TWIRL_fm0_2_${EXPECTED_EVALUATOR_GIT_SHA:0:12}" in wrapper
+    assert "83816d07975eebe3825d76dfe7096d22b70376f5" in wrapper
+    assert "2ad38165d0d89acb08970e9bdf2a07df54022bf020b6a72e310e4cb4eb3f014e" in wrapper
+    assert "573335ee9e2e9f3a7cc4aedf42dec76a584f0a72cdebacbf9f0e805a81d489f8" in wrapper
+    assert "92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c" in wrapper
+    assert "3c802741744999fe553e71bc2dccfbef6c309a29a28c30dfaac693a798bb3718" in wrapper
+    assert "bdd3e8039b312aeb21557662226a8a11b761dd1da031742be42ee9b0d1c6edc5" in wrapper
+    assert 'mkdir -- "${OUTPUT_DIR}"' in wrapper
+    assert 'mkdir -p "${OUTPUT_DIR}"' not in wrapper
+    assert "sys.flags.optimize == 0" in wrapper
+    assert "optimized Python would disable fail-closed assertions" in wrapper
+    assert 'get("global_step") == 0' in wrapper
+    assert 'get("sealed_test_access_count") == 0' in wrapper
+    assert '"evaluation_role": "exact_same_seed_initialization"' in wrapper
+    assert (
+        '"random_encoder_control": "separate_matched_random_control_seed_0"' in wrapper
+    )
+    assert '"development_event_retention_run": False' in wrapper
+    assert '"scientific_go_no_go_applied": False' in wrapper
+    assert '"eligible_evidence_steps_after_receipt_validation"' in wrapper
+    assert '"performed_by_this_job": False' in wrapper
+    assert "${INPUT_RECEIPT_SHA256}" not in wrapper
+    assert "sbatch" not in wrapper
+
+
+def test_fm0_2_initialization_controller_dry_run_is_exact() -> None:
+    result = subprocess.run(
+        ["bash", str(CONTROLLER), "submit-initialization-representation-evaluation"],
+        cwd=ROOT,
+        env=_initialization_environment(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "slurm_twirl_fm0_2_initialization_representation_health_cpu.sbatch" in (
+        result.stdout
+    )
+    assert "checkpoint_step_00000000.pt" in result.stdout
+    assert "step00002000/post_validation.receipt.json" in result.stdout
+    assert "step_00002000/representation_health.receipt.json" in result.stdout
+    assert "TWIRL_FM0_STOP_AFTER_STEP" not in result.stdout
+
+
+def test_fm0_2_generic_representation_controller_still_rejects_step_zero() -> None:
+    result = subprocess.run(
+        ["bash", str(CONTROLLER), "submit-representation-evaluation"],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "TWIRL_EXPECTED_GIT_SHA": "1" * 40,
+            "TWIRL_FM0_STOP_AFTER_STEP": "0",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "Unauthorized representation milestone" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    [
+        (
+            "TWIRL_FM0_ARTIFACT_GIT_SHA",
+            "2" * 40,
+            "frozen FM0.2.1 training revision",
+        ),
+        (
+            "TWIRL_FM0_INITIALIZATION_CHECKPOINT",
+            f"{PROJECT_ROOT}/wrong/checkpoint_step_00000000.pt",
+            "exact seed-560067 initialization",
+        ),
+        (
+            "TWIRL_FM0_STEP2000_POST_VALIDATION",
+            f"{PROJECT_ROOT}/wrong/post_validation.receipt.json",
+            "not authoritative",
+        ),
+        (
+            "TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT",
+            f"{PROJECT_ROOT}/wrong/representation_health.receipt.json",
+            "not authoritative",
+        ),
+        (
+            "TWIRL_FM0_STEP2000_POST_VALIDATION_SHA256",
+            "0" * 64,
+            "not the frozen receipt",
+        ),
+        (
+            "TWIRL_FM0_STEP2000_REPRESENTATION_RECEIPT_SHA256",
+            "0" * 64,
+            "not the frozen receipt",
+        ),
+    ],
+)
+def test_fm0_2_initialization_controller_rejects_drift_before_ssh(
+    name: str,
+    value: str,
+    message: str,
+) -> None:
+    environment = _initialization_environment()
+    environment[name] = value
+    result = subprocess.run(
+        ["bash", str(CONTROLLER), "submit-initialization-representation-evaluation"],
+        cwd=ROOT,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert message in result.stderr
+    assert "ssh " not in result.stdout

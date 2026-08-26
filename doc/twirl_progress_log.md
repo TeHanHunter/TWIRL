@@ -708,6 +708,34 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
 
 ## Stage 5
 
+### Foundation-model validation
+
+- `2026-08-26`: The frozen seed-`560067` FM0.2.1 canary stopped at step
+  `2000`; its strict CPU validation and development-only representation
+  evaluation passed with zero sealed-test access. The [step-2000 report]
+  (../reports/stage5_validation/twirl_fm0_2_s56_s64_step2000_evaluation_v1/README.md)
+  records `z_window` effective rank `39.40` and positive paired and
+  trained-minus-random separation intervals, while masked Huber remained
+  `0.109%` worse than the frozen zero predictor and cross-sector retrieval was
+  not demonstrated. The formal gate and development event-retention run remain
+  unapplied.
+- `2026-08-26`: Consolidated the new-Mac checkout onto the pushed FM handoff
+  branch while retaining the dirty rsync state in a recoverable Git stash.
+  Added a dedicated CPU-only step-0 evaluation path that pins the exact
+  seed-`560067` initialization, step-2000 validation/evaluator receipts,
+  unchanged evaluator revision and code hashes, development population, and
+  observation-sector authority. It refuses output-directory reuse and maps the
+  frozen evaluator's `trained_encoder` field explicitly to the exact
+  initialization rather than its separate seed-0 random control. Focused tests
+  and the full fast suite passed (`915` passed, `33` optional skips). No ORCD
+  job was submitted because the new Mac has no user-opened control socket.
+
+**Next:** After the user opens the prescribed ORCD control socket, deploy the
+reviewed exact commit and submit only the four-CPU, 16-GiB, no-GPU step-0
+evaluation. Validate its checksum-bound receipt before comparing steps
+`0/500/1000/2000`; keep training, event retention, the formal gate, and the
+sealed test closed.
+
 ### Candidate validation and follow-up
 
 - Heuristic/LEO checks, two-aperture review, human adjudication, scalar centroid
