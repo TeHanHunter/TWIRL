@@ -6,7 +6,7 @@ Read [the documentation guide](README.md) to find task-specific protocols.
 Detailed results belong in [the progress log](twirl_progress_log.md), and
 unresolved choices belong in [ideas](ideas.md).
 
-Last reconciled: `2026-08-24`.
+Last reconciled: `2026-08-26`.
 
 ## Milestone dashboard
 
@@ -17,7 +17,7 @@ Last reconciled: `2026-08-24`.
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
 | Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
-| TWIRL-FM0 | FM0.1 found an untrained pooled-projection path and failed the rank gate; the frozen FM0.2.1 objective canary isolates that repair | Pass the exact-code CPU loader/restart gate, then advance one-H200 milestones only through steps 64, 500, 1000, and 2000 with independent validation |
+| TWIRL-FM0 | FM0.2.1 completed its authorized step-2000 canary; the targeted rank/separation pathology is repaired, but masked Huber remains `0.109%` worse than zero and the formal gate is incomplete | Preserve the stopped run, review the checksum-bound CPU-only step-0 evaluation path, and do not advance the model ladder |
 
 The exact current run state and historical metrics are recorded in the
 [progress log](twirl_progress_log.md). Reports are evidence snapshots, not
@@ -99,7 +99,18 @@ project authority.
   through step 2,000 only. Every H200 invocation requires a fresh Stage-1-safe
   admission and uses one H200, four CPUs, and 32 GiB. The sealed test,
   FM0.2.2, a 20,000-step extension, production use, and a foundation-model
-  claim remain unauthorized.
+  claim remain unauthorized. The exact-code CPU gate, FP32 smoke, real step-64
+  milestone, and independent restart validation passed. Step 500 also passed
+  strict validation. The matched step-500/1000/2000 development trajectory
+  then raised `z_window` effective rank from `6.45` to `19.43` to `39.40` and
+  made both separation intervals positive, but the final masked Huber remained
+  `0.109%` worse than the frozen zero predictor and cross-sector retrieval was
+  not demonstrated. The [step-2000 report](../reports/stage5_validation/twirl_fm0_2_s56_s64_step2000_evaluation_v1/README.md)
+  is development-only evidence: the formal go/no-go was not applied,
+  development event retention was not run, the exact same-seed step-0
+  evaluation remains missing, and the sealed test stayed closed. Detailed
+  evidence is in the step-2000 report and its
+  [new-Mac handoff](../reports/stage5_validation/twirl_fm0_2_s56_s64_step2000_evaluation_v1/HANDOFF.md).
 - S63 may appear as unlabeled FM pretraining data, so it is never prospective
   FM evidence. The Teacher-v3 S63 test remains prospective only while no FM
   embedding, score, queue, threshold, or review decision influences it.
@@ -263,12 +274,12 @@ negotiation or career-planning notes do not belong in the public plan.
    only the isolated low-priority S94 shared-QLP reuse smoke described in the
    protocol; do not release a full S94+ queue before its gates pass.
 2. Run the two isolated model experiments: complete the sealed Teacher-v3 S63
-   score-hidden review, and keep its isolation rule. For FM work, advance only
-   the frozen FM0.2.1 objective canary: pass the exact-code CPU gate and FP32
-   smoke, then stop and validate at steps 64, 500, 1000, and 2000. Apply the
-   development representation and event-retention gates at step 2000. Do not
-   advance FM0.1.3 or FM0.2.2, extend to 20,000 steps, rerun a second seed, or
-   open the sealed FM test.
+   score-hidden review, and keep its isolation rule. For FM work, preserve the
+   stopped FM0.2.1 step-2000 artifacts and review a checksum-bound CPU-only
+   path for the required exact same-seed step-0 representation evaluation.
+   Keep the formal gate unapplied and do not run development event retention
+   without explicit authorization. Do not advance FM0.1.3 or FM0.2.2, extend
+   beyond step 2000, rerun a second seed, or open the sealed FM test.
 3. Advance the transparent survey path independently: implement the dip branch
    and multi-sector merging, freeze the archive/index and release boundary
    (including no-TIC and S94+ decisions), then complete the recovery chain

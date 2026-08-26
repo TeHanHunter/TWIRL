@@ -1,0 +1,20 @@
+{
+  "admission_receipt_sha256": "c763b8a0f6dd419936a23e8a5cb0db15dcdeadcbb017201313ae71a85afbaf9a",
+  "created_at_utc": "2026-08-26T15:51:33.650824+00:00",
+  "foundation_model_claim_authorized": false,
+  "input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7",
+  "input_reuse_receipt_sha256": "46faed954e6758dfea71f7754670611fab03af63613dad3be433af71dd38e641",
+  "milestone_checkpoint_sha256": "976b5053c857c38b9fbf7a35c9d0605f0023318b2c9bd37a88995992e5aa7bd2",
+  "passed": true,
+  "production_authorized": false,
+  "run_contract_sha256": "58159980fe1e644b0a9c86e4c9459f927a0ca81920cc74db367d8bea920f5f02",
+  "run_contract_target_step": 20000,
+  "run_git_sha": "ddf442aafb8f62966e549e2287abad3474dd556a",
+  "run_kind": "real_canary",
+  "schema_version": "twirl_fm0_2_orcd_canary_invocation_v1",
+  "sealed_test_access_count": 0,
+  "seed": 560067,
+  "stop_after_step": 2000,
+  "summary_sha256": "73826444ab8ac9606d2c7b40b7b5cd05006ca91eb29f5f6113d98e91cc40c0fc",
+  "variant": "TWIRL-FM0.2.1"
+}

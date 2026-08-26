@@ -1,0 +1,30 @@
+{
+  "admission_receipt_sha256": "c763b8a0f6dd419936a23e8a5cb0db15dcdeadcbb017201313ae71a85afbaf9a",
+  "artifacts_sha256": {
+    "checkpoint.pt": "c8c09b57cc949c4011fae9a4698925ba5b1ce0d28573c8e9d74448017922a4b9",
+    "checkpoint_step_00000000.pt": "92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c",
+    "checkpoint_step_00000064.pt": "34438f30c0aed96c3873d75adab08f3384b70bae89f00aee4d5c3f936733ba5e",
+    "checkpoint_step_00000500.pt": "529a17772e0734c44ec6e50c7e4ec5ca338170c1878326afc054dc0f92fb18dd",
+    "checkpoint_step_00001000.pt": "a8467728383ee80e65bae2cef6ce9036b8cc4a58aa2cc48b49ad5d4e064071b9",
+    "checkpoint_step_00002000.pt": "976b5053c857c38b9fbf7a35c9d0605f0023318b2c9bd37a88995992e5aa7bd2",
+    "run_contract.json": "58159980fe1e644b0a9c86e4c9459f927a0ca81920cc74db367d8bea920f5f02",
+    "summary.json": "73826444ab8ac9606d2c7b40b7b5cd05006ca91eb29f5f6113d98e91cc40c0fc"
+  },
+  "created_at_utc": "2026-08-26T19:20:35.641869+00:00",
+  "foundation_model_claim_authorized": false,
+  "independent_run_validation_sha256": "f08f33a512dcf537f7bc794afcf8a37e2ea07ed8f80c5f33e5f9a65086b065c4",
+  "input_receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7",
+  "input_reuse_receipt_sha256": "46faed954e6758dfea71f7754670611fab03af63613dad3be433af71dd38e641",
+  "passed": true,
+  "production_authorized": false,
+  "run_contract_target_step": 20000,
+  "run_git_sha": "ddf442aafb8f62966e549e2287abad3474dd556a",
+  "run_kind": "real_canary",
+  "schema_version": "twirl_fm0_2_milestone_post_validation_v1",
+  "scientific_result": false,
+  "sealed_test_access_count": 0,
+  "seed": 560067,
+  "stop_after_step": 2000,
+  "validator_git_sha": "ddf442aafb8f62966e549e2287abad3474dd556a",
+  "variant": "TWIRL-FM0.2.1"
+}

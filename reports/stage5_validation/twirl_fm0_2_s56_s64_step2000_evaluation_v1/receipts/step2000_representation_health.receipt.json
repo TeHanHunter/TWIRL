@@ -1,0 +1,16 @@
+{
+  "artifact_git_sha": "ddf442aafb8f62966e549e2287abad3474dd556a",
+  "checkpoint_sha256": "976b5053c857c38b9fbf7a35c9d0605f0023318b2c9bd37a88995992e5aa7bd2",
+  "evaluation_sha256": "3c802741744999fe553e71bc2dccfbef6c309a29a28c30dfaac693a798bb3718",
+  "evaluator_contract_sha256": "ed8004180b28c7e2bd85911d0128f9180eddd3c35bdaae299e2f7edba6e5baac",
+  "evaluator_git_sha": "83816d07975eebe3825d76dfe7096d22b70376f5",
+  "foundation_model_claim_authorized": false,
+  "observation_sector_authority_sha256": "bdd3e8039b312aeb21557662226a8a11b761dd1da031742be42ee9b0d1c6edc5",
+  "passed": true,
+  "post_validation_sha256": "80d678c4621a22258c5d0e8f0be6f7e08ffa5bf93841c315abf42e9bb006b110",
+  "production_authorized": false,
+  "schema_version": "twirl_fm0_2_representation_evaluation_receipt_v1",
+  "scientific_go_no_go_applied": false,
+  "sealed_test_access_count": 0,
+  "stop_after_step": 2000
+}

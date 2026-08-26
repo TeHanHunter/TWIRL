@@ -1,0 +1,61 @@
+{
+  "architecture": "tcn",
+  "checkpoint_sha256": "517535acaabe0c5a8038ba0137ec5403564d8c6acab9c40ff3400e5decfff11f",
+  "device": "cuda",
+  "elapsed_seconds_this_invocation": 2173.890868377988,
+  "final_metrics": {
+    "embedding_projection_gradient_norm": 0.0009767886949703097,
+    "learning_rate": 0.0003,
+    "masked_views_seen": 128000.0,
+    "reconstruction": 0.00476228233310394,
+    "reconstruction_first": 0.00476228233310394,
+    "reconstruction_mean": 0.004746605409309268,
+    "reconstruction_second": 0.0047309285146184266,
+    "step": 1000.0,
+    "total": 0.007836741409031674,
+    "vicreg": 15.372295379638672,
+    "vicreg_covariance": 3.232729434967041,
+    "vicreg_invariance": 0.000781537382863462,
+    "vicreg_variance": 0.48480111360549927,
+    "vicreg_weighted": 0.0030744590759277345,
+    "window_draws_seen": 64000.0
+  },
+  "global_step": 1000,
+  "immutable_milestone_checkpoints": [
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000000.pt",
+      "sha256": "92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000000.pt.sha256",
+      "step": 0
+    },
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000064.pt",
+      "sha256": "34438f30c0aed96c3873d75adab08f3384b70bae89f00aee4d5c3f936733ba5e",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000064.pt.sha256",
+      "step": 64
+    },
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000500.pt",
+      "sha256": "529a17772e0734c44ec6e50c7e4ec5ca338170c1878326afc054dc0f92fb18dd",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00000500.pt.sha256",
+      "step": 500
+    },
+    {
+      "checkpoint": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00001000.pt",
+      "sha256": "a8467728383ee80e65bae2cef6ce9036b8cc4a58aa2cc48b49ad5d4e064071b9",
+      "sha256_sidecar": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_s56_s64_objective_canary/ddf442aafb8f/model_runs/fm0_2_1_canary/seed560067/checkpoint_step_00001000.pt.sha256",
+      "step": 1000
+    }
+  ],
+  "objective": "masked_reconstruction_plus_same_window_vicreg",
+  "parameter_count": 8825602,
+  "passed": true,
+  "precision": "bf16",
+  "real_data_consumed": true,
+  "requested_stop_after_step": 1000,
+  "run_contract_sha256": "58159980fe1e644b0a9c86e4c9459f927a0ca81920cc74db367d8bea920f5f02",
+  "schema_version": "twirl_fm0_1_real_run_summary_v1",
+  "scientific_result": false,
+  "synthetic_only": false,
+  "variant": "TWIRL-FM0.2.1"
+}

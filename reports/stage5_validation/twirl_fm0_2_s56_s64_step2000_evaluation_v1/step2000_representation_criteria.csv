@@ -1,0 +1,7 @@
+criterion,observed,threshold,meets_criterion
+z_window_effective_rank,39.39935029993325,>= 26,True
+z_window_zero_or_constant_dimensions,0,<= 0,True
+z_paired_minus_unrelated_95_lower,0.0550733132268454,> 0,True
+z_trained_minus_random_95_lower,0.03310707000584554,> 0,True
+development_masked_huber,0.004869892727583647,<= 0.004864579067,False
+sealed_test_access_count,0,== 0,True
