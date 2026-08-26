@@ -25,6 +25,11 @@ from twirl.plotting.style import apply_twirl_style, get_ordered_palette  # noqa:
 
 EXPECTED_TRAINING_SHA = "ddf442aafb8f62966e549e2287abad3474dd556a"
 EXPECTED_EVALUATOR_SHA = "83816d07975eebe3825d76dfe7096d22b70376f5"
+EXPECTED_ORCHESTRATION_SHA = "393ee8f9f1372ca2e017d4fea59f9593bc96e4fc"
+EXPECTED_INITIALIZATION_CHECKPOINT_SHA = "92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c"
+EXPECTED_INITIALIZATION_EVALUATION_SHA = "bc75b96271487851162f542682501f30fba1bcaa40b425333ad1767c32da1fe6"
+EXPECTED_INITIALIZATION_RECEIPT_SHA = "5e489c8abf0ef7c70c815889701a8dfc1a7ad31eed7b5a4366158ec68d61e29c"
+EXPECTED_STEP2000_REPRESENTATION_RECEIPT_SHA = "616ef9a100b7b7a3a1923f81ac19a272cab8b6f4657a4a58c2815688ee6d1191"
 EXPECTED_CHECKPOINT_SHA = "976b5053c857c38b9fbf7a35c9d0605f0023318b2c9bd37a88995992e5aa7bd2"
 EXPECTED_COMPONENT_HASH = "50e0b59e1bc80ded61e30c1a6c07a56eee6306b03c3bd52e1f30ebdc43f5c72f"
 EXPECTED_OBSERVATION_HASH = "9ffdc49e042cf4e8dccbe53e70fd849723abf96625c36a00adea8f4fde20546a"
@@ -52,6 +57,8 @@ HISTORY_FIELDS = [
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--step0-health", type=Path)
+    parser.add_argument("--step0-receipt", type=Path)
     for step in (500, 1000, 2000):
         parser.add_argument(f"--step{step}-health", type=Path, required=True)
     parser.add_argument("--step2000-receipt", type=Path, required=True)
@@ -59,6 +66,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--step1000-loss-history", type=Path, required=True)
     parser.add_argument("--step2000-loss-history", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--representation-only", action="store_true")
     return parser
 
 
@@ -108,6 +116,38 @@ def _validate_health(step: int, health: dict[str, Any]) -> None:
         raise ValueError(f"step {step} observation-sector authority differs")
 
 
+def _validate_initialization_receipt(
+    receipt: dict[str, Any], receipt_path: Path, health_path: Path
+) -> None:
+    if _sha256(receipt_path) != EXPECTED_INITIALIZATION_RECEIPT_SHA:
+        raise ValueError("step-0 receipt is not the reviewed artifact")
+    if receipt.get("schema_version") != "twirl_fm0_2_initialization_representation_evaluation_receipt_v1" or receipt.get("passed") is not True:
+        raise ValueError("step-0 receipt did not pass")
+    if receipt.get("orchestration_git_sha") != EXPECTED_ORCHESTRATION_SHA:
+        raise ValueError("step-0 orchestration revision differs")
+    if receipt.get("artifact_git_sha") != EXPECTED_TRAINING_SHA or receipt.get("evaluator_git_sha") != EXPECTED_EVALUATOR_SHA:
+        raise ValueError("step-0 training/evaluator revision differs")
+    if receipt.get("evaluation_sha256") != _sha256(health_path) or receipt.get("evaluation_sha256") != EXPECTED_INITIALIZATION_EVALUATION_SHA:
+        raise ValueError("step-0 evaluation binding differs")
+    if receipt.get("checkpoint_sha256") != EXPECTED_INITIALIZATION_CHECKPOINT_SHA or receipt.get("checkpoint_step") != 0 or receipt.get("checkpoint_seed") != 560067:
+        raise ValueError("step-0 checkpoint binding differs")
+    roles = receipt.get("output_field_role_mapping", {})
+    if receipt.get("evaluation_role") != "exact_same_seed_initialization" or roles.get("trained_encoder") != "exact_same_seed_initialization" or roles.get("random_encoder_control") != "separate_matched_random_control_seed_0":
+        raise ValueError("step-0 evaluation roles differ")
+    population = receipt.get("development_population", {})
+    if population.get("selected_leakage_components") != 256 or population.get("selected_observation_visits") != 383:
+        raise ValueError("step-0 development population counts differ")
+    if population.get("selected_leakage_components_sha256") != EXPECTED_COMPONENT_HASH or population.get("selected_observation_keys_sha256") != EXPECTED_OBSERVATION_HASH:
+        raise ValueError("step-0 development population differs")
+    if receipt.get("observation_sector_authority_sha256") != EXPECTED_AUTHORITY_HASH or receipt.get("step2000_representation_receipt_sha256") != EXPECTED_STEP2000_REPRESENTATION_RECEIPT_SHA:
+        raise ValueError("step-0 authority/reference binding differs")
+    if receipt.get("sealed_test_access_count") != 0:
+        raise ValueError("step-0 receipt records sealed access")
+    for field in ("development_event_retention_run", "scientific_go_no_go_applied", "production_authorized", "foundation_model_claim_authorized"):
+        if receipt.get(field) is not False:
+            raise ValueError(f"step-0 receipt unexpectedly enables {field}")
+
+
 def _validated_history(payload: dict[str, Any], expected_step: int) -> list[dict[str, float]]:
     if payload.get("schema_version") != "twirl_fm0_2_loss_history_extract_v1":
         raise ValueError("loss-history extract schema differs")
@@ -154,10 +194,23 @@ def _validate_inputs(
     step1000_history: dict[str, Any],
     step2000_history: dict[str, Any],
     step2000_health_path: Path,
+    initialization_receipt: dict[str, Any] | None = None,
+    initialization_receipt_path: Path | None = None,
+    initialization_health_path: Path | None = None,
 ) -> list[dict[str, float]]:
     for step, health in health_by_step.items():
         _validate_health(step, health)
     step2000 = health_by_step[2000]
+    if 0 in health_by_step:
+        if initialization_receipt is None or initialization_receipt_path is None or initialization_health_path is None:
+            raise ValueError("step-0 health and receipt must be supplied together")
+        _validate_initialization_receipt(
+            initialization_receipt, initialization_receipt_path, initialization_health_path
+        )
+        if health_by_step[0]["run"]["checkpoint_sha256"] != EXPECTED_INITIALIZATION_CHECKPOINT_SHA:
+            raise ValueError("step-0 health checkpoint binding differs")
+    elif initialization_receipt is not None or initialization_receipt_path is not None or initialization_health_path is not None:
+        raise ValueError("step-0 health and receipt must be supplied together")
     if step2000["run"]["checkpoint_sha256"] != EXPECTED_CHECKPOINT_SHA:
         raise ValueError("step-2000 checkpoint hash differs")
     if receipt.get("passed") is not True or receipt.get("stop_after_step") != 2000:
@@ -311,16 +364,18 @@ def _plot_representation(health_by_step: dict[int, dict[str, Any]], output_dir: 
     ordered_steps = sorted(health_by_step)
     healths = [health_by_step[step] for step in ordered_steps]
     steps = np.asarray(ordered_steps, dtype=float)
+    x_limits = (float(steps[0] - 70.0), float(steps[-1] + 70.0))
     final = health_by_step[2000]
     controls = final["random_encoder_control"]["representations"]
     colors = get_ordered_palette(8)
+    checkpoint_label = "checkpoint" if 0 in health_by_step else "trained"
     apply_twirl_style("full_page")
     fig, axes = plt.subplots(3, 2, figsize=(7.1, 7.5))
     ax_rank, ax_paired, ax_delta, ax_recon, ax_retrieval, ax_spectrum = axes.flat
 
     for branch, color, marker, label in (
-        ("h_window", colors[5], "o", r"trained $h$"),
-        ("z_window", colors[7], "s", r"trained $z$"),
+        ("h_window", colors[5], "o", rf"{checkpoint_label} $h$"),
+        ("z_window", colors[7], "s", rf"{checkpoint_label} $z$"),
     ):
         values = [
             float(health["trained_encoder"]["representations"][branch]["embedding_health"]["effective_rank"])
@@ -331,14 +386,14 @@ def _plot_representation(health_by_step: dict[int, dict[str, Any]], output_dir: 
     ax_rank.axhline(float(controls["z_window"]["embedding_health"]["effective_rank"]), color="0.55", ls=":", lw=1.0, label="matched random $z$")
     ax_rank.axhline(pca_rank, color="0.3", ls="--", lw=1.0, label="train-fit PCA")
     ax_rank.axhline(Z_RANK_MINIMUM, color=colors[2], ls="-.", lw=1.0, label="$z$ gate")
-    ax_rank.set(xlabel="Optimizer step", ylabel="Effective rank", xticks=steps, xlim=(430, 2070))
+    ax_rank.set(xlabel="Optimizer step", ylabel="Effective rank", xticks=steps, xlim=x_limits)
     ax_rank.legend(loc="upper left", ncol=2)
     ax_rank.text(0.98, 0.06, r"constant dims at 2000: $z=0$, $h=1$", transform=ax_rank.transAxes, ha="right", va="bottom")
     _panel_label(ax_rank, "a", right=True)
 
     for branch, color, marker, label in (
-        ("h_window", colors[5], "o", r"trained $h$"),
-        ("z_window", colors[7], "s", r"trained $z$"),
+        ("h_window", colors[5], "o", rf"{checkpoint_label} $h$"),
+        ("z_window", colors[7], "s", rf"{checkpoint_label} $z$"),
     ):
         intervals = [
             _interval(
@@ -354,7 +409,7 @@ def _plot_representation(health_by_step: dict[int, dict[str, Any]], output_dir: 
     ax_paired.axhline(random_z, color="0.55", ls=":", lw=1.0, label="matched random $z$")
     ax_paired.axhline(scalar, color=colors[2], ls="-.", lw=1.0, label="robust scalar")
     ax_paired.axhline(pca, color="0.3", ls="--", lw=1.0, label="train-fit PCA")
-    ax_paired.set(xlabel="Optimizer step", ylabel="Paired − unrelated cosine", xticks=steps, xlim=(430, 2070), yscale="log")
+    ax_paired.set(xlabel="Optimizer step", ylabel="Paired − unrelated cosine", xticks=steps, xlim=x_limits, yscale="log")
     ax_paired.legend(loc="upper left", ncol=2)
     _panel_label(ax_paired, "b", right=True)
 
@@ -368,21 +423,28 @@ def _plot_representation(health_by_step: dict[int, dict[str, Any]], output_dir: 
         ]
         _plot_interval(ax_delta, steps, intervals, color=color, marker=marker, label=label)
     ax_delta.axhline(0.0, color="0.25", ls="--", lw=0.9)
-    ax_delta.set(xlabel="Optimizer step", ylabel="Trained − random separation", xticks=steps, xlim=(430, 2070))
+    ax_delta.set(xlabel="Optimizer step", ylabel="Checkpoint − seed-0 control", xticks=steps, xlim=x_limits)
     ax_delta.legend(loc="upper left")
     _panel_label(ax_delta, "c", right=True)
 
-    excess = np.asarray([100.0 * (float(health["masked_reconstruction"]["model_to_zero_baseline_ratio"]) - 1.0) for health in healths])
-    ax_recon.plot(steps, excess, color=colors[6], marker="o", ms=4, lw=1.2)
-    ax_recon.axhline(0.0, color="0.25", ls="--", lw=0.9, label="zero predictor / gate")
-    ax_recon.set(xlabel="Optimizer step", ylabel="Masked Huber excess vs zero (%)", xticks=steps, xlim=(430, 2070))
-    ax_recon.annotate(f"{excess[-1]:.3f}% worse", xy=(steps[-1], excess[-1]), xytext=(-76, 18), textcoords="offset points", arrowprops={"arrowstyle": "-", "color": "0.35", "lw": 0.7})
+    ratios = np.asarray([float(health["masked_reconstruction"]["model_to_zero_baseline_ratio"]) for health in healths])
+    if 0 in health_by_step:
+        ax_recon.plot(steps, ratios, color=colors[6], marker="o", ms=4, lw=1.2)
+        ax_recon.axhline(1.0, color="0.25", ls="--", lw=0.9, label="zero predictor / gate")
+        ax_recon.set(xlabel="Optimizer step", ylabel="Masked Huber / zero predictor", xticks=steps, xlim=x_limits, yscale="log")
+        ax_recon.annotate(f"{100.0 * (ratios[-1] - 1.0):.3f}% worse", xy=(steps[-1], ratios[-1]), xytext=(-76, 18), textcoords="offset points", arrowprops={"arrowstyle": "-", "color": "0.35", "lw": 0.7})
+    else:
+        excess = 100.0 * (ratios - 1.0)
+        ax_recon.plot(steps, excess, color=colors[6], marker="o", ms=4, lw=1.2)
+        ax_recon.axhline(0.0, color="0.25", ls="--", lw=0.9, label="zero predictor / gate")
+        ax_recon.set(xlabel="Optimizer step", ylabel="Masked Huber excess vs zero (%)", xticks=steps, xlim=x_limits)
+        ax_recon.annotate(f"{excess[-1]:.3f}% worse", xy=(steps[-1], excess[-1]), xytext=(-76, 18), textcoords="offset points", arrowprops={"arrowstyle": "-", "color": "0.35", "lw": 0.7})
     ax_recon.legend(loc="upper right")
     _panel_label(ax_recon, "d")
 
     for branch, color, marker, label in (
-        ("h_window", colors[5], "o", r"trained $h$"),
-        ("z_window", colors[7], "s", r"trained $z$"),
+        ("h_window", colors[5], "o", rf"{checkpoint_label} $h$"),
+        ("z_window", colors[7], "s", rf"{checkpoint_label} $z$"),
     ):
         intervals = [
             _interval(health["trained_encoder"]["representations"][branch]["query_sector_excluded_cross_visit_retrieval"], "top1_source_clustered_95_interval")
@@ -395,14 +457,15 @@ def _plot_representation(health_by_step: dict[int, dict[str, Any]], output_dir: 
     ax_retrieval.axhline(random_retrieval, color="0.55", ls=":", lw=1.0, label="matched random $z$")
     ax_retrieval.axhline(scalar_retrieval, color=colors[2], ls="-.", lw=1.0, label="robust scalar")
     ax_retrieval.axhline(pca_retrieval, color="0.3", ls="--", lw=1.0, label="train-fit PCA")
-    ax_retrieval.set(xlabel="Optimizer step", ylabel="Cross-sector top-1 retrieval", xticks=steps, xlim=(430, 2070), ylim=(0.0, 0.10))
+    ax_retrieval.set(xlabel="Optimizer step", ylabel="Cross-sector top-1 retrieval", xticks=steps, xlim=x_limits, ylim=(0.0, 0.10))
     ax_retrieval.legend(loc="upper left", ncol=2)
     _panel_label(ax_retrieval, "e", right=True)
 
     indices = np.arange(1, 257)
-    for health, color, label in zip(healths, (colors[3], colors[5], colors[7]), ("step 500", "step 1000", "step 2000"), strict=True):
+    spectrum_colors = (colors[1], colors[3], colors[5], colors[7]) if len(healths) == 4 else (colors[3], colors[5], colors[7])
+    for health, step, color in zip(healths, ordered_steps, spectrum_colors, strict=True):
         singular = np.asarray(health["trained_encoder"]["projection_spectrum"]["singular_values"], dtype=float)
-        ax_spectrum.plot(indices, singular, color=color, lw=1.0, label=label)
+        ax_spectrum.plot(indices, singular, color=color, lw=1.0, label=f"step {step}")
     random_singular = np.asarray(final["random_encoder_control"]["projection_spectrum"]["singular_values"], dtype=float)
     ax_spectrum.plot(indices, random_singular, color="0.55", ls=":", lw=1.0, label="matched random")
     ax_spectrum.set(xlabel="Singular-value index", ylabel="Projection singular value", yscale="log", xlim=(1, 256))
@@ -410,7 +473,7 @@ def _plot_representation(health_by_step: dict[int, dict[str, Any]], output_dir: 
     _panel_label(ax_spectrum, "f")
 
     fig.subplots_adjust(left=0.10, right=0.985, bottom=0.075, top=0.985, hspace=0.34, wspace=0.30)
-    stem = output_dir / "fm0_2_step2000_representation_trajectory"
+    stem = output_dir / ("fm0_2_step0_step2000_representation_trajectory" if 0 in health_by_step else "fm0_2_step2000_representation_trajectory")
     fig.savefig(stem.with_suffix(".png"), dpi=240)
     fig.savefig(stem.with_suffix(".pdf"))
     plt.close(fig)
@@ -493,11 +556,17 @@ def _plot_training(rows: list[dict[str, float]], output_dir: Path) -> None:
 
 def main() -> int:
     args = _parser().parse_args()
+    if (args.step0_health is None) != (args.step0_receipt is None):
+        raise ValueError("--step0-health and --step0-receipt must be supplied together")
     health_by_step = {
         500: _load_json(args.step500_health),
         1000: _load_json(args.step1000_health),
         2000: _load_json(args.step2000_health),
     }
+    initialization_receipt = None
+    if args.step0_health is not None:
+        health_by_step[0] = _load_json(args.step0_health)
+        initialization_receipt = _load_json(args.step0_receipt)
     receipt = _load_json(args.step2000_receipt)
     post_validation = _load_json(args.step2000_post_validation)
     step1000_history = _load_json(args.step1000_loss_history)
@@ -509,12 +578,16 @@ def main() -> int:
         step1000_history,
         step2000_history,
         args.step2000_health,
+        initialization_receipt=initialization_receipt,
+        initialization_receipt_path=args.step0_receipt,
+        initialization_health_path=args.step0_health,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    _write_csv(args.output_dir / "training_trace.csv", rows, HISTORY_FIELDS)
+    if not args.representation_only:
+        _write_csv(args.output_dir / "training_trace.csv", rows, HISTORY_FIELDS)
     metric_rows = _representation_rows(health_by_step)
     _write_csv(
-        args.output_dir / "step500_step1000_step2000_metrics.csv",
+        args.output_dir / ("step0_step500_step1000_step2000_metrics.csv" if 0 in health_by_step else "step500_step1000_step2000_metrics.csv"),
         metric_rows,
         list(metric_rows[0]),
     )
@@ -525,9 +598,11 @@ def main() -> int:
         list(gate_rows[0]),
     )
     _plot_representation(health_by_step, args.output_dir)
-    _plot_training(rows, args.output_dir)
-    print(args.output_dir / "fm0_2_step2000_representation_trajectory.png")
-    print(args.output_dir / "fm0_2_step2000_training_components.png")
+    if not args.representation_only:
+        _plot_training(rows, args.output_dir)
+    print(args.output_dir / ("fm0_2_step0_step2000_representation_trajectory.png" if 0 in health_by_step else "fm0_2_step2000_representation_trajectory.png"))
+    if not args.representation_only:
+        print(args.output_dir / "fm0_2_step2000_training_components.png")
     return 0
 
 

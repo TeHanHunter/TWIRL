@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import hashlib
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -15,6 +17,13 @@ PROJECT_ROOT = "/orcd/data/mki_aryeh/001/twirl"
 TRAINING_SHA = "ddf442aafb8f62966e549e2287abad3474dd556a"
 POST_SHA = "80d678c4621a22258c5d0e8f0be6f7e08ffa5bf93841c315abf42e9bb006b110"
 REFERENCE_SHA = "616ef9a100b7b7a3a1923f81ac19a272cab8b6f4657a4a58c2815688ee6d1191"
+STEP0_REPORT = (
+    ROOT / "reports" / "stage5_validation" / "twirl_fm0_2_s56_s64_step0_evaluation_v1"
+)
+STEP0_EVALUATION_SHA = (
+    "bc75b96271487851162f542682501f30fba1bcaa40b425333ad1767c32da1fe6"
+)
+STEP0_RECEIPT_SHA = "5e489c8abf0ef7c70c815889701a8dfc1a7ad31eed7b5a4366158ec68d61e29c"
 
 
 def _sha256(path: Path) -> str:
@@ -237,6 +246,62 @@ def test_fm0_2_generic_representation_controller_still_rejects_step_zero() -> No
     )
     assert result.returncode == 2
     assert "Unauthorized representation milestone" in result.stderr
+
+
+def test_fm0_2_step0_evaluation_receipt_is_exact_and_keeps_gates_closed() -> None:
+    receipts = STEP0_REPORT / "receipts"
+    evaluation_path = receipts / "step0_representation_health.json"
+    receipt_path = receipts / "step0_representation_health.receipt.json"
+    sidecar_path = receipts / "step0_representation_health.receipt.json.sha256"
+    evaluation = json.loads(evaluation_path.read_text(encoding="utf-8"))
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert _sha256(evaluation_path) == STEP0_EVALUATION_SHA
+    assert _sha256(receipt_path) == STEP0_RECEIPT_SHA
+    assert sidecar_path.read_text(encoding="utf-8") == (
+        f"{STEP0_RECEIPT_SHA}  representation_health.receipt.json\n"
+    )
+    assert receipt["passed"] is True
+    assert receipt["evaluation_sha256"] == STEP0_EVALUATION_SHA
+    assert receipt["checkpoint_step"] == 0
+    assert receipt["checkpoint_seed"] == 560067
+    assert receipt["evaluation_role"] == "exact_same_seed_initialization"
+    assert receipt["output_field_role_mapping"] == {
+        "trained_encoder": "exact_same_seed_initialization",
+        "random_encoder_control": "separate_matched_random_control_seed_0",
+        "source_paired_trained_minus_random": (
+            "exact_initialization_minus_matched_random_control"
+        ),
+    }
+    assert receipt["sealed_test_access_count"] == 0
+    assert receipt["development_event_retention_run"] is False
+    assert receipt["scientific_go_no_go_applied"] is False
+    assert receipt["production_authorized"] is False
+    assert receipt["foundation_model_claim_authorized"] is False
+    assert evaluation["run"]["global_step"] == 0
+    assert evaluation["data_access"]["sealed_test_access_count"] == 0
+
+
+def test_fm0_2_four_point_table_contains_the_exact_same_seed_trajectory() -> None:
+    table = STEP0_REPORT / "step0_step500_step1000_step2000_metrics.csv"
+    with table.open(encoding="utf-8", newline="") as stream:
+        rows = list(csv.DictReader(stream))
+    assert {(int(row["step"]), row["representation"]) for row in rows} == {
+        (step, branch)
+        for step in (0, 500, 1000, 2000)
+        for branch in ("h_window", "z_window")
+    }
+    z_by_step = {
+        int(row["step"]): row for row in rows if row["representation"] == "z_window"
+    }
+    assert float(z_by_step[0]["effective_rank"]) == pytest.approx(3.0274745240463248)
+    assert float(z_by_step[2000]["effective_rank"]) == pytest.approx(39.39935029993325)
+    assert float(z_by_step[0]["cross_sector_retrieval_clustered_mean"]) == (
+        pytest.approx(0.033796296296296297)
+    )
+    assert float(z_by_step[2000]["cross_sector_retrieval_clustered_mean"]) == (
+        pytest.approx(0.020833333333333332)
+    )
 
 
 @pytest.mark.parametrize(

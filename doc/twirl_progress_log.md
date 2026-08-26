@@ -729,12 +729,37 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   initialization rather than its separate seed-0 random control. Focused tests
   and the full fast suite passed (`915` passed, `33` optional skips). No ORCD
   job was submitted because the new Mac has no user-opened control socket.
+- `2026-08-26`: Reused the user-opened new-Mac ORCD control socket with all
+  authentication fallbacks disabled, fetched only the pushed handoff branch,
+  and deployed clean detached orchestration revision `393ee8f9`. The exact
+  seed-`560067` initialization evaluator ran as CPU job `21340937` on
+  `node4702` with four CPUs, `16 GiB`, no GPU, and empty stderr; it completed
+  `0:0` in `3m46s`. The step-0 evaluation SHA-256 is
+  `bc75b962...1fe6`, and its receipt SHA-256 is `5e489c8a...e29c`. The
+  receipt binds the frozen training/evaluator revisions, initialization
+  checkpoint, step-2000 receipts, identical `256`-component/`383`-visit
+  development population, and observation-sector authority. It records zero
+  sealed access, no event-retention run, no formal gate, and no production or
+  foundation-model authorization.
+- `2026-08-26`: The completed
+  [four-point analysis](../reports/stage5_validation/twirl_fm0_2_s56_s64_step0_evaluation_v1/README.md)
+  shows a genuine same-seed rank repair: `z_window` effective rank rises from
+  `3.03` at initialization to `39.40` at step 2000, while masked Huber falls by
+  `80.05%` but remains `0.109%` worse than zero. Cross-sector retrieval does
+  not improve descriptively (`0.03380 -> 0.02083`), and the exact
+  initialization already exceeds the separate seed-0 control on paired
+  separation, so the trained-minus-random gate is seed-sensitive. A read-only
+  sector audit reconciled the approximately 20-sector statement: the
+  operational footprint is 19 sectors through S74, but only S56--S65 are
+  accepted Stage-1 products and only S56--S64 form the frozen FM release.
+  Later-sector admission, repeated-host inventory, and a frozen development-
+  only temporal panel precede any data-scale training comparison.
 
-**Next:** After the user opens the prescribed ORCD control socket, deploy the
-reviewed exact commit and submit only the four-CPU, 16-GiB, no-GPU step-0
-evaluation. Validate its checksum-bound receipt before comparing steps
-`0/500/1000/2000`; keep training, event retention, the formal gate, and the
-sealed test closed.
+**Next:** Build a label-free FM admission and repeated-host inventory for later
+accepted sectors. Once at least five genuinely later sectors pass the FM
+gates, freeze a development-only temporal panel and evaluate the existing
+step-2000 checkpoint zero-shot; keep new training, event retention, the formal
+gate, and the sealed test closed.
 
 ### Candidate validation and follow-up
 

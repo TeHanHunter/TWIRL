@@ -17,7 +17,7 @@ Last reconciled: `2026-08-26`.
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
 | Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
-| TWIRL-FM0 | FM0.2.1 completed its authorized step-2000 canary; the targeted rank/separation pathology is repaired, but masked Huber remains `0.109%` worse than zero and the formal gate is incomplete | Run the locally validated checksum-bound CPU-only step-0 evaluation, compare the four milestones, and do not advance the model ladder |
+| TWIRL-FM0 | FM0.2.1 completed its four-point canary trajectory; rank repair is learned, but masked Huber remains `0.109%` worse than zero, cross-sector retrieval did not improve, and the formal gate is incomplete | Admit and inventory genuinely later sectors, then freeze a development-only temporal panel for zero-shot evaluation; do not advance the model ladder |
 
 The exact current run state and historical metrics are recorded in the
 [progress log](twirl_progress_log.md). Reports are evidence snapshots, not
@@ -108,11 +108,24 @@ project authority.
   not demonstrated. The [step-2000 report](../reports/stage5_validation/twirl_fm0_2_s56_s64_step2000_evaluation_v1/README.md)
   is development-only evidence: the formal go/no-go was not applied,
   development event retention was not run, the exact same-seed step-0
-  evaluation remains missing, and the sealed test stayed closed. Detailed
+  evaluation was initially missing, and the sealed test stayed closed. Detailed
   evidence is in the step-2000 report and its
   [new-Mac handoff](../reports/stage5_validation/twirl_fm0_2_s56_s64_step2000_evaluation_v1/HANDOFF.md).
-  A dedicated step-0 CPU path now passes local fail-closed tests and remains
-  unsubmitted pending a user-opened ORCD control socket.
+  The dedicated [step-0 evaluation](../reports/stage5_validation/twirl_fm0_2_s56_s64_step0_evaluation_v1/README.md)
+  then completed on the identical development panel with zero sealed access.
+  The exact same-seed trajectory confirms that `z_window` effective rank was
+  learned (`3.03 -> 39.40`) and masked Huber fell by `80.05%`, but
+  cross-sector retrieval changed descriptively from `0.03380` to `0.02083`
+  and the exact initialization already exceeded the separate seed-0 random
+  control on paired separation. This is a targeted mechanism success, not an
+  overall canary pass or useful-embedding result. The current operational
+  campaign spans approximately 19 sectors through S74, but only S56--S64 form
+  a frozen FM release and only S56--S65 are accepted Stage-1 sectors. Next
+  perform a label-free later-sector FM admission and repeated-host inventory;
+  once at least five genuinely later accepted sectors pass, freeze them as a
+  development-only temporal panel and evaluate the existing step-2000
+  checkpoint zero-shot before considering a separately controlled data-scale
+  experiment.
 - S63 may appear as unlabeled FM pretraining data, so it is never prospective
   FM evidence. The Teacher-v3 S63 test remains prospective only while no FM
   embedding, score, queue, threshold, or review decision influences it.
@@ -277,12 +290,13 @@ negotiation or career-planning notes do not belong in the public plan.
    protocol; do not release a full S94+ queue before its gates pass.
 2. Run the two isolated model experiments: complete the sealed Teacher-v3 S63
    score-hidden review, and keep its isolation rule. For FM work, preserve the
-   stopped FM0.2.1 step-2000 artifacts and execute only the locally validated,
-   checksum-bound CPU path for the required exact same-seed step-0
-   representation evaluation after a user opens the ORCD control socket. Keep
-   the formal gate unapplied and do not run development event retention without
-   explicit authorization. Do not advance FM0.1.3 or FM0.2.2, extend beyond
-   step 2000, rerun a second seed, or open the sealed FM test.
+   completed four-point FM0.2.1 evidence and perform only the label-free
+   later-sector FM admission/repeated-host inventory needed to define a
+   genuinely later development panel. Evaluate the existing checkpoint
+   zero-shot only after that panel is frozen. Keep the formal gate unapplied
+   and do not run development event retention without explicit authorization.
+   Do not advance FM0.1.3 or FM0.2.2, extend beyond step 2000, rerun a second
+   seed, start a data-scale training comparison, or open the sealed FM test.
 3. Advance the transparent survey path independently: implement the dip branch
    and multi-sector merging, freeze the archive/index and release boundary
    (including no-TIC and S94+ decisions), then complete the recovery chain
