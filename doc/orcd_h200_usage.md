@@ -59,6 +59,23 @@ different from PDO because login requires a password plus Duo, so the user owns
 the interactive authentication step and the agent only reuses the resulting SSH
 control socket.
 
+On a configured TWIRL Mac, the preferred user-side command is the tracked
+interactive helper. With no arguments it opens Hostess3, Blackhole, ORCD, PDO,
+and ORCD Globus sessions using `~/.ssh/id_tess`; it authenticates only and
+never starts production:
+
+```bash
+/Users/tehan/Projects/TWIRL/scripts/orcd/open_twirl_control_masters.sh
+```
+
+For an ORCD-only FM session, use:
+
+```bash
+/Users/tehan/Projects/TWIRL/scripts/orcd/open_twirl_control_masters.sh --orcd-only
+```
+
+The explicit commands below remain the manual fallback.
+
 Optional pre-step: from a browser, log into `https://orcd-ood.mit.edu/` first.
 This may refresh short-lived SSH-key access for Engaging. The subsequent SSH
 control socket is still opened from a user terminal, never by Codex or an
@@ -119,8 +136,7 @@ ssh \
   -o PasswordAuthentication=no \
   -o KbdInteractiveAuthentication=no \
   -o NumberOfPasswordPrompts=0 \
-  -o ControlMaster=auto \
-  -o ControlPath="$HOME/.ssh/cm/%r@%h:%p" \
+  -S "$HOME/.ssh/cm/tehan@orcd-login.mit.edu:22" \
   tehan@orcd-login.mit.edu \
   'hostname; whoami; sinfo -h -p pg_mki_aryeh -o "%P %D %t %G" | head -5'
 ```

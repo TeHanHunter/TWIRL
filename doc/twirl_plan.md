@@ -125,11 +125,14 @@ project authority.
   release and only S56--S65 are accepted Stage-1 sectors. The fail-closed
   [later-sector policy](../configs/models/twirl_fm0_2_later_sector_admission_v1.yaml)
   now binds the real release, corpus-selection, and alias authorities and keeps
-  new and repeated hosts separate. No temporal panel is frozen. Once at least
-  five genuinely later accepted sectors pass, use the label-blind inventory to
-  freeze the still-unset detector/cadence/cohort-adequacy thresholds and then a
-  development-only panel. Evaluate the existing step-2000 checkpoint zero-shot
-  before considering a separately controlled data-scale experiment.
+  new and repeated hosts separate. A separate ORCD source gate now recognizes
+  the checksum-bound S65 archive and the 32-cell retained S66+ layout without
+  promoting deferred sectors to accepted A2v1. No temporal panel is frozen.
+  Once at least five genuinely later sectors pass the ORCD HDF5-openability,
+  six-view, cadence-quality, and identity gates, use the label-blind inventory
+  to freeze the still-unset detector/cadence/cohort-adequacy thresholds and
+  then a development-only panel. Evaluate the existing step-2000 checkpoint
+  zero-shot before considering a separately controlled data-scale experiment.
 - S63 may appear as unlabeled FM pretraining data, so it is never prospective
   FM evidence. The Teacher-v3 S63 test remains prospective only while no FM
   embedding, score, queue, threshold, or review decision influences it.

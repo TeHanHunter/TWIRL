@@ -791,13 +791,24 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   suite passes `100` focused tests; the repository fast suite passes `1,017`
   tests with `33` optional-environment skips, and documentation/static checks
   pass. Independent final review found no remaining P1/P2 contract issue.
+- `2026-08-27`: Reconciled the later-sector FM path with the ORCD-resident
+  light curves rather than waiting on PDO product return. S65 already has a
+  checksum-bound `228,917`-HDF5 sector archive on ORCD, and S66--S78 use the
+  immutable 32-cell completion-plus-retention layout. Added a fail-closed
+  [ORCD source verifier](../scripts/stage5_validation/build_twirl_fm0_orcd_source_receipt.py)
+  that binds either source form while keeping `FM_ORCD_SOURCE_READY` distinct
+  from HDF5-openability, six-view, temporal-panel, A2v1-acceptance, and
+  occurrence-rate claims. S79 is actively computing on two H200s and S80 is
+  dependency-queued; the FM preparation lane remains CPU-only and separate.
 
-**Next:** Apply the label-free admission contract as S65--S69 become accepted.
-Once all five sectors pass and the repeated/new-host floors are met, freeze the
-adequacy thresholds from the label-blind inventory, then publish a separate
-immutable development-panel freeze and evaluate the existing step-2000
-checkpoint against its exact same-seed step-0 control, zero-shot. Keep new
-training, event retention, the formal gate, and the sealed test closed.
+**Next:** Write the real S65--S69 ORCD source receipts, open every selected
+HDF5 through the unchanged quality-aware adapter, build the exact six-view
+shards, and construct the label-blind repeated/new-host inventory. Once all
+five sectors pass and the cohort floors are met, freeze adequacy thresholds,
+publish a separate immutable development-panel freeze, and evaluate the
+existing step-2000 checkpoint against its exact same-seed step-0 control,
+zero-shot. Keep new training, event retention, the formal gate, and the sealed
+test closed.
 
 ### Candidate validation and follow-up
 
