@@ -115,6 +115,17 @@ def _retained_sector(tmp_path: Path, *, sector: int = 66) -> Path:
 
 def test_retained_sector_requires_all_32_receipt_bound_cells(tmp_path: Path) -> None:
     root = _retained_sector(tmp_path)
+    historical = next(root.glob("outputs/*/retained/*.retention.json"))
+    payload = json.loads(historical.read_text())
+    label = payload["cell"]
+    payload["cell"] = {
+        "sector": 66,
+        "orbit": int(label.split("_o", 1)[1].split("_", 1)[0]),
+        "camera": int(label.split("_cam", 1)[1].split("_", 1)[0]),
+        "ccd": int(label.rsplit("_ccd", 1)[1]),
+        "label": label,
+    }
+    _write_json(historical, payload)
     receipt = verify_retained_sector_source(
         sector_root=root, sector=66, expected_orbits=(139, 140)
     )

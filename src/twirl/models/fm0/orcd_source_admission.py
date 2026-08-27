@@ -59,6 +59,35 @@ def _expected_cells(sector: int, orbits: Sequence[int]) -> set[str]:
     }
 
 
+def _retention_cell_label(value: Any) -> str:
+    """Normalize the two historical retention-receipt cell encodings."""
+
+    if isinstance(value, str):
+        return value
+    if isinstance(value, Mapping):
+        label = str(value.get("label", "")).strip()
+        match = _CELL.fullmatch(label)
+        if match is None:
+            return ""
+        try:
+            identity = (
+                int(value.get("sector")),
+                int(value.get("orbit")),
+                int(value.get("camera")),
+                int(value.get("ccd")),
+            )
+        except (TypeError, ValueError):
+            return ""
+        parsed = (
+            int(match.group("sector")),
+            int(match.group("orbit")),
+            int(match.group("camera")),
+            int(match.group("ccd")),
+        )
+        return label if identity == parsed else ""
+    return ""
+
+
 def verify_archive_source(
     *, archive_dir: str | Path, sector: int, expected_orbits: Sequence[int]
 ) -> dict[str, Any]:
@@ -160,7 +189,7 @@ def verify_retained_sector_source(
             or complete.get("cell") != cell
             or retained.get("schema") != "twirl-a2v1-orcd-retention-v1"
             or retained.get("ok") is not True
-            or retained.get("cell") != cell
+            or _retention_cell_label(retained.get("cell")) != cell
             or retained.get("attempt_id") != complete.get("attempt_id")
             or retained.get("pdo_return_deferred") is not True
             or retained.get("pdo_sector_accepted") is not False
