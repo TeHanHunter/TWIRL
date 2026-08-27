@@ -837,14 +837,32 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   transferred quaternion, QLP-qflag, and TICA authorities. The immutable
   receipt SHA-256 is `71afae2c...52e4a3`; it reports zero unexplained or
   authority-excluded S67 cadences and keeps checksum-provenance, six-view,
-  identity, A2v1 acceptance, and temporal-panel claims closed. S68 is running;
-  S69--S77 remain dependency-held and stop automatically after any failure.
+  identity, A2v1 acceptance, and temporal-panel claims closed. S68 job
+  `21407076` then completed in `6m38s` with exit `0:0`: all `108,991` declared
+  HDF5 opened, zero were unreadable, and `634,273,102` cadences reconciled with
+  zero authority exclusions. Its receipt SHA-256 is `6521f1aa...b17abf7`.
+  S69 is running; S70--S77 remain dependency-held and stop automatically after
+  any failure.
+- `2026-08-27`: Froze a model-outcome-independent
+  [later-sector exclusion ledger](../configs/models/twirl_fm0_later_sector_exclusions_v1.yaml).
+  S65 is excluded from the first later-sector zero-shot panel and first
+  post-FM0.2 training release because the camera-4/CCD-4 SPOC authority lacks
+  quaternion cadences `802061--803522` (`1,462` rows). This does not demote its
+  accepted A2v1 product state. A future repair may enter only a newly versioned
+  release after every FM gate passes. The frozen admission-policy v1 remains
+  immutable and cannot express this skip, so a separately hashed v2 must bind
+  the ledger before an inventory or panel is frozen. Reserved `TWIRL-FM0.3`
+  for any justified post-zero-shot campaign: `.3.1` is provisionally a
+  fixed-TCN, fixed-view, fixed-objective data-scale baseline, while dual-mask
+  reconstruction and a stable-host cross-visit head remain separately
+  controlled later ablations. No training or temporal-panel freeze was
+  authorized.
 
 **Next:** Let the fail-closed S68--S77 HDF5/cadence chain finish, prove the S78
-TICA gap is fully outside every retained detector HDF5 before admitting it, and
-repair or explicitly mask S65's `1,462` unknown cam4/CCD4 mission-quality
-cadences. Then build exact six-view shards and the label-blind repeated/new-host
-inventory. Once at least five sectors and the cohort floors pass, freeze
+TICA gap is fully outside every retained detector HDF5 before admitting it.
+Keep S65 outside this release under the frozen exclusion ledger. Then build
+exact six-view shards and the label-blind repeated/new-host inventory. Once at
+least five sectors and the cohort floors pass, freeze
 adequacy thresholds, publish a separate immutable development-panel freeze,
 and evaluate the existing step-2000 checkpoint against its exact same-seed
 step-0 control, zero-shot. Keep new training, event retention, the formal gate,

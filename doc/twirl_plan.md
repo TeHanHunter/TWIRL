@@ -6,7 +6,7 @@ Read [the documentation guide](README.md) to find task-specific protocols.
 Detailed results belong in [the progress log](twirl_progress_log.md), and
 unresolved choices belong in [ideas](ideas.md).
 
-Last reconciled: `2026-08-26`.
+Last reconciled: `2026-08-27`.
 
 ## Milestone dashboard
 
@@ -130,16 +130,37 @@ project authority.
   promoting deferred sectors to accepted A2v1; real source receipts now cover
   S65--S78. A separate uniform mission-quality source gate follows current QLP
   semantics: SPOC before S67 and TICA from S67 onward, always joined with the
-  detector QLP qflag. Provenance-bound mission-quality receipts pass S66--S77;
-  S65 remains blocked by missing SPOC rows and S78 by TICA rows absent beyond
-  the delivered FFI/HDF5 tail. The first full read-only ORCD HDF5/cadence audit
-  passes S67, and the same fail-closed chronological chain is running through
-  S77. No temporal panel is frozen.
+  detector QLP qflag. Provenance-bound mission-quality receipts pass S66--S77.
+  S65 is now a predeclared, model-outcome-independent exclusion from the first
+  later-sector panel and next training release because its camera-4/CCD-4 SPOC
+  authority lacks `1,462` quaternion cadences; the machine-readable
+  [exclusion ledger](../configs/models/twirl_fm0_later_sector_exclusions_v1.yaml)
+  records the prohibition on retroactive insertion after repair. The frozen
+  admission-policy v1 still requires S65 and therefore cannot be reused for
+  the revised panel; a separately hashed v2 must consume the exclusion ledger
+  before inventory or panel freeze. S78 remains blocked by TICA rows absent
+  beyond the delivered FFI/HDF5 tail. Full read-only ORCD HDF5/cadence audits
+  pass S67 and S68, and the same fail-closed chronological chain is running
+  through S77. No temporal panel is frozen.
   Once at least five genuinely later sectors pass the ORCD HDF5-openability,
   six-view, cadence-quality, and identity gates, use the label-blind inventory
   to freeze the still-unset detector/cadence/cohort-adequacy thresholds and
   then a development-only panel. Evaluate the existing step-2000 checkpoint
   zero-shot before considering a separately controlled data-scale experiment.
+- If that evidence justifies another training campaign, name it
+  `TWIRL-FM0.3`; do not reuse `FM0.2.2`, which already denotes the blocked
+  parameter-matched Conformer under the frozen FM0.2 contract. The provisional
+  first candidate, `TWIRL-FM0.3.1`, is a fixed-TCN data-scale baseline: retain
+  the FM0.2.1 two-ADP-view encoder and same-window objective, use only fully
+  gated sectors, and compare at the same window-draw milestones before any
+  longer exposure-normalized extension. Freeze a genuinely newer temporal
+  holdout before training. Subsequent candidates may optimize both independent
+  reconstruction masks and then test a separate stable-host cross-visit head,
+  but each is a one-mechanism ablation; raw/ADP015 view additions and a
+  Conformer revisit remain later experiments. Exact same-seed initialization,
+  source-paired changes, at least two frozen training seeds after the canary,
+  new/repeated-host reporting, and event-retention checks are required before
+  promotion. This naming/design direction is not training authorization.
 - S63 may appear as unlabeled FM pretraining data, so it is never prospective
   FM evidence. The Teacher-v3 S63 test remains prospective only while no FM
   embedding, score, queue, threshold, or review decision influences it.

@@ -1,0 +1,43 @@
+schema_version: twirl_fm0_later_sector_exclusion_ledger_v1
+decision_id: twirl_fm0_later_sector_exclusions_v1
+status: frozen_pre_model_evaluation
+prepared_on: 2026-08-27
+
+scope:
+  applies_to:
+    - first_later_sector_zero_shot_development_panel
+    - first_post_fm0_2_training_release
+  selection_is_label_blind: true
+  selection_precedes_later_sector_embedding_or_model_score_access: true
+  model_training_authorized: false
+  temporal_panel_frozen: false
+  sealed_test_access_authorized: false
+  stage1_product_state_changed: false
+
+excluded_sectors:
+  - sector: 65
+    decision: exclude
+    reason_code: incomplete_mission_quality_authority
+    mission_quality_provider: spoc
+    affected_orbit: 138
+    affected_camera: 4
+    affected_ccd: 4
+    missing_cadence_count: 1462
+    missing_cadence_intervals_inclusive:
+      - [802061, 803522]
+    evidence_summary: >-
+      The quaternion authority has 1,462 orbit-138 cadences for which the
+      Sector-65 camera-4/CCD-4 SPOC mission-quality source has no row. The
+      mission-quality admission gate therefore fails closed and publishes no
+      passing receipt.
+    exclusion_is_model_outcome_based: false
+    repair_policy: >-
+      A repaired Sector 65 may enter only a separately versioned future input
+      release after the complete mission-quality, retained-HDF5, six-view,
+      identity, and release gates pass. It must not be inserted retroactively
+      into a frozen panel or training release.
+
+claim_limit: >-
+  This ledger records a pre-model data-quality exclusion. It does not admit any
+  later sector, freeze a temporal panel, authorize training, alter A2v1 product
+  acceptance, or establish a production or foundation-model result.
