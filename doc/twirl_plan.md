@@ -140,8 +140,8 @@ project authority.
   the revised panel; a separately hashed v2 must consume the exclusion ledger
   before inventory or panel freeze. S78 remains blocked by TICA rows absent
   beyond the delivered FFI/HDF5 tail. Full read-only ORCD HDF5/cadence audits
-  pass S67--S73, S74 is running, and the same fail-closed chronological chain
-  continues through S77. No temporal panel is frozen.
+  pass S67--S76 and S77 is running at the end of the same fail-closed
+  chronological chain. No temporal panel is frozen.
   Once at least five genuinely later sectors pass the ORCD HDF5-openability,
   six-view, cadence-quality, and identity gates, use the label-blind inventory
   to freeze the still-unset detector/cadence/cohort-adequacy thresholds and
