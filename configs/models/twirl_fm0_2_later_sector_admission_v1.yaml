@@ -1,0 +1,171 @@
+schema_version: twirl_fm0_2_later_sector_admission_config_v1
+campaign_id: twirl_fm0_2_later_sector_admission_v1
+model_family: TWIRL-FM0
+status: frozen_policy_not_run
+prepared_on: 2026-08-26
+
+scope:
+  purpose: label_blind_later_sector_admission_and_repeated_host_inventory
+  policy_only: true
+  results_recorded: false
+  panel_frozen: false
+  admitted_sectors: []
+  model_training_authorized: false
+  sealed_test_access_authorized: false
+  event_retention_authorized: false
+  formal_fm0_2_gate_authorized: false
+  production_model_claim: false
+  foundation_model_claim: false
+  prospective_test_claim: false
+
+baseline:
+  training_sectors: [56, 57, 58, 59, 60, 61, 62, 63, 64]
+  release_id: twirl_fm0_1_s56_s64_v2
+  manifest_sha256: f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a
+  selection_sha256: 3fb2cc3d9cd652999df366ab3cd05f22daa6f23f4ceda66f17c43281e2aaf3b8
+  selection_n_observations: 342721
+  alias_authority_sha256: 03d09fd36df6e24996a4a6688aa78e17f733a80165eb40061b28a821959f8bc8
+  physical_source_field: gaia_dr3_source_id
+  split_field: leakage_component_id
+  alias_edge: [gaia_dr3_source_id, tic_id]
+  manifest_binding_required_at_runtime: true
+  selection_binding_required_at_runtime: true
+  alias_authority_binding_required_at_runtime: true
+  binding_algorithm: sha256
+  baseline_rows_must_be_byte_identical: true
+  baseline_component_membership_must_be_unchanged: true
+  new_alias_edge_touching_baseline_node: fail
+  new_alias_edge_merging_frozen_components: fail
+
+identity:
+  split_algorithm: sha256_full_digest_big_endian_modulo
+  split_salt: twirl_fm0_1_source_split_v1
+  split_modulus: 10000
+  partitions_half_open:
+    poc_train: {start_inclusive: 0, end_exclusive: 8000}
+    poc_development: {start_inclusive: 8000, end_exclusive: 9000}
+    poc_sealed_test: {start_inclusive: 9000, end_exclusive: 10000}
+  allowed_source_partitions: [poc_train, poc_development]
+  sealed_source_partitions: [poc_sealed_test]
+  sealed_rows_emitted: 0
+  sealed_identity_rows_counted_only: true
+  sealed_light_curve_or_shard_rows_read: false
+  reuse_baseline_assignments_exactly: true
+  baseline_alias_component_identities_immutable: true
+  reject_new_alias_edges_touching_baseline: true
+  all_new_alias_components_use_same_frozen_split: true
+  ambiguous_all_new_components: quarantine
+
+selection:
+  role: development_only_temporal_panel_candidate
+  selection_supplied_explicitly_at_runtime: true
+  ordered_candidate_sectors: [65, 66, 67, 68, 69]
+  selected_sectors: []
+  minimum_sectors: 5
+  first_allowed_sector: 65
+  must_begin_immediately_after_training_era: true
+  chronological_order_required: true
+  require_contiguous_numeric_sectors: true
+  skipping_an_intervening_sector: forbidden
+  selection_after_labels_or_scores: forbidden
+  extending_after_model_results: forbidden
+  panel_freeze_requires_separate_immutable_receipt: true
+  expected_orbits_must_be_explicit: true
+  infer_orbits_from_sector_formula: false
+  expected_orbits_by_sector:
+    65: [137, 138]
+    66: [139, 140]
+    67: [141, 142]
+    68: [143, 144]
+    69: [145, 146]
+  unmapped_sector_policy: fail
+
+admission:
+  fail_closed: true
+  required_receipt_schema_version: twirl_fm0_later_sector_admission_receipt_v1
+  required_product_state: A2V1_ACCEPTED
+  required_passed: true
+  receipt_sha256_supplied_at_runtime: true
+  stage1_acceptance_binding_key: stage1_acceptance_receipt
+  stage1_acceptance_sha256_required: true
+  observation_manifest_binding_key: observation_manifest
+  observation_manifest_sha256_required: true
+  alias_authority_binding_key: alias_authority
+  alias_authority_sha256_required: true
+  required_evidence_schema_version: twirl_fm0_later_sector_evidence_v1
+  required_evidence_gate_name_field: gate_name
+  required_evidence_metric_contract_version: twirl_fm0_later_sector_evidence_metrics_v1
+  required_evidence_upstream_schema_version: twirl_fm0_later_sector_upstream_control_v1
+  required_evidence_upstream_artifact_fields: [role, path, sha256, content_class]
+  required_evidence_upstream_content_class: control_metadata
+  minimum_upstream_artifacts_per_gate: 1
+  distinct_evidence_artifacts_required: true
+  required_evidence_gates:
+    - checksum_bound_a2v1_hdf5_provenance
+    - checksum_bound_a2v1_fits_provenance
+    - edge_aware_coverage
+    - hdf5_openability
+    - authoritative_internal_cadence_quality
+    - authoritative_external_cadence_quality
+    - explicit_omissions
+    - fm_channel_mask_finite_numerical_envelope
+    - stable_physical_source_registry_join
+  evidence_binding_fields: [path, sha256, passed]
+  every_required_evidence_binding_must_pass: true
+  deferred_orcd_checkpoint_is_accepted: false
+  hdf5_only_sector_is_accepted: false
+  diagnostic_product_state_is_accepted: false
+  missing_or_unbound_evidence_policy: fail
+
+later_observation_manifest:
+  required_schema_version: twirl_fm0_later_sector_observation_v1
+  required_flux_view_names:
+    - raw_relative_1x1
+    - raw_relative_3x3
+    - adp_1x1
+    - adp_3x3
+    - adp015_1x1
+    - adp015_3x3
+  exact_flux_view_order_required: true
+
+inventory:
+  cohort_authority: complete_s56_s64_baseline_manifest
+  repeated_host_definition: leakage_component_present_in_training_era_baseline
+  new_host_definition: leakage_component_absent_from_training_era_baseline
+  keep_repeated_and_new_host_cohorts_separate: true
+  cohort_partition_intersections:
+    - repeated_host_poc_train
+    - repeated_host_poc_development
+    - new_host_poc_train
+    - new_host_poc_development
+  allowed_inputs:
+    - identity_and_alias_edges
+    - source_partition
+    - sector_orbit_camera_ccd_placement
+    - product_state_and_checksum_receipts
+    - cadence_and_channel_qa_receipts
+  component_sampling_cap: null
+  retain_all_eligible_visits: true
+  minimum_repeated_host_components: 64
+  minimum_new_host_components: 256
+  count_floors_are_not_panel_freeze_authority: true
+  adequacy_thresholds_frozen: false
+  panel_freeze_ready_must_remain_false: true
+
+forbidden_input_tokens:
+  - light_curve_values
+  - bls
+  - search
+  - candidate
+  - human_label
+  - morphology_label
+  - injection_truth
+  - embedding
+  - model_score
+  - representation_metric
+  - checkpoint_comparison
+
+claim_limit: >-
+  This policy can admit accepted A2v1 sectors and build a label-blind inventory.
+  It does not freeze a temporal panel, open sealed rows, authorize training, or
+  establish a prospective, production, or foundation-model result.

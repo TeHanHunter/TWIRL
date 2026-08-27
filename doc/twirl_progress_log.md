@@ -197,11 +197,27 @@ authorized two-H200, at-most-78-CPU streaming lane; PDO remains authoritative.
   one has neither channel. None is a negative label. The complete
   `628,955`-row BLS binding and all published output hashes validate, and the
   local suite passes `420` tests with `3` skips plus detection and docs checks.
+- `2026-08-26`: A strict read-only PDO/ORCD reconciliation confirmed that the
+  operational campaign now reaches S80 without changing the acceptance
+  boundary. S65 remains the only accepted sector after the S56--S64 FM release:
+  its PDO validation has `228,917` readable nonzero HDF5 products, zero
+  non-edge omissions, and `114,419` passing FITS. S66 completed 32 ORCD cells,
+  but only its two cam4/ccd4 cells (`3,564` HDF5 total) returned to PDO. The two
+  cam4/ccd3 attempt payloads remain complete on ORCD at `1,886` HDF5 and `196`
+  ePSF files each; only their cleaned source grids must be re-ingressed before
+  retention. The other 28 cells remain retained.
+  S67--S78 each have 32 completion and retention receipts explicitly marking
+  PDO return deferred and the sector unaccepted. S79 compute and S80 input
+  preparation remain active. These checkpoints are not FM temporal evidence
+  until the unchanged PDO return, FITS, full-schema, and QA gates pass.
 
-**Next:** Resume S65 orbit-138 `cam4/ccd1` with reduced GPU concurrency, then
-re-enter the unchanged FITS/full-schema gate and continue S66-S69. Keep this
-parallel to the S63 prospective Teacher-v3 lane; later-sector gathering does
-not block that sealed test.
+**Next:** Let the live S79/S80 controller remain coherent. After S80 ingress
+reaches a stable terminal state, re-ingress only S66's two cleaned cam4/ccd3
+source grids, retain their intact payloads, and return/promote all 30
+unpromoted S66 cells one at a time before running the unchanged PDO acceptance
+gates. Then return and gate S67 onward in sector order. Keep this parallel to
+the S63 prospective Teacher-v3 lane; later-sector gathering does not block that
+sealed test.
 
 ### Catalog, archive index, and sample control
 
@@ -754,12 +770,34 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   accepted Stage-1 products and only S56--S64 form the frozen FM release.
   Later-sector admission, repeated-host inventory, and a frozen development-
   only temporal panel precede any data-scale training comparison.
+- `2026-08-26`: Added a separate fail-closed
+  [later-sector admission policy](../configs/models/twirl_fm0_2_later_sector_admission_v1.yaml),
+  [inventory builder](../scripts/stage5_validation/build_twirl_fm0_later_sector_inventory.py),
+  and reusable admission module. The contract pins the exact S56--S64 input
+  manifest, corpus-selection, and Gaia--TIC alias authorities; rebuilds the
+  frozen leakage components; rejects any later alias edge that touches or
+  merges the baseline graph; and requires checksum-bound accepted-sector
+  evidence for provenance, coverage/openability, cadence quality, omissions,
+  FM numerical/channel integrity, and source-registry identity. Incremental
+  inventories keep new and repeated hosts separate, exclude sealed identities,
+  and cannot freeze the panel. Their five-sector and repeated/new-host
+  requirements are count floors only; detector/cadence/cohort-adequacy
+  thresholds remain deliberately unfrozen until a real label-blind inventory
+  exists. The [preflight report]
+  (../reports/stage5_validation/twirl_fm0_2_later_sector_admission_v1/README.md)
+  records that only S65 is currently later and accepted; no inventory receipt,
+  temporal freeze, checkpoint evaluation, training, event retention, formal
+  gate, or sealed-test access was performed. The final adversarial admission
+  suite passes `100` focused tests; the repository fast suite passes `1,017`
+  tests with `33` optional-environment skips, and documentation/static checks
+  pass. Independent final review found no remaining P1/P2 contract issue.
 
-**Next:** Build a label-free FM admission and repeated-host inventory for later
-accepted sectors. Once at least five genuinely later sectors pass the FM
-gates, freeze a development-only temporal panel and evaluate the existing
-step-2000 checkpoint zero-shot; keep new training, event retention, the formal
-gate, and the sealed test closed.
+**Next:** Apply the label-free admission contract as S65--S69 become accepted.
+Once all five sectors pass and the repeated/new-host floors are met, freeze the
+adequacy thresholds from the label-blind inventory, then publish a separate
+immutable development-panel freeze and evaluate the existing step-2000
+checkpoint against its exact same-seed step-0 control, zero-shot. Keep new
+training, event retention, the formal gate, and the sealed test closed.
 
 ### Candidate validation and follow-up
 

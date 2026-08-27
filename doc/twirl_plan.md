@@ -12,7 +12,7 @@ Last reconciled: `2026-08-26`.
 
 | Workstream | Current milestone | Next gate |
 | --- | --- | --- |
-| Stage 1 light curves | A2v1 S56--S65 accepted; S66--S72 retained ORCD compute checkpoints; S73 active and S74 resident/queued | Restore the active-plus-three resident buffer, continue the frozen campaign, and gate an isolated S94 shared-QLP reuse smoke |
+| Stage 1 light curves | A2v1 S56--S65 accepted; S66 partially returned; S67--S78 retained ORCD compute checkpoints; S79 computing and S80 prepared | Re-ingress S66's two cleaned source grids, return S66, then run the unchanged PDO acceptance gates and continue chronological returns |
 | Stage 2 search | Transparent periodic BLS exists; Teacher v3 is frozen for enrichment | Complete the sealed S63 test while independently implementing the dip branch and multi-sector merging |
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
@@ -28,13 +28,15 @@ project authority.
 ### A2v1 production
 
 - S56--S65 are accepted A2v1 sectors. Do not replay them.
-- S66--S72 completed their authorized ORCD compute path and are retained as
-  deferred checkpoints. They are not accepted products until returned to PDO
-  and passed through the unchanged HDF5, FITS, schema, and QA gates.
-- The S66--S93 campaign is active in S73, with S74 resident, verified, and
-  dependency-queued behind it. S75--S77 are still entering the transport
-  buffer, so the active-plus-three-future residency target is not yet met. The
-  campaign follows the single frozen
+- S66 completed all 32 ORCD cells, but only the two cam4/ccd4 cells have
+  returned to canonical PDO storage. Its two cam4/ccd3 science payloads remain
+  intact on ORCD; their cleaned source grids require a bounded re-ingress before
+  retention. The other 28 cells remain retained on ORCD.
+  S67--S78 completed all 32 cells and are retained as deferred checkpoints.
+  None is accepted until returned to PDO and passed through the unchanged
+  HDF5, FITS, schema, and QA gates.
+- The S66--S93 campaign is computing S79 while S80's 32 prepared cells enter
+  the live controller. The campaign follows the single frozen
   scientific recipe and the campaign resource profile in the
   [A2v1 protocol](a2v1_production_protocol.md). Stop on any failed scientific
   or provenance gate. Maintain the active sector plus three complete future
@@ -119,13 +121,15 @@ project authority.
   and the exact initialization already exceeded the separate seed-0 random
   control on paired separation. This is a targeted mechanism success, not an
   overall canary pass or useful-embedding result. The current operational
-  campaign spans approximately 19 sectors through S74, but only S56--S64 form
-  a frozen FM release and only S56--S65 are accepted Stage-1 sectors. Next
-  perform a label-free later-sector FM admission and repeated-host inventory;
-  once at least five genuinely later accepted sectors pass, freeze them as a
-  development-only temporal panel and evaluate the existing step-2000
-  checkpoint zero-shot before considering a separately controlled data-scale
-  experiment.
+  campaign spans 25 sectors through S80, but only S56--S64 form a frozen FM
+  release and only S56--S65 are accepted Stage-1 sectors. The fail-closed
+  [later-sector policy](../configs/models/twirl_fm0_2_later_sector_admission_v1.yaml)
+  now binds the real release, corpus-selection, and alias authorities and keeps
+  new and repeated hosts separate. No temporal panel is frozen. Once at least
+  five genuinely later accepted sectors pass, use the label-blind inventory to
+  freeze the still-unset detector/cadence/cohort-adequacy thresholds and then a
+  development-only panel. Evaluate the existing step-2000 checkpoint zero-shot
+  before considering a separately controlled data-scale experiment.
 - S63 may appear as unlabeled FM pretraining data, so it is never prospective
   FM evidence. The Teacher-v3 S63 test remains prospective only while no FM
   embedding, score, queue, threshold, or review decision influences it.
@@ -283,9 +287,14 @@ negotiation or career-planning notes do not belong in the public plan.
 
 ## Immediate implementation priorities
 
-1. Continue the frozen S66--S93 A2v1 deferred-return campaign in sector order;
-   restore the active-plus-three resident buffer, stop on failed gates, and
-   preserve Stage 1 priority over exploratory GPU work. In parallel, prepare
+1. Continue the frozen S66--S93 A2v1 campaign without disrupting the active
+   S79/S80 controller. Once S80 ingress reaches a stable terminal state,
+   re-ingress only the two cleaned S66 cam4/ccd3 source grids, retain their
+   intact payloads, return S66 one cell at a time, and run the unchanged PDO
+   acceptance gates before promoting or skipping any later sector. Then return
+   and gate S67 onward in chronological order. Preserve Stage 1 priority over
+   exploratory GPU work.
+   In parallel, prepare
    only the isolated low-priority S94 shared-QLP reuse smoke described in the
    protocol; do not release a full S94+ queue before its gates pass.
 2. Run the two isolated model experiments: complete the sealed Teacher-v3 S63
