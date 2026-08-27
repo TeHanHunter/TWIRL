@@ -130,7 +130,11 @@ project authority.
   promoting deferred sectors to accepted A2v1; real source receipts now cover
   S65--S78. A separate uniform mission-quality source gate follows current QLP
   semantics: SPOC before S67 and TICA from S67 onward, always joined with the
-  detector QLP qflag. No temporal panel is frozen.
+  detector QLP qflag. Provenance-bound mission-quality receipts pass S66--S77;
+  S65 remains blocked by missing SPOC rows and S78 by TICA rows absent beyond
+  the delivered FFI/HDF5 tail. The first full read-only ORCD HDF5/cadence audit
+  passes S67, and the same fail-closed chronological chain is running through
+  S77. No temporal panel is frozen.
   Once at least five genuinely later sectors pass the ORCD HDF5-openability,
   six-view, cadence-quality, and identity gates, use the label-blind inventory
   to freeze the still-unset detector/cadence/cohort-adequacy thresholds and

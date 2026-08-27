@@ -813,17 +813,42 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   fail-closed [mission-quality gate](../scripts/stage5_validation/build_twirl_fm0_mission_quality_receipt.py)
   that enforces that provider boundary plus exact quaternion and QLP-qflag
   coverage while keeping HDF5, shard, and panel claims false.
+- `2026-08-27`: Materialized current-QLP TICA quality files in immutable
+  user-owned releases and replaced the initial exact-only quality receipt with
+  a provenance-bound v2 contract. S66--S76 pass with zero quaternion-authority
+  exclusions. S77 passes after recording exactly `32` mission-only boundary
+  rows (cadences `936740` and `936741` in all `16` detectors) as explicit
+  exclusions; retained HDF5 is not mutated. S65 remains a negative control and
+  publishes no receipt because cam4/CCD4 still lacks `1,462` SPOC rows. S78
+  remains blocked because its TICA database/delivery contains `6,405` rows per
+  detector and misses trailing quaternion cadences; a sampled orbit-164 HDF5
+  ends immediately before the first missing cadence, but detector-wide omission
+  proof is still required.
+- `2026-08-27`: Built and transferred one checksum-bound compact S66--S77
+  mission-quality release to ORCD. It contains `12` receipts and `694` source
+  files, preserves the QLP orbit/run and mission layouts, and binds
+  `226,416,794` logical bytes. The archive SHA-256 is
+  `f3d8b532...beda514`; all `706` manifest-listed receipts/sources re-hashed
+  successfully after extraction.
+- `2026-08-27`: Added a read-only retained-HDF5/cadence-quality admission gate
+  and launched a strict CPU-only S67--S77 `afterok` chain. S67 job `21406846`
+  completed in `12m59s` with exit `0:0`: all `215,405` declared HDF5 opened,
+  zero were unreadable, and `1,262,165,389` cadences reconciled against the
+  transferred quaternion, QLP-qflag, and TICA authorities. The immutable
+  receipt SHA-256 is `71afae2c...52e4a3`; it reports zero unexplained or
+  authority-excluded S67 cadences and keeps checksum-provenance, six-view,
+  identity, A2v1 acceptance, and temporal-panel claims closed. S68 is running;
+  S69--S77 remain dependency-held and stop automatically after any failure.
 
-**Next:** Repair or explicitly mask S65's `1,462` unknown cam4/CCD4 mission-
-quality cadences, materialize checksum-bound TICA mission-quality authorities
-for S67 onward, then open every chronologically selected HDF5 through the
-uniform quality-aware adapter and build the exact six-view shards. Construct
-the label-blind repeated/new-host inventory only after those gates pass. Once
-at least five sectors and the cohort floors pass, freeze adequacy thresholds,
-publish a separate immutable development-panel freeze, and evaluate the
-existing step-2000 checkpoint against its exact same-seed step-0 control,
-zero-shot. Keep new training, event retention, the formal gate, and the sealed
-test closed.
+**Next:** Let the fail-closed S68--S77 HDF5/cadence chain finish, prove the S78
+TICA gap is fully outside every retained detector HDF5 before admitting it, and
+repair or explicitly mask S65's `1,462` unknown cam4/CCD4 mission-quality
+cadences. Then build exact six-view shards and the label-blind repeated/new-host
+inventory. Once at least five sectors and the cohort floors pass, freeze
+adequacy thresholds, publish a separate immutable development-panel freeze,
+and evaluate the existing step-2000 checkpoint against its exact same-seed
+step-0 control, zero-shot. Keep new training, event retention, the formal gate,
+and the sealed test closed.
 
 ### Candidate validation and follow-up
 
