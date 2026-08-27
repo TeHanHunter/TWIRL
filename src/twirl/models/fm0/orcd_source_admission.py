@@ -177,7 +177,12 @@ def verify_retained_sector_source(
         assert match is not None
         cell_root = outputs / cell
         complete_paths = sorted((cell_root / "complete").glob("*.json"))
-        retention_paths = sorted((cell_root / "retained").glob("*.retention.json"))
+        retention_paths = sorted(
+            {
+                *(cell_root / "retained").glob("*.retention.json"),
+                *(cell_root / "retained").glob("*/retention.json"),
+            }
+        )
         if len(complete_paths) != 1 or len(retention_paths) != 1:
             raise FM0ContractError(f"{cell} lacks one completion/retention receipt")
         complete_path, retention_path = complete_paths[0], retention_paths[0]
