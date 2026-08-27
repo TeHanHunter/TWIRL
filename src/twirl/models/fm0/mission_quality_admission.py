@@ -30,6 +30,9 @@ MISSION_QUALITY_READY_STATE = "FM_MISSION_QUALITY_READY"
 MISSION_QUALITY_POLICY = "spoc_before_s67_tica_from_s67_v1"
 MISSION_QUALITY_EXCLUSION_POLICY = "qlp_quaternion_authority_exclusion_v1"
 TICA_QUALITY_ALLOWED_MASK = (1 << 2) | (1 << 5) | (1 << 11)
+TICA_MATERIALIZATION_SCHEMA_VERSION = "twirl_fm0_tica_quality_materialization_v1"
+_SHA40 = re.compile(r"^[0-9a-f]{40}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 def mission_quality_type(sector: int) -> str:
@@ -131,6 +134,102 @@ def _canonical_json_sha256(payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _load_tica_materialization(
+    *, flag_root: Path, sector: int
+) -> tuple[dict[tuple[int, int], Mapping[str, Any]], dict[str, Any], list[dict[str, Any]]]:
+    summary_path = flag_root / "summary.json"
+    ready_path = flag_root / "READY"
+    if not summary_path.is_file() or not ready_path.is_file():
+        raise FM0ContractError(
+            f"S{sector} TICA materialization lacks summary.json or READY"
+        )
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise FM0ContractError(
+            f"S{sector} TICA materialization summary is invalid"
+        ) from exc
+    if not isinstance(summary, Mapping):
+        raise FM0ContractError(f"S{sector} TICA materialization summary is not an object")
+    producer_git_sha = str(summary.get("producer_git_sha", ""))
+    qlp_source_sha256 = str(summary.get("qlp_source_sha256", ""))
+    if (
+        summary.get("schema_version") != TICA_MATERIALIZATION_SCHEMA_VERSION
+        or int(summary.get("sector", -1)) != sector
+        or summary.get("mission_quality_type") != "tica"
+        or summary.get("source") != "qlp.lctools.bin.hlsp.query_ticaflags"
+        or int(summary.get("n_detectors", -1)) != 16
+        or summary.get("cadence_coverage_verified") is not False
+        or _SHA40.fullmatch(producer_git_sha) is None
+        or _SHA256.fullmatch(qlp_source_sha256) is None
+        or not str(summary.get("qlp_version", "")).strip()
+        or not Path(str(summary.get("qlp_source_path", ""))).is_absolute()
+    ):
+        raise FM0ContractError(
+            f"S{sector} TICA materialization summary violates its contract"
+        )
+    if ready_path.read_text(encoding="utf-8").strip() != producer_git_sha:
+        raise FM0ContractError(
+            f"S{sector} TICA READY marker disagrees with producer_git_sha"
+        )
+    detectors = summary.get("detectors")
+    if not isinstance(detectors, list) or len(detectors) != 16:
+        raise FM0ContractError(
+            f"S{sector} TICA materialization detector inventory is incomplete"
+        )
+    by_detector: dict[tuple[int, int], Mapping[str, Any]] = {}
+    for entry in detectors:
+        if not isinstance(entry, Mapping):
+            raise FM0ContractError(
+                f"S{sector} TICA materialization detector entry is invalid"
+            )
+        camera = int(entry.get("camera", -1))
+        ccd = int(entry.get("ccd", -1))
+        key = (camera, ccd)
+        expected_name = f"ticaffiflag_s{sector}_cam{camera}_ccd{ccd}.txt"
+        if (
+            camera not in range(1, 5)
+            or ccd not in range(1, 5)
+            or key in by_detector
+            or entry.get("path") != expected_name
+            or _SHA256.fullmatch(str(entry.get("sha256", ""))) is None
+            or int(entry.get("n_rows", 0)) <= 0
+        ):
+            raise FM0ContractError(
+                f"S{sector} TICA materialization detector inventory is invalid"
+            )
+        by_detector[key] = entry
+    if set(by_detector) != {
+        (camera, ccd) for camera in range(1, 5) for ccd in range(1, 5)
+    }:
+        raise FM0ContractError(
+            f"S{sector} TICA materialization detector inventory is incomplete"
+        )
+    provenance = {
+        "producer_git_sha": producer_git_sha,
+        "qlp_version": str(summary["qlp_version"]),
+        "qlp_source_path": str(summary["qlp_source_path"]),
+        "qlp_source_sha256": qlp_source_sha256,
+        "summary_path": str(summary_path),
+        "summary_sha256": sha256_file(summary_path),
+        "ready_path": str(ready_path),
+        "ready_sha256": sha256_file(ready_path),
+    }
+    bindings = [
+        {
+            "role": "tica_materialization_summary",
+            "path": str(summary_path),
+            "sha256": provenance["summary_sha256"],
+        },
+        {
+            "role": "tica_materialization_ready",
+            "path": str(ready_path),
+            "sha256": provenance["ready_sha256"],
+        },
+    ]
+    return by_detector, provenance, bindings
+
+
 def verify_mission_quality_sources(
     *,
     sector: int,
@@ -153,7 +252,17 @@ def verify_mission_quality_sources(
             f"{provider.upper()} mission-quality root is missing: {flag_root}"
         )
 
-    bindings: list[dict[str, Any]] = []
+    tica_inventory: dict[tuple[int, int], Mapping[str, Any]] = {}
+    tica_materialization: dict[str, Any] | None = None
+    materialization_bindings: list[dict[str, Any]] = []
+    if provider == "tica":
+        (
+            tica_inventory,
+            tica_materialization,
+            materialization_bindings,
+        ) = _load_tica_materialization(flag_root=flag_root, sector=sector)
+
+    bindings: list[dict[str, Any]] = list(materialization_bindings)
     n_quat_rows = 0
     n_qflag_rows = 0
     n_mission_rows = 0
@@ -220,6 +329,17 @@ def verify_mission_quality_sources(
             flags = _read_flag_file(
                 path, label=f"{provider.upper()} mission-quality authority"
             )
+            observed_hash = sha256_file(path)
+            if provider == "tica":
+                declared = tica_inventory[(camera, ccd)]
+                if (
+                    observed_hash != str(declared["sha256"])
+                    or len(flags) != int(declared["n_rows"])
+                ):
+                    raise FM0ContractError(
+                        f"S{sector} cam{camera}/ccd{ccd} TICA file disagrees "
+                        "with its materialization summary"
+                    )
             if provider == "tica" and any(
                 int(value) & ~TICA_QUALITY_ALLOWED_MASK for value in flags.values()
             ):
@@ -249,7 +369,7 @@ def verify_mission_quality_sources(
                     "camera": camera,
                     "ccd": ccd,
                     "path": str(path),
-                    "sha256": sha256_file(path),
+                    "sha256": observed_hash,
                     "n_rows": len(flags),
                 }
             )
@@ -288,6 +408,7 @@ def verify_mission_quality_sources(
         "mission_quality_authority_exclusions_sha256": _canonical_json_sha256(
             authority_exclusions
         ),
+        "tica_materialization": tica_materialization,
         "source_bindings": bindings,
         "hdf5_quality_join_verified": False,
         "six_view_shards_verified": False,
