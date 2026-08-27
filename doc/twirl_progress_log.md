@@ -841,8 +841,12 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   `21407076` then completed in `6m38s` with exit `0:0`: all `108,991` declared
   HDF5 opened, zero were unreadable, and `634,273,102` cadences reconciled with
   zero authority exclusions. Its receipt SHA-256 is `6521f1aa...b17abf7`.
-  S69 is running; S70--S77 remain dependency-held and stop automatically after
-  any failure.
+  S69--S73 then completed consecutively with exit `0:0`. Across those five
+  sectors, all `256,326` declared HDF5 opened, zero were unreadable, and
+  `1,374,212,726` cadences reconciled with zero authority exclusions. Their
+  receipt SHA-256 prefixes are respectively `b612ad07`, `e761a8e9`,
+  `cf1088f3`, `94edd224`, and `b64cd095`. S74 is running; S75--S77 remain
+  dependency-held and stop automatically after any failure.
 - `2026-08-27`: Froze a model-outcome-independent
   [later-sector exclusion ledger](../configs/models/twirl_fm0_later_sector_exclusions_v1.yaml).
   S65 is excluded from the first later-sector zero-shot panel and first
@@ -858,7 +862,7 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   controlled later ablations. No training or temporal-panel freeze was
   authorized.
 
-**Next:** Let the fail-closed S68--S77 HDF5/cadence chain finish, prove the S78
+**Next:** Let the fail-closed S74--S77 HDF5/cadence chain finish, prove the S78
 TICA gap is fully outside every retained detector HDF5 before admitting it.
 Keep S65 outside this release under the frozen exclusion ledger. Then build
 exact six-view shards and the label-blind repeated/new-host inventory. Once at
