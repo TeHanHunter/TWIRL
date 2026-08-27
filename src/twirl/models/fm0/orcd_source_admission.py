@@ -203,17 +203,20 @@ def verify_retained_sector_source(
             value is True for value in checks.values()
         ):
             raise FM0ContractError(f"{cell} retained-root checks did not all pass")
+        validation_hashes = validation.get("hashes", validation)
+        if not isinstance(validation_hashes, Mapping):
+            raise FM0ContractError(f"{cell} retained-root hashes are invalid")
         for key in (
             "input_manifest_sha256",
             "output_manifest_sha256",
             "environment_manifest_sha256",
         ):
             if _digest(complete.get(key), label=f"{cell} {key}") != _digest(
-                validation.get(key), label=f"{cell} retained {key}"
+                validation_hashes.get(key), label=f"{cell} retained {key}"
             ):
                 raise FM0ContractError(f"{cell} {key} differs after retention")
         if _digest(
-            validation.get("completion_json_sha256"),
+            validation_hashes.get("completion_json_sha256"),
             label=f"{cell} completion receipt digest",
         ) != _sha256(complete_path):
             raise FM0ContractError(f"{cell} completion receipt digest drifted")

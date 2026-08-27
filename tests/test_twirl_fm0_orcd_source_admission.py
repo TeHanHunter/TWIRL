@@ -125,6 +125,16 @@ def test_retained_sector_requires_all_32_receipt_bound_cells(tmp_path: Path) -> 
         "ccd": int(label.rsplit("_ccd", 1)[1]),
         "label": label,
     }
+    validation = payload["retained_root_validation"]
+    validation["hashes"] = {
+        key: validation.pop(key)
+        for key in (
+            "completion_json_sha256",
+            "input_manifest_sha256",
+            "output_manifest_sha256",
+            "environment_manifest_sha256",
+        )
+    }
     _write_json(historical, payload)
     receipt = verify_retained_sector_source(
         sector_root=root, sector=66, expected_orbits=(139, 140)
