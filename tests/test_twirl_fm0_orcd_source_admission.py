@@ -137,6 +137,11 @@ def test_retained_sector_requires_all_32_receipt_bound_cells(tmp_path: Path) -> 
     }
     historical.unlink()
     _write_json(historical.parent / "legacy" / "retention.json", payload)
+    modern = next(root.glob("outputs/*/retained/*.retention.json"))
+    _write_json(
+        modern.parent / "older-attempt" / "retention.json",
+        json.loads(modern.read_text()),
+    )
     receipt = verify_retained_sector_source(
         sector_root=root, sector=66, expected_orbits=(139, 140)
     )
