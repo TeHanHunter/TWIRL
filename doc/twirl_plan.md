@@ -139,9 +139,12 @@ project authority.
   admission-policy v1 still requires S65 and therefore cannot be reused for
   the revised panel; a separately hashed v2 must consume the exclusion ledger
   before inventory or panel freeze. S78 remains blocked by TICA rows absent
-  beyond the delivered FFI/HDF5 tail. Full read-only ORCD HDF5/cadence audits
-  pass S67--S76 and S77 is running at the end of the same fail-closed
-  chronological chain. No temporal panel is frozen.
+  beyond the delivered FFI/HDF5 tail. The full read-only ORCD HDF5/cadence
+  chain passes S67--S77: all `844,690` declared products opened and
+  `4,673,166,886` light-curve cadences reconciled, with no unreadable product
+  or unexplained authority gap. S77's `32` declared mission-only detector rows
+  propagate to `57,994` explicitly masked light-curve cadence occurrences. No
+  temporal panel is frozen.
   Once at least five genuinely later sectors pass the ORCD HDF5-openability,
   six-view, cadence-quality, and identity gates, use the label-blind inventory
   to freeze the still-unset detector/cadence/cohort-adequacy thresholds and

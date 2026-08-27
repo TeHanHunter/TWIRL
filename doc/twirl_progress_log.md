@@ -848,8 +848,21 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   `cf1088f3`, `94edd224`, and `b64cd095`. S74--S76 then passed with all
   `205,976` declared HDF5 opened, zero unreadable files, `1,179,099,318`
   reconciled cadences, and zero authority exclusions. Their receipt SHA-256
-  prefixes are `7023d6b3`, `f1ae5b15`, and `128548fe`. S77 is running as the
-  final job in the fail-closed chain.
+  prefixes are `7023d6b3`, `f1ae5b15`, and `128548fe`. Final S77 job
+  `21407087` completed in `3m41s` with exit `0:0`: all `57,992` HDF5 opened,
+  zero were unreadable, and `223,416,351` cadences reconciled. Its `32`
+  predeclared mission-only detector rows recur across `57,994` light-curve
+  cadence occurrences and are explicitly authority-excluded; no unexplained
+  gap remains. The S77 receipt SHA-256 is `2d3f6cfa...b1f8dc` and binds
+  exclusion-ledger SHA-256 `850722d9...f7811`.
+- `2026-08-27`: The complete S67--S77 retained-HDF5/cadence chain passed. All
+  `844,690` declared products opened, zero were unreadable, and
+  `4,673,166,886` light-curve cadences reconciled against quaternion, QLP
+  detector-qflag, and TICA mission-quality authorities. The only authority
+  exclusions are S77's `57,994` expected light-curve occurrences of the `32`
+  declared mission-only detector rows. These receipts close HDF5 openability
+  and cadence-quality only; six-view, identity, product-acceptance, temporal-
+  panel, training, and model-result gates remain closed.
 - `2026-08-27`: Froze a model-outcome-independent
   [later-sector exclusion ledger](../configs/models/twirl_fm0_later_sector_exclusions_v1.yaml).
   S65 is excluded from the first later-sector zero-shot panel and first
@@ -865,11 +878,12 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   controlled later ablations. No training or temporal-panel freeze was
   authorized.
 
-**Next:** Let the final S77 HDF5/cadence audit finish, prove the S78
-TICA gap is fully outside every retained detector HDF5 before admitting it.
-Keep S65 outside this release under the frozen exclusion ledger. Then build
-exact six-view shards and the label-blind repeated/new-host inventory. Once at
-least five sectors and the cohort floors pass, freeze
+**Next:** Build exact six-view shards for the passed S67--S77 pool, complete the
+stable-identity joins and label-blind repeated/new-host inventory, and replace
+the S65-dependent admission-policy v1 with a separately hashed v2 that binds
+the frozen exclusion ledger. In parallel, prove the S78 TICA gap is fully
+outside every retained detector HDF5 before admitting it; keep S65 outside this
+release. Once at least five sectors and the cohort floors pass, freeze
 adequacy thresholds, publish a separate immutable development-panel freeze,
 and evaluate the existing step-2000 checkpoint against its exact same-seed
 step-0 control, zero-shot. Keep new training, event retention, the formal gate,
