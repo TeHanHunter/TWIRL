@@ -145,7 +145,8 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - Preserve the MIT raw data layout. Add TWIRL metadata and indices on top rather than inventing a parallel raw layout.
 - On PDO, keep TWIRL-run outputs, symlinks, staging, and scratch products under `/pdo/users/tehan/` rather than writing into shared PDO trees.
 - The TGLC env for `tglc` stages is `/sw/qlp-environment/.venv/bin/python` with the TWIRL TGLC fork on `PYTHONPATH`; it has the newer Astropy layout needed by `tglc lightcurves`.
-- The legacy QLP env for `lctools detrend` and `lctools hlsp` is `/pdo/app/qlp-environment/.venv/bin/python` with `qlp==0.13.2`.
+- The QLP env for `lctools detrend` and `lctools hlsp` is `/pdo/app/qlp-environment/.venv/bin/python`; the activated environment currently resolves `qlp==0.14.6`. Keep the TGLC fork alone on `PYTHONPATH` so the FFITools `qlp==0.1` package cannot shadow it.
+- Current QLP `hlsp --flag-type auto` uses SPOC mission-quality flags for Sector `< 67` and TICA mission-quality flags for Sector `>= 67`, then combines the selected mission flag with the QLP detector qflag. FM cadence authorities must preserve that semantic boundary rather than forcing SPOC files across all sectors.
 - For Sector `< 67` including S56, HLSP uses `--flag-type spoc --flag-source fits`; SPOC flags live under `/pdo/qlp-data/spocflags/`.
 - Cap BLAS/OpenMP threads before multiprocessing pools on PDO: `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=NUMEXPR_NUM_THREADS=1`.
 - The GPU ePSF path requires the TWIRL-local venv at `/pdo/users/tehan/twirl-gpu-venv` with `cupy-cuda11x`, `LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib`, and the TGLC fork resolving first on `PYTHONPATH`.

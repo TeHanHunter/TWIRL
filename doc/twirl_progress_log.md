@@ -800,11 +800,26 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   from HDF5-openability, six-view, temporal-panel, A2v1-acceptance, and
   occurrence-rate claims. S79 is actively computing on two H200s and S80 is
   dependency-queued; the FM preparation lane remains CPU-only and separate.
+- `2026-08-27`: Published real immutable ORCD source-readiness receipts for
+  every sector S65--S78. Each retained S66--S78 sector binds all `32` cells;
+  the newly verified S70--S78 sectors declare respectively `36,963`, `38,685`,
+  `51,665`, `49,220`, `81,173`, `65,791`, `59,012`, `57,992`, and `63,394`
+  HDF5 products without claiming openability or six-view admission. A complete
+  PDO cadence audit found exact QLP-qflag coverage for every S66--S78 detector.
+  Legacy SPOC files are exact through S74, but S75 and S76 omit `29,446` and
+  `20,770` detector-cadence rows, demonstrating that SPOC cannot be forced
+  beyond its intended boundary. Inspection of the activated QLP 0.14.6 source
+  confirms `auto` selects SPOC for S<67 and TICA for S>=67. Added a reusable
+  fail-closed [mission-quality gate](../scripts/stage5_validation/build_twirl_fm0_mission_quality_receipt.py)
+  that enforces that provider boundary plus exact quaternion and QLP-qflag
+  coverage while keeping HDF5, shard, and panel claims false.
 
-**Next:** Write the real S65--S69 ORCD source receipts, open every selected
-HDF5 through the unchanged quality-aware adapter, build the exact six-view
-shards, and construct the label-blind repeated/new-host inventory. Once all
-five sectors pass and the cohort floors are met, freeze adequacy thresholds,
+**Next:** Repair or explicitly mask S65's `1,462` unknown cam4/CCD4 mission-
+quality cadences, materialize checksum-bound TICA mission-quality authorities
+for S67 onward, then open every chronologically selected HDF5 through the
+uniform quality-aware adapter and build the exact six-view shards. Construct
+the label-blind repeated/new-host inventory only after those gates pass. Once
+at least five sectors and the cohort floors pass, freeze adequacy thresholds,
 publish a separate immutable development-panel freeze, and evaluate the
 existing step-2000 checkpoint against its exact same-seed step-0 control,
 zero-shot. Keep new training, event retention, the formal gate, and the sealed

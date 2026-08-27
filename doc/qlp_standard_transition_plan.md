@@ -42,7 +42,8 @@ The existing `/pdo/users/tehan/tglc-deep-catalogs/hlsp_s0056/` is not modified; 
 
 ## Execution sequence (per Photometry Roadmap, Sector 56 orbits 119 + 120)
 
-Activate the QLP 0.13.2 env via `source scripts/activate_qlp_env.sh`.
+Activate the pip-installed QLP env via `source scripts/activate_qlp_env.sh`
+(currently QLP 0.14.6; do not allow FFITools `qlp==0.1` to shadow it).
 
 1. **Orbit setup.** TWIRL-local equivalent of `./new-qlp-orbit.sh` under `<NEW_ROOT>/`.
 2. **`tglc catalogs`** per `(orbit, cam, ccd)` — QLP-default catalog (all TICs on the CCD, down to the roadmap's mag limit, typically ~Tmag 16). Reuse sibling-orbit catalog symlinking (CLAUDE.md, MEMORY).

@@ -127,7 +127,10 @@ project authority.
   now binds the real release, corpus-selection, and alias authorities and keeps
   new and repeated hosts separate. A separate ORCD source gate now recognizes
   the checksum-bound S65 archive and the 32-cell retained S66+ layout without
-  promoting deferred sectors to accepted A2v1. No temporal panel is frozen.
+  promoting deferred sectors to accepted A2v1; real source receipts now cover
+  S65--S78. A separate uniform mission-quality source gate follows current QLP
+  semantics: SPOC before S67 and TICA from S67 onward, always joined with the
+  detector QLP qflag. No temporal panel is frozen.
   Once at least five genuinely later sectors pass the ORCD HDF5-openability,
   six-view, cadence-quality, and identity gates, use the label-blind inventory
   to freeze the still-unset detector/cadence/cohort-adequacy thresholds and

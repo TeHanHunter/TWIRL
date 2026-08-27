@@ -660,15 +660,15 @@ production rule, extraction branch, or detrending contract changes materially:
 
 ## QLP Environment Setup
 
-The `qlp lctools detrend` and `qlp lctools hlsp` steps require `qlp==0.13.2` (with `lctools`), which lives in `/pdo/app/qlp-environment/.venv/`. This is **different** from the shared `/sw/qlp-environment/.venv/`, which imports the old `qlp==0.1` from FFITools via the system PYTHONPATH and does not have `lctools`.
+The `qlp lctools detrend` and `qlp lctools hlsp` steps use the pip-installed QLP environment at `/pdo/app/qlp-environment/.venv/`; the activated environment resolved `qlp==0.14.6` on `2026-08-27`. This is **different** from the shared `/sw/qlp-environment/.venv/`, which can import the old `qlp==0.1` from FFITools via the system PYTHONPATH and does not have `lctools`.
 
-**The system PYTHONPATH problem:** PDO sets `PYTHONPATH` to include `/pdo/app/ffitools-versions/FFITools-0.6.0/QLPTools`, which shadows the pip-installed qlp 0.13.2 with the old qlp 0.1. The fix is to set `PYTHONPATH` to the TGLC fork only (no FFITools paths).
+**The system PYTHONPATH problem:** PDO sets `PYTHONPATH` to include `/pdo/app/ffitools-versions/FFITools-0.6.0/QLPTools`, which shadows the pip-installed QLP with the old `qlp==0.1`. The fix is to set `PYTHONPATH` to the TGLC fork only (no FFITools paths).
 
 **Activation script:** [`scripts/activate_qlp_env.sh`](/Users/tehan/PycharmProjects/TWIRL/scripts/activate_qlp_env.sh)
 
 ```bash
 source /pdo/users/tehan/TWIRL/scripts/activate_qlp_env.sh
-# Prints: "QLP env active: qlp 0.13.2 | Python 3.11.9"
+# Prints the active pip QLP and Python versions (QLP 0.14.6 on 2026-08-27).
 # Then use:
 qlp_run lctools detrend --help
 qlp_run lctools hlsp --help
