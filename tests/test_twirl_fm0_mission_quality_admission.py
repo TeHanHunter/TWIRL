@@ -19,9 +19,16 @@ def _write_quat(path: Path, cadences: tuple[int, ...]) -> None:
     path.write_text("cadence,flag\n" + "".join(f"{value},0\n" for value in cadences))
 
 
-def _write_flags(path: Path, cadences: tuple[int, ...]) -> None:
+def _write_flags(
+    path: Path, cadences: tuple[int, ...], *, nonzero_value: int = 1
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(f"{value}, {index % 2}\n" for index, value in enumerate(cadences)))
+    path.write_text(
+        "".join(
+            f"{value}, {nonzero_value if index % 2 else 0}\n"
+            for index, value in enumerate(cadences)
+        )
+    )
 
 
 def _quality_tree(tmp_path: Path, *, sector: int) -> Path:
@@ -44,6 +51,7 @@ def _quality_tree(tmp_path: Path, *, sector: int) -> Path:
             _write_flags(
                 tmp_path / directory / f"{prefix}_s{sector}_cam{camera}_ccd{ccd}.txt",
                 all_cadences,
+                nonzero_value=4 if provider == "tica" else 1,
             )
     return tmp_path
 
@@ -64,6 +72,7 @@ def test_quality_gate_uses_uniform_sector_provider_policy(
     assert receipt["quality_state"] == MISSION_QUALITY_READY_STATE
     assert receipt["n_qflag_files"] == 32
     assert receipt["n_mission_quality_files"] == 16
+    assert receipt["n_mission_quality_rows_excluded_by_quat"] == 0
     assert receipt["hdf5_quality_join_verified"] is False
     assert receipt["panel_admission_authorized"] is False
 
@@ -72,10 +81,65 @@ def test_quality_gate_rejects_missing_mission_cadence(tmp_path: Path) -> None:
     root = _quality_tree(tmp_path, sector=66)
     path = root / "spocflags/spocffiflag_s66_cam4_ccd4.txt"
     path.write_text("2040, 0\n2041, 0\n")
-    with pytest.raises(FM0ContractError, match="cadence coverage differs"):
+    with pytest.raises(FM0ContractError, match="missing quaternion cadences"):
         verify_mission_quality_sources(
             sector=66,
             expected_orbits=(139, 140),
+            qlp_root=root,
+        )
+
+
+def test_quality_gate_records_mission_rows_excluded_by_quat(
+    tmp_path: Path,
+) -> None:
+    root = _quality_tree(tmp_path, sector=67)
+    path = root / "ticaflags/ticaffiflag_s67_cam1_ccd1.txt"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("9998, 0\n9999, 4\n")
+    receipt = verify_mission_quality_sources(
+        sector=67,
+        expected_orbits=(141, 142),
+        qlp_root=root,
+    )
+    assert receipt["n_mission_quality_rows_excluded_by_quat"] == 2
+    assert receipt["n_mission_quality_rows_retained"] == 64
+    assert receipt["n_nonzero_mission_quality_rows_retained"] == 32
+    assert receipt["mission_quality_authority_exclusions"]["by_detector"][
+        "cam1_ccd1"
+    ] == {
+        "n_rows": 2,
+        "rows": [
+            {"cadence": 9998, "mission_quality": 0},
+            {"cadence": 9999, "mission_quality": 4},
+        ],
+    }
+    assert len(receipt["mission_quality_authority_exclusions_sha256"]) == 64
+
+
+def test_quality_gate_rejects_extra_qlp_qflag_cadence(tmp_path: Path) -> None:
+    root = _quality_tree(tmp_path, sector=67)
+    path = root / "orbit-141/ffi/run/cam1ccd1_qflag.txt"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("9999, 0\n")
+    with pytest.raises(FM0ContractError, match="QLP qflag cadence coverage differs"):
+        verify_mission_quality_sources(
+            sector=67,
+            expected_orbits=(141, 142),
+            qlp_root=root,
+        )
+
+
+def test_quality_gate_rejects_tica_bits_outside_current_qlp_mask(
+    tmp_path: Path,
+) -> None:
+    root = _quality_tree(tmp_path, sector=67)
+    path = root / "ticaflags/ticaffiflag_s67_cam1_ccd1.txt"
+    text = path.read_text(encoding="utf-8").replace("1010, 0", "1010, 1")
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(FM0ContractError, match="three-bit authority"):
+        verify_mission_quality_sources(
+            sector=67,
+            expected_orbits=(141, 142),
             qlp_root=root,
         )
 

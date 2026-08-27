@@ -147,6 +147,10 @@ If this file and those docs disagree, treat the docs as authoritative and update
 - The TGLC env for `tglc` stages is `/sw/qlp-environment/.venv/bin/python` with the TWIRL TGLC fork on `PYTHONPATH`; it has the newer Astropy layout needed by `tglc lightcurves`.
 - The QLP env for `lctools detrend` and `lctools hlsp` is `/pdo/app/qlp-environment/.venv/bin/python`; the activated environment currently resolves `qlp==0.14.6`. Keep the TGLC fork alone on `PYTHONPATH` so the FFITools `qlp==0.1` package cannot shadow it.
 - Current QLP `hlsp --flag-type auto` uses SPOC mission-quality flags for Sector `< 67` and TICA mission-quality flags for Sector `>= 67`, then combines the selected mission flag with the QLP detector qflag. FM cadence authorities must preserve that semantic boundary rather than forcing SPOC files across all sectors.
+- The QLP camera quaternion files are the cadence authority. Mission-quality
+  files must cover every quaternion cadence; mission-only rows are retained as
+  explicit authority exclusions for downstream masking, while a missing
+  quaternion cadence fails closed.
 - For Sector `< 67` including S56, HLSP uses `--flag-type spoc --flag-source fits`; SPOC flags live under `/pdo/qlp-data/spocflags/`.
 - Cap BLAS/OpenMP threads before multiprocessing pools on PDO: `OMP_NUM_THREADS=OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=NUMEXPR_NUM_THREADS=1`.
 - The GPU ePSF path requires the TWIRL-local venv at `/pdo/users/tehan/twirl-gpu-venv` with `cupy-cuda11x`, `LD_LIBRARY_PATH=/sw/python-versions/python-3.11.9/lib`, and the TGLC fork resolving first on `PYTHONPATH`.

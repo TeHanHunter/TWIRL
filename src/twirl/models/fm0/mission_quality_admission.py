@@ -14,6 +14,7 @@ deferred ORCD sector to accepted A2v1.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -23,10 +24,12 @@ from typing import Any
 from .registry import FM0ContractError, sha256_file
 
 MISSION_QUALITY_RECEIPT_SCHEMA_VERSION = (
-    "twirl_fm0_mission_quality_source_receipt_v1"
+    "twirl_fm0_mission_quality_source_receipt_v2"
 )
 MISSION_QUALITY_READY_STATE = "FM_MISSION_QUALITY_READY"
 MISSION_QUALITY_POLICY = "spoc_before_s67_tica_from_s67_v1"
+MISSION_QUALITY_EXCLUSION_POLICY = "qlp_quaternion_authority_exclusion_v1"
+TICA_QUALITY_ALLOWED_MASK = (1 << 2) | (1 << 5) | (1 << 11)
 
 
 def mission_quality_type(sector: int) -> str:
@@ -103,6 +106,31 @@ def _assert_exact_coverage(
         )
 
 
+def _mission_authority_exclusions(
+    *,
+    observed: Mapping[int, int],
+    expected: set[int],
+    label: str,
+) -> list[dict[str, int]]:
+    missing = sorted(expected - set(observed))
+    if missing:
+        raise FM0ContractError(
+            f"{label} is missing quaternion cadences; missing={len(missing)} "
+            f"examples={missing[:5]}"
+        )
+    return [
+        {"cadence": int(cadence), "mission_quality": int(observed[cadence])}
+        for cadence in sorted(set(observed) - expected)
+    ]
+
+
+def _canonical_json_sha256(payload: Mapping[str, Any]) -> str:
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def verify_mission_quality_sources(
     *,
     sector: int,
@@ -129,8 +157,11 @@ def verify_mission_quality_sources(
     n_quat_rows = 0
     n_qflag_rows = 0
     n_mission_rows = 0
+    n_mission_rows_retained = 0
     n_qflag_nonzero = 0
     n_mission_nonzero = 0
+    n_mission_nonzero_retained = 0
+    exclusions_by_detector: dict[str, dict[str, Any]] = {}
     for camera in range(1, 5):
         cadence_by_orbit: dict[int, set[int]] = {}
         for orbit in orbits:
@@ -189,13 +220,29 @@ def verify_mission_quality_sources(
             flags = _read_flag_file(
                 path, label=f"{provider.upper()} mission-quality authority"
             )
-            _assert_exact_coverage(
-                observed=set(flags),
+            if provider == "tica" and any(
+                int(value) & ~TICA_QUALITY_ALLOWED_MASK for value in flags.values()
+            ):
+                raise FM0ContractError(
+                    f"S{sector} cam{camera}/ccd{ccd} TICA quality contains "
+                    "bits outside the current QLP three-bit authority"
+                )
+            exclusions = _mission_authority_exclusions(
+                observed=flags,
                 expected=detector_cadences,
                 label=f"S{sector} cam{camera}/ccd{ccd} {provider.upper()} quality",
             )
             n_mission_rows += len(flags)
+            n_mission_rows_retained += len(detector_cadences)
             n_mission_nonzero += sum(value != 0 for value in flags.values())
+            n_mission_nonzero_retained += sum(
+                flags[cadence] != 0 for cadence in detector_cadences
+            )
+            detector_name = f"cam{camera}_ccd{ccd}"
+            exclusions_by_detector[detector_name] = {
+                "n_rows": len(exclusions),
+                "rows": exclusions,
+            }
             bindings.append(
                 {
                     "role": f"{provider}_mission_quality",
@@ -206,6 +253,14 @@ def verify_mission_quality_sources(
                     "n_rows": len(flags),
                 }
             )
+
+    authority_exclusions = {
+        "policy": MISSION_QUALITY_EXCLUSION_POLICY,
+        "n_rows": sum(
+            int(entry["n_rows"]) for entry in exclusions_by_detector.values()
+        ),
+        "by_detector": exclusions_by_detector,
+    }
 
     return {
         "schema_version": MISSION_QUALITY_RECEIPT_SCHEMA_VERSION,
@@ -222,8 +277,17 @@ def verify_mission_quality_sources(
         "n_quaternion_rows": n_quat_rows,
         "n_qflag_rows": n_qflag_rows,
         "n_mission_quality_rows": n_mission_rows,
+        "n_mission_quality_rows_retained": n_mission_rows_retained,
+        "n_mission_quality_rows_excluded_by_quat": authority_exclusions[
+            "n_rows"
+        ],
         "n_nonzero_qflag_rows": n_qflag_nonzero,
         "n_nonzero_mission_quality_rows": n_mission_nonzero,
+        "n_nonzero_mission_quality_rows_retained": n_mission_nonzero_retained,
+        "mission_quality_authority_exclusions": authority_exclusions,
+        "mission_quality_authority_exclusions_sha256": _canonical_json_sha256(
+            authority_exclusions
+        ),
         "source_bindings": bindings,
         "hdf5_quality_join_verified": False,
         "six_view_shards_verified": False,
@@ -253,9 +317,11 @@ def write_mission_quality_receipt(
 
 
 __all__ = [
+    "MISSION_QUALITY_EXCLUSION_POLICY",
     "MISSION_QUALITY_POLICY",
     "MISSION_QUALITY_READY_STATE",
     "MISSION_QUALITY_RECEIPT_SCHEMA_VERSION",
+    "TICA_QUALITY_ALLOWED_MASK",
     "mission_quality_type",
     "verify_mission_quality_sources",
     "write_mission_quality_receipt",
