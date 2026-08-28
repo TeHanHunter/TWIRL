@@ -7,17 +7,18 @@ checksum-bound A2v1 HDF5 adapter deliberately remain separate input paths.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from io import BytesIO
 import csv
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
-from pathlib import Path
 import re
 import stat
 import zipfile
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from io import BytesIO
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -30,7 +31,6 @@ from .registry import (
     read_rows,
     sha256_file,
 )
-
 
 INPUT_RELEASE_SCHEMA_VERSION = "twirl_fm0_1_input_release_v1"
 BUILD_SUMMARY_SCHEMA_VERSION = "twirl_fm0_1_input_release_build_summary_v1"
@@ -55,6 +55,21 @@ RAW_ARRAY_KEYS = frozenset(
         "orbit",
         "internal_quality",
         "spoc_quality",
+        "qlp_quality",
+        "authority_excluded",
+        "raw_flux_1x1",
+        "raw_flux_error_1x1",
+        "raw_flux_3x3",
+        "raw_flux_error_3x3",
+    }
+)
+MISSION_QUALITY_RAW_ARRAY_KEYS = frozenset(
+    {
+        "time",
+        "cadence",
+        "orbit",
+        "internal_quality",
+        "mission_quality",
         "qlp_quality",
         "authority_excluded",
         "raw_flux_1x1",
@@ -192,11 +207,16 @@ def _absolute_visit_bounds(time: np.ndarray) -> tuple[float, float]:
     return start, end
 
 
-def _strict_raw_arrays(raw: Mapping[str, Any]) -> dict[str, np.ndarray]:
+def _strict_raw_arrays_with_mission_field(
+    raw: Mapping[str, Any],
+    *,
+    mission_field: str,
+    expected_keys: frozenset[str],
+) -> dict[str, np.ndarray]:
     keys = frozenset(raw)
-    if keys != RAW_ARRAY_KEYS:
-        missing = sorted(RAW_ARRAY_KEYS - keys)
-        extra = sorted(keys - RAW_ARRAY_KEYS)
+    if keys != expected_keys:
+        missing = sorted(expected_keys - keys)
+        extra = sorted(keys - expected_keys)
         raise FM0ContractError(f"raw observation keys mismatch; missing={missing}, extra={extra}")
     assert_no_search_columns(keys, context="raw observation arrays")
     typed = {
@@ -204,7 +224,7 @@ def _strict_raw_arrays(raw: Mapping[str, Any]) -> dict[str, np.ndarray]:
         "cadence": _as_1d(raw, "cadence", np.int64),
         "orbit": _as_1d(raw, "orbit", np.int64),
         "internal_quality": _as_1d(raw, "internal_quality", np.uint64),
-        "spoc_quality": _as_1d(raw, "spoc_quality", np.uint64),
+        "mission_quality": _as_1d(raw, mission_field, np.uint64),
         "qlp_quality": _as_1d(raw, "qlp_quality", np.uint64),
         "authority_excluded": _as_1d(raw, "authority_excluded", np.bool_),
         "raw_flux_1x1": _as_1d(raw, "raw_flux_1x1", np.float64),
@@ -223,6 +243,28 @@ def _strict_raw_arrays(raw: Mapping[str, Any]) -> dict[str, np.ndarray]:
     ordered = {key: value[order] for key, value in typed.items()}
     _absolute_visit_bounds(ordered["time"])
     return ordered
+
+
+def _strict_raw_arrays(raw: Mapping[str, Any]) -> dict[str, np.ndarray]:
+    """Load the frozen v1 SPOC-named raw schema without changing its API."""
+
+    return _strict_raw_arrays_with_mission_field(
+        raw,
+        mission_field="spoc_quality",
+        expected_keys=RAW_ARRAY_KEYS,
+    )
+
+
+def _strict_mission_quality_raw_arrays(
+    raw: Mapping[str, Any],
+) -> dict[str, np.ndarray]:
+    """Load the additive provider-neutral raw schema used by later sectors."""
+
+    return _strict_raw_arrays_with_mission_field(
+        raw,
+        mission_field="mission_quality",
+        expected_keys=MISSION_QUALITY_RAW_ARRAY_KEYS,
+    )
 
 
 def _segments(time: np.ndarray, orbit: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -314,18 +356,21 @@ def _derive_aperture(
     }
 
 
-def build_observation_release(
-    raw: Mapping[str, Any],
+def _build_observation_release_from_arrays(
+    arrays: Mapping[str, np.ndarray],
     *,
-    input_adapter: str = FIXTURE_ADAPTER_NAME,
-    scientific_training_eligible: bool = False,
+    input_adapter: str,
+    scientific_training_eligible: bool,
+    mission_quality_provider: str | None,
+    external_quality_formula: str,
 ) -> ObservationRelease:
-    """Apply the frozen quality, six-view, error, and timing contract."""
+    """Apply the shared frozen numerical core to already validated arrays."""
 
-    arrays = _strict_raw_arrays(raw)
     time = arrays["time"]
     visit_start, visit_end = _absolute_visit_bounds(time)
-    external_quality = arrays["spoc_quality"] | (arrays["qlp_quality"] << np.uint64(30))
+    external_quality = arrays["mission_quality"] | (
+        arrays["qlp_quality"] << np.uint64(30)
+    )
     time_valid = np.isfinite(time)
     effective_good = (
         time_valid
@@ -387,6 +432,28 @@ def build_observation_release(
         (time[1:][adjacent] - time[:-1][adjacent]) * 86400.0 / CADENCE_SECONDS
     ).astype(np.float32)
     view_present = np.any(flux_valid, axis=0).astype(np.bool_)
+    audit: dict[str, Any] = {
+        "external_quality_formula": external_quality_formula,
+        "n_effective_good": int(np.sum(effective_good)),
+        "aperture_available_1x1": bool(small["available"]),
+        "aperture_available_3x3": bool(large["available"]),
+        "n_aperture_good_1x1": small["n_aperture_good"],
+        "n_aperture_good_3x3": large["n_aperture_good"],
+        "n_error_good_1x1": small["n_error_good"],
+        "n_error_good_3x3": large["n_error_good"],
+        "median_1x1": small["median"],
+        "median_3x3": large["median"],
+        "scale_1x1": small["scale"],
+        "scale_3x3": large["scale"],
+        "scale_source_1x1": small["scale_source"],
+        "scale_source_3x3": large["scale_source"],
+        "absolute_visit_start": visit_start,
+        "absolute_visit_end": visit_end,
+        "input_adapter": str(input_adapter),
+        "scientific_training_eligible": bool(scientific_training_eligible),
+    }
+    if mission_quality_provider is not None:
+        audit["mission_quality_provider"] = mission_quality_provider
     release = ObservationRelease(
         flux=flux,
         flux_valid=flux_valid,
@@ -398,29 +465,54 @@ def build_observation_release(
         segment_boundary=segment_boundary,
         segment_id=segment_id,
         view_present=view_present,
-        audit={
-            "external_quality_formula": "spoc_quality | (qlp_quality << 30)",
-            "n_effective_good": int(np.sum(effective_good)),
-            "aperture_available_1x1": bool(small["available"]),
-            "aperture_available_3x3": bool(large["available"]),
-            "n_aperture_good_1x1": small["n_aperture_good"],
-            "n_aperture_good_3x3": large["n_aperture_good"],
-            "n_error_good_1x1": small["n_error_good"],
-            "n_error_good_3x3": large["n_error_good"],
-            "median_1x1": small["median"],
-            "median_3x3": large["median"],
-            "scale_1x1": small["scale"],
-            "scale_3x3": large["scale"],
-            "scale_source_1x1": small["scale_source"],
-            "scale_source_3x3": large["scale_source"],
-            "absolute_visit_start": visit_start,
-            "absolute_visit_end": visit_end,
-            "input_adapter": str(input_adapter),
-            "scientific_training_eligible": bool(scientific_training_eligible),
-        },
+        audit=audit,
     )
     validate_observation_release(release)
     return release
+
+
+def build_observation_release(
+    raw: Mapping[str, Any],
+    *,
+    input_adapter: str = FIXTURE_ADAPTER_NAME,
+    scientific_training_eligible: bool = False,
+) -> ObservationRelease:
+    """Apply the frozen v1 SPOC quality, six-view, error, and timing contract."""
+
+    return _build_observation_release_from_arrays(
+        _strict_raw_arrays(raw),
+        input_adapter=input_adapter,
+        scientific_training_eligible=scientific_training_eligible,
+        mission_quality_provider=None,
+        external_quality_formula="spoc_quality | (qlp_quality << 30)",
+    )
+
+
+def build_mission_quality_observation_release(
+    raw: Mapping[str, Any],
+    *,
+    mission_quality_provider: str,
+    input_adapter: str,
+    scientific_training_eligible: bool = False,
+) -> ObservationRelease:
+    """Apply the same numerical core with provider-neutral later-sector quality.
+
+    The returned shard arrays are byte-schema compatible with FM0.1, but the
+    audit provenance names the actual mission provider.  This additive entry
+    point deliberately leaves :func:`build_observation_release` and its frozen
+    SPOC-named v1 schema unchanged.
+    """
+
+    provider = str(mission_quality_provider).strip().lower()
+    if provider not in {"spoc", "tica"}:
+        raise FM0ContractError("mission_quality_provider must be 'spoc' or 'tica'")
+    return _build_observation_release_from_arrays(
+        _strict_mission_quality_raw_arrays(raw),
+        input_adapter=str(input_adapter),
+        scientific_training_eligible=scientific_training_eligible,
+        mission_quality_provider=provider,
+        external_quality_formula="mission_quality | (qlp_quality << 30)",
+    )
 
 
 def validate_observation_release(release: ObservationRelease) -> None:
@@ -527,7 +619,7 @@ def deterministic_training_window(
     if not segments.size:
         raise FM0ContractError("cannot sample an empty observation")
     seed = hashlib.sha256(
-        f"twirl_fm0_1_window_v1:{observation_key}:{epoch}:{draw_index}".encode("utf-8")
+        f"twirl_fm0_1_window_v1:{observation_key}:{epoch}:{draw_index}".encode()
     ).digest()
     value = int.from_bytes(seed, "big")
     segment = int(segments[value % segments.size])

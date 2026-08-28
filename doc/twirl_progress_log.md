@@ -877,17 +877,57 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   reconstruction and a stable-host cross-visit head remain separately
   controlled later ablations. No training or temporal-panel freeze was
   authorized.
+- `2026-08-28`: Corrected CPU-only S66 HDF5/cadence audit job `21498338`
+  completed on `node4702` in `1h32m11s` with exit `0:0`. All `511,773`
+  declared HDF5 products opened, zero were unreadable, and `2,872,070,553`
+  light-curve cadences reconciled against the SPOC plus QLP authorities with
+  zero authority exclusions. The immutable receipt SHA-256 is
+  `c1c4bb61...1c5e985`. The complete S66--S77 chain therefore covers
+  `1,356,463` opened products and `7,545,237,439` reconciled cadences with no
+  unreadable file or unexplained authority gap; only S77's predeclared
+  `57,994` mission-only light-curve cadence occurrences are explicitly
+  excluded. S65 remains outside the release.
+- `2026-08-28`: Recorded Jeroen's short-event-retention concern as a matched
+  context-window experiment rather than a photometry rebuild. FM0.2.1 uses a
+  `2,048`-cadence (`4.74 d`) input crop, a theoretical `1,543`-cadence
+  (`3.57 d`) TCN receptive field, and masked-mean window pooling. The next data
+  products therefore retain complete visits with no model context bound. A
+  later development-only loader diagnostic will compare contiguous `256`,
+  `512`, `1,024`, and `2,048` cadence-slot crops from the same shards while
+  holding physical-source sampling and total model-visible cadence exposure
+  fixed. `TWIRL-FM0.3.1` remains the fixed-context data-scale baseline; a
+  justified shorter-context-only candidate is provisionally
+  `TWIRL-FM0.3.2`. Neither training nor a temporal-panel freeze was authorized.
+- `2026-08-28`: Implemented the fail-closed S66--S77 full-visit preparation
+  path. It builds provider-neutral cadence references using SPOC for S66 and
+  TICA for S67+, creates label-blind source inventories without opening HDF5
+  photometry, writes immutable six-view shards only for train/development
+  identities, and keeps the complete visits independent of model context
+  length. A checksum-bound [authority map]
+  (../configs/orcd/twirl_fm0_s66_s77_full_visit_preparation_v1.json) with
+  SHA-256 `10adea2e...fa7d7c` fixes every common and per-sector input including
+  the completed S66 receipt. The dry-run-first ORCD controller launches two
+  chronological CPU Phase-A chains, freezes their exact generated hashes,
+  then permits one chronological six-view chain and one full CPU admission-v2
+  pass. All long-output builders now publish read-only, clean only their exact
+  attempt-owned final/partial paths after interruption, and receive a
+  ten-minute pre-termination signal. The aggregate sealed-data contract states
+  precisely that pre-existing label-blind QA read only identity attributes,
+  Cadence, and QualityFlag for all identities; no sealed time, aperture-flux,
+  flux-error, or derived shard enters preparation. The complete fast suite
+  passed (`1,109` tests; `33` optional skips), focused independent launch audit
+  found no P0/P1 blocker, and no H200 or training path exists in the
+  controller.
 
-**Next:** Build exact six-view shards for the passed S67--S77 pool, complete the
-stable-identity joins and label-blind repeated/new-host inventory, and replace
-the S65-dependent admission-policy v1 with a separately hashed v2 that binds
-the frozen exclusion ledger. In parallel, prove the S78 TICA gap is fully
-outside every retained detector HDF5 before admitting it; keep S65 outside this
-release. Once at least five sectors and the cohort floors pass, freeze
-adequacy thresholds, publish a separate immutable development-panel freeze,
-and evaluate the existing step-2000 checkpoint against its exact same-seed
-step-0 control, zero-shot. Keep new training, event retention, the formal gate,
-and the sealed test closed.
+**Next:** Materialize and freeze provider-neutral quality references plus the
+label-blind source inventory for S66--S77, then build their exact full-visit
+six-view shards and run the separately hashed admission-v2 gate. Keep S65
+outside this release. In parallel, prove the S78 TICA gap is fully outside
+every retained detector HDF5 before admitting it. Once at least five sectors
+and the cohort floors pass, freeze adequacy thresholds, publish a separate
+immutable development-panel freeze, and evaluate the existing step-2000
+checkpoint against its exact same-seed step-0 control, zero-shot. Keep new
+training, event retention, the formal gate, and the sealed test closed.
 
 ### Candidate validation and follow-up
 

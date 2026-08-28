@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 ORCD = ROOT / "scripts" / "orcd"
@@ -302,6 +301,51 @@ def test_input_gate_uses_correct_local_time_and_exact_shard_allowlist() -> None:
     assert '"foundation_model_claim_authorized": False' in script
     assert "--a2v1-hdf5-manifest" in script
     assert 'adapter == "a2v1_hdf5_quality_aware_v1"' in script
+
+
+def test_later_data_preparation_wrappers_are_cpu_only_and_fail_closed() -> None:
+    quality = text("slurm_twirl_fm0_mission_quality_reference_cpu.sbatch")
+    assert "#SBATCH -p pg_mki_aryeh" in quality
+    assert "#SBATCH --exclude=node4900" in quality
+    assert "build_twirl_fm0_mission_quality_reference.py" in quality
+    assert "S66=SPOC" not in quality  # Provider is verified from the manifest.
+    assert 'expected_provider = "spoc" if sector < 67 else "tica"' in quality
+    assert "#SBATCH --signal=B:TERM@600" in quality
+    assert "cleanup_owned_outputs" in quality
+    assert '"${OUT}"|"${PARTIAL}"' in quality
+    assert "OUTPUTS_ABSENT_AT_ENTRY=1" in quality
+    assert 'kill -s "${signal}" "${CHILD_PID}"' in quality
+
+    inventory = text("slurm_twirl_fm0_later_source_inventory_cpu.sbatch")
+    assert "#SBATCH -p pg_mki_aryeh" in inventory
+    assert "#SBATCH --exclude=node4900" in inventory
+    assert "build_twirl_fm0_later_source_inventory.py" in inventory
+    assert "TWIRL_FM0_CORPUS_SELECTION_SHA256" in inventory
+    assert 'summary.get("hdf5_content_opened") is not False' in inventory
+    assert 'summary.get("sealed_hdf5_content_opened") is not False' in inventory
+    assert 'summary.get("panel_admission_authorized") is not False' in inventory
+    assert "#SBATCH --signal=B:TERM@600" in inventory
+    assert "cleanup_owned_outputs" in inventory
+    assert '"${OUT}"|"${PARTIAL}"' in inventory
+    assert "OUTPUTS_ABSENT_AT_ENTRY=1" in inventory
+    assert 'kill -s "${signal}" "${CHILD_PID}"' in inventory
+
+    six_view = text("slurm_twirl_fm0_later_six_view_cpu.sbatch")
+    assert "#SBATCH -p pg_mki_aryeh" in six_view
+    assert "#SBATCH --exclude=node4900" in six_view
+    assert "#SBATCH --gres" not in six_view
+    assert "build_twirl_fm0_later_sector_release.py" in six_view
+    assert "TWIRL_FM0_SOURCE_INVENTORY_SUMMARY_SHA256" in six_view
+    assert "TWIRL_FM0_QUALITY_REFERENCE_MANIFEST_SHA256" in six_view
+    assert "TWIRL_FM0_HDF5_QUALITY_RECEIPT_SHA256" in six_view
+    assert "validate_later_sector_release" in six_view
+    assert "require_read_only=True" in six_view
+    assert "cleanup_owned_outputs" in six_view
+    assert '"${OUT}"|"${PARTIAL}"' in six_view
+    assert "OUTPUTS_ABSENT_AT_ENTRY=1" in six_view
+    assert 'kill -s "${signal}" "${CHILD_PID}"' in six_view
+    assert "chmod -R" not in six_view
+    assert "#SBATCH --signal=B:TERM@600" in six_view
 
 
 def test_environment_is_versioned_and_torch_is_pinned() -> None:

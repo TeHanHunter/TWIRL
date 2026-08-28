@@ -5,7 +5,7 @@ Accepted decisions belong in [the plan](twirl_plan.md); execution history
 belongs in [the progress log](twirl_progress_log.md). Earlier brainstorming is
 preserved in the [archived snapshot](archive/ideas_through_2026-07-13.md).
 
-Last reconciled: `2026-07-16`.
+Last reconciled: `2026-08-28`.
 
 ## Blocking decisions
 
@@ -77,6 +77,41 @@ Before any future teacher iteration is approved:
   claim because it was consumed by the completed S57--S59 human-review return.
   Preserve that label provenance and use a later sealed sector for prospective
   evaluation.
+
+## FM context length and short-event retention
+
+Jeroen raised the concern that the FM input context may be too long relative
+to the few-cadence transit and occultation signatures TWIRL cares about.  The
+relevant FM0.2.1 term is the **context window** or **input crop**, not a patch:
+the active TCN reads `2,048` cadences (about `4.74 d`) without Conformer-style
+patching.  Its cadence stem plus 22 dilated two-convolution blocks have a
+theoretical receptive field of `1,543` cadences (about `3.57 d`), after which
+the representation is masked-mean pooled over the full valid crop.  A
+one-to-ten-cadence event may therefore contribute too little to the pooled
+embedding even when cadence-level reconstruction retains it.
+
+Before freezing another training design:
+
+- distinguish context length from the Conformer-only patch stride (`4`
+  cadences in the frozen FM0.1 implementation) and from the TCN receptive
+  field;
+- preregister a matched crop-length diagnostic, provisionally comparing
+  contiguous `256`, `512`, `1,024`, and `2,048` cadence-slot crops while
+  holding physical-source sampling, total model-visible cadence exposure,
+  masks, and checkpoint comparisons fixed;
+- measure short-event retention together with reconstruction, embedding rank,
+  repeated-host retrieval, and sensitivity to longer variability so a shorter
+  crop is not selected from transit retention alone;
+- test a single shorter-context change before considering a mixed-scale
+  sampler, local-event pooling, or patch-width change; and
+- treat a changed context/sampling contract as a structural model experiment,
+  provisionally `TWIRL-FM0.3.2`, not as a silent continuation of the fixed-
+  context `TWIRL-FM0.3.1` data-scale baseline.
+
+The immutable full-visit six-view shards should remain independent of this
+choice so the prepared S56--S64 plus S66--S77 data can support each
+preregistered loader-level crop length without rebuilding photometry. S65
+remains outside this release under its pre-model exclusion ledger.
 
 ## Catalog and contextual science
 

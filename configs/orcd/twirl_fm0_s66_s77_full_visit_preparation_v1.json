@@ -1,0 +1,92 @@
+{
+  "schema_version": "twirl_fm0_s66_s77_full_visit_preparation_authority_v1",
+  "campaign_id": "twirl_fm0_s66_s77_full_visit_preparation_v1",
+  "scope": {
+    "ordered_sectors": [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77],
+    "excluded_sectors": [65],
+    "blocked_sectors": [78],
+    "untouched_sectors": [79, 80],
+    "full_visit_six_view_shards": true,
+    "label_blind_sector_wide_hdf5_quality_qa_allowed": true,
+    "sealed_aperture_photometry_or_derived_shard_access_forbidden": true,
+    "temporal_panel_freeze_authorized": false,
+    "model_training_authorized": false,
+    "h200_use_authorized": false
+  },
+  "orcd": {
+    "host": "tehan@orcd-login.mit.edu",
+    "control_socket": "/Users/tehan/.ssh/cm/tehan@orcd-login.mit.edu:22",
+    "project_root": "/orcd/data/mki_aryeh/001/twirl",
+    "source_repository": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL",
+    "detached_repository_prefix": "/orcd/data/mki_aryeh/001/twirl/code/TWIRL_fm_s66_s77_",
+    "partition": "pg_mki_aryeh",
+    "excluded_node": "node4900",
+    "python": "/orcd/data/mki_aryeh/001/twirl/envs/twirl-fm0-poc-py3119-torch2110-cu128-v1/bin/python"
+  },
+  "authorities": {
+    "mission_quality_transfer": {
+      "root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_mission_quality_transfer_v1/e0729364/s66-s77_e0729364",
+      "manifest_path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_mission_quality_transfer_v1/e0729364/s66-s77_e0729364/manifest.json",
+      "manifest_sha256": "7efe878d52431c6c1b9f00878d8eee70c28420394d62ecd2a43c3adaa88edd1b"
+    },
+    "corpus_selection": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_through_s77_preparation_v1/030e3455/later_selection_s66_s77/selection.csv",
+      "sha256": "d1b83b74e459a9b2ed0a00db188d8b55c1385caf3fb6fef259d8b1f17015c9f3",
+      "summary_path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_through_s77_preparation_v1/030e3455/later_selection_s66_s77/summary.json",
+      "summary_sha256": "334ffacbaf29dcdcce511d2dc26ecf9c4af3b4de96056ff1c976ec054f45b171"
+    },
+    "target_observations": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/retired_worktrees/20260717_cleanup/TWIRL/data_local/catalogs/twirl_master_catalog/twirl_wd_tess_observations_v0.fits",
+      "sha256": "2f42698420a5e2d945a3fd60d3ddc057c06f3fd19c2b9882829ea0c26e5280d9"
+    },
+    "gaia_tic_aliases": {
+      "path": "/orcd/data/mki_aryeh/001/twirl/retired_worktrees/20260717_cleanup/TWIRL/data_local/catalogs/twirl_master_catalog/gaia_dr3_to_tic_matches.csv",
+      "sha256": "1b1b1f0426f9d990fc43810827ff093d3a7c430aaed3ab03184786274f8040f9"
+    },
+    "admission_policy": {
+      "repository_path": "configs/models/twirl_fm0_2_later_sector_admission_v2.yaml",
+      "sha256": "10536c89d2656604c97f6289cb03fc9f5aca459aa5340303324314e4905dfd76"
+    },
+    "exclusion_ledger": {
+      "repository_path": "configs/models/twirl_fm0_later_sector_exclusions_v1.yaml",
+      "sha256": "b621340d020d33fcf19179afd31c9522672cd1c71e04568b9e2b2c86467ad03a"
+    },
+    "source_receipts": {
+      "66": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0066.source.json", "sha256": "221a43a13ce2a115d69d90f442a4a5256d927a850579526661af7a1be6751d14"},
+      "67": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0067.source.json", "sha256": "7b10ec24826ea32bc05bd910703cd35b937185c8f72d5bbf5e20cc3e46f14711"},
+      "68": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0068.source.json", "sha256": "6a8f663767f177dcf9ddda58fed6111e3c4ffef8b8866da66e93ccf81a756f1b"},
+      "69": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0069.source.json", "sha256": "511aacffa89872cb5aea71cd9533d6df5d3ed3effba5e192ea91c943dd9059f9"},
+      "70": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0070.source.json", "sha256": "03031d8c88ab8ebe58efe4a18f0413a0a897f3244c5bff11eeab824184e9e482"},
+      "71": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0071.source.json", "sha256": "6f4610f2f9f61e8e9dd2e1ad6bc6cd8ca3544cd67e4ed0c2b51c9383d6a1e40c"},
+      "72": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0072.source.json", "sha256": "ba6878924e74dadc30aea15b70cf0efcf66f4779e2efd6e790e69e6493e551f5"},
+      "73": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0073.source.json", "sha256": "70186077fc5c90b8a439540a85ad1f204ed2d048bf42d6c1eb25bc21cbe9abec"},
+      "74": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0074.source.json", "sha256": "4cbe6b831335be3e6d0b397a50ee37dfcfc2a9c49305ab06420e40df0f1dc598"},
+      "75": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0075.source.json", "sha256": "de70b43cfc232b3bc3f32e17e7144a3e559e45583df4e0a6d0fe5535b08a52dd"},
+      "76": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0076.source.json", "sha256": "30804522e2c6bb3d91f5abb7a1913b13a27cf3107db0ac9cbf645a108fe7c978"},
+      "77": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_orcd_source_admission_v1/d5239392b9da/receipts/s0077.source.json", "sha256": "e57197c48536940478070386cd6b7db8497fbec241c6dee0e34cc4b58ce84590"}
+    },
+    "hdf5_quality_receipts": {
+      "66": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0066/receipt.json", "sha256": "c1c4bb613e1cd61fdc9b50b09b35282488e267155feb387220a2981b71c5e985"},
+      "67": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0067/receipt.json", "sha256": "71afae2cda7e444b440e5278705cd5d41bf4acbf4db6119c089d34437952e4a3"},
+      "68": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0068/receipt.json", "sha256": "6521f1aa0e42f02408f110f1d4c92876547d283bf23d712aaaf2dd131b17abf7"},
+      "69": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0069/receipt.json", "sha256": "b612ad07f0b4f55256021961e6995df3849737b34372684bb75debc153e13fbe"},
+      "70": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0070/receipt.json", "sha256": "e761a8e9b8169ea01f6b24711306c453e4df643b2af6b107f4d1c0494d926e26"},
+      "71": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0071/receipt.json", "sha256": "cf1088f3d3e216c65e4a51aad72e210acff0f4dffd140dab042581a9f6c3ce91"},
+      "72": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0072/receipt.json", "sha256": "94edd224cc964d5ad59962fa301f9d91c2a94142bbc82c3c4e478866f7a4cb3d"},
+      "73": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0073/receipt.json", "sha256": "b64cd095c62f6389c085e7fd17064263d6c167801a347de13b60bc796628c3af"},
+      "74": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0074/receipt.json", "sha256": "7023d6b36b2d0f6b5c1b0b4ff74b72b191868ba001ccfa855fdb9f5f99541873"},
+      "75": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0075/receipt.json", "sha256": "f1ae5b15e150f599f59f1de70d9c6d356ee5ed238345651247079efb18dd8717"},
+      "76": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0076/receipt.json", "sha256": "128548fe1af525da90da8d7af5d0d8ac118cd6f265526af6765d1b3becee1e54"},
+      "77": {"path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_2_hdf5_quality_admission_v1/030e3455/s0077/receipt.json", "sha256": "2d3f6cfa46789145dc2d67ff1c3e097a2bac5f9fa782af4ba9e0d50164b1f8dc"}
+    }
+  },
+  "outputs": {
+    "run_root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_s66_s77_full_visit_preparation_v1",
+    "quality_reference_root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_s66_s77_full_visit_preparation_v1/phase_a/mission_quality_reference",
+    "source_inventory_root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_s66_s77_full_visit_preparation_v1/phase_a/source_inventory",
+    "phase_a_authority_record": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_s66_s77_full_visit_preparation_v1/phase_a/authority_record.json",
+    "six_view_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1",
+    "admission_receipt": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_s66_s77_full_visit_preparation_v1/admission_v2/receipt.json",
+    "launch_root": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_s66_s77_full_visit_preparation_v1/launch"
+  }
+}

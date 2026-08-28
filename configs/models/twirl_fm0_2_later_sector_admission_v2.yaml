@@ -1,0 +1,122 @@
+schema_version: twirl_fm0_2_later_sector_admission_config_v2
+campaign_id: twirl_fm0_2_later_sector_admission_v2
+model_family: TWIRL-FM0
+status: frozen_preparation_policy_not_run
+prepared_on: 2026-08-28
+
+scope:
+  purpose: checksum_bound_later_sector_preparation_pool_admission
+  policy_only: true
+  preparation_pool_admission_only: true
+  results_recorded: false
+  panel_frozen: false
+  model_training_authorized: false
+  sealed_test_access_authorized: false
+  event_retention_authorized: false
+  formal_model_gate_authorized: false
+  production_model_claim: false
+  foundation_model_claim: false
+  prospective_test_claim: false
+
+exclusion_ledger:
+  required_schema_version: twirl_fm0_later_sector_exclusion_ledger_v1
+  required_decision_id: twirl_fm0_later_sector_exclusions_v1
+  required_sha256: b621340d020d33fcf19179afd31c9522672cd1c71e04568b9e2b2c86467ad03a
+  binding_algorithm: sha256
+  excluded_sectors: [65]
+  exclusion_must_precede_model_evaluation: true
+  repaired_sector_retroactive_insertion: forbidden
+
+selection:
+  role: complete_label_blind_preparation_pool
+  ordered_sectors: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+  first_sector: 66
+  final_sector: 77
+  exact_sector_set_required: true
+  chronological_order_required: true
+  require_contiguous_numeric_sectors: true
+  skipped_sector_policy: fail
+  excluded_sector_policy: fail
+  unmapped_sector_policy: fail
+  expected_orbits_must_be_explicit: true
+  expected_orbits_by_sector:
+    66: [139, 140]
+    67: [141, 142]
+    68: [143, 144]
+    69: [145, 146]
+    70: [147, 148]
+    71: [149, 150]
+    72: [151, 152]
+    73: [153, 154]
+    74: [155, 156]
+    75: [157, 158]
+    76: [159, 160]
+    77: [161, 162]
+  s78_included: false
+  s79_s80_touched: false
+
+evidence:
+  fail_closed: true
+  exact_path_and_sha256_supplied_at_runtime: true
+  distinct_receipt_paths_and_sha256_required: true
+  required_receipts_per_sector:
+    mission_quality_reference:
+      schema_version: twirl_fm0_mission_quality_reference_v2
+    hdf5_quality:
+      schema_version: twirl_fm0_hdf5_quality_admission_v1
+      quality_state: FM_HDF5_QUALITY_READY
+    source_inventory:
+      schema_version: twirl_fm0_later_retained_source_summary_v1
+    six_view_release:
+      schema_version: twirl_fm0_later_six_view_sector_release_v1
+      release_state: FM_SIX_VIEW_DEFERRED_READY
+      flux_view_names:
+        - raw_relative_1x1
+        - raw_relative_3x3
+        - adp_1x1
+        - adp_3x3
+        - adp015_1x1
+        - adp015_3x3
+  every_receipt_must_pass: true
+  missing_or_unbound_receipt_policy: fail
+  cross_receipt_sha256_bindings_required: true
+  model_outcome_blind_required: true
+  sealed_aperture_photometry_or_derived_shard_access_forbidden: true
+  label_blind_sector_wide_hdf5_quality_qa_allowed: true
+
+product_boundary:
+  required_source_product_state: ORCD_COMPLETE_DEFERRED
+  preparation_pool_state: ORCD_COMPLETE_DEFERRED
+  preparation_pool_admitted: true
+  a2v1_accepted: false
+  scientific_training_eligible: false
+  panel_admission_authorized: false
+  temporal_panel_frozen: false
+  model_training_authorized: false
+  deferred_checkpoint_is_stage1_acceptance: false
+  deferred_checkpoint_is_scientific_release: false
+  separate_future_acceptance_contract_required: true
+
+forbidden_input_tokens:
+  - light_curve_values
+  - bls
+  - search
+  - candidate
+  - human_label
+  - morphology_label
+  - injection_truth
+  - embedding
+  - model_score
+  - representation_metric
+  - checkpoint_comparison
+
+claim_limit: >-
+  Passing this policy certifies only that the complete S66--S77 deferred ORCD
+  preparation pool has exact, mutually bound mission-quality, HDF5-quality,
+  source-inventory, and six-view receipts after the pre-model exclusion of
+  Sector 65. It does not accept A2v1 sectors, freeze a temporal panel, open
+  sealed photometry or derived shards, authorize training, or establish a
+  model result. Pre-existing label-blind sector-wide QA may read only HDF5
+  identity attributes, LightCurve/Cadence, and LightCurve/QualityFlag. For
+  poc_sealed_test rows, no time, aperture-flux, or flux-error array is loaded
+  and no derived shard is created.

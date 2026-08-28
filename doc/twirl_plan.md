@@ -6,7 +6,7 @@ Read [the documentation guide](README.md) to find task-specific protocols.
 Detailed results belong in [the progress log](twirl_progress_log.md), and
 unresolved choices belong in [ideas](ideas.md).
 
-Last reconciled: `2026-08-27`.
+Last reconciled: `2026-08-28`.
 
 ## Milestone dashboard
 
@@ -137,14 +137,16 @@ project authority.
   [exclusion ledger](../configs/models/twirl_fm0_later_sector_exclusions_v1.yaml)
   records the prohibition on retroactive insertion after repair. The frozen
   admission-policy v1 still requires S65 and therefore cannot be reused for
-  the revised panel; a separately hashed v2 must consume the exclusion ledger
-  before inventory or panel freeze. S78 remains blocked by TICA rows absent
-  beyond the delivered FFI/HDF5 tail. The full read-only ORCD HDF5/cadence
-  chain passes S67--S77: all `844,690` declared products opened and
-  `4,673,166,886` light-curve cadences reconciled, with no unreadable product
-  or unexplained authority gap. S77's `32` declared mission-only detector rows
-  propagate to `57,994` explicitly masked light-curve cadence occurrences. No
-  temporal panel is frozen.
+  the revised panel. The separately hashed admission-policy v2 consumes the
+  exclusion ledger and requires exact S66--S77 quality, source, HDF5, and
+  six-view bundles before it can pass; it does not freeze a panel or authorize
+  training. S78 remains blocked by TICA rows absent beyond the delivered
+  FFI/HDF5 tail. The full read-only ORCD HDF5/cadence
+  chain passes S66--S77: all `1,356,463` declared products opened and
+  `7,545,237,439` light-curve cadences reconciled, with no unreadable product
+  or unexplained authority gap. S66 uses SPOC with zero exclusions. S77's `32`
+  declared TICA-only detector rows propagate to `57,994` explicitly masked
+  light-curve cadence occurrences. No temporal panel is frozen.
   Once at least five genuinely later sectors pass the ORCD HDF5-openability,
   six-view, cadence-quality, and identity gates, use the label-blind inventory
   to freeze the still-unset detector/cadence/cohort-adequacy thresholds and
@@ -156,9 +158,16 @@ project authority.
   first candidate, `TWIRL-FM0.3.1`, is a fixed-TCN data-scale baseline: retain
   the FM0.2.1 two-ADP-view encoder and same-window objective, use only fully
   gated sectors, and compare at the same window-draw milestones before any
-  longer exposure-normalized extension. Freeze a genuinely newer temporal
-  holdout before training. Subsequent candidates may optimize both independent
-  reconstruction masks and then test a separate stable-host cross-visit head,
+  longer exposure-normalized extension. Before freezing a changed-context
+  candidate, run a matched development-only loader diagnostic with `256`,
+  `512`, `1,024`, and `2,048` contiguous cadence-slot crops from the same
+  immutable full-visit shards, holding physical-source sampling and total
+  model-visible cadence exposure fixed. If shorter context is then selected,
+  treat it as the single structural change in the provisional
+  `TWIRL-FM0.3.2` candidate, not a silent continuation of `.3.1`. Freeze a
+  genuinely newer temporal holdout before training. Subsequent candidates may
+  optimize both independent reconstruction masks and then test a separate
+  stable-host cross-visit head,
   but each is a one-mechanism ablation; raw/ADP015 view additions and a
   Conformer revisit remain later experiments. Exact same-seed initialization,
   source-paired changes, at least two frozen training seeds after the canary,
