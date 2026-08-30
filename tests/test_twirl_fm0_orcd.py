@@ -338,8 +338,10 @@ def test_later_data_preparation_wrappers_are_cpu_only_and_fail_closed() -> None:
     assert "TWIRL_FM0_SOURCE_INVENTORY_SUMMARY_SHA256" in six_view
     assert "TWIRL_FM0_QUALITY_REFERENCE_MANIFEST_SHA256" in six_view
     assert "TWIRL_FM0_HDF5_QUALITY_RECEIPT_SHA256" in six_view
-    assert "validate_later_sector_release" in six_view
-    assert "require_read_only=True" in six_view
+    assert "#SBATCH -c 8" in six_view
+    assert "validate_later_sector_release" not in six_view
+    assert "TWIRL_FM0_VALIDATION_WORKERS" in six_view
+    assert "six-view READY binding drifted" in six_view
     assert "cleanup_owned_outputs" in six_view
     assert '"${OUT}"|"${PARTIAL}"' in six_view
     assert "OUTPUTS_ABSENT_AT_ENTRY=1" in six_view

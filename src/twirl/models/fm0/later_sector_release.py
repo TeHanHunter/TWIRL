@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path, PurePosixPath
@@ -45,7 +46,7 @@ from .input_release import (
     FLUX_VIEW_NAMES,
     build_mission_quality_observation_release,
     deterministic_npz_bytes,
-    load_input_release,
+    load_input_release_bytes,
 )
 from .later_hdf5_adapter import (
     LATER_ALLOWED_SOURCE_PARTITIONS,
@@ -626,9 +627,14 @@ def _load_hdf5_quality_receipt(
 
 
 def _validate_shard(path: Path, row: Mapping[str, Any]) -> None:
-    if not path.is_file() or sha256_file(path) != row["sha256"]:
+    if path.is_symlink() or not path.is_file():
+        raise FM0ContractError(
+            f"later six-view shard hash drifted or is missing: {path}"
+        )
+    payload = path.read_bytes()
+    if hashlib.sha256(payload).hexdigest() != row["sha256"]:
         raise FM0ContractError(f"later six-view shard hash drifted: {path}")
-    release = load_input_release(path)
+    release = load_input_release_bytes(payload)
     if (
         release.n_cadences != int(row["n_cadences"])
         or release.n_segments != int(row["n_segments"])
@@ -636,6 +642,10 @@ def _validate_shard(path: Path, row: Mapping[str, Any]) -> None:
         != json.loads(str(row["view_present_json"]))
     ):
         raise FM0ContractError(f"later six-view shard metadata drifted: {path}")
+
+
+def _validate_shard_item(item: tuple[Path, Mapping[str, Any]]) -> None:
+    _validate_shard(*item)
 
 
 def _read_csv_exact(
@@ -702,6 +712,8 @@ def validate_later_sector_release(
     *,
     expected_receipt_sha256: str | None = None,
     require_read_only: bool = True,
+    verify_shard_payloads: bool = True,
+    validation_workers: int | None = None,
 ) -> tuple[Path, Mapping[str, Any], dict[str, Any]]:
     """Revalidate a complete immutable later-sector six-view bundle."""
 
@@ -837,6 +849,7 @@ def validate_later_sector_release(
     expected_shards: set[str] = set()
     manifest_total_cadences = 0
     manifest_total_segments = 0
+    shard_validation_rows: list[tuple[Path, Mapping[str, Any]]] = []
     for row in manifest_rows:
         observation_key = str(row["observation_key"])
         gaia = str(row["gaia_dr3_source_id"])
@@ -883,7 +896,27 @@ def validate_later_sector_release(
             raise FM0ContractError("six-view manifest counts must be positive")
         manifest_total_cadences += row_cadences
         manifest_total_segments += row_segments
-        _validate_shard(release_root / relative.as_posix(), row)
+        if verify_shard_payloads:
+            shard_validation_rows.append((release_root / relative.as_posix(), row))
+    if verify_shard_payloads:
+        workers = validation_workers
+        if workers is None:
+            workers = int(os.environ.get("TWIRL_FM0_VALIDATION_WORKERS", "1"))
+        if workers < 1 or workers > 32:
+            raise FM0ContractError("six-view validation workers must be in [1, 32]")
+        if workers == 1:
+            for path, row in shard_validation_rows:
+                _validate_shard(path, row)
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                batch_size = workers * 16
+                for start in range(0, len(shard_validation_rows), batch_size):
+                    tuple(
+                        pool.map(
+                            _validate_shard_item,
+                            shard_validation_rows[start : start + batch_size],
+                        )
+                    )
     if (
         manifest_total_cadences != n_cadences
         or manifest_total_segments != n_segments

@@ -7,7 +7,7 @@
 #SBATCH --job-name=twirl-fm0-six-view
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH -c 1
+#SBATCH -c 8
 #SBATCH --mem=32G
 #SBATCH -t 2-00:00:00
 #SBATCH --signal=B:TERM@600
@@ -144,6 +144,7 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
+export TWIRL_FM0_VALIDATION_WORKERS="${SLURM_CPUS_PER_TASK:-8}"
 
 echo "[fm0-later-six-view] host=$(hostname) sector=${TWIRL_FM0_SECTOR} start=$(date -Is)"
 "${PYTHON}" scripts/stage5_validation/build_twirl_fm0_later_sector_release.py \
@@ -168,27 +169,34 @@ for path in \
   [[ -s "${path}" ]] || die "six-view builder omitted ${path}"
 done
 
-"${PYTHON}" - "${OUT}" "${TWIRL_FM0_SECTOR}" "${TWIRL_EXPECTED_GIT_SHA}" <<'PY' &
+"${PYTHON}" - "${OUT}" "${TWIRL_FM0_SECTOR}" "${TWIRL_EXPECTED_GIT_SHA}" <<'PY'
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 from pathlib import Path
-
-from twirl.models.fm0.later_sector_release import validate_later_sector_release
 
 root = Path(sys.argv[1])
 sector = int(sys.argv[2])
 revision = sys.argv[3]
-_receipt_path, receipt, summary = validate_later_sector_release(
-    root, require_read_only=True
-)
-if receipt.get("producer_git_sha") != revision or int(receipt.get("sector", -1)) != sector:
+receipt_path = root / "receipt.json"
+receipt_payload = receipt_path.read_bytes()
+receipt = json.loads(receipt_payload)
+receipt_sha = hashlib.sha256(receipt_payload).hexdigest()
+if (
+    receipt.get("producer_git_sha") != revision
+    or int(receipt.get("sector", -1)) != sector
+    or receipt.get("passed") is not True
+    or receipt.get("six_view_shards_verified") is not True
+):
     raise SystemExit("six-view producer/sector binding drifted")
-if summary["n_observations"] != receipt["n_observations"]:
-    raise SystemExit("six-view validation summary drifted")
+if (root / "READY").read_text(encoding="utf-8").strip() != receipt_sha:
+    raise SystemExit("six-view READY binding drifted")
+for path in root.iterdir():
+    if path.stat().st_mode & 0o222:
+        raise SystemExit(f"six-view root entry is writable: {path}")
 PY
-CHILD_PID=$!
-wait_child
 
 trap - ERR TERM INT
 echo "[fm0-later-six-view] complete=$(date -Is) output=${OUT}"

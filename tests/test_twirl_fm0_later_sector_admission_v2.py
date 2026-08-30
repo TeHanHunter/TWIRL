@@ -664,5 +664,6 @@ def test_six_view_gate_propagates_every_full_bundle_validation_failure(
         "kwargs": {
             "expected_receipt_sha256": binding.sha256,
             "require_read_only": True,
+            "verify_shard_payloads": False,
         },
     }

@@ -146,6 +146,7 @@ def test_deploy_accepts_a_predeployed_standalone_exact_clone_first() -> None:
 
 def test_controller_requires_phase_a_freeze_before_six_view_and_cpu_admission() -> None:
     script = _controller_text()
+    six_view = script[script.index("  submit-six-view)") : script.index("  submit-admission)")]
     assert "submit-phase-a-freeze)" in script
     assert "validate-phase-a" in script
     assert "sacct -nX" in script
@@ -154,6 +155,9 @@ def test_controller_requires_phase_a_freeze_before_six_view_and_cpu_admission() 
     assert "slurm_twirl_fm0_later_admission_v2_cpu.sbatch" in script
     assert "phase_a_record_sha256" in script
     assert "six_view_tail_job" in script
+    assert "previous_0=''" in six_view and "previous_3=''" in six_view
+    assert "(sector - 66) % 4" in six_view
+    assert "six_view_fast.tsv" in script
     assert "submit-training" not in script
     assert "slurm_twirl_fm0_1_real_train_h200.sbatch" not in script
 

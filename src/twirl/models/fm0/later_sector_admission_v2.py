@@ -546,6 +546,7 @@ def _verify_six_view(
         path.parent,
         expected_receipt_sha256=binding.sha256,
         require_read_only=True,
+        verify_shard_payloads=False,
     )
     observations = int(bundle["n_observations"])
     shards = int(bundle["n_shards"])

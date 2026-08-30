@@ -22,7 +22,7 @@ Actions:
                          source-inventory afterok chains, with durable records.
   submit-phase-a-freeze  Submit the CPU full-validator after both chain tails.
   submit-six-view        Require the completed immutable Phase-A authority
-                         record, then submit chronological full-visit shards.
+                         record, then submit four chronological sector lanes.
   submit-admission       Require the completed six-view chain, then submit the
                          final CPU admission-v2/full-bundle validation job.
   validate-admission     Read-only terminal job/receipt validation.
@@ -384,7 +384,10 @@ case "${ACTION}" in
       mkdir -- '${RUN_ROOT}/.claims/submit-six-view'
       printf 'sector\tjob_id\tdependency\texpected_git_sha\tauthority_map_sha256\tphase_a_record_sha256\n' > \"\${record}.submitting\"
       phase_sha=\$(sha256sum '${PHASE_A_AUTHORITY_RECORD}' | awk '{print \$1}')
-      previous=''
+      previous_0=''
+      previous_1=''
+      previous_2=''
+      previous_3=''
       for sector in \$(seq 66 77); do
         case \"\${sector}\" in ${HDF5_CASE} esac
         quality_dir='${QUALITY_REFERENCE_ROOT}/s'\$(printf '%04d' \"\${sector}\")
@@ -393,6 +396,13 @@ case "${ACTION}" in
         quality_sha=\$(sha256sum \"\${quality_dir}/manifest.json\" | awk '{print \$1}')
         source_sha=\$(sha256sum \"\${source_dir}/summary.json\" | awk '{print \$1}')
         export_spec='ALL,TWIRL_ORCD_REPO=${REMOTE_REPO},TWIRL_EXPECTED_GIT_SHA=${EXPECTED_SHA},TWIRL_FM0_SECTOR='\"\${sector}\"',TWIRL_FM0_SOURCE_INVENTORY_DIR='\"\${source_dir}\"',TWIRL_FM0_SOURCE_INVENTORY_SUMMARY_SHA256='\"\${source_sha}\"',TWIRL_FM0_QUALITY_REFERENCE_DIR='\"\${quality_dir}\"',TWIRL_FM0_QUALITY_REFERENCE_MANIFEST_SHA256='\"\${quality_sha}\"',TWIRL_FM0_HDF5_QUALITY_RECEIPT='\"\${hdf5_receipt}\"',TWIRL_FM0_HDF5_QUALITY_RECEIPT_SHA256='\"\${hdf5_sha}\"',TWIRL_FM0_SIX_VIEW_RELEASE_DIR='\"\${six_dir}\"''
+        lane=\$(( (sector - 66) % 4 ))
+        case \"\${lane}\" in
+          0) previous=\"\${previous_0}\" ;;
+          1) previous=\"\${previous_1}\" ;;
+          2) previous=\"\${previous_2}\" ;;
+          3) previous=\"\${previous_3}\" ;;
+        esac
         if [[ -n \"\${previous}\" ]]; then
           job=\$(sbatch --parsable --dependency=afterok:\"\${previous}\" --export=\"\${export_spec}\" '${REMOTE_REPO}/scripts/orcd/slurm_twirl_fm0_later_six_view_cpu.sbatch')
           dependency=\"afterok:\${previous}\"
@@ -402,7 +412,12 @@ case "${ACTION}" in
         fi
         [[ \"\${job}\" =~ ^[0-9]+$ ]]
         printf '%s\t%s\t%s\t%s\t%s\t%s\n' \"\${sector}\" \"\${job}\" \"\${dependency}\" '${EXPECTED_SHA}' '${MAP_SHA256}' \"\${phase_sha}\" >> \"\${record}.submitting\"
-        previous=\"\${job}\"
+        case \"\${lane}\" in
+          0) previous_0=\"\${job}\" ;;
+          1) previous_1=\"\${job}\" ;;
+          2) previous_2=\"\${job}\" ;;
+          3) previous_3=\"\${job}\" ;;
+        esac
       done
       chmod a-w \"\${record}.submitting\"
       mv -- \"\${record}.submitting\" \"\${record}\"
@@ -412,11 +427,15 @@ case "${ACTION}" in
   submit-admission)
     remote "set -euo pipefail
       ${REMOTE_GATE}
-      six_record='${LAUNCH_ROOT}/six_view.tsv'
+      six_record='${LAUNCH_ROOT}/six_view_fast.tsv'
+      if [[ ! -e \"\${six_record}\" ]]; then six_record='${LAUNCH_ROOT}/six_view.tsv'; fi
       [[ \$(wc -l < \"\${six_record}\") -eq 13 ]]
+      while IFS= read -r six_job; do
+        [[ \"\${six_job}\" =~ ^[0-9]+$ ]]
+        state=\$(sacct -nX -j \"\${six_job}\" -o State,ExitCode | awk 'NF {print \$1,\$2; exit}')
+        [[ \"\${state}\" == 'COMPLETED 0:0' ]]
+      done < <(tail -n +2 \"\${six_record}\" | cut -f2)
       six_tail=\$(tail -1 \"\${six_record}\" | cut -f2)
-      state=\$(sacct -nX -j \"\${six_tail}\" -o State,ExitCode | awk 'NF {print \$1,\$2; exit}')
-      [[ \"\${state}\" == 'COMPLETED 0:0' ]]
       for sector in \$(seq 66 77); do
         receipt='${SIX_VIEW_ROOT}/s'\$(printf '%04d' \"\${sector}\")'/receipt.json'
         test -s \"\${receipt}\" && test ! -w \"\${receipt}\"

@@ -579,10 +579,10 @@ def deterministic_npz_bytes(release: ObservationRelease) -> bytes:
     return output.getvalue()
 
 
-def load_input_release(path: str | Path) -> ObservationRelease:
-    """Load and validate one deterministic release shard."""
+def load_input_release_bytes(payload: bytes) -> ObservationRelease:
+    """Load and validate one deterministic release shard from in-memory bytes."""
 
-    with np.load(Path(path), allow_pickle=False) as archive:
+    with np.load(BytesIO(payload), allow_pickle=False) as archive:
         keys = frozenset(archive.files)
         if keys != SHARD_ARRAY_KEYS:
             raise FM0ContractError(
@@ -592,6 +592,12 @@ def load_input_release(path: str | Path) -> ObservationRelease:
         release = ObservationRelease(**{name: archive[name] for name in SHARD_ARRAY_KEYS})
     validate_observation_release(release)
     return release
+
+
+def load_input_release(path: str | Path) -> ObservationRelease:
+    """Load and validate one deterministic release shard."""
+
+    return load_input_release_bytes(Path(path).read_bytes())
 
 
 def evaluation_windows(release: ObservationRelease) -> tuple[WindowSpec, ...]:
