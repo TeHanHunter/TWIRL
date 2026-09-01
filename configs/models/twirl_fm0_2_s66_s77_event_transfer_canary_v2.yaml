@@ -1,0 +1,145 @@
+schema_version: twirl_fm0_event_transfer_canary_config_v2
+campaign_id: twirl_fm0_2_s66_s77_event_transfer_canary_v2
+model_family: TWIRL-FM0
+status: frozen_bls_free_development_probe
+prepared_on: 2026-09-01
+
+purpose:
+  primary: test_cadence_local_single_event_information_for_later_classifiers
+  task_geometry: candidate_centered_single_event_classification
+  evidence_scope: injection_support_supervised_synthetic_event_localization_and_linear_decodability
+  probe_only: true
+  formal_model_gate: false
+  production_model_claim: false
+
+authorization:
+  development_shard_payload_access: true
+  artificial_single_event_injection: true
+  frozen_checkpoint_inference: true
+  low_capacity_probe_fitting: true
+  fm_encoder_optimizer_or_training: false
+  bls_period_candidate_or_event_features: false
+  sealed_test_access: false
+
+inputs:
+  temporal_panel_receipt_sha256: 78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624
+  allowed_sectors: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+  excluded_sectors: [65]
+  source_partition: poc_development
+  variant: TWIRL-FM0.2.1
+  checkpoint_steps: [0, 2000]
+  checkpoint_sha256:
+    step0: 92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c
+    step2000: 976b5053c857c38b9fbf7a35c9d0605f0023318b2c9bd37a88995992e5aa7bd2
+
+split:
+  train_sectors: [66, 67, 68, 69, 70, 71]
+  validation_sectors: [72, 73, 74]
+  locked_development_test_sectors: [75, 76, 77]
+  component_spanning_blocks: quarantine
+  one_visit_per_component: true
+  target_components_per_cohort_per_block: 240
+  shortfall_policy: fail_closed
+  minimum_components_per_cohort_per_block: 12
+  component_and_visit_order: deterministic_sha256
+  cohorts: [repeated, new]
+
+temporal_resolution:
+  nominal_cadence_seconds: 200
+  context_cadences: [128, 2048]
+  direct_nested_crops: true
+  one_encoder_token_per_input_cadence: true
+  temporal_downsampling: false
+  patching_or_cadence_averaging: false
+  conformer_patch_stride_required: 1
+  pooling_before_token_score: false
+  token_aggregation: masked_max_after_shared_linear_cadence_score
+  checkpoint_time_normalization_remains_2048: true
+
+artificial_event:
+  profile: symmetric_trapezoid_sampled_at_cadence_centers
+  ingress_egress_fraction_each: 0.3333333333333333
+  duration_cadences: [1, 3, 9]
+  fractional_depths: [0.01, 0.03, 0.1, 0.3]
+  balanced_cells: 12
+  one_clean_and_one_injected_sample_per_component: true
+  one_event_per_injected_sample: true
+  window_centered_on_synthetic_event: true
+  classification_not_blind_detection: true
+  center_jitter_cadences_inclusive: [-24, 24]
+  apply_to_views: [adp_1x1, adp_3x3]
+  period_defined: false
+  injection_truth_used_as_feature: false
+  injection_support_used_as_training_target: true
+
+features:
+  primary: step2000_h_cadence_128
+  controls:
+    - step0_h_cadence_128
+    - step0_h_cadence_2048
+    - step2000_h_cadence_2048
+    - step2000_z_cadence_128_diagnostic
+    - raw_adp_validity_error_cadence_128
+    - quality_only_cadence_128
+  z_cadence_definition: apply_frozen_checkpoint_projection_to_each_cadence_independently
+  raw_channels: [adp_1x1, adp_3x3, flux_valid_1x1, flux_valid_3x3, flux_error_1x1, flux_error_3x3, error_valid_1x1, error_valid_3x3, local_time_cadences, delta_time_cadences, time_valid, segment_boundary]
+  quality_only_channels: [flux_valid_1x1, flux_valid_3x3, error_valid_1x1, error_valid_3x3, local_time_cadences, delta_time_cadences, time_valid, segment_boundary]
+  forbidden_feature_families: [period, bls, candidate_score, event_duration, event_depth, event_center_numeric_value, injection_support]
+
+probe:
+  family: shared_linear_cadence_scorer
+  sample_logit: masked_max_of_per_cadence_logits
+  temporal_pooling_before_scoring: false
+  training_objective: pair_balanced_four_stratum_per_cadence_binary_cross_entropy
+  training_target: synthetic_event_support_boolean_target_not_input_feature
+  standardization: training_valid_tokens_dimensionwise_center_and_scale_no_temporal_resampling
+  learning_rate: 0.02
+  l2_weight: 0.001
+  epochs: 400
+  initialization_seed: 560203
+  threshold_selection: validation_balanced_accuracy
+  locked_test_not_used_for_probe_fit_or_threshold: true
+
+probe_mechanics:
+  raw_control_minimum_overall_roc_auc_lower_95: 0.75
+  raw_control_minimum_each_depth_0_30_roc_auc: 0.90
+  raw_control_require_negative_adp_flux_coefficients: true
+  raw_control_paired_ranking_lower_95_strictly_above_chance: true
+  quality_only_maximum_absolute_roc_auc_from_chance: 0.05
+
+metrics:
+  primary: paired_component_ranking_accuracy
+  secondary: [roc_auc, average_precision, balanced_accuracy, macro_f1, brier_score, expected_calibration_error, tpr_at_validation_frozen_5_percent_fpr, fpr_at_validation_frozen_5_percent_fpr]
+  fpr_operating_point: 0.05
+  calibration_bins: 10
+  uncertainty: deterministic_paired_component_bootstrap_95_interval
+  bootstrap_replicates: 1000
+  bootstrap_seed: 560204
+  report_by_cohort: true
+  report_by_event_cell: true
+
+readiness:
+  primary_feature: step2000_h_cadence_128
+  minimum_roc_auc_lower_95: 0.75
+  minimum_paired_roc_auc_delta: 0.02
+  paired_delta_controls: [step0_h_cadence_128, step2000_h_cadence_2048]
+  paired_delta_lower_95_strictly_positive: true
+  raw_noninferiority_control: raw_adp_validity_error_cadence_128
+  raw_noninferiority_margin: 0.01
+  minimum_each_cohort_roc_auc: 0.70
+  minimum_tpr_at_5_percent_fpr: 0.30
+  minimum_tpr_at_5_percent_fpr_lower_95: 0.20
+  maximum_locked_test_fpr_at_validation_frozen_threshold: 0.10
+  require_paired_ranking_lower_95_above_chance: true
+  raw_noninferiority_supports_readiness_not_superiority: true
+
+claim_limit: >-
+  This development-only canary uses synthetic event support only as a
+  training target for a shared per-cadence linear scorer; the support is never
+  an input feature. It tests injection-support-supervised synthetic event
+  localization and linear decodability in a frozen cadence-indexed
+  representation. It does not establish unknown-location learning, natural
+  event performance, or blind detection. It does not average cadence
+  representations, train the FM encoder, use BLS or period features, open
+  sealed data, establish prospective performance, or authorize model
+  promotion.

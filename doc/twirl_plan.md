@@ -191,10 +191,25 @@ project authority.
   at `128` cadences, with chronological sector blocks, source-component
   quarantine, and exact step-0, `2,048`-cadence, raw-flux, and quality-only
   controls. The low-capacity head is a shared per-cadence linear score followed
-  by a masked maximum, with no temporal averaging. The two real candidates
+  by a masked maximum, with no temporal averaging. CPU job `21765395` showed
+  that fitting that hard maximum directly is invalid: its raw-flux control
+  stayed at exact chance even for `30%` injected dips because clean/injected
+  gradients cancel whenever the injected cadence is not already the random
+  argmax. That result is a probe-mechanics failure, not model evidence. The
+  replacement v2 contract uses injection support only as training truth for
+  four pair-balanced, independently scored cadence strata; support remains
+  forbidden as an input feature, and full-window evaluation still uses the
+  hard maximum. Its raw-flux and quality-only mechanics gates must pass before
+  any FM comparison is interpreted. The two real candidates
   must then match data, objective, context, masks, seeds, draws, and optimizer
   budget so architecture is the only difference.
-  Freeze a genuinely newer temporal holdout before training. Subsequent
+  The legacy optimized `z_window` VICReg is also disallowed for FM0.3 because
+  it is built from a temporal mean. Before real training, freeze one shared
+  cadence-level noncollapse objective, expose the post-context cadence stream
+  identically for TCN and Conformer, bind one training-eligible manifest that
+  reuses S56--S64 and S66--S77 shards without rewriting them, and freeze a
+  genuinely newer temporal holdout. The current S66--S77 preparation receipt
+  is intentionally training-ineligible. Subsequent
   candidates may optimize both independent reconstruction masks and then test
   a separate stable-host cross-visit head,
   but each is a one-mechanism ablation; raw/ADP015 view additions and a

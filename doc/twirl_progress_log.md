@@ -981,12 +981,31 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   `z_window` is only about `0.044x` and `0.040x`. The next transfer test should
   therefore use the encoder-side `h_window`, not the learned projection
   `z_window`, with `128` cadences as the leading local-event context.
+- `2026-09-01`: CPU mechanics job `21765394` completed `0:0` in `16 s` and
+  verified both provisional FM0.3 candidates at exact `128/128` cadence-token
+  geometry. TCN and Conformer both use stride one, identity patch/time paths,
+  no temporal downsampling, and finite cadence-indexed outputs; the immutable
+  result SHA-256 is
+  `4ed8bd35ceb586f75194bd3e193e2f5d1c7ed738a67a26bf0779a2289895f464`.
+  This is a training-free mechanics pass, not an architecture selection.
+- `2026-09-01`: CPU transfer job `21765395` completed `0:0` in `11m06s`; the
+  immutable result SHA-256 is
+  `57762a5e94ad03d4d1244ae8b50af1d3baf8a3ba4e693da715c6967e517a1798`.
+  Its primary step-2,000 `128`-cadence AUROC was `0.499783`, but the result is
+  not valid model evidence: the raw control was exactly `0.5` in every one of
+  the `12` duration/depth cells, including `30%` dips. The hard-max training
+  operator passed gradient only through the current argmax, so paired
+  clean/injected gradients cancelled whenever the event cadence did not
+  already win. A separately versioned v2 repair retains exact cadence tokens
+  and hard-max evaluation but uses event support only as training truth for
+  four pair-balanced per-cadence BCE strata. It adds fail-closed raw-flux and
+  quality-only mechanics gates; no FM training, BLS, GPU, or sealed access is
+  authorized.
 
-**Next:** Freeze a source/sector-disjoint BLS-free classifier-transfer contract
-using step-2,000 `h_window` at `128` cadences, with exact step-0,
-`2,048`-cadence, and non-FM controls. Do not fit it, train FM0.3, apply the
-formal gate, or open the sealed test until that contract is separately
-reviewed.
+**Next:** Run the immutable event-transfer v2 repair and interpret FM metrics
+only if its raw/quality mechanics gate passes. Before any real FM0.3 run,
+freeze a cadence-level noncollapse objective, a training-eligible S56--S64 plus
+S66--S77 manifest with S65 excluded, and a genuinely newer temporal holdout.
 
 ### Candidate validation and follow-up
 

@@ -34,8 +34,11 @@ from .temporal_panel import DEVELOPMENT_PARTITION
 from .temporal_zero_shot import TEMPORAL_COHORTS, load_temporal_panel
 
 EVENT_TRANSFER_CONFIG_SCHEMA_VERSION = "twirl_fm0_event_transfer_canary_config_v1"
+EVENT_TRANSFER_CONFIG_SCHEMA_VERSION_V2 = "twirl_fm0_event_transfer_canary_config_v2"
 EVENT_TRANSFER_RESULT_SCHEMA_VERSION = "twirl_fm0_event_transfer_canary_result_v1"
+EVENT_TRANSFER_RESULT_SCHEMA_VERSION_V2 = "twirl_fm0_event_transfer_canary_result_v2"
 EVENT_TRANSFER_CAMPAIGN_ID = "twirl_fm0_2_s66_s77_event_transfer_canary_v1"
+EVENT_TRANSFER_CAMPAIGN_ID_V2 = "twirl_fm0_2_s66_s77_event_transfer_canary_v2"
 EVENT_TRANSFER_SALT = "twirl_fm0_event_transfer_canary_v1"
 SPLIT_SECTORS: Mapping[str, tuple[int, ...]] = {
     "train": tuple(range(66, 72)),
@@ -105,9 +108,17 @@ def load_event_transfer_config(
     config = dict(
         _mapping(yaml.safe_load(payload_bytes), label="event-transfer config")
     )
-    if config.get("schema_version") != EVENT_TRANSFER_CONFIG_SCHEMA_VERSION:
+    schema_version = str(config.get("schema_version", ""))
+    if schema_version not in {
+        EVENT_TRANSFER_CONFIG_SCHEMA_VERSION,
+        EVENT_TRANSFER_CONFIG_SCHEMA_VERSION_V2,
+    }:
         raise ValueError("event-transfer config schema differs")
-    if config.get("campaign_id") != EVENT_TRANSFER_CAMPAIGN_ID:
+    token_supervised = schema_version == EVENT_TRANSFER_CONFIG_SCHEMA_VERSION_V2
+    expected_campaign = (
+        EVENT_TRANSFER_CAMPAIGN_ID_V2 if token_supervised else EVENT_TRANSFER_CAMPAIGN_ID
+    )
+    if config.get("campaign_id") != expected_campaign:
         raise ValueError("event-transfer campaign differs")
     if (
         config.get("model_family") != "TWIRL-FM0"
@@ -129,6 +140,10 @@ def load_event_transfer_config(
         ("production_model_claim", False),
     ):
         _exact_bool(purpose, key, expected)
+    if token_supervised and purpose.get("evidence_scope") != (
+        "injection_support_supervised_synthetic_event_localization_and_linear_decodability"
+    ):
+        raise ValueError("event-transfer v2 evidence scope differs")
 
     authorization = _mapping(config.get("authorization"), label="authorization")
     for key in (
@@ -261,6 +276,8 @@ def load_event_transfer_config(
         _exact_bool(event, key, True)
     for key in ("period_defined", "injection_truth_used_as_feature"):
         _exact_bool(event, key, False)
+    if token_supervised:
+        _exact_bool(event, "injection_support_used_as_training_target", True)
 
     features = _mapping(config.get("features"), label="features")
     if (features.get("primary"), *tuple(features.get("controls", ()))) != FEATURE_SPECS:
@@ -313,6 +330,19 @@ def load_event_transfer_config(
         raise ValueError("event-transfer probe differs")
     _exact_bool(probe, "temporal_pooling_before_scoring", False)
     _exact_bool(probe, "locked_test_not_used_for_probe_fit_or_threshold", True)
+    expected_training_objective = (
+        "pair_balanced_four_stratum_per_cadence_binary_cross_entropy"
+        if token_supervised
+        else "sample_binary_cross_entropy_after_hard_masked_max"
+    )
+    if probe.get("training_objective", expected_training_objective) != (
+        expected_training_objective
+    ):
+        raise ValueError("event-transfer probe training objective differs")
+    if token_supervised and probe.get("training_target") != (
+        "synthetic_event_support_boolean_target_not_input_feature"
+    ):
+        raise ValueError("event-transfer probe training target differs")
     if (
         probe.get("standardization")
         != "training_valid_tokens_dimensionwise_center_and_scale_no_temporal_resampling"
@@ -392,6 +422,17 @@ def load_event_transfer_config(
     }
     if dict(readiness) != expected_readiness:
         raise ValueError("event-transfer readiness rule differs")
+
+    if token_supervised:
+        mechanics = _mapping(config.get("probe_mechanics"), label="probe mechanics")
+        if dict(mechanics) != {
+            "raw_control_minimum_overall_roc_auc_lower_95": 0.75,
+            "raw_control_minimum_each_depth_0_30_roc_auc": 0.90,
+            "raw_control_require_negative_adp_flux_coefficients": True,
+            "raw_control_paired_ranking_lower_95_strictly_above_chance": True,
+            "quality_only_maximum_absolute_roc_auc_from_chance": 0.05,
+        }:
+            raise ValueError("event-transfer probe mechanics rule differs")
     return config, source, hashlib.sha256(payload_bytes).hexdigest()
 
 
@@ -618,10 +659,21 @@ def inject_jittered_single_event(
     return injected, support
 
 
-def build_paired_samples(
+def build_paired_samples_with_token_targets(
     schedule: Sequence[Mapping[str, Any]], *, context_length: int
-) -> tuple[list[dict[str, np.ndarray]], np.ndarray, tuple[str, ...], tuple[str, ...]]:
-    """Materialize clean/injected pairs using direct cadence-preserving crops."""
+) -> tuple[
+    list[dict[str, np.ndarray]],
+    np.ndarray,
+    tuple[str, ...],
+    tuple[str, ...],
+    np.ndarray,
+]:
+    """Materialize exact pairs plus training-only event-cadence targets.
+
+    The target mask is never appended to a model or raw-control feature.  It is
+    retained separately so the v2 probe can learn a shared cadence scorer
+    without using a temporally pooled training objective.
+    """
 
     if context_length not in CONTEXT_LENGTHS:
         raise ValueError("context length differs from the frozen grid")
@@ -629,22 +681,47 @@ def build_paired_samples(
     labels: list[int] = []
     components: list[str] = []
     cohorts: list[str] = []
+    token_targets: list[np.ndarray] = []
     for item in schedule:
         clean = slice_centered_context(
             item["visit"]["sample"], context_length=context_length
         )
-        injected, _support = inject_jittered_single_event(
+        injected, support = inject_jittered_single_event(
             clean,
             duration_cadences=int(item["duration_cadences"]),
             fractional_depth=float(item["fractional_depth"]),
             jitter_cadences=int(item["jitter_cadences"]),
         )
-        for sample, label in ((clean, 0), (injected, 1)):
+        for sample, label, target in (
+            (clean, 0, np.zeros(context_length, dtype=bool)),
+            (injected, 1, support),
+        ):
             samples.append(sample)
             labels.append(label)
             components.append(str(item["component_id"]))
             cohorts.append(str(item["cohort"]))
-    return samples, np.asarray(labels, dtype=np.int8), tuple(components), tuple(cohorts)
+            token_targets.append(np.asarray(target, dtype=bool))
+    return (
+        samples,
+        np.asarray(labels, dtype=np.int8),
+        tuple(components),
+        tuple(cohorts),
+        np.stack(token_targets),
+    )
+
+
+def build_paired_samples(
+    schedule: Sequence[Mapping[str, Any]], *, context_length: int
+) -> tuple[list[dict[str, np.ndarray]], np.ndarray, tuple[str, ...], tuple[str, ...]]:
+    """Materialize clean/injected pairs using direct cadence-preserving crops."""
+
+    samples, labels, components, cohorts, _targets = (
+        build_paired_samples_with_token_targets(
+            schedule,
+            context_length=context_length,
+        )
+    )
+    return samples, labels, components, cohorts
 
 
 def _validate_token_matrix(
@@ -731,6 +808,154 @@ def fit_shared_linear_max_probe(
             print(
                 f"FM_EVENT_TRANSFER feature={progress_label} "
                 f"phase=fit epoch={step}/{epochs}",
+                flush=True,
+            )
+    return ProbeFit(
+        weight=weight,
+        bias=float(bias),
+        center=center,
+        scale=scale,
+        objective_history=tuple(history),
+    )
+
+
+def paired_token_probe_examples(
+    token_valid: np.ndarray,
+    token_targets: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return four-stratum targets and exact per-pair example weights."""
+
+    valid = np.asarray(token_valid, dtype=bool)
+    if valid.ndim != 2:
+        raise ValueError("cadence probe validity must be two-dimensional")
+    targets = np.asarray(token_targets, dtype=bool)
+    if targets.shape != valid.shape:
+        raise ValueError("cadence probe targets must match token validity")
+    if np.any(targets & ~valid):
+        raise ValueError("cadence probe has a positive target on an invalid token")
+    if valid.shape[0] % 2:
+        raise ValueError("cadence probe requires adjacent clean/injected pairs")
+    pair_count = valid.shape[0] // 2
+    if np.any(targets[0::2]) or np.any(~np.any(targets[1::2], axis=1)):
+        raise ValueError("cadence probe target rows do not follow clean/injected pairs")
+
+    example_weights = np.zeros(valid.shape, dtype=np.float64)
+    example_targets = np.zeros(valid.shape, dtype=np.float32)
+    for pair_index in range(pair_count):
+        clean_index = 2 * pair_index
+        injected_index = clean_index + 1
+        support = targets[injected_index]
+        clean_support = support & valid[clean_index]
+        injected_support = support & valid[injected_index]
+        clean_off = ~support & valid[clean_index]
+        injected_off = ~support & valid[injected_index]
+        strata = (
+            (injected_index, injected_support, 1.0),
+            (clean_index, clean_support, 0.0),
+            (injected_index, injected_off, 0.0),
+            (clean_index, clean_off, 0.0),
+        )
+        for row_index, mask, target_value in strata:
+            count = int(np.count_nonzero(mask))
+            if count == 0:
+                raise ValueError("cadence probe encountered an empty pair stratum")
+            example_weights[row_index, mask] = 1.0 / (4.0 * pair_count * count)
+            example_targets[row_index, mask] = target_value
+    if not math.isclose(
+        float(np.sum(example_weights)),
+        1.0,
+        rel_tol=0.0,
+        abs_tol=1.0e-12,
+    ):
+        raise ValueError("cadence probe stratum weights do not sum to one")
+    return example_targets, example_weights
+
+
+def fit_shared_linear_token_probe(
+    tokens: np.ndarray,
+    token_valid: np.ndarray,
+    token_targets: np.ndarray,
+    *,
+    learning_rate: float = 0.02,
+    l2_weight: float = 0.001,
+    epochs: int = 400,
+    seed: int = 560203,
+    progress_label: str | None = None,
+) -> ProbeFit:
+    """Fit one shared scorer from paired cadence labels without pooling.
+
+    Each clean/injected pair contributes equal weight to four strata:
+    injected support, paired-clean support, injected off-support, and clean
+    off-support.  This prevents event duration or the 128-cadence background
+    from diluting the useful gradient.  The scalar loss reduces independently
+    scored cadence examples; no representation is averaged across time.
+    ``token_targets`` is training truth only and is never supplied to the
+    fitted scorer or to :func:`score_shared_linear_max_probe`.
+    """
+
+    values, valid = _validate_token_matrix(tokens, token_valid)
+    example_targets, example_weights = paired_token_probe_examples(
+        valid,
+        token_targets,
+    )
+
+    observed = values[valid]
+    center = np.mean(observed, axis=0)
+    scale = np.std(observed, axis=0)
+    scale = np.where(np.isfinite(scale) & (scale > 1.0e-8), scale, 1.0)
+    standardized = (values - center[None, None, :]) / scale[None, None, :]
+    selected = example_weights > 0.0
+    training_values = standardized[selected]
+    training_targets = example_targets[selected]
+    training_weights = example_weights[selected]
+
+    rng = np.random.default_rng(int(seed))
+    weight = rng.normal(0.0, 1.0e-3, size=values.shape[2]).astype(np.float32)
+    bias = 0.0
+    m_w = np.zeros_like(weight)
+    v_w = np.zeros_like(weight)
+    m_b = v_b = 0.0
+    history: list[float] = []
+    beta1, beta2 = 0.9, 0.999
+    for step in range(1, _exact_int(epochs, label="probe epochs") + 1):
+        logits = training_values @ weight + bias
+        residual = _sigmoid(logits) - training_targets
+        weighted_residual = training_weights * residual
+        grad_w = np.sum(weighted_residual[:, None] * training_values, axis=0)
+        grad_w += float(l2_weight) * weight
+        grad_b = float(np.sum(weighted_residual))
+        m_w = beta1 * m_w + (1.0 - beta1) * grad_w
+        v_w = beta2 * v_w + (1.0 - beta2) * np.square(grad_w)
+        m_b = beta1 * m_b + (1.0 - beta1) * grad_b
+        v_b = beta2 * v_b + (1.0 - beta2) * grad_b * grad_b
+        weight -= (
+            float(learning_rate)
+            * (m_w / (1.0 - beta1**step))
+            / (np.sqrt(v_w / (1.0 - beta2**step)) + 1.0e-8)
+        )
+        bias -= (
+            float(learning_rate)
+            * (m_b / (1.0 - beta1**step))
+            / (math.sqrt(v_b / (1.0 - beta2**step)) + 1.0e-8)
+        )
+        if step == 1 or step % 20 == 0 or step == epochs:
+            loss = float(
+                np.sum(
+                    training_weights
+                    * (
+                        np.logaddexp(0.0, logits)
+                        - training_targets * logits
+                    )
+                )
+                + 0.5 * float(l2_weight) * np.dot(weight, weight)
+            )
+            history.append(loss)
+        if progress_label is not None and (
+            step == 1 or step % 100 == 0 or step == epochs
+        ):
+            print(
+                f"FM_EVENT_TRANSFER feature={progress_label} "
+                f"phase=fit_token_supervised epoch={step}/{epochs}",
                 flush=True,
             )
     return ProbeFit(
@@ -1228,6 +1453,95 @@ def summarize_readiness(
     }
 
 
+def summarize_probe_mechanics(
+    feature_results: Mapping[str, Any],
+    *,
+    mechanics_config: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify that flux, but not quality metadata, drives the v2 probe."""
+
+    raw = _mapping(
+        feature_results["raw_adp_validity_error_cadence_128"],
+        label="raw-control result",
+    )
+    quality = _mapping(
+        feature_results["quality_only_cadence_128"],
+        label="quality-only result",
+    )
+    raw_metrics = _mapping(
+        raw["locked_development_test"],
+        label="raw-control locked metrics",
+    )
+    raw_auc = float(raw_metrics["roc_auc"]["estimate"])
+    raw_auc_lower = float(
+        raw_metrics["roc_auc"]["paired_component_bootstrap_95_interval"][0]
+    )
+    raw_ranking_lower = float(
+        raw_metrics["paired_component_ranking_accuracy"][
+            "paired_component_bootstrap_95_interval"
+        ][0]
+    )
+    raw_flux_coefficients = tuple(float(value) for value in raw["raw_flux_coefficients"])
+    if len(raw_flux_coefficients) != 2:
+        raise ValueError("raw-control result lacks its two ADP flux coefficients")
+    quality_auc = float(
+        quality["locked_development_test"]["roc_auc"]["estimate"]
+    )
+    raw_cells = _mapping(
+        raw["locked_development_test_by_event_cell"],
+        label="raw-control event cells",
+    )
+    deep_cells = {
+        name: float(value["roc_auc"]["estimate"])
+        for name, value in raw_cells.items()
+        if str(name).endswith("_depth_0.30")
+    }
+    if len(deep_cells) != len(EVENT_DURATIONS):
+        raise ValueError("raw-control mechanics lacks the three depth-0.30 cells")
+    criteria = {
+        "raw_control_overall_roc_auc_lower_95_at_least_floor": raw_auc_lower
+        >= float(mechanics_config["raw_control_minimum_overall_roc_auc_lower_95"]),
+        "raw_control_each_depth_0_30_roc_auc_at_least_floor": all(
+            value
+            >= float(
+                mechanics_config["raw_control_minimum_each_depth_0_30_roc_auc"]
+            )
+            for value in deep_cells.values()
+        ),
+        "raw_control_adp_flux_coefficients_are_dip_positive": (
+            all(value < 0.0 for value in raw_flux_coefficients)
+            if mechanics_config["raw_control_require_negative_adp_flux_coefficients"]
+            else True
+        ),
+        "raw_control_paired_ranking_lower_95_above_chance": (
+            raw_ranking_lower > 0.5
+            if mechanics_config[
+                "raw_control_paired_ranking_lower_95_strictly_above_chance"
+            ]
+            else True
+        ),
+        "quality_only_roc_auc_near_chance": abs(quality_auc - 0.5)
+        <= float(
+            mechanics_config["quality_only_maximum_absolute_roc_auc_from_chance"]
+        ),
+    }
+    return {
+        "passed": all(criteria.values()),
+        "criteria": criteria,
+        "raw_control_roc_auc": raw_auc,
+        "raw_control_roc_auc_lower_95": raw_auc_lower,
+        "raw_control_paired_ranking_lower_95": raw_ranking_lower,
+        "raw_control_flux_coefficients": list(raw_flux_coefficients),
+        "raw_control_depth_0_30_cell_roc_auc": deep_cells,
+        "quality_only_roc_auc": quality_auc,
+        "interpretation": (
+            "token_supervised_probe_mechanics_valid"
+            if all(criteria.values())
+            else "token_supervised_probe_mechanics_failed"
+        ),
+    }
+
+
 def assert_cadence_preserving_model(
     model: Any, *, context_length: int, output: Mapping[str, Any]
 ) -> None:
@@ -1333,6 +1647,9 @@ def evaluate_event_transfer_canary(
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("PyTorch is required for event-transfer inference") from exc
     config, config_source, config_sha = load_event_transfer_config(config_path)
+    token_supervised = (
+        config["schema_version"] == EVENT_TRANSFER_CONFIG_SCHEMA_VERSION_V2
+    )
     inputs = _mapping(config["inputs"], label="inputs")
     if temporal_panel_receipt_sha256 != inputs["temporal_panel_receipt_sha256"]:
         raise ValueError("event-transfer temporal-panel receipt hash differs")
@@ -1376,6 +1693,7 @@ def evaluate_event_transfer_canary(
                 np.ndarray,
                 tuple[str, ...],
                 tuple[str, ...],
+                np.ndarray,
             ],
         ],
     ] = {}
@@ -1383,7 +1701,10 @@ def evaluate_event_transfer_canary(
     for block in SPLIT_SECTORS:
         subset = [item for item in schedule if item["block"] == block]
         block_data[block] = {
-            length: build_paired_samples(subset, context_length=length)
+            length: build_paired_samples_with_token_targets(
+                subset,
+                context_length=length,
+            )
             for length in CONTEXT_LENGTHS
         }
         block_cells[block] = tuple(
@@ -1409,10 +1730,19 @@ def evaluate_event_transfer_canary(
         length = 2_048 if spec.endswith("_2048") else 128
         encoded: dict[
             str,
-            tuple[np.ndarray, np.ndarray, np.ndarray, tuple[str, ...], tuple[str, ...]],
+            tuple[
+                np.ndarray,
+                np.ndarray,
+                np.ndarray,
+                tuple[str, ...],
+                tuple[str, ...],
+                np.ndarray,
+            ],
         ] = {}
         for block in SPLIT_SECTORS:
-            samples, labels, components, cohorts = block_data[block][length]
+            samples, labels, components, cohorts, token_targets = block_data[block][
+                length
+            ]
             if spec == "step2000_z_cadence_128_diagnostic":
                 base_tokens, valid = short_step2000_cache[block]
                 tokens = base_tokens @ projection_weight.T + projection_bias
@@ -1427,17 +1757,30 @@ def evaluate_event_transfer_canary(
                 )
                 if spec == "step2000_h_cadence_128":
                     short_step2000_cache[block] = tokens, valid
-            encoded[block] = tokens, valid, labels, components, cohorts
+            encoded[block] = (
+                tokens,
+                valid,
+                labels,
+                components,
+                cohorts,
+                token_targets,
+            )
             print(
                 f"FM_EVENT_TRANSFER feature={spec} block={block} phase=encoded",
                 flush=True,
             )
         train = encoded["train"]
         print(f"FM_EVENT_TRANSFER feature={spec} phase=fit", flush=True)
-        fit = fit_shared_linear_max_probe(
+        fit_function = (
+            fit_shared_linear_token_probe
+            if token_supervised
+            else fit_shared_linear_max_probe
+        )
+        fit_target = train[5] if token_supervised else train[2]
+        fit = fit_function(
             train[0],
             train[1],
-            train[2],
+            fit_target,
             learning_rate=float(probe_config["learning_rate"]),
             l2_weight=float(probe_config["l2_weight"]),
             epochs=int(probe_config["epochs"]),
@@ -1530,6 +1873,10 @@ def evaluate_event_transfer_canary(
             "input_cadence_tokens": length,
             "temporal_downsampling": False,
             "pooling_before_token_score": False,
+            "probe_training_objective": probe_config.get(
+                "training_objective",
+                "sample_binary_cross_entropy_after_hard_masked_max",
+            ),
             "validation_threshold": float(threshold),
             "validation_frozen_5_percent_fpr_threshold": float(fpr_threshold),
             "validation_operating_fpr": float(
@@ -1539,11 +1886,18 @@ def evaluate_event_transfer_canary(
                 np.mean(validation_prediction[validation[2] == 1])
             ),
             "probe_objective_history": list(fit.objective_history),
+            "probe_weight_l2": float(np.linalg.norm(fit.weight)),
+            "probe_bias": float(fit.bias),
             "locked_development_test": overall,
             "locked_development_test_by_cohort": by_cohort,
             "locked_development_test_by_event_cell": by_cell,
             "locked_development_test_by_cohort_and_event_cell": by_cohort_and_cell,
         }
+        if spec == "raw_adp_validity_error_cadence_128":
+            results[spec]["raw_flux_coefficients"] = [
+                float(fit.weight[0]),
+                float(fit.weight[1]),
+            ]
         print(f"FM_EVENT_TRANSFER feature={spec} phase=complete", flush=True)
 
     if test_reference is None:
@@ -1557,6 +1911,31 @@ def evaluate_event_transfer_canary(
         bootstrap_replicates=int(metric_config["bootstrap_replicates"]),
         bootstrap_seed=int(metric_config["bootstrap_seed"]),
     )
+    probe_mechanics = (
+        summarize_probe_mechanics(
+            results,
+            mechanics_config=_mapping(
+                config["probe_mechanics"],
+                label="probe mechanics",
+            ),
+        )
+        if token_supervised
+        else {
+            "passed": True,
+            "interpretation": "legacy_v1_probe_mechanics_not_gated",
+        }
+    )
+    metric_readiness_passed = bool(readiness["ready_for_next_real_training"])
+    overall_readiness_passed = bool(
+        probe_mechanics["passed"] and metric_readiness_passed
+    )
+    reported_readiness = dict(readiness)
+    if token_supervised:
+        reported_readiness["fm_metric_criteria_satisfied"] = metric_readiness_passed
+        reported_readiness["probe_mechanics_gate_required"] = True
+        reported_readiness["ready_for_next_real_training"] = (
+            overall_readiness_passed
+        )
 
     schedule_public = []
     for item in schedule:
@@ -1564,13 +1943,21 @@ def evaluate_event_transfer_canary(
         public["window_binding"] = dict(item["visit"]["binding"])
         schedule_public.append(public)
     return {
-        "schema_version": EVENT_TRANSFER_RESULT_SCHEMA_VERSION,
-        "campaign_id": EVENT_TRANSFER_CAMPAIGN_ID,
-        "evaluation_completed": True,
-        "passed": bool(readiness["ready_for_next_real_training"]),
-        "scientific_readiness_passed": bool(
-            readiness["ready_for_next_real_training"]
+        "schema_version": (
+            EVENT_TRANSFER_RESULT_SCHEMA_VERSION_V2
+            if token_supervised
+            else EVENT_TRANSFER_RESULT_SCHEMA_VERSION
         ),
+        "campaign_id": (
+            EVENT_TRANSFER_CAMPAIGN_ID_V2
+            if token_supervised
+            else EVENT_TRANSFER_CAMPAIGN_ID
+        ),
+        "evaluation_completed": True,
+        "passed": overall_readiness_passed,
+        "probe_mechanics_passed": bool(probe_mechanics["passed"]),
+        "fm_metric_criteria_passed": metric_readiness_passed,
+        "scientific_readiness_passed": overall_readiness_passed,
         "config_path": str(config_source),
         "config_sha256": config_sha,
         "temporal_panel_receipt_sha256": temporal_panel_receipt_sha256,
@@ -1582,12 +1969,19 @@ def evaluate_event_transfer_canary(
         "schedule_audit": schedule_audit,
         "checkpoint_validation": {"step0": validation0, "step2000": validation2000},
         "feature_results": results,
-        "readiness": readiness,
+        "probe_mechanics": probe_mechanics,
+        "readiness": reported_readiness,
         "cadence_preservation": {
             "nominal_cadence_seconds": 200,
             "one_encoder_token_per_input_cadence": True,
             "patching_or_cadence_averaging": False,
             "only_temporal_reduction": "masked_max_after_shared_linear_cadence_score",
+            "probe_training_target_used_as_input_feature": False,
+            "probe_training_loss_reduction": (
+                "class_balanced_scalar_loss_over_independently_scored_cadence_examples"
+                if token_supervised
+                else "legacy_sample_loss_after_hard_masked_max"
+            ),
         },
         "boundaries": {
             "fm_encoder_trained": False,
@@ -1596,6 +1990,8 @@ def evaluate_event_transfer_canary(
             "formal_model_gate": False,
             "development_only": True,
             "candidate_centered_classification_not_blind_detection": True,
+            "unknown_location_transfer_established": False,
+            "natural_event_performance_established": False,
             "locked_development_test_used_for_fit_or_threshold": False,
         },
     }
@@ -1603,24 +1999,30 @@ def evaluate_event_transfer_canary(
 
 __all__ = [
     "EVENT_TRANSFER_CONFIG_SCHEMA_VERSION",
+    "EVENT_TRANSFER_CONFIG_SCHEMA_VERSION_V2",
     "EVENT_TRANSFER_RESULT_SCHEMA_VERSION",
+    "EVENT_TRANSFER_RESULT_SCHEMA_VERSION_V2",
     "FEATURE_SPECS",
     "ProbeFit",
     "assert_cadence_preserving_model",
     "build_paired_samples",
+    "build_paired_samples_with_token_targets",
     "encode_cadence_tokens",
     "evaluate_event_transfer_canary",
     "fit_shared_linear_max_probe",
+    "fit_shared_linear_token_probe",
     "freeze_component_schedule",
     "inject_jittered_single_event",
     "load_event_transfer_config",
     "paired_auc_delta_bootstrap",
     "paired_component_bootstrap",
+    "paired_token_probe_examples",
     "probe_metrics",
     "raw_cadence_features",
     "score_shared_linear_max_probe",
     "sector_block",
     "select_balanced_accuracy_threshold",
     "select_fpr_threshold",
+    "summarize_probe_mechanics",
     "summarize_readiness",
 ]

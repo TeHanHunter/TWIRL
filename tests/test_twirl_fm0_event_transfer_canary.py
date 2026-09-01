@@ -13,6 +13,10 @@ CONFIG = (
     Path(__file__).parents[1]
     / "configs/models/twirl_fm0_2_s66_s77_event_transfer_canary_v1.yaml"
 )
+CONFIG_V2 = (
+    Path(__file__).parents[1]
+    / "configs/models/twirl_fm0_2_s66_s77_event_transfer_canary_v2.yaml"
+)
 
 
 def _sample(length: int = 2_048) -> dict[str, np.ndarray]:
@@ -42,6 +46,21 @@ def test_frozen_config_enforces_no_cadence_merging(tmp_path: Path) -> None:
     path.write_text(yaml.safe_dump(changed))
     with pytest.raises(ValueError, match="patching_or_cadence_averaging"):
         canary.load_event_transfer_config(path)
+
+
+def test_v2_config_uses_event_support_only_as_a_training_target() -> None:
+    config, source, digest = canary.load_event_transfer_config(CONFIG_V2)
+    assert source == CONFIG_V2.resolve()
+    assert len(digest) == 64
+    assert config["probe"]["training_objective"] == (
+        "pair_balanced_four_stratum_per_cadence_binary_cross_entropy"
+    )
+    assert config["artificial_event"]["injection_support_used_as_training_target"]
+    assert config["artificial_event"]["injection_truth_used_as_feature"] is False
+    assert "injection_support" in config["features"]["forbidden_feature_families"]
+    assert config["purpose"]["evidence_scope"] == (
+        "injection_support_supervised_synthetic_event_localization_and_linear_decodability"
+    )
 
 
 def test_sector_blocks_are_disjoint_and_complete() -> None:
@@ -131,6 +150,13 @@ def test_direct_crops_and_jittered_injection_preserve_every_cadence() -> None:
     for key in samples[0]:
         if key != "flux":
             np.testing.assert_array_equal(samples[0][key], samples[1][key])
+    targeted = canary.build_paired_samples_with_token_targets(
+        schedule,
+        context_length=128,
+    )
+    np.testing.assert_array_equal(targeted[1], labels)
+    assert not np.any(targeted[4][0])
+    assert np.flatnonzero(targeted[4][1]).tolist() == [70, 71, 72]
 
 
 def test_linear_max_probe_finds_single_cadence_signal_without_pooling() -> None:
@@ -157,6 +183,66 @@ def test_linear_max_probe_finds_single_cadence_signal_without_pooling() -> None:
     )
     assert metrics["paired_component_ranking_accuracy"] > 0.95
     assert metrics["roc_auc"] > 0.95
+
+
+def test_token_supervised_probe_finds_negative_dips_without_temporal_pooling() -> None:
+    rng = np.random.default_rng(31)
+    components = 64
+    length = 32
+    clean = rng.normal(0.0, 0.05, size=(components, length, 2))
+    injected = clean.copy()
+    positions = rng.integers(0, length, size=components)
+    injected[np.arange(components), positions, :2] -= 1.0
+    tokens = np.empty((2 * components, length, 2), dtype=np.float32)
+    tokens[0::2] = clean
+    tokens[1::2] = injected
+    labels = np.tile([0, 1], components)
+    valid = np.ones((2 * components, length), dtype=bool)
+    token_targets = np.zeros_like(valid)
+    token_targets[2 * np.arange(components) + 1, positions] = True
+    fit = canary.fit_shared_linear_token_probe(
+        tokens,
+        valid,
+        token_targets,
+        epochs=300,
+        seed=8,
+    )
+    scores = canary.score_shared_linear_max_probe(fit, tokens, valid)
+    ids = tuple(f"c{index // 2}" for index in range(2 * components))
+    metrics = canary.probe_metrics(
+        labels,
+        scores,
+        ids,
+        threshold=canary.select_balanced_accuracy_threshold(labels, scores),
+    )
+    standardized = (tokens - fit.center[None, None, :]) / fit.scale[None, None, :]
+    token_scores = standardized @ fit.weight + fit.bias
+    assert metrics["paired_component_ranking_accuracy"] > 0.95
+    assert metrics["roc_auc"] > 0.95
+    assert canary._rank_auc(token_targets.ravel(), token_scores.ravel()) > 0.99
+    assert np.all(fit.weight[:2] < 0.0)
+
+
+def test_token_probe_four_strata_are_pair_and_duration_balanced() -> None:
+    valid = np.ones((4, 16), dtype=bool)
+    targets = np.zeros_like(valid)
+    targets[1, 3] = True
+    targets[3, 4:13] = True
+    example_targets, weights = canary.paired_token_probe_examples(valid, targets)
+    assert np.isclose(np.sum(weights), 1.0)
+    for clean, injected in ((0, 1), (2, 3)):
+        support = targets[injected]
+        assert np.isclose(np.sum(weights[injected, support]), 0.125)
+        assert np.isclose(np.sum(weights[clean, support]), 0.125)
+        assert np.isclose(np.sum(weights[injected, ~support]), 0.125)
+        assert np.isclose(np.sum(weights[clean, ~support]), 0.125)
+        assert np.all(example_targets[injected, support] == 1.0)
+        assert not np.any(example_targets[clean])
+
+    invalid = valid.copy()
+    invalid[1, 3] = False
+    with pytest.raises(ValueError, match="positive target on an invalid token"):
+        canary.paired_token_probe_examples(invalid, targets)
 
 
 def test_raw_and_quality_controls_keep_one_row_per_cadence() -> None:
