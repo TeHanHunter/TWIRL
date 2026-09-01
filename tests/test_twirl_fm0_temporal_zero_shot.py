@@ -86,6 +86,51 @@ def test_bounded_selection_rejects_component_crossing_cohorts() -> None:
         select_temporal_rows(rows, max_repeated_components=2, max_new_components=2)
 
 
+def test_bounded_selection_skips_components_with_a_missing_required_view() -> None:
+    rows = [
+        {
+            **_selection_row("repeat-missing", "rm-66", "repeated", 66),
+            "view_present_json": "[1,1,0,1,1,1]",
+        },
+        {
+            **_selection_row("repeat-a", "ra-66", "repeated", 66),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+        {
+            **_selection_row("repeat-b", "rb-67", "repeated", 67),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+        {
+            **_selection_row("new-missing", "nm-66", "new", 66),
+            "view_present_json": "[1,1,1,0,1,1]",
+        },
+        {
+            **_selection_row("new-a", "na-66", "new", 66),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+        {
+            **_selection_row("new-b", "nb-67", "new", 67),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+    ]
+
+    selected = select_temporal_rows(
+        rows,
+        max_repeated_components=2,
+        max_new_components=2,
+        required_view_indices=(2, 3),
+    )
+
+    assert {row["leakage_component_id"] for row in selected["repeated"]} == {
+        "repeat-a",
+        "repeat-b",
+    }
+    assert {row["leakage_component_id"] for row in selected["new"]} == {
+        "new-a",
+        "new-b",
+    }
+
+
 def _raw_checkpoint(
     representative: np.ndarray,
     visits: np.ndarray,

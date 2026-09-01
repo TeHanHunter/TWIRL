@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import json
 import math
 import re
 from collections import defaultdict
@@ -20,6 +21,7 @@ from typing import Any
 
 import numpy as np
 
+from .dataset import variant_view_indices
 from .registry import sha256_file
 from .representation_health import (
     BASELINE_TIME_BINS,
@@ -353,8 +355,9 @@ def select_temporal_rows(
     *,
     max_repeated_components: int,
     max_new_components: int,
+    required_view_indices: Sequence[int] = (),
 ) -> dict[str, list[dict[str, str]]]:
-    """Select bounded components deterministically and retain all their visits."""
+    """Select bounded components whose every retained visit has required views."""
 
     limits = {
         "repeated": int(max_repeated_components),
@@ -362,6 +365,9 @@ def select_temporal_rows(
     }
     if any(value < 2 for value in limits.values()):
         raise ValueError("each temporal cohort requires at least two components")
+    required_views = tuple(int(value) for value in required_view_indices)
+    if any(value < 0 for value in required_views):
+        raise ValueError("required temporal-panel view indices must be nonnegative")
     grouped: dict[str, dict[str, list[dict[str, str]]]] = {
         cohort: defaultdict(list) for cohort in TEMPORAL_COHORTS
     }
@@ -389,7 +395,25 @@ def select_temporal_rows(
 
     selected: dict[str, list[dict[str, str]]] = {}
     for cohort in TEMPORAL_COHORTS:
-        components = tuple(grouped[cohort])
+        components: list[str] = []
+        for component, component_rows in grouped[cohort].items():
+            eligible = True
+            if required_views:
+                for row in component_rows:
+                    try:
+                        present = json.loads(row.get("view_present_json", "[]"))
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(
+                            "temporal selection received invalid view_present_json"
+                        ) from exc
+                    if not isinstance(present, list) or any(
+                        index >= len(present) or present[index] not in (1, True)
+                        for index in required_views
+                    ):
+                        eligible = False
+                        break
+            if eligible:
+                components.append(component)
         if len(components) < 2:
             raise ValueError(f"temporal cohort {cohort} has fewer than two components")
         ordered = sorted(
@@ -773,11 +797,6 @@ def evaluate_temporal_zero_shot(
     panel_rows, panel_summary = load_temporal_panel(
         temporal_panel_dir, receipt_sha256=temporal_panel_receipt_sha256
     )
-    selected = select_temporal_rows(
-        panel_rows,
-        max_repeated_components=max_repeated_components,
-        max_new_components=max_new_components,
-    )
 
     model0, contract0, validation0 = _load_trusted_model(
         root,
@@ -798,6 +817,12 @@ def evaluate_temporal_zero_shot(
     variant = str(contract0.get("variant", ""))
     if not variant:
         raise ValueError("checkpoint run contract lacks its model variant")
+    selected = select_temporal_rows(
+        panel_rows,
+        max_repeated_components=max_repeated_components,
+        max_new_components=max_new_components,
+        required_view_indices=variant_view_indices(variant),
+    )
     huber_delta = float(contract0["optimization"]["huber_delta"])
 
     baseline_manifest = Path(baseline_manifest_path).resolve(strict=True)
@@ -1055,7 +1080,8 @@ def evaluate_temporal_zero_shot(
             "identical_rows_windows_and_masks_bound_by_sample_sha256": True,
             "selection": (
                 "stable SHA-256 component ordering separately within repeated/new; "
-                "all visits retained for selected components"
+                "all visits retained for selected components; every retained visit "
+                "declares the checkpoint-required flux views"
             ),
             "query_sector_excluded_retrieval": True,
         },
