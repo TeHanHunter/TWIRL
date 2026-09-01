@@ -17,6 +17,51 @@ from twirl.models.fm0.model import (  # noqa: E402
 )
 
 
+_CADENCE_LAST_KEYS = (
+    "flux",
+    "flux_valid",
+    "flux_error",
+    "error_valid",
+    "local_time_cadences",
+    "delta_time_cadences",
+    "time_valid",
+    "segment_boundary",
+    "reconstruction_mask",
+    "temporal_mask",
+)
+
+
+def _slice_batch_context(
+    batch: dict[str, torch.Tensor], length: int
+) -> dict[str, torch.Tensor]:
+    sliced = {name: value.clone() for name, value in batch.items()}
+    for name in _CADENCE_LAST_KEYS:
+        if name in sliced:
+            sliced[name] = sliced[name][..., :length].clone()
+    return sliced
+
+
+def _tiny_model_config(architecture: str) -> FM0ModelConfig:
+    return FM0ModelConfig(
+        architecture=architecture,
+        n_flux_views=2,
+        window_length=64,
+        d_model=16,
+        embedding_dim=16,
+        stem_kernel=5,
+        dropout=0.0,
+        tcn_blocks=2,
+        tcn_dilation_cycle=(1, 2),
+        conformer_blocks=1,
+        conformer_heads=4,
+        conformer_ff_multiplier=2,
+        conformer_conv_kernel=7,
+        patch_stride=4,
+        minimum_parameters=1,
+        maximum_parameters=10_000_000,
+    )
+
+
 def test_default_tcn_and_conformer_are_in_frozen_matched_budget() -> None:
     tcn = build_fm0_model("TWIRL-FM0.1.1")
     conformer = build_fm0_model("TWIRL-FM0.1.2")
@@ -111,3 +156,95 @@ def test_conformer_reconstruction_retains_subpatch_cadence_state() -> None:
     with torch.no_grad():
         reconstruction = model(batch)["reconstruction"]
     assert not torch.equal(reconstruction[..., 0], reconstruction[..., 1])
+
+
+@pytest.mark.parametrize(
+    ("variant", "architecture"),
+    (("TWIRL-FM0.1.1", "tcn"), ("TWIRL-FM0.1.2", "conformer")),
+)
+def test_short_context_eval_matches_an_exact_length_masked_tail(
+    variant: str, architecture: str
+) -> None:
+    config = _tiny_model_config(architecture)
+    model = build_fm0_model(
+        variant, config_override=config, enforce_parameter_budget=False
+    ).eval()
+    dataset = SyntheticFM0Dataset(
+        SyntheticFM0Config(variant=variant, window_length=64, windows_per_epoch=4)
+    )
+    batch = collate_fm0_samples([dataset[0], dataset[1]])
+    short_length = 48
+    short_batch = _slice_batch_context(batch, short_length)
+    masked_tail_batch = {name: value.clone() for name, value in batch.items()}
+    masked_tail_batch["flux_valid"][..., short_length:] = False
+    masked_tail_batch["error_valid"][..., short_length:] = False
+    masked_tail_batch["time_valid"][..., short_length:] = False
+    masked_tail_batch["reconstruction_mask"][..., short_length:] = False
+
+    with pytest.raises(
+        ValueError, match="flux cadence length differs from model configuration"
+    ):
+        model(short_batch)
+
+    short_output = model.forward_short_context(short_batch)
+    with torch.no_grad():
+        masked_tail_output = model(masked_tail_batch)
+
+    assert short_output["reconstruction"].shape == (2, 2, short_length)
+    assert short_output["token_valid"].shape[-1] == (
+        short_length
+        if architecture == "tcn"
+        else short_length // config.patch_stride
+    )
+    assert all(not value.requires_grad for value in short_output.values())
+    torch.testing.assert_close(
+        short_output["reconstruction"],
+        masked_tail_output["reconstruction"][..., :short_length],
+    )
+    torch.testing.assert_close(
+        short_output["h_window"], masked_tail_output["h_window"]
+    )
+    torch.testing.assert_close(
+        short_output["z_window"], masked_tail_output["z_window"]
+    )
+
+
+def test_short_context_forward_is_eval_only_and_checkpoint_neutral() -> None:
+    config = _tiny_model_config("tcn")
+    model = build_fm0_model(
+        "TWIRL-FM0.1.1", config_override=config, enforce_parameter_budget=False
+    )
+    dataset = SyntheticFM0Dataset(
+        SyntheticFM0Config(
+            variant="TWIRL-FM0.1.1", window_length=64, windows_per_epoch=2
+        )
+    )
+    batch = collate_fm0_samples([dataset[0]])
+    short_batch = _slice_batch_context(batch, 32)
+
+    with pytest.raises(RuntimeError, match="short-context forward is evaluation-only"):
+        model.forward_short_context(short_batch)
+
+    model.eval()
+    full_eval_output = model.forward_short_context(batch)
+    with torch.no_grad():
+        full_output = model(batch)
+    for name in full_output:
+        torch.testing.assert_close(full_eval_output[name], full_output[name])
+
+    oversized_batch = {
+        name: (
+            torch.cat((value, value[..., -1:]), dim=-1)
+            if name in _CADENCE_LAST_KEYS
+            else value.clone()
+        )
+        for name, value in batch.items()
+    }
+    with pytest.raises(ValueError, match="no greater than the checkpoint window"):
+        model.forward_short_context(oversized_batch)
+
+    reloaded = build_fm0_model(
+        "TWIRL-FM0.1.1", config_override=config, enforce_parameter_budget=False
+    )
+    reloaded.load_state_dict(model.state_dict(), strict=True)
+    assert tuple(reloaded.state_dict()) == tuple(model.state_dict())

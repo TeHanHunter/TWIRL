@@ -305,7 +305,12 @@ class TWIRLFM0(_ModuleBase):
             config.d_model, config.n_flux_views, kernel_size=1
         )
 
-    def _pack_input(self, batch: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
+    def _pack_input(
+        self,
+        batch: dict[str, Any],
+        *,
+        allow_shorter_context: bool = False,
+    ) -> tuple[Any, Any, Any, Any]:
         required = (
             "flux",
             "flux_valid",
@@ -327,7 +332,14 @@ class TWIRLFM0(_ModuleBase):
         view_present = batch["view_present"].bool()
         if flux.ndim != 3 or flux.shape[1] != self.config.n_flux_views:
             raise ValueError("flux must have shape [batch, configured_view, cadence]")
-        if flux.shape[-1] != self.config.window_length:
+        cadence_length = int(flux.shape[-1])
+        if allow_shorter_context:
+            if cadence_length <= 0 or cadence_length > self.config.window_length:
+                raise ValueError(
+                    "evaluation context length must be positive and no greater "
+                    "than the checkpoint window length"
+                )
+        elif cadence_length != self.config.window_length:
             raise ValueError("flux cadence length differs from model configuration")
         if flux_valid.shape != flux.shape or reconstruction_mask.shape != flux.shape:
             raise ValueError("flux masks must match flux shape")
@@ -412,8 +424,16 @@ class TWIRLFM0(_ModuleBase):
             weights, dim=-1
         ).clamp_min(1.0)
 
-    def forward(self, batch: dict[str, Any]) -> dict[str, Any]:
-        packed, token_valid, local_time, delta_time = self._pack_input(batch)
+    def _forward(
+        self,
+        batch: dict[str, Any],
+        *,
+        allow_shorter_context: bool,
+    ) -> dict[str, Any]:
+        packed, token_valid, local_time, delta_time = self._pack_input(
+            batch, allow_shorter_context=allow_shorter_context
+        )
+        cadence_length = int(packed.shape[-1])
         hidden = self.stem(packed, token_valid)
         if self.config.architecture == "tcn":
             for block in self.tcn:
@@ -434,7 +454,7 @@ class TWIRLFM0(_ModuleBase):
                 token_hidden = block(token_hidden, output_valid)
             upsampled = token_hidden.transpose(1, 2).repeat_interleave(
                 self.config.patch_stride, dim=-1
-            )[:, :, : self.config.window_length]
+            )[:, :, :cadence_length]
             # The pre-patch cadence stem is a local reconstruction skip.  The
             # Conformer context therefore cannot force all four cadences in a
             # patch to share one decoded state and erase sub-patch events.
@@ -453,6 +473,28 @@ class TWIRLFM0(_ModuleBase):
             "z_window": embedding,
             "token_valid": output_valid,
         }
+
+    def forward(self, batch: dict[str, Any]) -> dict[str, Any]:
+        """Run the checkpoint-bound, exact-length model path."""
+
+        return self._forward(batch, allow_shorter_context=False)
+
+    def forward_short_context(self, batch: dict[str, Any]) -> dict[str, Any]:
+        """Evaluate a crop no longer than the checkpoint context.
+
+        This explicit path exists only for matched context-length diagnostics.
+        It keeps the checkpoint's configuration, parameters, time normalization,
+        and ordinary :meth:`forward` contract unchanged.  Requiring evaluation
+        mode and disabling autograd prevents this convenience path from becoming
+        an unreviewed variable-length training interface.
+        """
+
+        if self.training:
+            raise RuntimeError(
+                "short-context forward is evaluation-only; call model.eval() first"
+            )
+        with torch.no_grad():
+            return self._forward(batch, allow_shorter_context=True)
 
 
 def architecture_for_variant(

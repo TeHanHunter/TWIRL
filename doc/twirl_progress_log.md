@@ -918,16 +918,24 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   passed (`1,109` tests; `33` optional skips), focused independent launch audit
   found no P0/P1 blocker, and no H200 or training path exists in the
   controller.
+- `2026-09-01`: Repaired the final S66--S77 admission provenance handoff by
+  separating the immutable Phase-A producer revision from the current
+  admission-validator revision and binding the recorded Phase-A SHA-256.
+  CPU retry job `21749958` completed `0:0` in `17m15s`. The read-only
+  admission receipt SHA-256 is `9461e2f3...740701`; it closes exactly
+  `673,404` source rows to `606,387` nonsealed six-view shards while retaining
+  `67,017` sealed identities as excluded and keeping S65 outside the pool.
+  Added a separate identity-only temporal-panel freezer, a paired CPU
+  step-0/step-2000 evaluator, and evaluation-only short-context model support.
+  These paths do not authorize training, event retention, a formal gate, or
+  sealed-test access.
 
-**Next:** Materialize and freeze provider-neutral quality references plus the
-label-blind source inventory for S66--S77, then build their exact full-visit
-six-view shards and run the separately hashed admission-v2 gate. Keep S65
-outside this release. In parallel, prove the S78 TICA gap is fully outside
-every retained detector HDF5 before admitting it. Once at least five sectors
-and the cohort floors pass, freeze adequacy thresholds, publish a separate
-immutable development-panel freeze, and evaluate the existing step-2000
-checkpoint against its exact same-seed step-0 control, zero-shot. Keep new
-training, event retention, the formal gate, and the sealed test closed.
+**Next:** Freeze the admitted S66--S77 label-blind development panel, then run
+the exact step-0 and step-2000 checkpoints on identical repeated/new-host
+samples. Follow that result with the fixed-exposure `256`/`512`/`1,024`/`2,048`
+context diagnostic before deciding whether `TWIRL-FM0.3.1` remains the right
+next candidate. Keep new training, event retention, the formal gate, and the
+sealed test closed.
 
 ### Candidate validation and follow-up
 

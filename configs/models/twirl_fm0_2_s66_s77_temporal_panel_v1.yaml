@@ -1,0 +1,70 @@
+schema_version: twirl_fm0_temporal_panel_config_v1
+campaign_id: twirl_fm0_2_s66_s77_temporal_panel_v1
+model_family: TWIRL-FM0
+status: frozen_label_blind_development_panel_policy
+prepared_on: 2026-09-01
+
+scope:
+  purpose: identity_only_label_blind_development_evaluation_panel
+  label_blind: true
+  identity_only_freeze: true
+  shard_payload_access_authorized: false
+  model_training_authorized: false
+  sealed_test_access_authorized: false
+  event_retention_authorized: false
+  formal_model_gate_authorized: false
+  production_model_claim: false
+  prospective_test_claim: false
+
+admission:
+  required_schema_version: twirl_fm0_later_sector_preparation_pool_receipt_v2
+  exact_path_and_sha256_required: true
+  required_product_state: ORCD_COMPLETE_DEFERRED
+  required_preparation_pool_admitted: true
+  required_sectors: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+  excluded_sectors: [65]
+  later_sector_policy: fail
+
+sector_release:
+  required_receipt_schema_version: twirl_fm0_later_six_view_sector_release_v1
+  required_release_state: FM_SIX_VIEW_DEFERRED_READY
+  required_manifest_schema_version: twirl_fm0_later_six_view_manifest_v1
+  exact_receipt_and_manifest_sha256_required: true
+  read_only_materialized_authorities_required: true
+  full_visit_shards_required: true
+  model_context_length_bound: false
+  source_partitions_allowed_in_release: [poc_train, poc_development]
+  sealed_rows_allowed_in_release: false
+
+selection:
+  emitted_source_partition: poc_development
+  baseline_manifest_sectors: [56, 57, 58, 59, 60, 61, 62, 63, 64]
+  baseline_manifest_sha256: f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a
+  repeated_definition: leakage_component_present_in_frozen_baseline_manifest
+  new_definition: leakage_component_absent_from_frozen_baseline_manifest
+  retain_all_eligible_visits: true
+  duplicate_observation_policy: fail
+  component_partition_drift_policy: fail
+  scientific_training_eligible: false
+  development_evaluation_eligible: true
+
+forbidden_input_tokens:
+  - light_curve_values
+  - bls
+  - search
+  - candidate
+  - human_label
+  - morphology_label
+  - injection_truth
+  - embedding
+  - model_score
+  - representation_metric
+  - checkpoint_comparison
+
+claim_limit: >-
+  This receipt freezes only a checksum-bound, identity-only, label-blind
+  development-evaluation panel from the admitted S66--S77 preparation pool.
+  It excludes S65, S78 and later sectors, all training rows, and all sealed-test
+  rows. It does not open shard payloads, authorize model training or sealed-test
+  access, retain events, establish a formal model gate, or make a prospective
+  performance claim.

@@ -146,7 +146,11 @@ project authority.
   `7,545,237,439` light-curve cadences reconciled, with no unreadable product
   or unexplained authority gap. S66 uses SPOC with zero exclusions. S77's `32`
   declared TICA-only detector rows propagate to `57,994` explicitly masked
-  light-curve cadence occurrences. No temporal panel is frozen.
+  light-curve cadence occurrences. The separately repaired admission-v2 gate
+  now admits the exact S66--S77 preparation pool: `673,404` source rows,
+  `606,387` nonsealed six-view shards, and `67,017` sealed identities excluded.
+  Its immutable receipt remains training-ineligible and does not itself freeze
+  a temporal panel.
   Once at least five genuinely later sectors pass the ORCD HDF5-openability,
   six-view, cadence-quality, and identity gates, use the label-blind inventory
   to freeze the still-unset detector/cadence/cohort-adequacy thresholds and
@@ -344,8 +348,9 @@ negotiation or career-planning notes do not belong in the public plan.
    score-hidden review, and keep its isolation rule. For FM work, preserve the
    completed four-point FM0.2.1 evidence and perform only the label-free
    later-sector FM admission/repeated-host inventory needed to define a
-   genuinely later development panel. Evaluate the existing checkpoint
-   zero-shot only after that panel is frozen. Keep the formal gate unapplied
+   genuinely later development panel. The S66--S77 preparation pool is now
+   admitted; freeze its label-blind development panel and evaluate the exact
+   step-0 and step-2000 checkpoints zero-shot. Keep the formal gate unapplied
    and do not run development event retention without explicit authorization.
    Do not advance FM0.1.3 or FM0.2.2, extend beyond step 2000, rerun a second
    seed, start a data-scale training comparison, or open the sealed FM test.
