@@ -12,6 +12,7 @@ from twirl.models.fm0.dataset import (
     collate_fm0_samples,
 )
 from twirl.models.fm0.model import (
+    TWIRLFM0,
     FM0ModelConfig,
     architecture_for_variant,
     build_fm0_model,
@@ -239,6 +240,157 @@ def test_cadence_preserving_conformer_keeps_one_token_per_cadence() -> None:
     assert torch.equal(patched_valid, batch["time_valid"].bool())
     assert output["token_valid"].shape == batch["time_valid"].shape
     assert output["h_cadence"].shape[1] == batch["flux"].shape[-1]
+
+
+@pytest.mark.parametrize(
+    ("variant", "architecture", "window_length", "patch_stride"),
+    (
+        ("TWIRL-FM0.3.1", "tcn", 2_048, 1),
+        ("TWIRL-FM0.3.1", "tcn", 128, 4),
+        ("TWIRL-FM0.3.2", "conformer", 2_048, 1),
+        ("TWIRL-FM0.3.2", "conformer", 128, 4),
+    ),
+)
+def test_fm0_3_override_rejects_context_or_stride_that_loses_cadence_contract(
+    variant: str,
+    architecture: str,
+    window_length: int,
+    patch_stride: int,
+) -> None:
+    config = FM0ModelConfig(
+        architecture=architecture,
+        n_flux_views=2,
+        window_length=window_length,
+        d_model=16,
+        embedding_dim=16,
+        stem_kernel=5,
+        dropout=0.0,
+        tcn_blocks=2,
+        tcn_dilation_cycle=(1, 2),
+        conformer_blocks=1,
+        conformer_heads=4,
+        conformer_ff_multiplier=2,
+        conformer_conv_kernel=7,
+        patch_stride=patch_stride,
+        minimum_parameters=1,
+        maximum_parameters=10_000_000,
+    )
+    with pytest.raises(ValueError, match="cadence merging or downsampling"):
+        build_fm0_model(
+            variant,
+            config_override=config,
+            enforce_parameter_budget=False,
+        )
+
+
+@pytest.mark.parametrize(
+    ("variant", "architecture"),
+    (("TWIRL-FM0.3.1", "tcn"), ("TWIRL-FM0.3.2", "conformer")),
+)
+def test_fm0_3_h_cadence_is_the_post_context_stride_one_sequence(
+    variant: str,
+    architecture: str,
+) -> None:
+    config = FM0ModelConfig(
+        architecture=architecture,
+        n_flux_views=2,
+        window_length=128,
+        d_model=16,
+        embedding_dim=16,
+        stem_kernel=5,
+        dropout=0.0,
+        tcn_blocks=2,
+        tcn_dilation_cycle=(1, 2),
+        conformer_blocks=1,
+        conformer_heads=4,
+        conformer_ff_multiplier=2,
+        conformer_conv_kernel=7,
+        patch_stride=1,
+        minimum_parameters=1,
+        maximum_parameters=10_000_000,
+    )
+    model = build_fm0_model(
+        variant,
+        config_override=config,
+        enforce_parameter_budget=False,
+    ).eval()
+    dataset = SyntheticFM0Dataset(
+        SyntheticFM0Config(variant=variant, window_length=128, windows_per_epoch=4)
+    )
+    batch = collate_fm0_samples([dataset[0], dataset[1]])
+    captured: list[torch.Tensor] = []
+    context_blocks = model.tcn if architecture == "tcn" else model.conformer
+    handle = context_blocks[-1].register_forward_hook(
+        lambda _module, _args, output: captured.append(output.detach().clone())
+    )
+    try:
+        with torch.no_grad():
+            output = model(batch)
+    finally:
+        handle.remove()
+
+    expected = captured[0].transpose(1, 2) if architecture == "tcn" else captured[0]
+    assert model.config.patch_stride == 1
+    assert output["h_cadence"].shape == (2, 128, 16)
+    assert output["token_valid"].shape == (2, 128)
+    torch.testing.assert_close(output["h_cadence"], expected)
+
+
+def test_conformer_decoder_skip_cannot_change_h_cadence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = FM0ModelConfig(
+        architecture="conformer",
+        n_flux_views=2,
+        window_length=128,
+        d_model=16,
+        embedding_dim=16,
+        stem_kernel=5,
+        dropout=0.0,
+        conformer_blocks=1,
+        conformer_heads=4,
+        conformer_ff_multiplier=2,
+        conformer_conv_kernel=7,
+        patch_stride=1,
+        minimum_parameters=1,
+        maximum_parameters=10_000_000,
+    )
+    model = build_fm0_model(
+        "TWIRL-FM0.3.2",
+        config_override=config,
+        enforce_parameter_budget=False,
+    ).eval()
+    dataset = SyntheticFM0Dataset(
+        SyntheticFM0Config(
+            variant="TWIRL-FM0.3.2", window_length=128, windows_per_epoch=2
+        )
+    )
+    batch = collate_fm0_samples([dataset[0], dataset[1]])
+    with torch.no_grad():
+        baseline = model(batch)
+
+    def amplified_decoder_skip(
+        contextual_hidden: torch.Tensor,
+        cadence_stem_hidden: torch.Tensor,
+        token_valid: torch.Tensor,
+    ) -> torch.Tensor:
+        return (
+            contextual_hidden + 17.0 * cadence_stem_hidden
+        ) * token_valid[:, None, :]
+
+    monkeypatch.setattr(
+        TWIRLFM0,
+        "_conformer_decoder_hidden",
+        staticmethod(amplified_decoder_skip),
+    )
+    with torch.no_grad():
+        changed_skip = model(batch)
+
+    assert not torch.equal(baseline["reconstruction"], changed_skip["reconstruction"])
+    torch.testing.assert_close(baseline["h_cadence"], changed_skip["h_cadence"])
+    torch.testing.assert_close(baseline["h_window"], changed_skip["h_window"])
+    torch.testing.assert_close(baseline["z_window"], changed_skip["z_window"])
+    assert torch.equal(baseline["token_valid"], changed_skip["token_valid"])
 
 
 def test_model_config_rejects_nonpositive_patch_stride() -> None:

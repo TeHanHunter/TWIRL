@@ -1001,6 +1001,17 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   four pair-balanced per-cadence BCE strata. It adds fail-closed raw-flux and
   quality-only mechanics gates; no FM training, BLS, GPU, or sealed access is
   authorized.
+- `2026-09-01`: Hardened the provisional FM0.3 implementation around the
+  no-cadence-merging rule. Both variants now fail closed unless the context is
+  exactly `128` native `200 s` cadences at stride one; the Conformer exposes
+  its true post-context token sequence while keeping its stem skip confined to
+  reconstruction. Added the isolated
+  `position_centered_cadence_vicreg_loss`, which preserves `[batch, cadence,
+  feature]` geometry, centers only across windows at each fixed cadence, and
+  pools only scalar loss sufficient statistics. The Torch-enabled objective
+  tests passed `7/7` on ORCD; trainer replay, the cadence-collapse gate, and
+  the training-eligible manifest remain incomplete, so this does not authorize
+  a real FM0.3 run.
 
 **Next:** Run the immutable event-transfer v2 repair and interpret FM metrics
 only if its raw/quality mechanics gate passes. Before any real FM0.3 run,

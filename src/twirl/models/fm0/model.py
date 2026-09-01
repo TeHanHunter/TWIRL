@@ -435,6 +435,16 @@ class TWIRLFM0(_ModuleBase):
             weights, dim=-1
         ).clamp_min(1.0)
 
+    @staticmethod
+    def _conformer_decoder_hidden(
+        contextual_hidden: Any,
+        cadence_stem_hidden: Any,
+        token_valid: Any,
+    ) -> Any:
+        """Add the cadence-stem skip only on the reconstruction branch."""
+
+        return (contextual_hidden + cadence_stem_hidden) * token_valid[:, None, :]
+
     def _forward(
         self,
         batch: dict[str, Any],
@@ -469,20 +479,31 @@ class TWIRLFM0(_ModuleBase):
             # The pre-patch cadence stem is a local reconstruction skip.  The
             # Conformer context therefore cannot force all four cadences in a
             # patch to share one decoded state and erase sub-patch events.
-            full_hidden = (upsampled + hidden) * token_valid[:, None, :]
+            full_hidden = self._conformer_decoder_hidden(
+                upsampled,
+                hidden,
+                token_valid,
+            )
 
         h_window = self._masked_mean(token_hidden, output_valid)
         embedding = self.embedding_projection(h_window)
         reconstruction = self.reconstruction_head(full_hidden)
         reconstruction = reconstruction * token_valid[:, None, :]
+        cadence_hidden = (
+            token_hidden
+            if self.config.architecture == "tcn" or self.config.patch_stride == 1
+            else full_hidden.transpose(1, 2)
+        )
         return {
             "reconstruction": reconstruction,
-            # Preserve the cadence-indexed encoder/decoder state for later
-            # event-localizing heads.  For a cadence-preserving Conformer this
-            # requires patch_stride=1; older stride-4 checkpoints remain
-            # loadable, but their contextual state was formed from averaged
-            # four-cadence patches and is not a candidate for that contract.
-            "h_cadence": full_hidden.transpose(1, 2),
+            # Expose the true post-context token sequence to later
+            # event-localizing heads.  The Conformer cadence-stem skip remains
+            # decoder-only and cannot leak into this representation.  FM0.3
+            # requires patch_stride=1, so each output token is exactly one
+            # unbinned 200-second cadence.  Legacy stride-four Conformer
+            # checkpoints retain their prior decoder-state output shape for
+            # compatibility, but are excluded from the FM0.3 contract.
+            "h_cadence": cadence_hidden,
             # This output-only diagnostic localizes whether low rank originates
             # before or after the projection.  It adds no parameter or model
             # input and remains compatible with existing FM0.1 checkpoints.
@@ -552,8 +573,8 @@ def build_fm0_model(
     architecture = architecture_for_variant(
         variant, development_winner=development_winner
     )
+    short_context = variant in {"TWIRL-FM0.3.1", "TWIRL-FM0.3.2"}
     if config_override is None:
-        short_context = variant in {"TWIRL-FM0.3.1", "TWIRL-FM0.3.2"}
         config = FM0ModelConfig(
             architecture=architecture,
             n_flux_views=len(indices),
@@ -564,6 +585,13 @@ def build_fm0_model(
         config = config_override
         if config.architecture != architecture or config.n_flux_views != len(indices):
             raise ValueError("model override conflicts with frozen variant")
+    if short_context and (
+        config.window_length != FM0_3_WINDOW_LENGTH or config.patch_stride != 1
+    ):
+        raise ValueError(
+            "FM0.3 requires window_length=128 and patch_stride=1; cadence "
+            "merging or downsampling is forbidden"
+        )
     model = TWIRLFM0(config)
     if enforce_parameter_budget:
         count = count_trainable_parameters(model)

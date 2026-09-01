@@ -208,8 +208,14 @@ project authority.
   cadence-level noncollapse objective, expose the post-context cadence stream
   identically for TCN and Conformer, bind one training-eligible manifest that
   reuses S56--S64 and S66--S77 shards without rewriting them, and freeze a
-  genuinely newer temporal holdout. The current S66--S77 preparation receipt
-  is intentionally training-ineligible. Subsequent
+  genuinely newer temporal holdout. The model now fails closed unless every
+  FM0.3 override is exactly `128` cadences with stride one, and its Conformer
+  `h_cadence` is the true post-context sequence rather than the reconstruction
+  skip. A position-centered cadence VICReg helper now implements batch
+  centering at each fixed cadence and never constructs a temporally pooled
+  representation; trainer replay, the cadence-collapse evaluation gate, and
+  the real-data contract are still pending. The current S66--S77 preparation
+  receipt is intentionally training-ineligible. Subsequent
   candidates may optimize both independent reconstruction masks and then test
   a separate stable-host cross-visit head,
   but each is a one-mechanism ablation; raw/ADP015 view additions and a
