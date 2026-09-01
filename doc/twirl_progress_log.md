@@ -1012,11 +1012,44 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   tests passed `7/7` on ORCD; trainer replay, the cadence-collapse gate, and
   the training-eligible manifest remain incomplete, so this does not authorize
   a real FM0.3 run.
+- `2026-09-01`: Event-transfer v2 CPU job `21766861` completed `0:0` in
+  `1h21m56s`; its immutable result SHA-256 is
+  `42e9625c8bf1261b24379426fb732bc7e4289b76bde832bad0847916186930f3`.
+  The repaired pair-balanced cadence fit behaved sensibly: the loss fell from
+  about `0.6932` to `0.5597`, both standardized ADP coefficients were negative,
+  and the quality-only paired control was exactly `0.5`. The all-window
+  reduction nevertheless invalidated the mechanics gate. Raw AUROC was only
+  `0.50225`, paired ranking was `0.51667`, and the three `30%`-depth cells were
+  `0.50125`, `0.50906`, and `0.52125` for durations `1`, `3`, and `9` cadences.
+  The per-cadence fit learned the dip direction, but the maximum over all `128`
+  cadences usually remained on an unrelated real outlier shared by the clean
+  and injected pair. Every FM metric in this artifact is therefore
+  non-interpretable; it is not evidence for or against the TCN, the shorter
+  context, or training.
+- `2026-09-01`: Implemented the bounded FM0.3 pre-run path without launching a
+  model. The trainer now binds the explicit cadence-objective schema, optimizes
+  first-mask reconstruction plus position-centered cadence VICReg on the true
+  post-context `[batch, cadence, feature]` stream, and replays exact staged
+  gradients without creating a temporal representation. The collapse runner
+  checks native cadence differences from exact step-0/step-2,000 checkpoints,
+  but is explicitly a non-authoritative preflight until a panel receipt and
+  real-run contract exist. A compact identity-only composite freezer binds the
+  existing S56--S64 and S66--S77 manifests without copying shards; all S77
+  `poc_train` rows become the internal temporal holdout and every overlapping
+  earlier component is quarantined. The pre-freeze audit found `789,588`
+  candidate earlier training rows before that component quarantine and
+  `23,162` S77 holdout rows containing `178,463,210` cadences; the final counts
+  await the immutable remote receipt. A separate raw/quality-only v3 mechanics
+  control now uses exact paired event-center cadences and cannot load an FM.
+  The full local suite passed `1,212` tests with `43` optional skips. No shard
+  was rewritten, no sealed payload was opened, and no FM training was enabled.
 
-**Next:** Run the immutable event-transfer v2 repair and interpret FM metrics
-only if its raw/quality mechanics gate passes. Before any real FM0.3 run,
-freeze a cadence-level noncollapse objective, a training-eligible S56--S64 plus
-S66--S77 manifest with S65 excluded, and a genuinely newer temporal holdout.
+**Next:** Run the fast v3 raw/quality center-cadence mechanics control and
+freeze the composite identity receipt. If mechanics passes, run the
+predeclared candidate-band `36--92` transfer screen with raw, quality, step-0,
+and step-2,000 cadence-token controls. Only after those results are valid may
+the matched FM0.3.1 TCN/FM0.3.2 Conformer canary be authorized; preserve one
+native `200 s` cadence per token throughout.
 
 ### Candidate validation and follow-up
 

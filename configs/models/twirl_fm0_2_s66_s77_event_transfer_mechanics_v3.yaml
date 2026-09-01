@@ -1,0 +1,109 @@
+schema_version: twirl_fm0_event_transfer_mechanics_config_v3
+campaign_id: twirl_fm0_2_s66_s77_event_transfer_mechanics_v3
+model_family: TWIRL-FM0
+status: frozen_bls_free_development_mechanics_control
+prepared_on: 2026-09-01
+
+purpose:
+  primary: verify_raw_and_quality_cadence_probe_mechanics
+  mechanics_only: true
+  formal_model_gate: false
+  fm_metric_interpretation: false
+  production_model_claim: false
+
+authorization:
+  development_shard_payload_access: true
+  artificial_single_event_injection: true
+  low_capacity_probe_fitting: true
+  frozen_checkpoint_inference: false
+  fm_encoder_optimizer_or_training: false
+  bls_period_candidate_or_event_features: false
+  sealed_test_access: false
+
+inputs:
+  temporal_panel_receipt_sha256: 78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624
+  allowed_sectors: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+  excluded_sectors: [65]
+  source_partition: poc_development
+  variant: TWIRL-FM0.2.1
+
+split:
+  train_sectors: [66, 67, 68, 69, 70, 71]
+  validation_sectors: [72, 73, 74]
+  locked_development_test_sectors: [75, 76, 77]
+  component_spanning_blocks: quarantine
+  one_visit_per_component: true
+  target_components_per_cohort_per_block: 240
+  shortfall_policy: fail_closed
+  minimum_components_per_cohort_per_block: 12
+  component_and_visit_order: deterministic_sha256
+  cohorts: [repeated, new]
+
+temporal_resolution:
+  nominal_cadence_seconds: 200
+  context_cadences: 128
+  direct_centered_crop: true
+  one_logit_per_native_cadence: true
+  temporal_downsampling: false
+  patching_or_cadence_averaging: false
+  representation_pooling: false
+  off_support_used_for_fit_or_evaluation: false
+  held_out_reduction: exact_injected_support_center_vs_exact_paired_clean_cadence
+
+artificial_event:
+  profile: symmetric_trapezoid_sampled_at_cadence_centers
+  duration_cadences: [1, 3, 9]
+  fractional_depths: [0.01, 0.03, 0.1, 0.3]
+  center_jitter_cadences_inclusive: [-24, 24]
+  apply_to_views: [adp_1x1, adp_3x3]
+  one_clean_and_one_injected_sample_per_component: true
+  one_event_per_injected_sample: true
+  period_defined: false
+  injection_truth_used_as_feature: false
+  support_role: training_target_and_held_out_evaluation_truth_never_input_feature
+
+features:
+  controls:
+    - raw_adp_validity_error_cadence_128
+    - quality_only_cadence_128
+  raw_channels: [adp_1x1, adp_3x3, flux_valid_1x1, flux_valid_3x3, flux_error_1x1, flux_error_3x3, error_valid_1x1, error_valid_3x3, local_time_cadences, delta_time_cadences, time_valid, segment_boundary]
+  quality_only_channels: [flux_valid_1x1, flux_valid_3x3, error_valid_1x1, error_valid_3x3, local_time_cadences, delta_time_cadences, time_valid, segment_boundary]
+  forbidden_feature_families: [period, bls, candidate_score, event_duration, event_depth, event_center_numeric_value, injection_support]
+
+probe:
+  family: shared_linear_cadence_scorer
+  training_objective: pair_balanced_center_support_per_cadence_binary_cross_entropy
+  standardization: training_clean_and_injected_center_cadences_only
+  one_example_per_clean_or_injected_component_row: true
+  support_appended_to_features: false
+  off_support_used_for_standardization_or_fit: false
+  learning_rate: 0.02
+  l2_weight: 0.001
+  epochs: 400
+  initialization_seed: 560203
+
+evaluation:
+  split: locked_development_test
+  support_use: select_center_cadence_as_held_out_truth_after_all_logits_are_emitted
+  comparison: injected_center_logit_vs_exact_paired_clean_center_logit
+  pair_weighting: one_equal_vote_per_component
+  duration_weighting: one_equal_vote_per_component_not_per_support_cadence
+  uncertainty: deterministic_component_pair_bootstrap_95_interval
+  bootstrap_replicates: 1000
+  bootstrap_seed: 560205
+
+mechanics:
+  raw_minimum_center_paired_ranking_lower_95: 0.95
+  raw_minimum_each_depth_0_30_center_paired_ranking: 0.90
+  raw_require_negative_adp_flux_coefficients: true
+  quality_center_paired_ranking_required_exact: 0.50
+
+claim_limit: >-
+  This fast development-only artifact checks only raw and quality-control probe
+  mechanics. It fits on one native center cadence per clean or injected row,
+  emits one independently scored logit per native 200-second cadence, and uses
+  held-out synthetic support only to select the exact center truth cadence
+  after logits exist. Support is never an input feature. It does not load or
+  evaluate an FM checkpoint, interpret FM metrics, establish unknown-location
+  performance, average or merge cadence representations, use BLS, open sealed
+  data, or authorize model promotion.

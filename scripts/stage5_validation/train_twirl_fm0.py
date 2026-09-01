@@ -29,6 +29,10 @@ from twirl.models.fm0.model import (  # noqa: E402
     count_trainable_parameters,
 )
 from twirl.models.fm0.training import (  # noqa: E402
+    CADENCE_VICREG_OBJECTIVE_IDENTITY,
+    FM0_3_MASK_SPAN_RANGE,
+    FM0_3_MASK_TARGET_FRACTION,
+    FM0_3_WINDOW_LENGTH,
     FM0OptimizationConfig,
     run_real_training,
     run_synthetic_training,
@@ -47,6 +51,12 @@ from twirl.models.fm0.validation import (  # noqa: E402
     validate_run_release,
     write_json_with_sha256,
     write_sha256_sidecar,
+)
+
+FM0_3_CONFIG_SCHEMA_VERSION = "twirl_fm0_3_cadence_objective_config_v1"
+FM0_2_CONFIG_SCHEMA_VERSION = "twirl_fm0_2_objective_canary_config_v1"
+RUNTIME_ONLY_STOP_CONFIG_SCHEMAS = frozenset(
+    {FM0_2_CONFIG_SCHEMA_VERSION, FM0_3_CONFIG_SCHEMA_VERSION}
 )
 
 
@@ -91,10 +101,120 @@ def _load_config(path: Path) -> dict[str, object]:
         raise ValueError("FM0 config must be a YAML mapping")
     if payload.get("schema_version") not in {
         "twirl_fm0_1_poc_config_v1",
-        "twirl_fm0_2_objective_canary_config_v1",
+        FM0_2_CONFIG_SCHEMA_VERSION,
+        FM0_3_CONFIG_SCHEMA_VERSION,
     }:
         raise ValueError("FM0 config schema mismatch")
     return payload
+
+
+def _objective_settings(
+    config: dict[str, object],
+    variant_payload: dict[str, object],
+) -> tuple[str, bool, bool, str | None]:
+    """Resolve only an objective explicitly authorized by its config schema."""
+
+    schema_version = config.get("schema_version")
+    objective_name = str(variant_payload.get("objective", ""))
+    objective_identity = None
+    if schema_version == FM0_3_CONFIG_SCHEMA_VERSION:
+        if objective_name != CADENCE_VICREG_OBJECTIVE_IDENTITY:
+            raise ValueError(
+                "FM0.3 requires the frozen cadence-level objective identity"
+            )
+        objective_identity = CADENCE_VICREG_OBJECTIVE_IDENTITY
+        use_vicreg = True
+    elif objective_name == "masked_reconstruction":
+        use_vicreg = False
+    elif objective_name in {
+        "masked_reconstruction_plus_same_window_vicreg",
+        "dual_mask_reconstruction_plus_same_window_vicreg",
+    }:
+        use_vicreg = True
+    else:
+        raise ValueError(f"unsupported FM0 objective: {objective_name!r}")
+
+    if schema_version == "twirl_fm0_1_poc_config_v1":
+        reconstruct_second_view = use_vicreg
+    else:
+        objective_payload = config.get("objective")
+        if not isinstance(objective_payload, dict):
+            raise ValueError("FM0 reconstruction objective is malformed")
+        if schema_version == FM0_3_CONFIG_SCHEMA_VERSION and (
+            objective_payload.get("name") != objective_name
+        ):
+            raise ValueError("FM0.3 objective declarations disagree")
+        reconstruction_payload = objective_payload.get("reconstruction", {})
+        if not isinstance(reconstruction_payload, dict):
+            raise ValueError("FM0 reconstruction objective is malformed")
+        optimized_masks = reconstruction_payload.get("optimized_mask_views")
+        if optimized_masks == ["first"]:
+            reconstruct_second_view = False
+        elif optimized_masks == ["first", "second"]:
+            reconstruct_second_view = True
+        else:
+            raise ValueError("FM0 optimized mask-view declaration is invalid")
+    if objective_identity is not None and reconstruct_second_view:
+        raise ValueError("FM0.3 cadence objective optimizes only the first mask")
+    return (
+        objective_name,
+        use_vicreg,
+        reconstruct_second_view,
+        objective_identity,
+    )
+
+
+def _dataset_geometry(schema_version: object) -> dict[str, object]:
+    """Return the schema-bound model window and masking geometry."""
+
+    if schema_version == FM0_3_CONFIG_SCHEMA_VERSION:
+        return {
+            "window_length": FM0_3_WINDOW_LENGTH,
+            "mask_target_fraction": FM0_3_MASK_TARGET_FRACTION,
+            "mask_span_range": FM0_3_MASK_SPAN_RANGE,
+        }
+    return {}
+
+
+def _bind_training_stop_contract(
+    run_contract: dict[str, object],
+    *,
+    schema_version: object,
+    optimizer_horizon: int,
+    invocation_target_step: int,
+    canary_payload: dict[str, object] | None = None,
+) -> None:
+    """Bind invariant training science while leaving staged stops resumable."""
+
+    if schema_version == FM0_2_CONFIG_SCHEMA_VERSION:
+        if canary_payload is None:
+            raise ValueError("FM0.2 stop contract lacks its canary declaration")
+        run_contract.update(
+            {
+                "training_horizon_step": optimizer_horizon,
+                "immutable_milestone_steps": [
+                    int(value)
+                    for value in canary_payload["immutable_milestone_steps"]
+                ],
+                "authorized_stop_after_steps": [
+                    int(value)
+                    for value in canary_payload["authorized_stop_after_steps"]
+                ],
+                "synthetic_smoke_step": int(
+                    canary_payload["fp32_synthetic_smoke_steps"]
+                ),
+            }
+        )
+    elif schema_version == FM0_3_CONFIG_SCHEMA_VERSION:
+        run_contract.update(
+            {
+                "training_horizon_step": optimizer_horizon,
+                "stop_after_step_is_execution_state_not_scientific_contract": True,
+            }
+        )
+    else:
+        # Preserve the byte-level FM0.1 run/checkpoint contract.
+        run_contract["target_step"] = invocation_target_step
 
 
 def main() -> int:
@@ -109,10 +229,15 @@ def main() -> int:
         freeze_receipt_path=args.freeze_receipt,
     )
     config = _load_config(args.config)
-    is_fm0_2 = (
-        config.get("schema_version")
-        == "twirl_fm0_2_objective_canary_config_v1"
-    )
+    schema_version = config.get("schema_version")
+    is_fm0_2 = schema_version == FM0_2_CONFIG_SCHEMA_VERSION
+    is_fm0_3 = schema_version == FM0_3_CONFIG_SCHEMA_VERSION
+    runtime_only_stop = schema_version in RUNTIME_ONLY_STOP_CONFIG_SCHEMAS
+    if is_fm0_3 and not args.synthetic_smoke:
+        raise ValueError(
+            "FM0.3 real-data training requires a separately frozen input-release "
+            "contract"
+        )
     if is_fm0_2:
         authorization = config.get("authorization")
         if (
@@ -142,29 +267,13 @@ def main() -> int:
     variant_payload = variants[args.variant]
     if not isinstance(variant_payload, dict):
         raise ValueError("requested FM0 variant is malformed")
-    objective_name = str(variant_payload.get("objective", ""))
-    if objective_name == "masked_reconstruction":
-        use_vicreg = False
-    elif objective_name in {
-        "masked_reconstruction_plus_same_window_vicreg",
-        "dual_mask_reconstruction_plus_same_window_vicreg",
-    }:
-        use_vicreg = True
-    else:
-        raise ValueError(f"unsupported FM0 objective: {objective_name!r}")
-    if config.get("schema_version") == "twirl_fm0_1_poc_config_v1":
-        reconstruct_second_view = use_vicreg
-    else:
-        reconstruction_payload = config.get("objective", {}).get("reconstruction", {})
-        if not isinstance(reconstruction_payload, dict):
-            raise ValueError("FM0.2 reconstruction objective is malformed")
-        optimized_masks = reconstruction_payload.get("optimized_mask_views")
-        if optimized_masks == ["first"]:
-            reconstruct_second_view = False
-        elif optimized_masks == ["first", "second"]:
-            reconstruct_second_view = True
-        else:
-            raise ValueError("FM0.2 optimized mask-view declaration is invalid")
+    (
+        objective_name,
+        use_vicreg,
+        reconstruct_second_view,
+        objective_identity,
+    ) = _objective_settings(config, variant_payload)
+    dataset_geometry = _dataset_geometry(schema_version)
     optimization_payload = config.get("optimization", {})
     if not isinstance(optimization_payload, dict):
         raise ValueError("frozen optimization config is malformed")
@@ -338,6 +447,7 @@ def main() -> int:
                 source_partition="poc_train",
                 windows_per_epoch=int(optimization.max_optimizer_steps)
                 * int(optimization.effective_batch_windows),
+                **dataset_geometry,
             )
         )
         release_binding = {
@@ -390,28 +500,20 @@ def main() -> int:
         "expected_git_sha": git_sha,
         "optimization": asdict(optimization),
     }
-    if is_fm0_2:
+    if is_fm0_3:
         run_contract.update(
             {
-                "training_horizon_step": optimization.max_optimizer_steps,
-                "immutable_milestone_steps": [
-                    int(value)
-                    for value in canary_payload["immutable_milestone_steps"]
-                ],
-                "authorized_stop_after_steps": [
-                    int(value)
-                    for value in canary_payload["authorized_stop_after_steps"]
-                ],
-                "synthetic_smoke_step": int(
-                    canary_payload["fp32_synthetic_smoke_steps"]
-                ),
+                "mask_target_fraction": FM0_3_MASK_TARGET_FRACTION,
+                "mask_span_range": list(FM0_3_MASK_SPAN_RANGE),
             }
         )
-    else:
-        # Preserve the byte-level FM0.1 run/checkpoint contract. FM0.2 moves
-        # the invocation stop out of this invariant structure so exact resume
-        # can advance 64 -> 500 -> 1000 -> 2000 without changing science.
-        run_contract["target_step"] = args.target_step
+    _bind_training_stop_contract(
+        run_contract,
+        schema_version=schema_version,
+        optimizer_horizon=optimization.max_optimizer_steps,
+        invocation_target_step=args.target_step,
+        canary_payload=canary_payload if is_fm0_2 else None,
+    )
     contract_path = output / "run_contract.json"
     if contract_path.exists():
         if read_json(contract_path) != run_contract:
@@ -429,7 +531,11 @@ def main() -> int:
     parameter_count = count_trainable_parameters(model)
     if args.synthetic_smoke:
         dataset = SyntheticFM0Dataset(
-            SyntheticFM0Config(variant=args.variant, seed=args.seed)
+            SyntheticFM0Config(
+                variant=args.variant,
+                seed=args.seed,
+                **dataset_geometry,
+            )
         )
         result = run_synthetic_training(
             model=model,
@@ -443,6 +549,7 @@ def main() -> int:
             precision=args.precision,
             use_vicreg=use_vicreg,
             reconstruct_second_view=reconstruct_second_view,
+            objective_identity=objective_identity,
             resume_checkpoint=args.resume_checkpoint,
         )
     else:
@@ -460,6 +567,7 @@ def main() -> int:
             precision=args.precision,
             use_vicreg=use_vicreg,
             reconstruct_second_view=reconstruct_second_view,
+            objective_identity=objective_identity,
             resume_checkpoint=args.resume_checkpoint,
         )
     checkpoint_path = output / "checkpoint.pt"
@@ -479,7 +587,7 @@ def main() -> int:
         "objective": objective_name,
         "parameter_count": parameter_count,
         "global_step": result["global_step"],
-        "requested_stop_after_step": args.target_step if is_fm0_2 else None,
+        "requested_stop_after_step": args.target_step if runtime_only_stop else None,
         "final_metrics": result["final_metrics"],
         "precision": result["precision"],
         "device": result["device"],

@@ -1,0 +1,87 @@
+{
+  "schema_version": "twirl_fm0_3_composite_freeze_authority_v1",
+  "legacy": {
+    "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/input_releases/twirl_fm0_1_s56_s64_v2",
+    "manifest_sha256": "f9c62ba02ea40ad7b2f457cd4dab55526ee7a453ead8a1a553c4de9f2969598a",
+    "receipt_path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_1_s56_s67_poc/ece8619fd72f/frozen/input_release_validation/input_release.receipt.json",
+    "receipt_sha256": "a0908e43e92cae0f3e832382e986319e5942cce12b90bf3f90db17a03eb792f7"
+  },
+  "later": [
+    {
+      "sector": 66,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0066",
+      "manifest_sha256": "3083dacb2ba269b4677fe5d5bf5ecef87843a2fd2d028c81e507da40b6c07388",
+      "receipt_sha256": "5c3189ad96d06761d9a90481d109116d2626e3f7e117b8941f966f41038e0f58"
+    },
+    {
+      "sector": 67,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0067",
+      "manifest_sha256": "f86865ab4b41482dc815fb3fe58232aedc251fa95ca3cbbb6e4ce7106b705a9b",
+      "receipt_sha256": "a20e85da8d074f55d93ca09a45c557150f602483e2a0e72c93a72e9c4c340c8c"
+    },
+    {
+      "sector": 68,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0068",
+      "manifest_sha256": "ac6bca47690d22c139eb0147cb3a1ca8c5de55caca832a0a05c5f50769efba54",
+      "receipt_sha256": "c74cbf263e5373e1fcd608c7b3484797f906230fb983d69ce9cf38c78b8b55bb"
+    },
+    {
+      "sector": 69,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0069",
+      "manifest_sha256": "692b16b26816a8da34ce76a31294ab6a0a4ead048a0fb8840822d14941b291cf",
+      "receipt_sha256": "6a94128457d9611b112b7108550253215e4b1af22886b754c00356f9db2cb9c9"
+    },
+    {
+      "sector": 70,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0070",
+      "manifest_sha256": "90016da5384aa54faac0297fa7ddfb33e30c86fca6922c98c4f3814aca3036ff",
+      "receipt_sha256": "d7ee538e4e28f61b2dfa0c1575b296adaf598ed9627ef5b6fc41d977266f49a8"
+    },
+    {
+      "sector": 71,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0071",
+      "manifest_sha256": "30b2f9aec644e2732f1a26add6ef88c7167590d4343937bae6137c79ef49e748",
+      "receipt_sha256": "16587528e02aea8476de78668d46d2b0d7a2a92f167c995a42421d15c3428b12"
+    },
+    {
+      "sector": 72,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0072",
+      "manifest_sha256": "effbfc3d60178085ea67a03b811270f1e8c9801e1cf81778efb62e0e983cb4f9",
+      "receipt_sha256": "233dd52f4d16b019708d3a47ff669d4195f5e4220f3a66bc9876a7b2b013a04d"
+    },
+    {
+      "sector": 73,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0073",
+      "manifest_sha256": "f0cd608c4646a493b9a34aac34912cd8a3a283c9a225cde7c2a9daeb02f5fdc8",
+      "receipt_sha256": "c2d048462d9d100379d6459ac2c9a416a49869545f05d586d14439cd2c002928"
+    },
+    {
+      "sector": 74,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0074",
+      "manifest_sha256": "da60d9b924b50199b12697c1f0d90c5d6aa32013c162f737285cb1160b15651b",
+      "receipt_sha256": "ab357fc3e16d5c3cf69568593e84041e1c1722cc88df3fcd9bb36a9a5df183b5"
+    },
+    {
+      "sector": 75,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0075",
+      "manifest_sha256": "a9a258c1cde1b762f23bcc0a94c236611eb3aaee944ab7006632f4bdc1ec5233",
+      "receipt_sha256": "630e655011223c4d4fd19c86408f24c959362e37cf4c717cc1eb0a8cf45df306"
+    },
+    {
+      "sector": 76,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0076",
+      "manifest_sha256": "5c27ff4079eb04cffdcacbf255f65bc1a4cca208a62c5ed996f49a551508b1d4",
+      "receipt_sha256": "7b675bdf489fedf8fd22f63650c081ea31df6be17bf48ed36ef90e08ca5f5b72"
+    },
+    {
+      "sector": 77,
+      "release_root": "/orcd/data/mki_aryeh/001/twirl/exports/fm0/later_sector_releases/twirl_fm0_s66_s77_full_visit_v1/s0077",
+      "manifest_sha256": "f5d8216bea74f3991764827881910983d436126d8843f8a2c6d56452abad0728",
+      "receipt_sha256": "b06093bbe2fc621b62b4a163198f8db31432bc47150687b8699ce7a491688764"
+    }
+  ],
+  "admission_receipt": {
+    "path": "/orcd/data/mki_aryeh/001/twirl/reports/stage5_validation/twirl_fm0_s66_s77_full_visit_preparation_v1/admission_v2/receipt.json",
+    "sha256": "9461e2f38328ece9b02bef8ff761bfd248e9766d9df98537242c45f7e2740701"
+  }
+}

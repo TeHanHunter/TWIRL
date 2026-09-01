@@ -5,10 +5,9 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 from typing import Any, Mapping
-
 
 RUN_CONTRACT_SCHEMA_VERSION = "twirl_fm0_1_synthetic_run_contract_v1"
 RUN_SUMMARY_SCHEMA_VERSION = "twirl_fm0_1_synthetic_run_summary_v1"
@@ -188,9 +187,19 @@ def _inspect_trusted_checkpoint(
     from dataclasses import fields
 
     from .dataset import variant_view_indices
-    from .model import FM0ModelConfig, TWIRLFM0, count_trainable_parameters
+    from .model import (
+        TWIRLFM0,
+        FM0ModelConfig,
+        build_fm0_model,
+        count_trainable_parameters,
+    )
     from .training import (
+        CADENCE_VICREG_OBJECTIVE_IDENTITY,
         CHECKPOINT_SCHEMA_VERSION,
+        FM0_3_MASK_SPAN_RANGE,
+        FM0_3_MASK_TARGET_FRACTION,
+        FM0_3_WINDOW_LENGTH,
+        OBJECTIVE_STATE_SCHEMA_V2,
         FM0OptimizationConfig,
         make_optimizer_and_scheduler,
     )
@@ -232,6 +241,28 @@ def _inspect_trusted_checkpoint(
     checkpoint_step = progress.get("global_step")
     summary_step = summary.get("global_step")
     target_step = contract.get("target_step")
+    cadence_objective = (
+        contract.get("objective") == CADENCE_VICREG_OBJECTIVE_IDENTITY
+    )
+    if cadence_objective:
+        expected_objective_state = {
+            "schema_version": OBJECTIVE_STATE_SCHEMA_V2,
+            "identity": CADENCE_VICREG_OBJECTIVE_IDENTITY,
+            "use_vicreg": True,
+            "reconstruct_second_view": False,
+        }
+        if (
+            checkpoint.get("objective_state") != expected_objective_state
+            or contract.get("use_vicreg") is not True
+            or contract.get("reconstruct_second_view") is not False
+            or contract.get("mask_target_fraction")
+            != FM0_3_MASK_TARGET_FRACTION
+            or tuple(contract.get("mask_span_range", ()))
+            != FM0_3_MASK_SPAN_RANGE
+        ):
+            raise ValueError("FM0.3 cadence objective checkpoint contract differs")
+    if cadence_objective and target_step is not None:
+        raise ValueError("FM0.3 invocation stop must remain runtime-only")
     if target_step is None:
         target_step = summary.get("requested_stop_after_step")
         horizon = contract.get("training_horizon_step")
@@ -245,7 +276,15 @@ def _inspect_trusted_checkpoint(
             or target_step > horizon
         ):
             raise ValueError("FM0 invocation stop is outside the invariant horizon")
-        if contract.get("synthetic_smoke"):
+        if cadence_objective:
+            if (
+                contract.get(
+                    "stop_after_step_is_execution_state_not_scientific_contract"
+                )
+                is not True
+            ):
+                raise ValueError("FM0.3 runtime-only stop declaration is missing")
+        elif contract.get("synthetic_smoke"):
             if target_step != contract.get("synthetic_smoke_step"):
                 raise ValueError("FM0 synthetic invocation stop differs from its contract")
         else:
@@ -290,6 +329,23 @@ def _inspect_trusted_checkpoint(
         or variant != summary.get("variant")
     ):
         raise ValueError("FM0 checkpoint model identity differs from the release")
+    canonical_model = None
+    if cadence_objective:
+        try:
+            canonical_model = build_fm0_model(
+                variant,
+                enforce_parameter_budget=True,
+            )
+        except (RuntimeError, TypeError, ValueError) as exc:
+            raise ValueError("canonical FM0.3 model construction failed") from exc
+        if (
+            model_config != canonical_model.config
+            or model_config.window_length != FM0_3_WINDOW_LENGTH
+            or model_config.patch_stride != 1
+        ):
+            raise ValueError(
+                "FM0.3 checkpoint differs from the canonical native-cadence model"
+            )
 
     model_state = checkpoint.get("model_state")
     if not isinstance(model_state, Mapping) or not model_state:
@@ -297,7 +353,7 @@ def _inspect_trusted_checkpoint(
     if not all(isinstance(value, torch.Tensor) for value in model_state.values()):
         raise ValueError("FM0 checkpoint model state contains a non-tensor")
     try:
-        model = TWIRLFM0(model_config)
+        model = canonical_model or TWIRLFM0(model_config)
         model.load_state_dict(model_state, strict=True)
     except (RuntimeError, TypeError, ValueError) as exc:
         raise ValueError(
@@ -367,6 +423,21 @@ def _inspect_trusted_checkpoint(
             or dataset_contract.get("seed") != contract.get("seed")
         ):
             raise ValueError("FM0 checkpoint real dataset contract mismatch")
+    if cadence_objective:
+        dataset_geometry = (
+            dataset_contract.get("config")
+            if dataset_contract.get("kind") == "synthetic"
+            else dataset_contract
+        )
+        if (
+            not isinstance(dataset_geometry, Mapping)
+            or dataset_geometry.get("window_length") != FM0_3_WINDOW_LENGTH
+            or dataset_geometry.get("mask_target_fraction")
+            != FM0_3_MASK_TARGET_FRACTION
+            or tuple(dataset_geometry.get("mask_span_range", ()))
+            != FM0_3_MASK_SPAN_RANGE
+        ):
+            raise ValueError("FM0.3 checkpoint dataset cadence geometry differs")
     for state_name in ("optimizer_state", "scheduler_state", "rng_state"):
         if not isinstance(checkpoint.get(state_name), Mapping):
             raise ValueError(f"FM0 checkpoint {state_name} is malformed")

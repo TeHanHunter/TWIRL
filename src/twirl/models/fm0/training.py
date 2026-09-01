@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from .cadence_objective import position_centered_cadence_vicreg_loss
 from .dataset import (
     FM0ReleaseDataset,
     SyntheticFM0Dataset,
@@ -31,22 +32,45 @@ except ImportError:  # pragma: no cover - local base environment omits Torch
 
 
 CHECKPOINT_SCHEMA_VERSION = "twirl_fm0_1_checkpoint_v1"
+OBJECTIVE_STATE_SCHEMA_V2 = "twirl_fm0_objective_state_v2"
+CADENCE_VICREG_OBJECTIVE_IDENTITY = (
+    "masked_reconstruction_plus_position_centered_cadence_vicreg_v1"
+)
+FM0_3_VARIANTS = frozenset({"TWIRL-FM0.3.1", "TWIRL-FM0.3.2"})
+FM0_3_WINDOW_LENGTH = 128
+FM0_3_MASK_TARGET_FRACTION = 0.15
+FM0_3_MASK_SPAN_RANGE = (1, 4)
 
 
 def _objective_state(
     *,
     use_vicreg: bool,
     reconstruct_second_view: bool,
-) -> dict[str, bool]:
+    objective_identity: str | None = None,
+) -> dict[str, Any]:
     """Return the checkpoint-bound objective switches for one invocation."""
 
     if type(use_vicreg) is not bool or type(reconstruct_second_view) is not bool:
         raise ValueError("FM0 objective switches must be boolean")
     if reconstruct_second_view and not use_vicreg:
         raise ValueError("a second reconstruction view requires paired VICReg input")
-    return {
+    state: dict[str, Any] = {
         "use_vicreg": use_vicreg,
         "reconstruct_second_view": reconstruct_second_view,
+    }
+    if objective_identity is None:
+        return state
+    if objective_identity != CADENCE_VICREG_OBJECTIVE_IDENTITY:
+        raise ValueError(f"unsupported explicit FM0 objective: {objective_identity!r}")
+    if not use_vicreg or reconstruct_second_view:
+        raise ValueError(
+            "FM0.3 cadence VICReg requires paired views and first-mask-only "
+            "reconstruction"
+        )
+    return {
+        "schema_version": OBJECTIVE_STATE_SCHEMA_V2,
+        "identity": objective_identity,
+        **state,
     }
 
 
@@ -54,17 +78,30 @@ def _validated_objective_state(
     value: Any,
     *,
     label: str,
-) -> dict[str, bool]:
+) -> dict[str, Any]:
     """Validate the exact, intentionally small objective-state schema."""
 
-    expected_keys = {"use_vicreg", "reconstruct_second_view"}
-    if not isinstance(value, Mapping) or set(value) != expected_keys:
-        raise ValueError(f"{label} must contain exactly {sorted(expected_keys)}")
-    if any(type(value[name]) is not bool for name in expected_keys):
+    legacy_keys = {"use_vicreg", "reconstruct_second_view"}
+    explicit_keys = legacy_keys | {"schema_version", "identity"}
+    observed_keys = frozenset(value) if isinstance(value, Mapping) else frozenset()
+    if not isinstance(value, Mapping) or observed_keys not in {
+        frozenset(legacy_keys),
+        frozenset(explicit_keys),
+    }:
+        raise ValueError(
+            f"{label} must contain exactly {sorted(legacy_keys)} or "
+            f"{sorted(explicit_keys)}"
+        )
+    if any(type(value[name]) is not bool for name in legacy_keys):
         raise ValueError(f"{label} switches must be boolean")
+    if observed_keys == frozenset(explicit_keys) and value.get(
+        "schema_version"
+    ) != OBJECTIVE_STATE_SCHEMA_V2:
+        raise ValueError(f"{label} explicit schema version is invalid")
     return _objective_state(
         use_vicreg=value["use_vicreg"],
         reconstruct_second_view=value["reconstruct_second_view"],
+        objective_identity=value.get("identity"),
     )
 
 
@@ -145,6 +182,115 @@ def _dataset_contract(dataset: Any) -> dict[str, Any]:
     if isinstance(dataset, FM0ReleaseDataset):
         return dict(dataset.contract)
     raise TypeError("unsupported FM0 training dataset")
+
+
+def _validate_cadence_objective_contract(
+    *,
+    model: Any,
+    dataset: Any,
+    run_contract: Mapping[str, Any],
+) -> None:
+    """Fail closed unless the complete FM0.3 cadence contract is explicit."""
+
+    variant = run_contract.get("variant")
+    if variant not in FM0_3_VARIANTS:
+        raise ValueError("cadence VICReg requires an explicit FM0.3 variant")
+    if run_contract.get("objective") != CADENCE_VICREG_OBJECTIVE_IDENTITY:
+        raise ValueError("FM0.3 run contract lacks the cadence objective identity")
+    if run_contract.get("mask_target_fraction") != FM0_3_MASK_TARGET_FRACTION:
+        raise ValueError("FM0.3 run contract mask target fraction is not frozen")
+    if run_contract.get("mask_span_range") != list(FM0_3_MASK_SPAN_RANGE):
+        raise ValueError("FM0.3 run contract mask span range is not frozen")
+
+    dataset_config = getattr(dataset, "config", None)
+    if dataset_config is None or dataset_config.variant != variant:
+        raise ValueError("FM0.3 dataset variant differs from the run contract")
+    if dataset_config.window_length != FM0_3_WINDOW_LENGTH:
+        raise ValueError("FM0.3 dataset context length must be 128 cadences")
+    if (
+        dataset_config.mask_target_fraction != FM0_3_MASK_TARGET_FRACTION
+        or dataset_config.mask_span_range != FM0_3_MASK_SPAN_RANGE
+    ):
+        raise ValueError("FM0.3 dataset mask geometry differs from the run contract")
+
+    model_config = getattr(model, "config", None)
+    if (
+        model_config is None
+        or model_config.window_length != FM0_3_WINDOW_LENGTH
+        or model_config.patch_stride != 1
+    ):
+        raise ValueError(
+            "FM0.3 cadence VICReg requires 128 inputs and one token per cadence"
+        )
+
+
+def _cadence_visibility_mask(batch: Mapping[str, Any]) -> Any:
+    """Return natural, present, and unmasked cadence eligibility for one view."""
+
+    required = ("flux_valid", "time_valid", "view_present", "reconstruction_mask")
+    missing = [name for name in required if name not in batch]
+    if missing:
+        raise ValueError(f"FM0 cadence objective batch lacks fields: {missing}")
+    flux_valid = batch["flux_valid"]
+    reconstruction_mask = batch["reconstruction_mask"]
+    time_valid = batch["time_valid"]
+    view_present = batch["view_present"]
+    if flux_valid.ndim != 3 or reconstruction_mask.shape != flux_valid.shape:
+        raise ValueError("FM0 cadence objective flux masks must have shape [B,V,L]")
+    if time_valid.shape != (flux_valid.shape[0], flux_valid.shape[2]):
+        raise ValueError("FM0 cadence objective time_valid must have shape [B,L]")
+    if view_present.shape != flux_valid.shape[:2]:
+        raise ValueError("FM0 cadence objective view_present must have shape [B,V]")
+
+    available = flux_valid.bool() & view_present.bool()[:, :, None]
+    natural = time_valid.bool() & torch.any(available, dim=1)
+    reconstruction = reconstruction_mask.bool()
+    return natural & ~torch.any(reconstruction, dim=1)
+
+
+def _paired_cadence_visibility_masks(
+    first_batch: Mapping[str, Any],
+    second_batch: Mapping[str, Any],
+) -> tuple[Any, Any]:
+    """Validate paired natural masks and return each independently visible set."""
+
+    source_fields = (
+        "flux",
+        "flux_valid",
+        "flux_error",
+        "error_valid",
+        "local_time_cadences",
+        "delta_time_cadences",
+        "time_valid",
+        "segment_boundary",
+        "view_present",
+    )
+    for name in source_fields:
+        if name not in first_batch or name not in second_batch:
+            raise ValueError(f"FM0 cadence objective paired batch lacks {name}")
+        if not torch.equal(first_batch[name], second_batch[name]):
+            raise ValueError(
+                f"FM0 cadence objective paired source tensor differs: {name}"
+            )
+    return (
+        _cadence_visibility_mask(first_batch),
+        _cadence_visibility_mask(second_batch),
+    )
+
+
+def _project_cadence_tokens(model: Any, output: Mapping[str, Any]) -> Any:
+    """Apply the shared projection tokenwise without constructing a window mean."""
+
+    hidden = output.get("h_cadence")
+    token_valid = output.get("token_valid")
+    if hidden is None or token_valid is None or hidden.ndim != 3:
+        raise ValueError("FM0.3 model output lacks cadence-indexed hidden states")
+    if token_valid.shape != hidden.shape[:2]:
+        raise ValueError("FM0.3 cadence hidden states and validity mask differ")
+    projected = model.embedding_projection(hidden)
+    if projected.shape[:2] != hidden.shape[:2] or projected.ndim != 3:
+        raise ValueError("FM0.3 cadence projection changed the token lattice")
+    return projected
 
 
 @dataclass(frozen=True)
@@ -446,7 +592,7 @@ def checkpoint_payload(
     optimization: FM0OptimizationConfig,
     dataset: Any,
     loss_history: list[dict[str, float]],
-    objective_state: Mapping[str, bool],
+    objective_state: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Capture every state needed for exact optimizer-step continuation."""
 
@@ -556,7 +702,7 @@ def load_checkpoint(
     scheduler: Any,
     expected_run_contract: Mapping[str, Any],
     expected_optimization: FM0OptimizationConfig,
-    expected_objective_state: Mapping[str, bool],
+    expected_objective_state: Mapping[str, Any],
     dataset: Any,
 ) -> tuple[int, list[dict[str, float]]]:
     """Load and validate a full FM0 checkpoint, including RNG and sampler state."""
@@ -661,7 +807,7 @@ def _restore_forward_rng_state(state: Mapping[str, Any], device: Any) -> None:
 
 
 def _embedding_projection_gradient_norm(model: Any) -> float:
-    """Return the L2 norm of the gradient that actually reaches ``z_window``."""
+    """Return the L2 norm reaching the shared window/cadence projection."""
 
     require_torch()
     squared = None
@@ -755,6 +901,90 @@ def _backprop_effective_batch_vicreg(
     }
 
 
+def _backprop_effective_batch_cadence_vicreg(
+    *,
+    model: Any,
+    replay_records: list[dict[str, Any]],
+    first_embeddings: list[Any],
+    second_embeddings: list[Any],
+    first_visible_masks: list[Any],
+    second_visible_masks: list[Any],
+    config: FM0OptimizationConfig,
+    device: Any,
+    precision: str,
+) -> tuple[Any, dict[str, Any]]:
+    """Replay exact forwards for full-batch cadence VICReg gradients."""
+
+    require_torch()
+    record_count = len(replay_records)
+    if not replay_records or any(
+        len(values) != record_count
+        for values in (
+            first_embeddings,
+            second_embeddings,
+            first_visible_masks,
+            second_visible_masks,
+        )
+    ):
+        raise ValueError("cadence VICReg replay records are incomplete")
+
+    full_first = torch.cat(first_embeddings, dim=0).float().requires_grad_(True)
+    full_second = torch.cat(second_embeddings, dim=0).float().requires_grad_(True)
+    full_first_visible = torch.cat(first_visible_masks, dim=0).bool()
+    full_second_visible = torch.cat(second_visible_masks, dim=0).bool()
+    if full_first.shape[0] != config.effective_batch_windows:
+        raise ValueError("cadence VICReg did not receive the complete effective batch")
+    cadence_vicreg, diagnostics = position_centered_cadence_vicreg_loss(
+        full_first,
+        full_second,
+        full_first_visible,
+        full_second_visible,
+        invariance_weight=config.vicreg_invariance_weight,
+        variance_weight=config.vicreg_variance_weight,
+        covariance_weight=config.vicreg_covariance_weight,
+    )
+    first_gradient, second_gradient = torch.autograd.grad(
+        cadence_vicreg, (full_first, full_second)
+    )
+
+    post_forward_rng = _capture_forward_rng_state(device)
+    offset = 0
+    try:
+        for record in replay_records:
+            count = int(record["batch_windows"])
+            _restore_forward_rng_state(record["first_rng"], device)
+            with _autocast_context(device, precision):
+                first_output = model(record["first_batch"])
+                first_z = _project_cadence_tokens(model, first_output)
+            first_z.backward(
+                (
+                    first_gradient[offset : offset + count]
+                    * float(config.vicreg_total_weight)
+                ).to(first_z.dtype)
+            )
+            del first_output, first_z
+
+            _restore_forward_rng_state(record["second_rng"], device)
+            with _autocast_context(device, precision):
+                second_output = model(record["second_batch"])
+                second_z = _project_cadence_tokens(model, second_output)
+            second_z.backward(
+                (
+                    second_gradient[offset : offset + count]
+                    * float(config.vicreg_total_weight)
+                ).to(second_z.dtype)
+            )
+            del second_output, second_z
+            offset += count
+    finally:
+        _restore_forward_rng_state(post_forward_rng, device)
+    if offset != config.effective_batch_windows:
+        raise ValueError("cadence VICReg replay did not cover the effective batch")
+    return cadence_vicreg.detach(), {
+        name: value.detach() for name, value in diagnostics.items()
+    }
+
+
 def _run_training(
     *,
     model: Any,
@@ -768,6 +998,7 @@ def _run_training(
     precision: str,
     use_vicreg: bool,
     reconstruct_second_view: bool,
+    objective_identity: str | None,
     synthetic_only: bool,
     checkpoint_interval_seconds: float,
     progress_interval_steps: int,
@@ -779,7 +1010,32 @@ def _run_training(
     invocation_objective = _objective_state(
         use_vicreg=use_vicreg,
         reconstruct_second_view=reconstruct_second_view,
+        objective_identity=objective_identity,
     )
+    cadence_vicreg = objective_identity == CADENCE_VICREG_OBJECTIVE_IDENTITY
+    if run_contract.get("objective") == CADENCE_VICREG_OBJECTIVE_IDENTITY and not (
+        cadence_vicreg
+    ):
+        raise ValueError("FM0.3 run contract and explicit objective path disagree")
+    if cadence_vicreg:
+        _validate_cadence_objective_contract(
+            model=model,
+            dataset=dataset,
+            run_contract=run_contract,
+        )
+        if "target_step" in run_contract:
+            raise ValueError("FM0.3 invocation stop must remain runtime-only")
+        if run_contract.get("training_horizon_step") != (
+            optimization.max_optimizer_steps
+        ):
+            raise ValueError("FM0.3 run contract optimizer horizon differs")
+        if (
+            run_contract.get(
+                "stop_after_step_is_execution_state_not_scientific_contract"
+            )
+            is not True
+        ):
+            raise ValueError("FM0.3 runtime-only stop declaration is missing")
     contract_use_vicreg = _optional_contract_bool(run_contract, "use_vicreg")
     if contract_use_vicreg is not None and contract_use_vicreg != use_vicreg:
         raise ValueError("FM0 run contract and objective path disagree")
@@ -848,6 +1104,8 @@ def _run_training(
         replay_records: list[dict[str, Any]] = []
         first_embeddings: list[Any] = []
         second_embeddings: list[Any] = []
+        first_visible_masks: list[Any] = []
+        second_visible_masks: list[Any] = []
         for micro_index in range(accumulation):
             batch_start = (
                 global_step * optimization.effective_batch_windows
@@ -874,9 +1132,18 @@ def _run_training(
             if use_vicreg:
                 if second_batch is None:  # pragma: no cover - defensive
                     raise RuntimeError("VICReg requires two masked views")
+                if cadence_vicreg:
+                    first_visible, second_visible = (
+                        _paired_cadence_visibility_masks(first_batch, second_batch)
+                    )
                 first_rng = _capture_forward_rng_state(resolved_device)
                 with _autocast_context(resolved_device, precision):
                     first_output = model(first_batch)
+                    first_embedding = (
+                        _project_cadence_tokens(model, first_output)
+                        if cadence_vicreg
+                        else first_output["z_window"]
+                    )
                     first_reconstruction, _ = masked_huber_reconstruction_loss(
                         first_output["reconstruction"],
                         first_batch["flux"].float(),
@@ -886,6 +1153,11 @@ def _run_training(
                     second_rng = _capture_forward_rng_state(resolved_device)
                     if reconstruct_second_view:
                         second_output = model(second_batch)
+                        second_embedding = (
+                            _project_cadence_tokens(model, second_output)
+                            if cadence_vicreg
+                            else second_output["z_window"]
+                        )
                         second_reconstruction, _ = masked_huber_reconstruction_loss(
                             second_output["reconstruction"],
                             second_batch["flux"].float(),
@@ -893,12 +1165,17 @@ def _run_training(
                             delta=optimization.huber_delta,
                         )
                     else:
-                        # FM0.2 uses the second mask only to define the paired
-                        # representation view. Its reconstruction remains a
-                        # no-gradient diagnostic, which avoids retaining a
-                        # decoder graph that is never optimized.
+                        # FM0.2 and FM0.3 use the second mask only to define the
+                        # paired representation view. Its reconstruction is a
+                        # no-gradient diagnostic; only the first mask is
+                        # optimized in these objective contracts.
                         with torch.no_grad():
                             second_output = model(second_batch)
+                            second_embedding = (
+                                _project_cadence_tokens(model, second_output)
+                                if cadence_vicreg
+                                else second_output["z_window"]
+                            )
                             second_reconstruction, _ = (
                                 masked_huber_reconstruction_loss(
                                     second_output["reconstruction"],
@@ -916,8 +1193,11 @@ def _run_training(
                         else first_reconstruction
                     )
                 (reconstruction / accumulation).backward()
-                first_embeddings.append(first_output["z_window"].detach())
-                second_embeddings.append(second_output["z_window"].detach())
+                first_embeddings.append(first_embedding.detach())
+                second_embeddings.append(second_embedding.detach())
+                if cadence_vicreg:
+                    first_visible_masks.append(first_visible.detach())
+                    second_visible_masks.append(second_visible.detach())
                 replay_records.append(
                     {
                         "first_batch": first_batch,
@@ -955,15 +1235,30 @@ def _run_training(
                         diagnostics[name].detach().cpu()
                     ) / accumulation
         if use_vicreg:
-            vicreg, vicreg_diagnostics = _backprop_effective_batch_vicreg(
-                model=model,
-                replay_records=replay_records,
-                first_embeddings=first_embeddings,
-                second_embeddings=second_embeddings,
-                config=optimization,
-                device=resolved_device,
-                precision=precision,
-            )
+            if cadence_vicreg:
+                vicreg, vicreg_diagnostics = (
+                    _backprop_effective_batch_cadence_vicreg(
+                        model=model,
+                        replay_records=replay_records,
+                        first_embeddings=first_embeddings,
+                        second_embeddings=second_embeddings,
+                        first_visible_masks=first_visible_masks,
+                        second_visible_masks=second_visible_masks,
+                        config=optimization,
+                        device=resolved_device,
+                        precision=precision,
+                    )
+                )
+            else:
+                vicreg, vicreg_diagnostics = _backprop_effective_batch_vicreg(
+                    model=model,
+                    replay_records=replay_records,
+                    first_embeddings=first_embeddings,
+                    second_embeddings=second_embeddings,
+                    config=optimization,
+                    device=resolved_device,
+                    precision=precision,
+                )
             metric_sums["vicreg"] = float(vicreg.cpu())
             metric_sums["vicreg_weighted"] = (
                 optimization.vicreg_total_weight * metric_sums["vicreg"]
@@ -972,6 +1267,15 @@ def _run_training(
                 metric_sums[f"vicreg_{name}"] = float(
                     vicreg_diagnostics[name].cpu()
                 )
+            if cadence_vicreg:
+                for name in (
+                    "common_visible_tokens",
+                    "statistical_cadence_positions",
+                    "statistical_degrees_of_freedom",
+                ):
+                    metric_sums[f"vicreg_{name}"] = float(
+                        vicreg_diagnostics[name].cpu()
+                    )
             metric_sums["total"] = (
                 metric_sums["reconstruction"]
                 + metric_sums["vicreg_weighted"]
@@ -1087,12 +1391,17 @@ def run_synthetic_training(
     precision: str,
     use_vicreg: bool,
     reconstruct_second_view: bool | None = None,
+    objective_identity: str | None = None,
     resume_checkpoint: str | Path | None = None,
 ) -> dict[str, Any]:
     """Run an explicitly synthetic numerical smoke."""
 
     resolved_reconstruct_second = (
-        bool(use_vicreg)
+        (
+            False
+            if objective_identity == CADENCE_VICREG_OBJECTIVE_IDENTITY
+            else bool(use_vicreg)
+        )
         if reconstruct_second_view is None
         else bool(reconstruct_second_view)
     )
@@ -1108,6 +1417,7 @@ def run_synthetic_training(
         precision=precision,
         use_vicreg=use_vicreg,
         reconstruct_second_view=resolved_reconstruct_second,
+        objective_identity=objective_identity,
         synthetic_only=True,
         checkpoint_interval_seconds=0,
         progress_interval_steps=1,
@@ -1128,11 +1438,16 @@ def run_real_training(
     precision: str,
     use_vicreg: bool = False,
     reconstruct_second_view: bool | None = None,
+    objective_identity: str | None = None,
     resume_checkpoint: str | Path | None = None,
 ) -> dict[str, Any]:
     """Train one declared FM0 objective on a checksum-bound input release."""
     resolved_reconstruct_second = (
-        bool(use_vicreg)
+        (
+            False
+            if objective_identity == CADENCE_VICREG_OBJECTIVE_IDENTITY
+            else bool(use_vicreg)
+        )
         if reconstruct_second_view is None
         else bool(reconstruct_second_view)
     )
@@ -1148,6 +1463,7 @@ def run_real_training(
         precision=precision,
         use_vicreg=use_vicreg,
         reconstruct_second_view=resolved_reconstruct_second,
+        objective_identity=objective_identity,
         synthetic_only=False,
         checkpoint_interval_seconds=1800,
         progress_interval_steps=10,

@@ -17,7 +17,7 @@ Last reconciled: `2026-09-01`.
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
 | Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
-| TWIRL-FM0 | The centered-event test confirms strong masked-mean context dilution; `128` cadences is the leading local context, and cadence averaging/downsampling is forbidden for the next encoder | Run the stride-1 mechanics screen and a BLS-free, source/sector-disjoint cadence-token classifier transfer test before any FM0.3 training |
+| TWIRL-FM0 | `128` native cadences at stride one is the fixed next context; the cadence objective and trainer replay are implemented, while cadence averaging/downsampling remains forbidden | Validate the raw/quality cadence probe, freeze the S56--S64 + S66--S77 composite index with S77 held out, then run the fixed-band transfer screen before any FM0.3 training |
 
 The exact current run state and historical metrics are recorded in the
 [progress log](twirl_progress_log.md). Reports are evidence snapshots, not
@@ -189,18 +189,21 @@ project authority.
   Before training either candidate, run a development-only BLS-free
   classifier-transfer contract using cadence tokens from the step-2,000 TCN
   at `128` cadences, with chronological sector blocks, source-component
-  quarantine, and exact step-0, `2,048`-cadence, raw-flux, and quality-only
-  controls. The low-capacity head is a shared per-cadence linear score followed
-  by a masked maximum, with no temporal averaging. CPU job `21765395` showed
-  that fitting that hard maximum directly is invalid: its raw-flux control
-  stayed at exact chance even for `30%` injected dips because clean/injected
-  gradients cancel whenever the injected cadence is not already the random
-  argmax. That result is a probe-mechanics failure, not model evidence. The
-  replacement v2 contract uses injection support only as training truth for
-  four pair-balanced, independently scored cadence strata; support remains
-  forbidden as an input feature, and full-window evaluation still uses the
-  hard maximum. Its raw-flux and quality-only mechanics gates must pass before
-  any FM comparison is interpreted. The two real candidates
+  quarantine, and exact step-0, raw-flux, and quality-only controls. CPU job
+  `21765395` showed that fitting a hard maximum directly is invalid because
+  paired gradients cancel before the injected cadence becomes the argmax.
+  The repaired v2 fit learned dip-positive raw coefficients, but job
+  `21766861` then exposed a separate evaluation mismatch: taking the maximum
+  over all `128` real cadences usually selected an unrelated natural outlier,
+  so the raw control remained at chance even for `30%` dips. Neither run is
+  model evidence. A fast v3 mechanics control therefore compares the injected
+  event-center cadence with the exact same cadence in its paired clean row;
+  this oracle use of support is mechanics-only and cannot score an FM. After
+  that control passes, the actual transfer screen will emit one score per
+  native cadence and reduce scalar scores only over the predeclared fixed band
+  `36--92`, the union of every allowed jittered event support. The band is the
+  same for every sample and never uses per-event support, duration, depth, or
+  BLS information. The two real candidates
   must then match data, objective, context, masks, seeds, draws, and optimizer
   budget so architecture is the only difference.
   The legacy optimized `z_window` VICReg is also disallowed for FM0.3 because
@@ -213,9 +216,18 @@ project authority.
   `h_cadence` is the true post-context sequence rather than the reconstruction
   skip. A position-centered cadence VICReg helper now implements batch
   centering at each fixed cadence and never constructs a temporally pooled
-  representation; trainer replay, the cadence-collapse evaluation gate, and
-  the real-data contract are still pending. The current S66--S77 preparation
-  receipt is intentionally training-ineligible. Subsequent
+  representation. The trainer now optimizes first-mask reconstruction plus
+  position-centered cadence VICReg with exact staged replay and explicit
+  objective/checkpoint identity. A cadence-collapse artifact runner exists as
+  a non-authoritative preflight only; it cannot become a gate until a separately
+  frozen panel and immutable step-0/step-2,000 checkpoints exist. A compact
+  composite-release freezer now joins the accepted S56--S64 release to the
+  S66--S77 sector manifests without rewriting shards. It reserves every S77
+  `poc_train` component as an internal chronological holdout and removes every
+  overlapping earlier component from training. The remote composite receipt
+  and final post-quarantine counts are not yet frozen, and the current
+  S66--S77 preparation receipt remains intentionally training-ineligible.
+  Subsequent
   candidates may optimize both independent reconstruction masks and then test
   a separate stable-host cross-visit head,
   but each is a one-mechanism ablation; raw/ADP015 view additions and a
@@ -393,13 +405,14 @@ negotiation or career-planning notes do not belong in the public plan.
 2. Run the two isolated model experiments: complete the sealed Teacher-v3 S63
    score-hidden review, and keep its isolation rule. For FM work, preserve the
    completed FM0.2.1 temporal and centered-event evidence. Execute the frozen
-   development-only BLS-free classifier/triage transfer contract
-   whose primary feature is the step-2,000 cadence-token sequence at `128`
-   cadences and whose controls include step 0, `2,048` cadences, raw cadence
-   features, and quality-only inputs. Complete the CPU-only stride-1 mechanics
-   screen first. Do not advance FM0.1.3 or FM0.2.2, extend beyond step 2,000,
-   rerun a second seed, start FM0.3 training, apply a formal gate, or open the
-   sealed FM test.
+   development-only BLS-free classifier/triage transfer contract whose primary
+   feature is the step-2,000 cadence-token sequence at `128` cadences and whose
+   controls include step 0, raw cadence features, and quality-only inputs.
+   First run the raw/quality center-cadence mechanics control, freeze the
+   compact S56--S64 + S66--S77 identity release with S77 held out, then run the
+   predeclared `36--92` fixed-band transfer screen. Do not advance FM0.1.3 or
+   FM0.2.2, extend beyond step 2,000, rerun a second seed, start FM0.3 training,
+   apply a formal gate, or open the sealed FM test until those gates pass.
 3. Advance the transparent survey path independently: implement the dip branch
    and multi-sector merging, freeze the archive/index and release boundary
    (including no-TIC and S94+ decisions), then complete the recovery chain
