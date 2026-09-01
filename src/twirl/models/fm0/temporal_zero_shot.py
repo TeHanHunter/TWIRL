@@ -21,7 +21,7 @@ from typing import Any
 
 import numpy as np
 
-from .dataset import variant_view_indices
+from .dataset import VIEW_NAMES, variant_view_indices
 from .registry import sha256_file
 from .representation_health import (
     BASELINE_TIME_BINS,
@@ -406,12 +406,19 @@ def select_temporal_rows(
                         raise ValueError(
                             "temporal selection received invalid view_present_json"
                         ) from exc
-                    if not isinstance(present, list) or any(
-                        index >= len(present) or present[index] not in (1, True)
-                        for index in required_views
+                    if (
+                        not isinstance(present, list)
+                        or len(present) != len(VIEW_NAMES)
+                        or any(
+                            type(value) is not int or value not in {0, 1}
+                            for value in present
+                        )
                     ):
+                        raise ValueError(
+                            "temporal selection received invalid view_present_json schema"
+                        )
+                    if any(not bool(present[index]) for index in required_views):
                         eligible = False
-                        break
             if eligible:
                 components.append(component)
         if len(components) < 2:

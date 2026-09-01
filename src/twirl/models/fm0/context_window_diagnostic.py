@@ -10,6 +10,7 @@ computed, so shorter contexts do not receive extra statistical weight.
 from __future__ import annotations
 
 import hashlib
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,7 @@ from .temporal_panel import DEVELOPMENT_PARTITION
 from .temporal_zero_shot import (
     EXPECTED_CHECKPOINT_STEPS,
     TEMPORAL_COHORTS,
+    TEMPORAL_ZERO_SHOT_SELECTION_SALT,
     _paired_retrieval_delta,
     _paired_separation_delta,
     _sample_set_sha256,
@@ -67,6 +69,10 @@ _CADENCE_KEYS = (
     "reconstruction_mask",
 )
 _REPRESENTATIONS = ("h_window", "z_window")
+
+
+class ContextWindowIneligibleError(ValueError):
+    """A valid development visit cannot support the fixed-exposure grid."""
 
 
 def context_crop_bounds(context_length: int) -> tuple[tuple[int, int], ...]:
@@ -146,7 +152,7 @@ def _full_coverage_window_spec(
             % len(candidates)
         ]
     else:
-        raise ValueError(
+        raise ContextWindowIneligibleError(
             "development visit has no unpadded 2048-cadence interval with "
             "required-view support in every 256-cadence tile: "
             f"{observation_key}"
@@ -271,6 +277,103 @@ def _load_visit_base(
             "minimum_tile_support": minimum_support,
         },
     }
+
+
+def _component_order_key(cohort: str, component: str) -> tuple[str, str]:
+    digest = hashlib.sha256(
+        f"{TEMPORAL_ZERO_SHOT_SELECTION_SALT}\x1f{cohort}\x1f{component}".encode()
+    ).hexdigest()
+    return digest, component
+
+
+def _select_context_visit_data(
+    rows: Sequence[Mapping[str, str]],
+    *,
+    variant: str,
+    max_repeated_components: int,
+    max_new_components: int,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Choose whole components that can all support the frozen crop grid.
+
+    Only :class:`ContextWindowIneligibleError` is skippable.  Binding, path,
+    checksum, schema, and parsing failures remain fatal.
+    """
+
+    limits = {
+        "repeated": int(max_repeated_components),
+        "new": int(max_new_components),
+    }
+    if any(value < 2 for value in limits.values()):
+        raise ValueError("each context cohort requires at least two components")
+    all_view_eligible = select_temporal_rows(
+        rows,
+        max_repeated_components=len(rows),
+        max_new_components=len(rows),
+        required_view_indices=variant_view_indices(variant),
+    )
+    selected: dict[str, dict[str, Any]] = {}
+    audit: dict[str, dict[str, Any]] = {}
+    opened_observations: set[str] = set()
+    for cohort in TEMPORAL_COHORTS:
+        grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
+        for row in all_view_eligible[cohort]:
+            grouped[str(row["leakage_component_id"])].append(dict(row))
+        ordered = sorted(
+            grouped,
+            key=lambda component: _component_order_key(cohort, component),
+        )
+        accepted_rows: list[dict[str, str]] = []
+        accepted_visits: list[dict[str, Any]] = []
+        accepted_components: list[str] = []
+        skipped_components: list[str] = []
+        skipped_observations = 0
+        opened_for_cohort = 0
+        for component in ordered:
+            if len(accepted_components) >= limits[cohort]:
+                break
+            component_rows = sorted(
+                grouped[component],
+                key=lambda row: (int(row["sector"]), row["observation_key"]),
+            )
+            component_visits: list[dict[str, Any]] = []
+            structurally_ineligible = False
+            for row in component_rows:
+                observation = str(row["observation_key"])
+                if observation in opened_observations:
+                    raise ValueError("context eligibility reopened a development shard")
+                opened_observations.add(observation)
+                opened_for_cohort += 1
+                try:
+                    component_visits.append(_load_visit_base(row, variant=variant))
+                except ContextWindowIneligibleError:
+                    structurally_ineligible = True
+                    continue
+            if structurally_ineligible:
+                skipped_components.append(component)
+                skipped_observations += len(component_rows)
+                continue
+            accepted_components.append(component)
+            accepted_rows.extend(component_rows)
+            accepted_visits.extend(component_visits)
+        if len(accepted_components) < 2:
+            raise ValueError(
+                f"context cohort {cohort} has fewer than two compatible components"
+            )
+        selected[cohort] = {
+            "rows": accepted_rows,
+            "visits": accepted_visits,
+        }
+        audit[cohort] = {
+            "eligible_components_selected": len(accepted_components),
+            "eligible_observations_selected": len(accepted_rows),
+            "structurally_ineligible_components_skipped": len(skipped_components),
+            "structurally_ineligible_observations_excluded": skipped_observations,
+            "screening_shards_opened": opened_for_cohort,
+            "skipped_components_sha256": _identity_sha256(
+                tuple(sorted(skipped_components))
+            ),
+        }
+    return selected, audit
 
 
 def partition_base_sample(
@@ -526,30 +629,29 @@ def evaluate_context_window_diagnostic(
     variant = str(contract0.get("variant", ""))
     if not variant:
         raise ValueError("context diagnostic checkpoint lacks its variant")
-    selected = select_temporal_rows(
-        panel_rows,
-        max_repeated_components=max_repeated_components,
-        max_new_components=max_new_components,
-        required_view_indices=variant_view_indices(variant),
-    )
     for model in (model0, model2000):
         if int(model.config.window_length) != FIXED_EXPOSURE_CADENCES or not callable(
             getattr(model, "forward_short_context", None)
         ):
             raise ValueError("checkpoint model lacks exact short-context support")
 
-    cohort_data: dict[str, dict[str, Any]] = {}
+    cohort_data, context_eligibility = _select_context_visit_data(
+        panel_rows,
+        variant=variant,
+        max_repeated_components=max_repeated_components,
+        max_new_components=max_new_components,
+    )
     for cohort in TEMPORAL_COHORTS:
-        rows = selected[cohort]
-        visits = [_load_visit_base(row, variant=variant) for row in rows]
+        rows = cohort_data[cohort]["rows"]
+        visits = cohort_data[cohort]["visits"]
         base_samples = [visit["unmasked"] for visit in visits]
-        cohort_data[cohort] = {
-            "rows": rows,
-            "visits": visits,
-            "component_ids": [row["leakage_component_id"] for row in rows],
-            "sectors": [int(row["sector"]) for row in rows],
-            "base_interval_sha256": _sample_set_sha256(rows, base_samples),
-        }
+        cohort_data[cohort].update(
+            {
+                "component_ids": [row["leakage_component_id"] for row in rows],
+                "sectors": [int(row["sector"]) for row in rows],
+                "base_interval_sha256": _sample_set_sha256(rows, base_samples),
+            }
+        )
 
     checkpoint_contexts: dict[int, dict[str, Any]] = {
         step: {} for step in EXPECTED_CHECKPOINT_STEPS
@@ -684,6 +786,17 @@ def evaluate_context_window_diagnostic(
         },
         "temporal_panel": panel_summary,
         "evaluation_population": population,
+        "context_eligibility": {
+            "rule": (
+                "retain a component only when every visit supports one unpadded "
+                "2048-cadence single-segment interval with required-view support "
+                "in every 256-cadence tile"
+            ),
+            "selection_is_label_blind": True,
+            "only_structural_context_ineligibility_is_skippable": True,
+            "binding_path_checksum_and_schema_failures_are_fatal": True,
+            "cohorts": context_eligibility,
+        },
         "fixed_exposure": {
             "cadences_per_visit": FIXED_EXPOSURE_CADENCES,
             "context_lengths": list(CONTEXT_LENGTHS),
@@ -724,10 +837,14 @@ def evaluate_context_window_diagnostic(
             "query_sector_excluded_retrieval": True,
         },
         "data_access": {
-            "development_shards_opened": sum(
+            "development_shards_opened_for_context_screening": sum(
+                int(context_eligibility[cohort]["screening_shards_opened"])
+                for cohort in TEMPORAL_COHORTS
+            ),
+            "selected_development_shards": sum(
                 len(cohort_data[cohort]["rows"]) for cohort in TEMPORAL_COHORTS
             ),
-            "each_development_shard_opened_once": True,
+            "each_screened_development_shard_opened_at_most_once": True,
             "sealed_shards_opened": 0,
             "labels_candidates_or_events_opened": False,
             "artificial_events_injected": False,

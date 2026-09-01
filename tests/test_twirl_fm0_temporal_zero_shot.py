@@ -131,6 +131,42 @@ def test_bounded_selection_skips_components_with_a_missing_required_view() -> No
     }
 
 
+def test_bounded_selection_validates_every_row_of_an_excluded_component() -> None:
+    rows = [
+        {
+            **_selection_row("repeat-bad", "rb-66", "repeated", 66),
+            "view_present_json": "[1,1,0,1,1,1]",
+        },
+        {
+            **_selection_row("repeat-bad", "rb-67", "repeated", 67),
+            "view_present_json": "[1,1]",
+        },
+        {
+            **_selection_row("repeat-a", "ra-66", "repeated", 66),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+        {
+            **_selection_row("repeat-b", "rb-68", "repeated", 68),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+        {
+            **_selection_row("new-a", "na-66", "new", 66),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+        {
+            **_selection_row("new-b", "nb-67", "new", 67),
+            "view_present_json": "[1,1,1,1,1,1]",
+        },
+    ]
+    with pytest.raises(ValueError, match="view_present_json schema"):
+        select_temporal_rows(
+            rows,
+            max_repeated_components=2,
+            max_new_components=2,
+            required_view_indices=(2, 3),
+        )
+
+
 def _raw_checkpoint(
     representative: np.ndarray,
     visits: np.ndarray,

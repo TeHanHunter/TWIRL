@@ -222,6 +222,121 @@ def test_metrics_receive_one_row_per_visit() -> None:
     assert retrieval["n_visit_embeddings"] == 4
 
 
+def _panel_row(
+    component: str,
+    observation: str,
+    cohort: str,
+    sector: int,
+) -> dict[str, str]:
+    return {
+        "leakage_component_id": component,
+        "observation_key": observation,
+        "temporal_cohort": cohort,
+        "source_partition": "poc_development",
+        "sector": str(sector),
+        "view_present_json": "[1,1,1,1,1,1]",
+    }
+
+
+def test_context_selection_skips_only_the_whole_structurally_ineligible_component(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repeated_components = ("repeat-a", "repeat-b", "repeat-c")
+    bad = min(
+        repeated_components,
+        key=lambda component: diagnostic._component_order_key("repeated", component),
+    )
+    rows = [
+        _panel_row(component, f"{component}-66", "repeated", 66)
+        for component in repeated_components
+    ]
+    rows.append(_panel_row(bad, f"{bad}-67", "repeated", 67))
+    rows.extend(
+        (
+            _panel_row("new-a", "new-a-66", "new", 66),
+            _panel_row("new-b", "new-b-67", "new", 67),
+        )
+    )
+
+    def load(row: dict[str, str], *, variant: str) -> dict[str, object]:
+        assert variant == "TWIRL-FM0.2.1"
+        if row["leakage_component_id"] == bad:
+            raise diagnostic.ContextWindowIneligibleError("short segment")
+        return {"binding": {"observation_key": row["observation_key"]}}
+
+    monkeypatch.setattr(diagnostic, "_load_visit_base", load)
+    selected, audit = diagnostic._select_context_visit_data(
+        rows,
+        variant="TWIRL-FM0.2.1",
+        max_repeated_components=2,
+        max_new_components=2,
+    )
+
+    assert {row["leakage_component_id"] for row in selected["repeated"]["rows"]} == set(
+        repeated_components
+    ) - {bad}
+    assert len(selected["repeated"]["visits"]) == 2
+    assert audit["repeated"]["structurally_ineligible_components_skipped"] == 1
+    assert audit["repeated"]["structurally_ineligible_observations_excluded"] == 2
+
+
+def test_context_selection_does_not_skip_nonstructural_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repeated_components = ("repeat-a", "repeat-b", "repeat-c")
+    bad = min(
+        repeated_components,
+        key=lambda component: diagnostic._component_order_key("repeated", component),
+    )
+    rows = [
+        _panel_row(component, f"{component}-66", "repeated", 66)
+        for component in repeated_components
+    ]
+    rows.extend(
+        [
+            _panel_row(bad, f"{bad}-67", "repeated", 67),
+            _panel_row("new-a", "new-a", "new", 66),
+            _panel_row("new-b", "new-b", "new", 67),
+        ]
+    )
+
+    def fail(row: dict[str, str], *, variant: str) -> dict[str, object]:
+        assert variant == "TWIRL-FM0.2.1"
+        if row["leakage_component_id"] != bad:
+            return {"binding": {"observation_key": row["observation_key"]}}
+        if row["sector"] == "66":
+            raise diagnostic.ContextWindowIneligibleError("short segment")
+        raise RuntimeError("checksum failure")
+
+    monkeypatch.setattr(diagnostic, "_load_visit_base", fail)
+    with pytest.raises(RuntimeError, match="checksum failure"):
+        diagnostic._select_context_visit_data(
+            rows,
+            variant="TWIRL-FM0.2.1",
+            max_repeated_components=2,
+            max_new_components=2,
+        )
+
+
+def test_context_selection_requires_strict_view_presence_schema() -> None:
+    rows = [
+        {
+            **_panel_row("repeat-a", "repeat-a", "repeated", 66),
+            "view_present_json": "[1,1]",
+        },
+        _panel_row("repeat-b", "repeat-b", "repeated", 67),
+        _panel_row("new-a", "new-a", "new", 66),
+        _panel_row("new-b", "new-b", "new", 67),
+    ]
+    with pytest.raises(ValueError, match="view_present_json schema"):
+        diagnostic._select_context_visit_data(
+            rows,
+            variant="TWIRL-FM0.2.1",
+            max_repeated_components=2,
+            max_new_components=2,
+        )
+
+
 def test_sealed_row_is_rejected_before_any_path_access() -> None:
     with pytest.raises(ValueError, match="only development rows"):
         diagnostic._load_visit_base(
