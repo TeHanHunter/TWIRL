@@ -359,13 +359,22 @@ def load_phase_a_authority_record(
     authority: PreparationAuthorityMap,
     *,
     expected_producer_git_sha: str,
+    expected_sha256: str,
 ) -> tuple[Mapping[str, Any], Path, str]:
     """Load the immutable Phase-A record and recheck exact sector bindings."""
 
     output = _mapping(authority.payload["outputs"], label="outputs")
     path = Path(str(output["phase_a_authority_record"])).resolve()
-    if path.is_symlink() or not path.is_file() or path.stat().st_mode & 0o222:
-        raise FM0ContractError("Phase-A authority record is missing or writable")
+    expected = _digest(expected_sha256, label="Phase-A authority record SHA-256")
+    if (
+        path.is_symlink()
+        or not path.is_file()
+        or path.stat().st_mode & 0o222
+        or sha256_file(path) != expected
+    ):
+        raise FM0ContractError(
+            "Phase-A authority record is missing, writable, or hash-drifted"
+        )
     record = _load_json(path, label="Phase-A authority record")
     if (
         record.get("schema_version") != PHASE_A_RECORD_SCHEMA_VERSION
@@ -448,19 +457,23 @@ def load_phase_a_authority_record(
                 or sha256_file(bound_path) != digest
             ):
                 raise FM0ContractError(f"S{sector} Phase-A evidence binding drifted")
-    return record, path, sha256_file(path)
+    return record, path, expected
 
 
 def admit_from_preparation_authorities(
     authority: PreparationAuthorityMap,
     *,
+    phase_a_producer_git_sha: str,
+    phase_a_record_sha256: str,
     producer_git_sha: str,
     output_path: str | Path,
 ) -> tuple[dict[str, Any], str]:
     """Fully validate six-view releases and run the frozen admission-v2 gate."""
 
     record, _record_path, _record_sha = load_phase_a_authority_record(
-        authority, expected_producer_git_sha=producer_git_sha
+        authority,
+        expected_producer_git_sha=phase_a_producer_git_sha,
+        expected_sha256=phase_a_record_sha256,
     )
     authorities = _mapping(authority.payload["authorities"], label="authorities")
     outputs = _mapping(authority.payload["outputs"], label="outputs")

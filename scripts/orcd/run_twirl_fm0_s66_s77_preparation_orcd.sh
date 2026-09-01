@@ -25,6 +25,8 @@ Actions:
                          record, then submit four chronological sector lanes.
   submit-admission       Require the completed six-view chain, then submit the
                          final CPU admission-v2/full-bundle validation job.
+  retry-admission        After one recorded failed admission with no receipt,
+                         submit one new immutable repair attempt.
   validate-admission     Read-only terminal job/receipt validation.
   status                 Read-only job-record, Slurm, and artifact status.
 
@@ -59,7 +61,7 @@ if [[ -z "${ACTION}" ]]; then
   exit 2
 fi
 case "${ACTION}" in
-  probe|deploy|submit-phase-a|submit-phase-a-freeze|submit-six-view|submit-admission|validate-admission|status) ;;
+  probe|deploy|submit-phase-a|submit-phase-a-freeze|submit-six-view|submit-admission|retry-admission|validate-admission|status) ;;
   *) echo "Unknown action: ${ACTION}" >&2; usage >&2; exit 2 ;;
 esac
 
@@ -370,12 +372,17 @@ case "${ACTION}" in
       freeze_record='${LAUNCH_ROOT}/phase_a_freeze.tsv'
       [[ \$(wc -l < \"\${freeze_record}\") -eq 2 ]]
       freeze_job=\$(tail -1 \"\${freeze_record}\" | cut -f1)
+      phase_a_producer=\$(tail -1 \"\${freeze_record}\" | cut -f3)
+      phase_a_map=\$(tail -1 \"\${freeze_record}\" | cut -f4)
+      [[ \"\${phase_a_producer}\" =~ ^[0-9a-f]{40}$ ]]
+      [[ \"\${phase_a_map}\" == '${MAP_SHA256}' ]]
       state=\$(sacct -nX -j \"\${freeze_job}\" -o State,ExitCode | awk 'NF {print \$1,\$2; exit}')
       [[ \"\${state}\" == 'COMPLETED 0:0' ]]
       test -s '${PHASE_A_AUTHORITY_RECORD}' && test ! -w '${PHASE_A_AUTHORITY_RECORD}'
+      phase_sha=\$(sha256sum '${PHASE_A_AUTHORITY_RECORD}' | awk '{print \$1}')
       cd '${REMOTE_REPO}'
       PYTHONPATH='${REMOTE_REPO}/src' '${REMOTE_PYTHON}' scripts/stage5_validation/manage_twirl_fm0_s66_s77_preparation_authorities.py \
-        validate-phase-a --authority-map '${REMOTE_MAP}' --authority-map-sha256 '${MAP_SHA256}' --producer-git-sha '${EXPECTED_SHA}' >/dev/null
+        validate-phase-a --authority-map '${REMOTE_MAP}' --authority-map-sha256 '${MAP_SHA256}' --producer-git-sha \"\${phase_a_producer}\" --phase-a-record-sha256 \"\${phase_sha}\" >/dev/null
       for sector in \$(seq 66 77); do
         test ! -e '${SIX_VIEW_ROOT}/s'\$(printf '%04d' \"\${sector}\")
       done
@@ -383,7 +390,6 @@ case "${ACTION}" in
       test ! -e \"\${record}\" && test ! -e \"\${record}.submitting\"
       mkdir -- '${RUN_ROOT}/.claims/submit-six-view'
       printf 'sector\tjob_id\tdependency\texpected_git_sha\tauthority_map_sha256\tphase_a_record_sha256\n' > \"\${record}.submitting\"
-      phase_sha=\$(sha256sum '${PHASE_A_AUTHORITY_RECORD}' | awk '{print \$1}')
       previous_0=''
       previous_1=''
       previous_2=''
@@ -440,17 +446,75 @@ case "${ACTION}" in
         receipt='${SIX_VIEW_ROOT}/s'\$(printf '%04d' \"\${sector}\")'/receipt.json'
         test -s \"\${receipt}\" && test ! -w \"\${receipt}\"
       done
+      phase_record='${LAUNCH_ROOT}/phase_a_freeze.tsv'
+      [[ \$(wc -l < \"\${phase_record}\") -eq 2 ]]
+      phase_a_producer=\$(tail -1 \"\${phase_record}\" | cut -f3)
+      phase_a_map=\$(tail -1 \"\${phase_record}\" | cut -f4)
+      [[ \"\${phase_a_producer}\" =~ ^[0-9a-f]{40}$ ]]
+      [[ \"\${phase_a_map}\" == '${MAP_SHA256}' ]]
+      phase_a_record_sha=\$(tail -n +2 \"\${six_record}\" | cut -f6 | sort -u)
+      [[ \$(printf '%s\n' \"\${phase_a_record_sha}\" | wc -l) -eq 1 ]]
+      [[ \"\${phase_a_record_sha}\" =~ ^[0-9a-f]{64}$ ]]
+      [[ \$(sha256sum '${PHASE_A_AUTHORITY_RECORD}' | awk '{print \$1}') == \"\${phase_a_record_sha}\" ]]
       test ! -e '${ADMISSION_RECEIPT}'
       record='${LAUNCH_ROOT}/admission_v2.tsv'
       test ! -e \"\${record}\" && test ! -e \"\${record}.submitting\"
       mkdir -- '${RUN_ROOT}/.claims/submit-admission'
-      printf 'job_id\texpected_git_sha\tauthority_map_sha256\tsix_view_tail_job\n' > \"\${record}.submitting\"
+      printf 'job_id\texpected_git_sha\tphase_a_producer_git_sha\tphase_a_record_sha256\tauthority_map_sha256\tsix_view_tail_job\n' > \"\${record}.submitting\"
       job=\$(sbatch --parsable \
-        --export='ALL,TWIRL_ORCD_REPO=${REMOTE_REPO},TWIRL_EXPECTED_GIT_SHA=${EXPECTED_SHA},TWIRL_FM0_PREPARATION_AUTHORITY_MAP_SHA256=${MAP_SHA256},TWIRL_FM0_ADMISSION_V2_RECEIPT=${ADMISSION_RECEIPT}' \
+        --export='ALL,TWIRL_ORCD_REPO=${REMOTE_REPO},TWIRL_EXPECTED_GIT_SHA=${EXPECTED_SHA},TWIRL_FM0_PHASE_A_PRODUCER_GIT_SHA='\"\${phase_a_producer}\"',TWIRL_FM0_PHASE_A_RECORD_SHA256='\"\${phase_a_record_sha}\"',TWIRL_FM0_PREPARATION_AUTHORITY_MAP_SHA256=${MAP_SHA256},TWIRL_FM0_ADMISSION_V2_RECEIPT=${ADMISSION_RECEIPT}' \
         '${REMOTE_REPO}/scripts/orcd/slurm_twirl_fm0_later_admission_v2_cpu.sbatch')
       [[ \"\${job}\" =~ ^[0-9]+$ ]]
-      printf '%s\t%s\t%s\t%s\n' \
-        \"\${job}\" '${EXPECTED_SHA}' '${MAP_SHA256}' \"\${six_tail}\" >> \"\${record}.submitting\"
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        \"\${job}\" '${EXPECTED_SHA}' \"\${phase_a_producer}\" \"\${phase_a_record_sha}\" '${MAP_SHA256}' \"\${six_tail}\" >> \"\${record}.submitting\"
+      chmod a-w \"\${record}.submitting\"
+      mv -- \"\${record}.submitting\" \"\${record}\"
+      cat \"\${record}\""
+    ;;
+
+  retry-admission)
+    remote "set -euo pipefail
+      ${REMOTE_GATE}
+      prior_record='${LAUNCH_ROOT}/admission_v2.tsv'
+      [[ \$(wc -l < \"\${prior_record}\") -eq 2 ]]
+      prior_job=\$(tail -1 \"\${prior_record}\" | cut -f1)
+      [[ \"\${prior_job}\" =~ ^[0-9]+$ ]]
+      prior_state=\$(sacct -nX -j \"\${prior_job}\" -o State,ExitCode | awk 'NF {print \$1,\$2; exit}')
+      [[ \"\${prior_state}\" == 'FAILED 1:0' ]]
+      six_record='${LAUNCH_ROOT}/six_view_fast.tsv'
+      if [[ ! -e \"\${six_record}\" ]]; then six_record='${LAUNCH_ROOT}/six_view.tsv'; fi
+      [[ \$(wc -l < \"\${six_record}\") -eq 13 ]]
+      while IFS= read -r six_job; do
+        [[ \"\${six_job}\" =~ ^[0-9]+$ ]]
+        state=\$(sacct -nX -j \"\${six_job}\" -o State,ExitCode | awk 'NF {print \$1,\$2; exit}')
+        [[ \"\${state}\" == 'COMPLETED 0:0' ]]
+      done < <(tail -n +2 \"\${six_record}\" | cut -f2)
+      six_tail=\$(tail -1 \"\${six_record}\" | cut -f2)
+      phase_record='${LAUNCH_ROOT}/phase_a_freeze.tsv'
+      [[ \$(wc -l < \"\${phase_record}\") -eq 2 ]]
+      phase_a_producer=\$(tail -1 \"\${phase_record}\" | cut -f3)
+      phase_a_map=\$(tail -1 \"\${phase_record}\" | cut -f4)
+      [[ \"\${phase_a_producer}\" =~ ^[0-9a-f]{40}$ ]]
+      [[ \"\${phase_a_map}\" == '${MAP_SHA256}' ]]
+      phase_a_record_sha=\$(tail -n +2 \"\${six_record}\" | cut -f6 | sort -u)
+      [[ \$(printf '%s\n' \"\${phase_a_record_sha}\" | wc -l) -eq 1 ]]
+      [[ \"\${phase_a_record_sha}\" =~ ^[0-9a-f]{64}$ ]]
+      [[ \$(sha256sum '${PHASE_A_AUTHORITY_RECORD}' | awk '{print \$1}') == \"\${phase_a_record_sha}\" ]]
+      for sector in \$(seq 66 77); do
+        receipt='${SIX_VIEW_ROOT}/s'\$(printf '%04d' \"\${sector}\")'/receipt.json'
+        test -s \"\${receipt}\" && test ! -w \"\${receipt}\"
+      done
+      test ! -e '${ADMISSION_RECEIPT}'
+      record='${LAUNCH_ROOT}/admission_v2_retry1.tsv'
+      test ! -e \"\${record}\" && test ! -e \"\${record}.submitting\"
+      mkdir -- '${RUN_ROOT}/.claims/submit-admission-retry1'
+      printf 'job_id\texpected_git_sha\tphase_a_producer_git_sha\tphase_a_record_sha256\tauthority_map_sha256\tsix_view_tail_job\tprior_failed_job\n' > \"\${record}.submitting\"
+      job=\$(sbatch --parsable \
+        --export='ALL,TWIRL_ORCD_REPO=${REMOTE_REPO},TWIRL_EXPECTED_GIT_SHA=${EXPECTED_SHA},TWIRL_FM0_PHASE_A_PRODUCER_GIT_SHA='\"\${phase_a_producer}\"',TWIRL_FM0_PHASE_A_RECORD_SHA256='\"\${phase_a_record_sha}\"',TWIRL_FM0_PREPARATION_AUTHORITY_MAP_SHA256=${MAP_SHA256},TWIRL_FM0_ADMISSION_V2_RECEIPT=${ADMISSION_RECEIPT}' \
+        '${REMOTE_REPO}/scripts/orcd/slurm_twirl_fm0_later_admission_v2_cpu.sbatch')
+      [[ \"\${job}\" =~ ^[0-9]+$ ]]
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        \"\${job}\" '${EXPECTED_SHA}' \"\${phase_a_producer}\" \"\${phase_a_record_sha}\" '${MAP_SHA256}' \"\${six_tail}\" \"\${prior_job}\" >> \"\${record}.submitting\"
       chmod a-w \"\${record}.submitting\"
       mv -- \"\${record}.submitting\" \"\${record}\"
       cat \"\${record}\""
@@ -459,7 +523,8 @@ case "${ACTION}" in
   validate-admission)
     remote "set -euo pipefail
       ${REMOTE_GATE}
-      record='${LAUNCH_ROOT}/admission_v2.tsv'
+      record='${LAUNCH_ROOT}/admission_v2_retry1.tsv'
+      if [[ ! -e \"\${record}\" ]]; then record='${LAUNCH_ROOT}/admission_v2.tsv'; fi
       [[ \$(wc -l < \"\${record}\") -eq 2 ]]
       job=\$(tail -1 \"\${record}\" | cut -f1)
       state=\$(sacct -nX -j \"\${job}\" -o State,ExitCode | awk 'NF {print \$1,\$2; exit}')

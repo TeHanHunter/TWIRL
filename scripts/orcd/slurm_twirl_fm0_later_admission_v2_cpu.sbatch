@@ -18,6 +18,8 @@ umask 027
 readonly PROJECT_ROOT="/orcd/data/mki_aryeh/001/twirl"
 : "${TWIRL_ORCD_REPO:?controller must export the detached repository}"
 : "${TWIRL_EXPECTED_GIT_SHA:?controller must export the exact clean SHA}"
+: "${TWIRL_FM0_PHASE_A_PRODUCER_GIT_SHA:?controller must export the Phase-A producer SHA}"
+: "${TWIRL_FM0_PHASE_A_RECORD_SHA256:?controller must export the Phase-A record SHA-256}"
 : "${TWIRL_FM0_PREPARATION_AUTHORITY_MAP_SHA256:?controller must export the map SHA-256}"
 : "${TWIRL_FM0_ADMISSION_V2_RECEIPT:?controller must export the admission receipt}"
 
@@ -33,6 +35,8 @@ for path in "${REPO}" "${OUT}"; do
   [[ "${path}" == "${PROJECT_ROOT}"/* ]] || die "path escapes project root: ${path}"
 done
 [[ "${TWIRL_EXPECTED_GIT_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "invalid expected Git SHA"
+[[ "${TWIRL_FM0_PHASE_A_PRODUCER_GIT_SHA}" =~ ^[0-9a-f]{40}$ ]] || die "invalid Phase-A producer Git SHA"
+[[ "${TWIRL_FM0_PHASE_A_RECORD_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "invalid Phase-A record SHA-256"
 [[ "${TWIRL_FM0_PREPARATION_AUTHORITY_MAP_SHA256}" =~ ^[0-9a-f]{64}$ ]] || die "invalid authority-map SHA-256"
 [[ "$(git -C "${REPO}" rev-parse HEAD)" == "${TWIRL_EXPECTED_GIT_SHA}" ]] || die "wrong Git SHA"
 [[ -z "$(git -C "${REPO}" status --porcelain=v1 --untracked-files=all)" ]] || die "repository is not clean"
@@ -54,6 +58,8 @@ echo "[fm0-admission-v2] host=$(hostname) start=$(date -Is)"
   --authority-map "${MAP}" \
   --authority-map-sha256 "${TWIRL_FM0_PREPARATION_AUTHORITY_MAP_SHA256}" \
   --producer-git-sha "${TWIRL_EXPECTED_GIT_SHA}" \
+  --phase-a-producer-git-sha "${TWIRL_FM0_PHASE_A_PRODUCER_GIT_SHA}" \
+  --phase-a-record-sha256 "${TWIRL_FM0_PHASE_A_RECORD_SHA256}" \
   --output "${OUT}"
 
 [[ -s "${OUT}" ]] || die "admission-v2 receipt was not published"

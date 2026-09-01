@@ -62,5 +62,6 @@ echo "[fm0-phase-a-freeze] host=$(hostname) start=$(date -Is)"
   validate-phase-a \
   --authority-map "${MAP}" \
   --authority-map-sha256 "${TWIRL_FM0_PREPARATION_AUTHORITY_MAP_SHA256}" \
-  --producer-git-sha "${TWIRL_EXPECTED_GIT_SHA}"
+  --producer-git-sha "${TWIRL_EXPECTED_GIT_SHA}" \
+  --phase-a-record-sha256 "$(sha256 "${OUT}")"
 echo "[fm0-phase-a-freeze] complete=$(date -Is) sha256=$(sha256 "${OUT}")"

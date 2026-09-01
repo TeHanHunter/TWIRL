@@ -8,9 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from twirl.models.fm0 import preparation_authority
 from twirl.models.fm0.preparation_authority import (
     AUTHORITY_MAP_CAMPAIGN_ID,
     AUTHORITY_MAP_SCHEMA_VERSION,
+    PreparationAuthorityMap,
+    admit_from_preparation_authorities,
     load_preparation_authority_map,
 )
 from twirl.models.fm0.registry import FM0ContractError
@@ -158,6 +161,12 @@ def test_controller_requires_phase_a_freeze_before_six_view_and_cpu_admission() 
     assert "previous_0=''" in six_view and "previous_3=''" in six_view
     assert "(sector - 66) % 4" in six_view
     assert "six_view_fast.tsv" in script
+    assert "phase_a_producer_git_sha" in script
+    assert "phase_a_record_sha256" in script
+    assert "TWIRL_FM0_PHASE_A_PRODUCER_GIT_SHA" in script
+    assert "TWIRL_FM0_PHASE_A_RECORD_SHA256" in script
+    assert "admission_v2_retry1.tsv" in script
+    assert "'FAILED 1:0'" in script
     assert "submit-training" not in script
     assert "slurm_twirl_fm0_1_real_train_h200.sbatch" not in script
 
@@ -193,3 +202,95 @@ def test_controller_shell_syntax() -> None:
         capture_output=True,
         text=True,
     )
+
+
+def test_admission_keeps_phase_a_and_current_producer_revisions_distinct(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    phase_a_producer = "a" * 40
+    current_producer = "b" * 40
+    phase_a_digest = "c" * 64
+    six_root = tmp_path / "six-view"
+    rows = []
+    for sector in SECTORS:
+        receipt = six_root / f"s{sector:04d}" / "receipt.json"
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text(json.dumps({"sector": sector}), encoding="utf-8")
+        rows.append(
+            {
+                "sector": sector,
+                "mission_quality_reference": {
+                    "path": f"/mission/{sector}",
+                    "sha256": "1" * 64,
+                },
+                "hdf5_quality": {
+                    "path": f"/hdf5/{sector}",
+                    "sha256": "2" * 64,
+                },
+                "source_inventory": {
+                    "path": f"/source/{sector}",
+                    "sha256": "3" * 64,
+                },
+            }
+        )
+    repo = tmp_path / "repo"
+    authority_path = repo / "configs" / "orcd" / "authority.json"
+    authority_path.parent.mkdir(parents=True)
+    authority_path.write_text("{}", encoding="utf-8")
+    output = tmp_path / "admission.json"
+    authority = PreparationAuthorityMap(
+        path=authority_path,
+        sha256="4" * 64,
+        payload={
+            "authorities": {
+                "admission_policy": {
+                    "repository_path": "configs/models/policy.yaml",
+                    "sha256": "5" * 64,
+                },
+                "exclusion_ledger": {
+                    "repository_path": "configs/models/ledger.yaml",
+                    "sha256": "6" * 64,
+                },
+            },
+            "outputs": {
+                "six_view_root": str(six_root),
+                "admission_receipt": str(output),
+            },
+        },
+        hdf5_receipt_sha256={},
+    )
+    observed: dict[str, str] = {}
+
+    def fake_load(
+        supplied: PreparationAuthorityMap,
+        *,
+        expected_producer_git_sha: str,
+        expected_sha256: str,
+    ) -> tuple[dict[str, object], Path, str]:
+        assert supplied is authority
+        observed["phase_a_producer"] = expected_producer_git_sha
+        observed["phase_a_digest"] = expected_sha256
+        return {"sectors": rows}, tmp_path / "phase-a.json", phase_a_digest
+
+    def fake_admit(**kwargs: object) -> tuple[dict[str, object], str]:
+        observed["current_producer"] = str(kwargs["producer_git_sha"])
+        return {"preparation_pool_admitted": True}, "7" * 64
+
+    monkeypatch.setattr(preparation_authority, "load_phase_a_authority_record", fake_load)
+    monkeypatch.setattr(preparation_authority, "sha256_file", lambda _path: "8" * 64)
+    monkeypatch.setattr(preparation_authority, "admit_preparation_pool", fake_admit)
+
+    result, digest = admit_from_preparation_authorities(
+        authority,
+        phase_a_producer_git_sha=phase_a_producer,
+        phase_a_record_sha256=phase_a_digest,
+        producer_git_sha=current_producer,
+        output_path=output,
+    )
+    assert result == {"preparation_pool_admitted": True}
+    assert digest == "7" * 64
+    assert observed == {
+        "phase_a_producer": phase_a_producer,
+        "phase_a_digest": phase_a_digest,
+        "current_producer": current_producer,
+    }

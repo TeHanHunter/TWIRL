@@ -39,6 +39,17 @@ def build_parser() -> argparse.ArgumentParser:
         child.add_argument("--authority-map", type=Path, required=True)
         child.add_argument("--authority-map-sha256", type=_sha256, required=True)
         child.add_argument("--producer-git-sha", type=_git_sha, required=True)
+        if action == "validate-phase-a":
+            child.add_argument(
+                "--phase-a-record-sha256", type=_sha256, required=True
+            )
+        if action == "admit":
+            child.add_argument(
+                "--phase-a-producer-git-sha", type=_git_sha, required=True
+            )
+            child.add_argument(
+                "--phase-a-record-sha256", type=_sha256, required=True
+            )
         if action != "validate-phase-a":
             child.add_argument("--output", type=Path, required=True)
     return parser
@@ -60,11 +71,14 @@ def main(argv: list[str] | None = None) -> int:
         result, path, digest = load_phase_a_authority_record(
             authority,
             expected_producer_git_sha=args.producer_git_sha,
+            expected_sha256=args.phase_a_record_sha256,
         )
         result = {**result, "validated_path": str(path)}
     else:
         result, digest = admit_from_preparation_authorities(
             authority,
+            phase_a_producer_git_sha=args.phase_a_producer_git_sha,
+            phase_a_record_sha256=args.phase_a_record_sha256,
             producer_git_sha=args.producer_git_sha,
             output_path=args.output,
         )
