@@ -90,19 +90,21 @@ the representation is masked-mean pooled over the full valid crop.  A
 one-to-ten-cadence event may therefore contribute too little to the pooled
 embedding even when cadence-level reconstruction retains it.
 
-The completed fixed-exposure aggregate did not test event dilution: it tiled
-one `2,048`-cadence base and averaged every set of shorter-crop embeddings back
-over the same full exposure. The next controlled diagnostic therefore uses one
-centered trapezoid event and a matched no-event control, evaluates direct
-`128`, `256`, `512`, and `2,048` nested contexts without cross-crop averaging,
-period information, repeated synthetic transits, or BLS, and compares exact
-step-0/step-2000 representation displacement and visible-event reconstruction
-response.
+The direct centered-event diagnostic confirms the dilution mechanism. At step
+2,000, `128`-cadence `h_window` response is about `16.3x` the `2,048`-cadence
+response in both repeated and new later-sector cohorts, close to the exact
+`16x` change expected from masked-mean pooling. Once normalized for the
+pooling denominator and injected signal, the gain is only about `8%` for
+repeated hosts and `3%` for new hosts, with the latter interval crossing
+unity. The trained `z_window` projection suppresses event response much more
+strongly than encoder-side `h_window`, so `z_window` should remain a
+training-head diagnostic rather than the downstream transfer feature.
 
-Keep mixed-scale sampling, local-event pooling, and selection between the
-provisional fixed-context `TWIRL-FM0.3.1` and shorter-context
-`TWIRL-FM0.3.2` unresolved until that result. Centering is diagnostic-only and
-must not silently become the pretraining sampler.
+`128` cadences (about `7.1 h`) is now the leading local-event context, but
+selection between fixed-context `TWIRL-FM0.3.1` and shorter-context
+`TWIRL-FM0.3.2` remains contingent on a BLS-free classifier-transfer test.
+Mixed-scale sampling and a later global-plus-local pooling representation stay
+separate follow-up mechanisms rather than being bundled into `.3.2`.
 
 The immutable full-visit six-view shards should remain independent of this
 choice so the prepared S56--S64 plus S66--S77 data can support each
@@ -116,6 +118,8 @@ not to become a periodic-search algorithm. Before promotion, resolve:
 
 - Which supervised light-curve classification or triage task and label
   authority should test the frozen backbone?
+- Use encoder-side `h_window` as the primary representation; compare direct
+  `128` and `2,048` cadence contexts at exact step 0 and step 2,000.
 - What source- and sector-disjoint splits, plus repeated/new-host reporting,
   are required?
 - Which low-capacity head and non-FM baselines define useful transfer?

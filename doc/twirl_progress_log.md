@@ -963,11 +963,30 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   representation and visible-event reconstruction response at exact step 0
   and step 2,000. A separately frozen classifier remains the eventual transfer
   gate.
+- `2026-09-01`: CPU job `21759626` completed the direct centered single-event
+  context diagnostic in `30m02s` with exit `0:0`; the immutable output SHA-256
+  is `9ad6d817ef5c3e00b44c62e3a110940964256a780b84a92c7b446a7001ba3d1c`.
+  It used one eligible development visit for each of `48` repeated and `48`
+  new leakage components, applied all `12` one-event duration/depth conditions
+  per source, and opened no labels, candidates, BLS/period features, sealed
+  shards, optimizer, or training path. At step 2,000, paired `128/2,048`
+  `h_window` robust-scaled response ratios are `16.324` (source-clustered 95%
+  interval `[14.954, 17.702]`) for repeated hosts and `16.299`
+  (`[14.728, 17.919]`) for new hosts. The corresponding pooling- and
+  signal-corrected ratios are only `1.081` (`[1.040, 1.130]`) and `1.034`
+  (`[0.993, 1.077]`), showing that the large raw gain is predominantly the
+  expected masked-mean dilution effect. Training also suppresses short-event
+  response: at `128` cadences, step-2,000 `h_window` robust-scaled response is
+  about `0.50x` step 0 for repeated and `0.59x` for new hosts, while
+  `z_window` is only about `0.044x` and `0.040x`. The next transfer test should
+  therefore use the encoder-side `h_window`, not the learned projection
+  `z_window`, with `128` cadences as the leading local-event context.
 
-**Next:** Run the frozen centered single-event `128/256/512/2,048` diagnostic,
-then use its result to choose whether a shorter-context FM training canary is
-justified. Do not train, fit a classifier, apply the formal gate, or open the
-sealed test in this diagnostic.
+**Next:** Freeze a source/sector-disjoint BLS-free classifier-transfer contract
+using step-2,000 `h_window` at `128` cadences, with exact step-0,
+`2,048`-cadence, and non-FM controls. Do not fit it, train FM0.3, apply the
+formal gate, or open the sealed test until that contract is separately
+reviewed.
 
 ### Candidate validation and follow-up
 
