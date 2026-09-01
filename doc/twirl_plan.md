@@ -17,7 +17,7 @@ Last reconciled: `2026-09-01`.
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
 | Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
-| TWIRL-FM0 | The centered-event test confirms strong masked-mean context dilution: step-2,000 `h_window` response at `128` cadences is about `16.3x` its `2,048`-cadence response in both later-sector cohorts, but signal-normalized gain is only modest | Freeze a BLS-free, source/sector-disjoint frozen-encoder classifier transfer contract using `h_window` at `128` versus preregistered controls before any FM0.3 training |
+| TWIRL-FM0 | The centered-event test confirms strong masked-mean context dilution; `128` cadences is the leading local context, and cadence averaging/downsampling is forbidden for the next encoder | Run the stride-1 mechanics screen and a BLS-free, source/sector-disjoint cadence-token classifier transfer test before any FM0.3 training |
 
 The exact current run state and historical metrics are recorded in the
 [progress log](twirl_progress_log.md). Reports are evidence snapshots, not
@@ -170,25 +170,30 @@ project authority.
   injected signal, the ratios are only `1.081` and `1.034`, respectively, and
   the new-host interval includes unity. The learned `z_window` projection
   suppresses local-event response much more strongly than the encoder-side
-  `h_window`; downstream transfer tests must therefore treat `h_window` as the
-  primary representation and `z_window` as a training-head diagnostic.
+  `h_window`. Both are temporally mean-pooled, so the next transfer test uses
+  the cadence-indexed encoder sequence as its primary representation and
+  retains `h_window` and `z_window` only as historical diagnostics.
 - If that evidence justifies another training campaign, name it
   `TWIRL-FM0.3`; do not reuse `FM0.2.2`, which already denotes the blocked
   parameter-matched Conformer under the frozen FM0.2 contract. The provisional
-  first candidate, `TWIRL-FM0.3.1`, is a fixed-TCN data-scale baseline: retain
-  the FM0.2.1 two-ADP-view encoder and same-window objective, use only fully
-  gated sectors, and compare at the same window-draw milestones before any
-  longer exposure-normalized extension. The direct centered-event result makes
-  `128` cadences (about `7.1 h`) the leading local-event context, but its
+  first matched candidates are `TWIRL-FM0.3.1`, a `128`-cadence TCN baseline,
+  and `TWIRL-FM0.3.2`, a parameter-matched `128`-cadence Conformer with
+  `patch_stride=1`. Both preserve one encoder token per `200 s` cadence and
+  expose the cadence-indexed sequence to downstream heads; cadence averaging,
+  patching, and temporal downsampling are forbidden. The old stride-four
+  FM0.1.2/0.2.2 Conformer is historical evidence only. The direct
+  centered-event result makes `128` cadences (about `7.1 h`) the leading
+  local-event context, but its
   approximately `16x` advantage is predominantly the expected removal of
   masked-mean dilution rather than evidence of richer learned local features.
-  Before selecting `.3.1` or `.3.2`, freeze a development-only BLS-free
-  classifier-transfer contract using the step-2,000 `h_window` at `128`
-  cadences, with source/sector-disjoint splits and exact step-0, `2,048`-
-  cadence, and non-FM baselines. Do not use `z_window` as the primary transfer
-  feature. If that gate supports shorter context, treat it as the single
-  structural change in the provisional `TWIRL-FM0.3.2` candidate, not a silent
-  continuation of `.3.1`.
+  Before training either candidate, run a development-only BLS-free
+  classifier-transfer contract using cadence tokens from the step-2,000 TCN
+  at `128` cadences, with chronological sector blocks, source-component
+  quarantine, and exact step-0, `2,048`-cadence, raw-flux, and quality-only
+  controls. The low-capacity head is a shared per-cadence linear score followed
+  by a masked maximum, with no temporal averaging. The two real candidates
+  must then match data, objective, context, masks, seeds, draws, and optimizer
+  budget so architecture is the only difference.
   Freeze a genuinely newer temporal holdout before training. Subsequent
   candidates may optimize both independent reconstruction masks and then test
   a separate stable-host cross-visit head,
@@ -366,12 +371,14 @@ negotiation or career-planning notes do not belong in the public plan.
    protocol; do not release a full S94+ queue before its gates pass.
 2. Run the two isolated model experiments: complete the sealed Teacher-v3 S63
    score-hidden review, and keep its isolation rule. For FM work, preserve the
-   completed FM0.2.1 temporal and centered-event evidence. Freeze, but do not
-   yet execute, a development-only BLS-free classifier/triage transfer contract
-   whose primary feature is step-2,000 `h_window` at `128` cadences and whose
-   controls include step 0, `2,048` cadences, and a non-FM baseline. Do not
-   advance FM0.1.3 or FM0.2.2, extend beyond step 2,000, rerun a second seed,
-   start FM0.3 training, apply a formal gate, or open the sealed FM test.
+   completed FM0.2.1 temporal and centered-event evidence. Execute the frozen
+   development-only BLS-free classifier/triage transfer contract
+   whose primary feature is the step-2,000 cadence-token sequence at `128`
+   cadences and whose controls include step 0, `2,048` cadences, raw cadence
+   features, and quality-only inputs. Complete the CPU-only stride-1 mechanics
+   screen first. Do not advance FM0.1.3 or FM0.2.2, extend beyond step 2,000,
+   rerun a second seed, start FM0.3 training, apply a formal gate, or open the
+   sealed FM test.
 3. Advance the transparent survey path independently: implement the dip branch
    and multi-sector merging, freeze the archive/index and release boundary
    (including no-TIC and S94+ decisions), then complete the recovery chain

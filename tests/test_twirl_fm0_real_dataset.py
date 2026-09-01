@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import csv
-from dataclasses import asdict
 import hashlib
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -127,6 +127,34 @@ def test_release_dataset_is_deterministic_source_first_and_model_safe(tmp_path: 
             sample["flux_valid"] & sample["temporal_mask"][None, :],
         )
     assert first["local_time_cadences"][np.flatnonzero(first["time_valid"])[0]] == 0
+
+
+def test_release_dataset_passes_explicit_short_context_mask_policy(
+    tmp_path: Path,
+) -> None:
+    manifest_sha = _write_release(tmp_path)
+    dataset = FM0ReleaseDataset(
+        FM0ReleaseDatasetConfig(
+            release_root=str(tmp_path),
+            manifest_sha256=manifest_sha,
+            variant="TWIRL-FM0.3.1",
+            windows_per_epoch=2,
+            window_length=128,
+            mask_target_fraction=0.15,
+            mask_span_range=(1, 4),
+        )
+    )
+
+    first = dataset.sample(0, mask_view=0)
+    repeated = dataset.sample(0, mask_view=0)
+    assert first["flux"].shape == (2, 128)
+    assert np.array_equal(first["temporal_mask"], repeated["temporal_mask"])
+    eligible = first["time_valid"] & np.any(first["flux_valid"], axis=0)
+    target = int(np.ceil(0.15 * np.count_nonzero(eligible)))
+    masked = int(np.count_nonzero(first["temporal_mask"]))
+    assert target <= masked <= target + 3
+    assert dataset.contract["mask_target_fraction"] == 0.15
+    assert dataset.contract["mask_span_range"] == [1, 4]
 
 
 def test_release_dataset_rejects_manifest_or_partition_drift(tmp_path: Path) -> None:

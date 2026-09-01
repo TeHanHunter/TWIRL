@@ -1,8 +1,8 @@
 """Small, parameter-matched TWIRL-FM0 TCN and Conformer encoders."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from .dataset import WINDOW_LENGTH, variant_view_indices
@@ -23,6 +23,7 @@ else:
 
 
 Architecture = Literal["tcn", "conformer"]
+FM0_3_WINDOW_LENGTH = 128
 
 
 def require_torch() -> None:
@@ -72,6 +73,8 @@ class FM0ModelConfig:
             raise ValueError("TCN kernel must be odd")
         if not self.tcn_dilation_cycle:
             raise ValueError("TCN dilation cycle cannot be empty")
+        if self.patch_stride <= 0:
+            raise ValueError("patch_stride must be positive")
 
     @property
     def input_channels(self) -> int:
@@ -398,6 +401,12 @@ class TWIRLFM0(_ModuleBase):
 
     def _patch_mean(self, values: Any, valid: Any) -> tuple[Any, Any]:
         stride = self.config.patch_stride
+        # The cadence-preserving path is a literal identity: it does not enter
+        # the legacy patch-reduction code, even though a one-element mean would
+        # be numerically equivalent.  This keeps every 200-second cadence as
+        # its own encoder token.
+        if stride == 1:
+            return values, valid
         length = values.shape[-1]
         padding = (-length) % stride
         if padding:
@@ -413,6 +422,8 @@ class TWIRLFM0(_ModuleBase):
 
     def _patch_time(self, values: Any, valid: Any) -> Any:
         stride = self.config.patch_stride
+        if stride == 1:
+            return values
         padding = (-values.shape[-1]) % stride
         if padding:
             values = F.pad(values, (0, padding))
@@ -466,6 +477,12 @@ class TWIRLFM0(_ModuleBase):
         reconstruction = reconstruction * token_valid[:, None, :]
         return {
             "reconstruction": reconstruction,
+            # Preserve the cadence-indexed encoder/decoder state for later
+            # event-localizing heads.  For a cadence-preserving Conformer this
+            # requires patch_stride=1; older stride-4 checkpoints remain
+            # loadable, but their contextual state was formed from averaged
+            # four-cadence patches and is not a candidate for that contract.
+            "h_cadence": full_hidden.transpose(1, 2),
             # This output-only diagnostic localizes whether low rank originates
             # before or after the projection.  It adds no parameter or model
             # input and remains compatible with existing FM0.1 checkpoints.
@@ -510,6 +527,10 @@ def architecture_for_variant(
         return "tcn"
     if variant == "TWIRL-FM0.2.2":
         return "conformer"
+    if variant == "TWIRL-FM0.3.1":
+        return "tcn"
+    if variant == "TWIRL-FM0.3.2":
+        return "conformer"
     variant_view_indices(variant)
     if development_winner not in ("tcn", "conformer"):
         raise ValueError(
@@ -532,9 +553,12 @@ def build_fm0_model(
         variant, development_winner=development_winner
     )
     if config_override is None:
+        short_context = variant in {"TWIRL-FM0.3.1", "TWIRL-FM0.3.2"}
         config = FM0ModelConfig(
             architecture=architecture,
             n_flux_views=len(indices),
+            window_length=FM0_3_WINDOW_LENGTH if short_context else WINDOW_LENGTH,
+            patch_stride=1 if short_context else 4,
         )
     else:
         config = config_override

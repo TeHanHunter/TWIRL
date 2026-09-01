@@ -1,0 +1,56 @@
+schema_version: twirl_fm0_3_stride1_mechanics_config_v1
+campaign_id: twirl_fm0_3_stride1_mechanics_v1
+model_family: TWIRL-FM0
+status: frozen_training_free_mechanics
+prepared_on: 2026-09-01
+
+purpose:
+  primary: verify_cadence_preserving_short_context_model_mechanics
+  learned_utility_claim: false
+  architecture_selection_claim: false
+
+authorization:
+  deterministic_synthetic_inputs: true
+  random_initialization_only: true
+  checkpoint_access: false
+  development_shard_access: false
+  probe_fitting: false
+  optimizer_or_model_training: false
+  sealed_test_access: false
+  gpu_use: false
+  formal_model_gate: false
+
+cadence_contract:
+  nominal_cadence_seconds: 200
+  context_length_cadences: 128
+  context_duration_hours: 7.111111111111111
+  one_encoder_token_per_cadence: true
+  patch_stride: 1
+  cadence_averaging: false
+  temporal_downsampling: false
+  cadence_sequence_output: h_cadence
+  window_mean_outputs_diagnostic_only: [h_window, z_window]
+
+candidates:
+  TWIRL-FM0.3.1:
+    architecture: tcn
+    template_variant: TWIRL-FM0.1.1
+    expected_parameter_count: 8825602
+  TWIRL-FM0.3.2:
+    architecture: conformer
+    template_variant: TWIRL-FM0.1.2
+    expected_parameter_count: 9345282
+
+evaluation:
+  initialization_seeds: [560067, 560068]
+  synthetic_sources: 8
+  event_duration_cadences: [1, 3, 9]
+  event_fractional_depth: 0.03
+  identical_inputs_across_architectures: true
+  invalid_fill_invariance: true
+  require_finite_outputs: true
+
+claim_limit: >-
+  This CPU-only screen verifies tensor geometry and numerical mechanics at
+  random initialization. It does not measure learned transfer utility, select
+  an architecture, authorize GPU training, or support a foundation-model claim.

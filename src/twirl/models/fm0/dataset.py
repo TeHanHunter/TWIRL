@@ -7,13 +7,13 @@ numerical smoke.
 """
 from __future__ import annotations
 
-from collections import OrderedDict
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 import csv
 import hashlib
 import json
 import math
+from collections import OrderedDict
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,6 @@ from .input_release import (
     load_input_release,
 )
 from .registry import sha256_file
-
 
 WINDOW_LENGTH = 2048
 EVALUATION_STRIDE = 1024
@@ -51,6 +50,10 @@ VARIANT_VIEW_INDICES = {
     # architecture arms therefore retain the exact FM0.1.1/0.1.2 ADP views.
     "TWIRL-FM0.2.1": (2, 3),
     "TWIRL-FM0.2.2": (2, 3),
+    # FM0.3 changes context geometry and the Conformer stride, not the input
+    # photometry: both matched candidates keep the two ADP aperture views.
+    "TWIRL-FM0.3.1": (2, 3),
+    "TWIRL-FM0.3.2": (2, 3),
 }
 
 MODEL_WINDOW_KEYS = (
@@ -178,7 +181,7 @@ def synchronized_temporal_mask(
     if eligible_count == 0 or target_fraction == 0:
         return temporal, valid & temporal[None, :]
 
-    target_count = max(1, int(math.ceil(target_fraction * eligible_count)))
+    target_count = max(1, math.ceil(target_fraction * eligible_count))
     eligible_indices = np.flatnonzero(eligible)
     rng = np.random.default_rng(int(seed))
     attempts = 0
@@ -199,6 +202,24 @@ def synchronized_temporal_mask(
 
     temporal &= eligible
     return temporal, valid & temporal[None, :]
+
+
+def _validate_optional_mask_policy(
+    *,
+    target_fraction: float | None,
+    span_range: tuple[int, int] | None,
+) -> None:
+    """Validate opt-in mask overrides without changing legacy defaults."""
+
+    if target_fraction is not None and not 0.0 <= float(target_fraction) <= 1.0:
+        raise ValueError("mask_target_fraction must be in [0, 1]")
+    if span_range is None:
+        return
+    if len(span_range) != 2:
+        raise ValueError("mask_span_range must contain exactly two bounds")
+    minimum_span, maximum_span = (int(span_range[0]), int(span_range[1]))
+    if minimum_span <= 0 or maximum_span < minimum_span:
+        raise ValueError("mask_span_range must contain positive ordered bounds")
 
 
 def _as_cadence_view(
@@ -225,6 +246,8 @@ def prepare_model_window(
     variant: str,
     mask_seed: int,
     window_length: int = WINDOW_LENGTH,
+    mask_target_fraction: float | None = None,
+    mask_span_range: tuple[int, int] | None = None,
 ) -> dict[str, np.ndarray]:
     """Validate, orient, select views, pad, and mask one release window.
 
@@ -336,6 +359,12 @@ def prepare_model_window(
         sample["flux_valid"],
         sample["time_valid"],
         seed=mask_seed,
+        target_fraction=(
+            MASK_TARGET_FRACTION
+            if mask_target_fraction is None
+            else mask_target_fraction
+        ),
+        span_range=MASK_SPAN_RANGE if mask_span_range is None else mask_span_range,
     )
     sample["temporal_mask"] = temporal
     sample["reconstruction_mask"] = reconstruction
@@ -354,6 +383,10 @@ class SyntheticFM0Config:
     window_length: int = WINDOW_LENGTH
     noise_scale: float = 0.002
     event_depth: float = 0.01
+    # ``None`` preserves the byte-level FM0.1/FM0.2 dataset contract while
+    # allowing a short-context campaign to declare its scaled mask geometry.
+    mask_target_fraction: float | None = None
+    mask_span_range: tuple[int, int] | None = None
 
     def __post_init__(self) -> None:
         variant_view_indices(self.variant)
@@ -361,6 +394,10 @@ class SyntheticFM0Config:
             raise ValueError("synthetic source and visit counts must be positive")
         if self.windows_per_epoch <= 0 or self.window_length <= 0:
             raise ValueError("synthetic window counts and length must be positive")
+        _validate_optional_mask_policy(
+            target_fraction=self.mask_target_fraction,
+            span_range=self.mask_span_range,
+        )
 
 
 class SyntheticFM0Dataset:
@@ -407,8 +444,18 @@ class SyntheticFM0Dataset:
         delta = np.ones(cadence_count, dtype=np.float32)
         delta[0] = 0.0
         common = rng.normal(0.0, self.config.noise_scale, cadence_count)
-        event_center = int(rng.integers(128, max(129, cadence_count - 128)))
-        event_width = int(rng.integers(2, 13))
+        if cadence_count == WINDOW_LENGTH:
+            # Frozen FM0.1/FM0.2 synthetic sequence: keep the draw order and
+            # bounds verbatim so old checkpoints resume byte-for-byte.
+            event_center = int(rng.integers(128, max(129, cadence_count - 128)))
+            event_width = int(rng.integers(2, 13))
+        else:
+            # Short contexts cannot support the legacy 128-cadence margins.
+            # Draw an event that is guaranteed to lie wholly inside the crop.
+            minimum_width = min(2, cadence_count)
+            maximum_width = min(12, cadence_count)
+            event_width = int(rng.integers(minimum_width, maximum_width + 1))
+            event_center = int(rng.integers(0, cadence_count - event_width + 1))
         event = np.zeros(cadence_count, dtype=np.float32)
         event[event_center : min(cadence_count, event_center + event_width)] = (
             -self.config.event_depth
@@ -450,6 +497,8 @@ class SyntheticFM0Dataset:
                 mask_view,
             ),
             window_length=self.config.window_length,
+            mask_target_fraction=self.config.mask_target_fraction,
+            mask_span_range=self.config.mask_span_range,
         )
 
     def __getitem__(self, index: int) -> dict[str, np.ndarray]:
@@ -468,6 +517,8 @@ class FM0ReleaseDatasetConfig:
     windows_per_epoch: int = 1_280_000
     window_length: int = WINDOW_LENGTH
     shard_cache_size: int = 8
+    mask_target_fraction: float | None = None
+    mask_span_range: tuple[int, int] | None = None
 
     def __post_init__(self) -> None:
         variant_view_indices(self.variant)
@@ -481,6 +532,10 @@ class FM0ReleaseDatasetConfig:
             raise ValueError("window counts and length must be positive")
         if self.shard_cache_size <= 0:
             raise ValueError("shard_cache_size must be positive")
+        _validate_optional_mask_policy(
+            target_fraction=self.mask_target_fraction,
+            span_range=self.mask_span_range,
+        )
 
 
 class FM0ReleaseDataset:
@@ -542,7 +597,7 @@ class FM0ReleaseDataset:
 
     @property
     def contract(self) -> dict[str, Any]:
-        return {
+        contract = {
             "kind": "fm0_input_release",
             "release_root": str(self.release_root),
             "manifest_sha256": self.config.manifest_sha256,
@@ -555,6 +610,11 @@ class FM0ReleaseDataset:
             "n_observations": sum(len(rows) for rows in self._visits.values()),
             "n_excluded_missing_required_views": self._n_excluded_missing_required_views,
         }
+        if self.config.mask_target_fraction is not None:
+            contract["mask_target_fraction"] = self.config.mask_target_fraction
+        if self.config.mask_span_range is not None:
+            contract["mask_span_range"] = list(self.config.mask_span_range)
+        return contract
 
     def __len__(self) -> int:
         return self.config.windows_per_epoch
@@ -710,6 +770,8 @@ class FM0ReleaseDataset:
                 mask_view,
             ),
             window_length=self.config.window_length,
+            mask_target_fraction=self.config.mask_target_fraction,
+            mask_span_range=self.config.mask_span_range,
         )
 
     def __getitem__(self, index: int) -> dict[str, np.ndarray]:

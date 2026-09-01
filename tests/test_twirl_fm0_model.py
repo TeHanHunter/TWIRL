@@ -1,21 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import asdict
+
 import pytest
 
 torch = pytest.importorskip("torch")
 
-from twirl.models.fm0.dataset import (  # noqa: E402
+from twirl.models.fm0.dataset import (
     SyntheticFM0Config,
     SyntheticFM0Dataset,
     collate_fm0_samples,
 )
-from twirl.models.fm0.model import (  # noqa: E402
+from twirl.models.fm0.model import (
     FM0ModelConfig,
+    architecture_for_variant,
     build_fm0_model,
     count_trainable_parameters,
     parameter_match_fraction,
 )
-
 
 _CADENCE_LAST_KEYS = (
     "flux",
@@ -80,6 +82,42 @@ def test_fm0_2_objective_variants_reuse_the_exact_fm0_1_backbones() -> None:
     assert fm01_conformer.config == fm02_conformer.config
 
 
+def test_fm0_3_variant_mappings_freeze_short_cadence_preserving_geometry() -> None:
+    assert architecture_for_variant("TWIRL-FM0.3.1") == "tcn"
+    assert architecture_for_variant("TWIRL-FM0.3.2") == "conformer"
+
+    tcn = build_fm0_model("TWIRL-FM0.3.1")
+    conformer = build_fm0_model("TWIRL-FM0.3.2")
+    assert tcn.config.architecture == "tcn"
+    assert conformer.config.architecture == "conformer"
+    for model in (tcn, conformer):
+        assert model.config.n_flux_views == 2
+        assert model.config.window_length == 128
+        assert model.config.patch_stride == 1
+
+
+def test_legacy_model_config_checkpoint_keys_are_unchanged() -> None:
+    assert set(asdict(FM0ModelConfig(architecture="tcn", n_flux_views=2))) == {
+        "architecture",
+        "n_flux_views",
+        "window_length",
+        "d_model",
+        "embedding_dim",
+        "stem_kernel",
+        "dropout",
+        "tcn_blocks",
+        "tcn_kernel",
+        "tcn_dilation_cycle",
+        "conformer_blocks",
+        "conformer_heads",
+        "conformer_ff_multiplier",
+        "conformer_conv_kernel",
+        "patch_stride",
+        "minimum_parameters",
+        "maximum_parameters",
+    }
+
+
 @pytest.mark.parametrize(
     ("variant", "architecture"),
     (("TWIRL-FM0.1.1", "tcn"), ("TWIRL-FM0.1.2", "conformer")),
@@ -118,12 +156,14 @@ def test_tiny_models_preserve_shapes_and_ignore_invalid_fill(
         changed["flux"][~changed["flux_valid"]] = 1.0e6
         second = model(changed)
     assert first["reconstruction"].shape == (2, 2, 64)
+    assert first["h_cadence"].shape == (2, 64, 16)
     assert first["h_window"].shape == (2, 16)
     assert first["z_window"].shape == (2, 16)
     assert torch.equal(
         first["z_window"], model.embedding_projection(first["h_window"])
     )
     assert torch.equal(first["reconstruction"], second["reconstruction"])
+    assert torch.equal(first["h_cadence"], second["h_cadence"])
     assert torch.equal(first["h_window"], second["h_window"])
     assert torch.equal(first["z_window"], second["z_window"])
 
@@ -156,6 +196,54 @@ def test_conformer_reconstruction_retains_subpatch_cadence_state() -> None:
     with torch.no_grad():
         reconstruction = model(batch)["reconstruction"]
     assert not torch.equal(reconstruction[..., 0], reconstruction[..., 1])
+
+
+def test_cadence_preserving_conformer_keeps_one_token_per_cadence() -> None:
+    config = FM0ModelConfig(
+        architecture="conformer",
+        n_flux_views=2,
+        window_length=64,
+        d_model=16,
+        embedding_dim=16,
+        stem_kernel=5,
+        dropout=0.0,
+        conformer_blocks=1,
+        conformer_heads=4,
+        conformer_ff_multiplier=2,
+        conformer_conv_kernel=7,
+        patch_stride=1,
+        minimum_parameters=1,
+        maximum_parameters=10_000_000,
+    )
+    model = build_fm0_model(
+        "TWIRL-FM0.1.2", config_override=config, enforce_parameter_budget=False
+    ).eval()
+    dataset = SyntheticFM0Dataset(
+        SyntheticFM0Config(
+            variant="TWIRL-FM0.1.2", window_length=64, windows_per_epoch=2
+        )
+    )
+    batch = collate_fm0_samples([dataset[0]])
+
+    with torch.no_grad():
+        stem = model.stem(*model._pack_input(batch)[:2])
+        token_valid = batch["time_valid"].bool()
+        patched, patched_valid = model._patch_mean(stem, token_valid)
+        output = model(batch)
+
+    assert patched.shape[-1] == batch["flux"].shape[-1]
+    assert patched_valid.shape[-1] == batch["flux"].shape[-1]
+    assert patched is stem
+    assert patched_valid is token_valid
+    torch.testing.assert_close(patched, stem)
+    assert torch.equal(patched_valid, batch["time_valid"].bool())
+    assert output["token_valid"].shape == batch["time_valid"].shape
+    assert output["h_cadence"].shape[1] == batch["flux"].shape[-1]
+
+
+def test_model_config_rejects_nonpositive_patch_stride() -> None:
+    with pytest.raises(ValueError, match="patch_stride must be positive"):
+        FM0ModelConfig(architecture="conformer", n_flux_views=2, patch_stride=0)
 
 
 @pytest.mark.parametrize(

@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-import numpy as np
-from pathlib import Path
-import pytest
 import subprocess
 import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 from twirl.models.fm0.dataset import (
+    SyntheticFM0Config,
+    SyntheticFM0Dataset,
     evaluation_window_starts,
     prepare_model_window,
     synchronized_temporal_mask,
+    variant_view_indices,
 )
+from twirl.models.fm0.training import _synthetic_dataset_config_contract
 from twirl.models.fm0.validation import (
     RUN_CONTRACT_SCHEMA_VERSION,
     RUN_SUMMARY_SCHEMA_VERSION,
-    sha256_file,
     validate_run_release,
     write_json_with_sha256,
     write_sha256_sidecar,
@@ -52,6 +56,83 @@ def test_synchronized_mask_is_deterministic_and_never_targets_invalid() -> None:
     assert np.array_equal(first, second)
     assert np.array_equal(first, valid & first_time[None, :])
     assert not np.any(first[:, 30:35])
+
+
+def test_fm0_3_variants_keep_the_two_adp_views() -> None:
+    assert variant_view_indices("TWIRL-FM0.3.1") == (2, 3)
+    assert variant_view_indices("TWIRL-FM0.3.2") == (2, 3)
+
+
+def test_short_synthetic_event_and_scaled_mask_are_nonempty_and_deterministic() -> None:
+    config = SyntheticFM0Config(
+        variant="TWIRL-FM0.3.1",
+        window_length=128,
+        windows_per_epoch=2,
+        noise_scale=0.0,
+        event_depth=0.1,
+        mask_target_fraction=0.15,
+        mask_span_range=(1, 4),
+    )
+    dataset = SyntheticFM0Dataset(config)
+    first = dataset.sample(0, mask_view=0)
+    repeated = dataset.sample(0, mask_view=0)
+    second_mask = dataset.sample(0, mask_view=1)
+
+    for name in first:
+        assert np.array_equal(first[name], repeated[name]), name
+    assert np.any(first["flux"][first["flux_valid"]] < -0.05)
+    assert np.array_equal(first["flux"], second_mask["flux"])
+    assert not np.array_equal(first["temporal_mask"], second_mask["temporal_mask"])
+
+    eligible = first["time_valid"] & np.any(first["flux_valid"], axis=0)
+    target = int(np.ceil(0.15 * np.count_nonzero(eligible)))
+    masked = int(np.count_nonzero(first["temporal_mask"]))
+    assert target <= masked <= target + 3
+    assert np.array_equal(
+        first["reconstruction_mask"],
+        first["flux_valid"] & first["temporal_mask"][None, :],
+    )
+
+
+def test_legacy_synthetic_defaults_keep_checkpoint_keys_and_event_sequence() -> None:
+    config = SyntheticFM0Config(
+        variant="TWIRL-FM0.1.1",
+        windows_per_epoch=2,
+        noise_scale=0.0,
+        event_depth=0.1,
+    )
+    assert _synthetic_dataset_config_contract(config) == {
+        "variant": "TWIRL-FM0.1.1",
+        "seed": 560067,
+        "n_sources": 64,
+        "visits_per_source": 2,
+        "windows_per_epoch": 2,
+        "window_length": 2048,
+        "noise_scale": 0.0,
+        "event_depth": 0.1,
+    }
+
+    sample = SyntheticFM0Dataset(config)[0]
+    for view, expected_depth in enumerate((-0.104, -0.106)):
+        event_indices = np.flatnonzero(sample["flux"][view] < -0.05)
+        assert np.array_equal(event_indices, np.arange(1262, 1264))
+        assert sample["flux"][view, 1262] == pytest.approx(expected_depth)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    (
+        {"mask_target_fraction": -0.01},
+        {"mask_target_fraction": 1.01},
+        {"mask_span_range": (0, 4)},
+        {"mask_span_range": (4, 1)},
+    ),
+)
+def test_synthetic_config_rejects_invalid_mask_policy(
+    overrides: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="mask_"):
+        SyntheticFM0Config(variant="TWIRL-FM0.3.1", **overrides)
 
 
 def test_prepare_window_selects_frozen_views_and_pads_neutrally() -> None:

@@ -1,15 +1,16 @@
 """Losses and deterministic synthetic training for TWIRL-FM0.1."""
 from __future__ import annotations
 
-from contextlib import nullcontext
-from dataclasses import asdict, dataclass
 import hashlib
 import math
 import os
-from pathlib import Path
 import random
 import time
-from typing import Any, Mapping
+from collections.abc import Mapping
+from contextlib import nullcontext
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -125,9 +126,22 @@ def _immutable_milestone_steps(contract: Mapping[str, Any]) -> tuple[int, ...]:
     return tuple(steps)
 
 
+def _synthetic_dataset_config_contract(config: Any) -> dict[str, Any]:
+    """Serialize synthetic config without drifting legacy checkpoint keys."""
+
+    serialized = asdict(config)
+    for name in ("mask_target_fraction", "mask_span_range"):
+        if serialized.get(name) is None:
+            serialized.pop(name, None)
+    return serialized
+
+
 def _dataset_contract(dataset: Any) -> dict[str, Any]:
     if isinstance(dataset, SyntheticFM0Dataset):
-        return {"kind": "synthetic", "config": asdict(dataset.config)}
+        return {
+            "kind": "synthetic",
+            "config": _synthetic_dataset_config_contract(dataset.config),
+        }
     if isinstance(dataset, FM0ReleaseDataset):
         return dict(dataset.contract)
     raise TypeError("unsupported FM0 training dataset")
@@ -455,7 +469,9 @@ def checkpoint_payload(
         "optimization_config": asdict(optimization),
         "dataset_contract": _dataset_contract(dataset),
         "synthetic_dataset_config": (
-            asdict(dataset.config) if isinstance(dataset, SyntheticFM0Dataset) else None
+            _synthetic_dataset_config_contract(dataset.config)
+            if isinstance(dataset, SyntheticFM0Dataset)
+            else None
         ),
         "run_contract": dict(run_contract),
         "objective_state": _validated_objective_state(

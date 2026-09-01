@@ -97,12 +97,20 @@ response in both repeated and new later-sector cohorts, close to the exact
 pooling denominator and injected signal, the gain is only about `8%` for
 repeated hosts and `3%` for new hosts, with the latter interval crossing
 unity. The trained `z_window` projection suppresses event response much more
-strongly than encoder-side `h_window`, so `z_window` should remain a
-training-head diagnostic rather than the downstream transfer feature.
+strongly than encoder-side `h_window`. Both representations are temporal
+means, so neither is the primary downstream feature under the new
+cadence-preservation rule. The transfer test should consume the cadence-level
+encoder sequence through a shared tokenwise linear score and a final masked
+maximum; it must not bin, average, patch, or downsample the time axis.
 
-`128` cadences (about `7.1 h`) is now the leading local-event context, but
-selection between fixed-context `TWIRL-FM0.3.1` and shorter-context
-`TWIRL-FM0.3.2` remains contingent on a BLS-free classifier-transfer test.
+`128` cadences (about `7.1 h`) is now the leading local-event context. The
+provisional matched pair is a cadence-preserving TCN (`TWIRL-FM0.3.1`) and a
+stride-one cadence-preserving Conformer (`TWIRL-FM0.3.2`), contingent on a
+BLS-free classifier-transfer test and a training-free mechanics screen.
+The transfer test is explicitly candidate-centered single-event
+classification after an external proposal stage, not blind detection; its raw
+control receives the same time/position channels, while BLS remains a separate
+search approach.
 Mixed-scale sampling and a later global-plus-local pooling representation stay
 separate follow-up mechanisms rather than being bundled into `.3.2`.
 
@@ -118,8 +126,9 @@ not to become a periodic-search algorithm. Before promotion, resolve:
 
 - Which supervised light-curve classification or triage task and label
   authority should test the frozen backbone?
-- Use encoder-side `h_window` as the primary representation; compare direct
-  `128` and `2,048` cadence contexts at exact step 0 and step 2,000.
+- Use the cadence-level encoder sequence as the primary representation;
+  compare direct `128` and `2,048` cadence contexts at exact step 0 and step
+  2,000, and keep temporally averaged `h_window`/`z_window` diagnostic only.
 - What source- and sector-disjoint splits, plus repeated/new-host reporting,
   are required?
 - Which low-capacity head and non-FM baselines define useful transfer?
