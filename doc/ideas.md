@@ -5,7 +5,7 @@ Accepted decisions belong in [the plan](twirl_plan.md); execution history
 belongs in [the progress log](twirl_progress_log.md). Earlier brainstorming is
 preserved in the [archived snapshot](archive/ideas_through_2026-07-13.md).
 
-Last reconciled: `2026-08-28`.
+Last reconciled: `2026-09-01`.
 
 ## Blocking decisions
 
@@ -90,28 +90,39 @@ the representation is masked-mean pooled over the full valid crop.  A
 one-to-ten-cadence event may therefore contribute too little to the pooled
 embedding even when cadence-level reconstruction retains it.
 
-Before freezing another training design:
+The completed fixed-exposure aggregate did not test event dilution: it tiled
+one `2,048`-cadence base and averaged every set of shorter-crop embeddings back
+over the same full exposure. The next controlled diagnostic therefore uses one
+centered trapezoid event and a matched no-event control, evaluates direct
+`128`, `256`, `512`, and `2,048` nested contexts without cross-crop averaging,
+period information, repeated synthetic transits, or BLS, and compares exact
+step-0/step-2000 representation displacement and visible-event reconstruction
+response.
 
-- distinguish context length from the Conformer-only patch stride (`4`
-  cadences in the frozen FM0.1 implementation) and from the TCN receptive
-  field;
-- preregister a matched crop-length diagnostic, provisionally comparing
-  contiguous `256`, `512`, `1,024`, and `2,048` cadence-slot crops while
-  holding physical-source sampling, total model-visible cadence exposure,
-  masks, and checkpoint comparisons fixed;
-- measure short-event retention together with reconstruction, embedding rank,
-  repeated-host retrieval, and sensitivity to longer variability so a shorter
-  crop is not selected from transit retention alone;
-- test a single shorter-context change before considering a mixed-scale
-  sampler, local-event pooling, or patch-width change; and
-- treat a changed context/sampling contract as a structural model experiment,
-  provisionally `TWIRL-FM0.3.2`, not as a silent continuation of the fixed-
-  context `TWIRL-FM0.3.1` data-scale baseline.
+Keep mixed-scale sampling, local-event pooling, and selection between the
+provisional fixed-context `TWIRL-FM0.3.1` and shorter-context
+`TWIRL-FM0.3.2` unresolved until that result. Centering is diagnostic-only and
+must not silently become the pretraining sampler.
 
 The immutable full-visit six-view shards should remain independent of this
 choice so the prepared S56--S64 plus S66--S77 data can support each
 preregistered loader-level crop length without rebuilding photometry. S65
 remains outside this release under its pre-model exclusion ledger.
+
+## FM downstream transfer gate
+
+FM0 is intended to enable later BLS-free supervised classification and triage,
+not to become a periodic-search algorithm. Before promotion, resolve:
+
+- Which supervised light-curve classification or triage task and label
+  authority should test the frozen backbone?
+- What source- and sector-disjoint splits, plus repeated/new-host reporting,
+  are required?
+- Which low-capacity head and non-FM baselines define useful transfer?
+- What preregistered threshold permits promotion while BLS remains an
+  independent transparent search branch?
+- Which genuinely later sector remains untouched for prospective transfer
+  evaluation?
 
 ## Catalog and contextual science
 

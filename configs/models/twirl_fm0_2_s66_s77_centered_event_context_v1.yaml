@@ -1,0 +1,94 @@
+schema_version: twirl_fm0_centered_event_context_config_v1
+campaign_id: twirl_fm0_2_s66_s77_centered_event_context_v1
+model_family: TWIRL-FM0
+status: frozen_training_free_development_diagnostic
+prepared_on: 2026-09-01
+
+purpose:
+  primary: measure_single_short_event_information_retained_by_frozen_fm_representations
+  downstream_goal: support_later_bls_free_supervised_classification_and_triage
+  diagnostic_only: true
+
+authorization:
+  development_shard_payload_access: true
+  artificial_single_event_injection: true
+  checkpoint_inference: true
+  labels_or_candidates: false
+  bls_or_period_features: false
+  repeated_synthetic_events: false
+  classifier_or_probe_fitting: false
+  optimizer_or_model_training: false
+  sealed_test_access: false
+  formal_model_gate: false
+  production_model_claim: false
+
+inputs:
+  temporal_panel_receipt_sha256: 78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624
+  allowed_sectors: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+  excluded_sectors: [65]
+  source_partition: poc_development
+  checkpoint_steps: [0, 2000]
+  checkpoint_sha256:
+    step0: 92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c
+    step2000: 976b5053c857c38b9fbf7a35c9d0605f0023318b2c9bd37a88995992e5aa7bd2
+
+selection:
+  cohorts: [repeated, new]
+  max_components_per_cohort: 48
+  one_visit_per_component: true
+  component_and_visit_order: deterministic_sha256
+  base_interval_cadences: 2048
+  minimum_valid_fraction_each_required_view: 0.8
+  require_full_validity_over_maximum_event_support: true
+  only_structural_context_ineligibility_is_skippable: true
+  path_checksum_schema_and_partition_failures_are_fatal: true
+
+contexts:
+  cadence_lengths: [128, 256, 512, 2048]
+  nominal_cadence_seconds: 200
+  nested_and_centered_on_identical_base_interval: true
+  tile_or_cross_crop_averaging: false
+  checkpoint_time_normalization_remains_2048: true
+  effective_time_valid_counts_reported: true
+
+artificial_event:
+  profile: symmetric_trapezoid_sampled_at_cadence_centers
+  ingress_egress_fraction_each: 0.3333333333333333
+  duration_cadences: [1, 3, 9]
+  fractional_depths: [0.01, 0.03, 0.1, 0.3]
+  all_depth_duration_conditions_applied_to_each_source: true
+  one_event_in_each_injected_sample: true
+  event_center: designated_center_cadence_base_index_1024
+  apply_to_views: [adp_1x1, adp_3x3]
+  relative_flux_equation: injected=(1+original)*(1-depth_profile)-1
+  time_errors_validity_and_masks_unchanged: true
+  period_defined: false
+
+metrics:
+  representations: [h_window, z_window]
+  primary:
+    - original_population_robust_scaled_rms_displacement
+    - raw_l2_displacement
+    - one_minus_cosine_similarity
+    - coherent_shift_and_direction
+    - paired_context_ratio_to_2048
+    - paired_step2000_minus_step0
+  secondary_reconstruction:
+    - visible_event_projection_gain
+    - event_support_normalized_residual
+  uncertainty: deterministic_source_clustered_bootstrap_95_interval
+
+interpretation:
+  success_means: >-
+    A shorter direct context carries a stronger, coherent single-event signal
+    in the frozen representation relative to ordinary host-to-host variation.
+  does_not_establish:
+    - real_event_classification_performance
+    - masked_single_event_prediction
+    - transit_detection_or_period_recovery
+    - model_promotion
+  next_gate: separately_frozen_source_and_sector_disjoint_downstream_classifier_contract
+  frozen_checkpoint_limit: >-
+    Short-context inference retains the checkpoint's 2,048-cadence time
+    normalization and weights trained only on 2,048-cadence crops. A shorter-
+    context win motivates retraining, while a loss does not rule it out.

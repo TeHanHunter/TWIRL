@@ -6,7 +6,7 @@ Read [the documentation guide](README.md) to find task-specific protocols.
 Detailed results belong in [the progress log](twirl_progress_log.md), and
 unresolved choices belong in [ideas](ideas.md).
 
-Last reconciled: `2026-08-28`.
+Last reconciled: `2026-09-01`.
 
 ## Milestone dashboard
 
@@ -17,7 +17,7 @@ Last reconciled: `2026-08-28`.
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
 | Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
-| TWIRL-FM0 | FM0.2.1 completed its four-point canary trajectory; rank repair is learned, but masked Huber remains `0.109%` worse than zero, cross-sector retrieval did not improve, and the formal gate is incomplete | Admit and inventory genuinely later sectors, then freeze a development-only temporal panel for zero-shot evaluation; do not advance the model ladder |
+| TWIRL-FM0 | FM0.2.1 rank repair transfers to later repeated and new hosts, but separation is mixed, retrieval does not improve, and reconstruction remains slightly worse than zero | Run the training-free centered single-event `128/256/512/2,048` context diagnostic, then define the later frozen-backbone classifier transfer gate before any FM0.3 training |
 
 The exact current run state and historical metrics are recorded in the
 [progress log](twirl_progress_log.md). Reports are evidence snapshots, not
@@ -70,6 +70,12 @@ project authority.
   [frozen design](foundation_model_design.md),
   [configuration](../configs/models/twirl_fm0_1_s56_s67_poc.yaml), and
   [freeze receipt](../reports/stage5_validation/twirl_fm0_1_design_freeze_v1/freeze.json).
+- FM0 is a BLS-free general light-curve representation backbone for later
+  supervised classification and triage, with localized short-event morphology
+  retained. It does not replace the transparent periodic BLS search, which
+  remains an independent survey branch. Rank and reconstruction diagnostics
+  are necessary mechanism checks, but the eventual transfer gate must use a
+  separately frozen supervised classifier with the FM encoder held fixed.
 - The S56--S67 proof of concept is BLS-free. Gaia DR3 `source_id` is the
   scientific identity, but the fixed `80/10/10` train/development/sealed-test
   assignment is made by the connected Gaia--TIC `leakage_component_id`;
@@ -151,27 +157,33 @@ project authority.
   `606,387` nonsealed six-view shards, and `67,017` sealed identities excluded.
   Its immutable receipt remains training-ineligible and does not itself freeze
   a temporal panel.
-  Once at least five genuinely later sectors pass the ORCD HDF5-openability,
-  six-view, cadence-quality, and identity gates, use the label-blind inventory
-  to freeze the still-unset detector/cadence/cohort-adequacy thresholds and
-  then a development-only panel. Evaluate the existing step-2000 checkpoint
-  zero-shot before considering a separately controlled data-scale experiment.
+  The admitted S66--S77 pool was frozen into a label-blind development panel
+  and evaluated with the exact step-0 and step-2000 checkpoints. Rank repair
+  transferred to both repeated and new cohorts, but only repeated-host
+  separation improved; new-host separation worsened, retrieval did not
+  improve, and reconstruction remained slightly worse than zero. This is mixed
+  development evidence and does not authorize promotion or data-scale
+  training.
 - If that evidence justifies another training campaign, name it
   `TWIRL-FM0.3`; do not reuse `FM0.2.2`, which already denotes the blocked
   parameter-matched Conformer under the frozen FM0.2 contract. The provisional
   first candidate, `TWIRL-FM0.3.1`, is a fixed-TCN data-scale baseline: retain
   the FM0.2.1 two-ADP-view encoder and same-window objective, use only fully
   gated sectors, and compare at the same window-draw milestones before any
-  longer exposure-normalized extension. Before freezing a changed-context
-  candidate, run a matched development-only loader diagnostic with `256`,
-  `512`, `1,024`, and `2,048` contiguous cadence-slot crops from the same
-  immutable full-visit shards, holding physical-source sampling and total
-  model-visible cadence exposure fixed. If shorter context is then selected,
-  treat it as the single structural change in the provisional
-  `TWIRL-FM0.3.2` candidate, not a silent continuation of `.3.1`. Freeze a
-  genuinely newer temporal holdout before training. Subsequent candidates may
-  optimize both independent reconstruction masks and then test a separate
-  stable-host cross-visit head,
+  longer exposure-normalized extension. The first fixed-exposure context
+  diagnostic was nearly flat across `256`, `512`, `1,024`, and `2,048`, but it
+  cannot answer event dilution because it averaged short-crop embeddings back
+  over the same `2,048`-cadence exposure. Before selecting `.3.1` or `.3.2`,
+  run one training-free diagnostic containing a single centered trapezoid
+  event at direct `128`, `256`, `512`, and `2,048` contexts, with no period,
+  repeated transits, cross-crop averaging, or BLS input. Measure representation
+  and reconstruction response at exact step 0 and step 2,000. A later frozen-
+  backbone supervised classifier remains the transfer gate. If shorter
+  context is selected, treat it as the single structural change in the
+  provisional `TWIRL-FM0.3.2` candidate, not a silent continuation of `.3.1`.
+  Freeze a genuinely newer temporal holdout before training. Subsequent
+  candidates may optimize both independent reconstruction masks and then test
+  a separate stable-host cross-visit head,
   but each is a one-mechanism ablation; raw/ADP015 view additions and a
   Conformer revisit remain later experiments. Exact same-seed initialization,
   source-paired changes, at least two frozen training seeds after the canary,
@@ -346,14 +358,12 @@ negotiation or career-planning notes do not belong in the public plan.
    protocol; do not release a full S94+ queue before its gates pass.
 2. Run the two isolated model experiments: complete the sealed Teacher-v3 S63
    score-hidden review, and keep its isolation rule. For FM work, preserve the
-   completed four-point FM0.2.1 evidence and perform only the label-free
-   later-sector FM admission/repeated-host inventory needed to define a
-   genuinely later development panel. The S66--S77 preparation pool is now
-   admitted; freeze its label-blind development panel and evaluate the exact
-   step-0 and step-2000 checkpoints zero-shot. Keep the formal gate unapplied
-   and do not run development event retention without explicit authorization.
-   Do not advance FM0.1.3 or FM0.2.2, extend beyond step 2000, rerun a second
-   seed, start a data-scale training comparison, or open the sealed FM test.
+   completed FM0.2.1 temporal zero-shot evidence and run only the training-free
+   centered single-event `128/256/512/2,048` response diagnostic next. Then
+   freeze, but do not yet execute, the downstream classifier/triage transfer
+   contract. Do not advance FM0.1.3 or FM0.2.2, extend beyond step 2,000, rerun
+   a second seed, start a data-scale training comparison, apply a formal gate,
+   or open the sealed FM test.
 3. Advance the transparent survey path independently: implement the dip branch
    and multi-sector merging, freeze the archive/index and release boundary
    (including no-TIC and S94+ decisions), then complete the recovery chain

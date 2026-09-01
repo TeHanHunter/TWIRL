@@ -929,13 +929,45 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   step-0/step-2000 evaluator, and evaluation-only short-context model support.
   These paths do not authorize training, event retention, a formal gate, or
   sealed-test access.
+- `2026-09-01`: CPU job `21751614` froze the S66--S77 identity-only
+  development panel. Its receipt SHA-256 is
+  `78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624`.
+  The panel contains `67,403` visits in `52,344` leakage components: `16,409`
+  repeated-host visits in `7,030` components and `50,994` genuinely new-host
+  visits in `45,314` components. It contains zero sealed rows and remains
+  ineligible for training.
+- `2026-09-01`: CPU job `21752135` completed the exact paired S66--S77
+  temporal zero-shot evaluation; the immutable output SHA-256 is
+  `d7cb2d9d81f53fbfd2f599841339b8e7734243e5c3a8c7acd3e379510d6a20b7`.
+  Repeated-host `z_window` effective rank increased
+  `2.8898 -> 32.5069`, with paired-separation delta `+0.006781` and
+  source-clustered 95% interval `[0.000417, 0.013358]`, while retrieval changed
+  `2.9106% -> 1.6632%`. New-host rank increased `2.1358 -> 18.1707`, but
+  separation changed `-0.006670`, interval `[-0.013505, -0.000181]`, and
+  retrieval remained `5% -> 5%`. Step-2000/zero reconstruction ratios were
+  `1.00303` repeated and `1.00249` new. Rank repair transfers, but the later-
+  sector evidence is mixed and does not promote the model.
+- `2026-09-01`: CPU job `21752626` completed the fixed-exposure context
+  diagnostic; the immutable output SHA-256 is
+  `5376cdf2e9eea46cb6d1804f3ba9ec220278d352175533c574402570df78c708`.
+  Results were nearly flat across `256/512/1,024/2,048`, but the test cannot answer
+  event dilution because it averaged crop embeddings over the same fixed
+  `2,048`-cadence exposure. It validates evaluation-only short-context
+  mechanics, not a shorter-context choice.
+- `2026-09-01`: Clarified FM0's target as a BLS-free general light-curve
+  representation backbone for later supervised classification and triage,
+  with localized event morphology retained. Transparent periodic BLS remains
+  separate. Froze the next bounded diagnostic as one centered trapezoid event
+  at direct `128/256/512/2,048` contexts, with no period, repeated synthetic
+  transits, cross-crop averaging, or BLS input. It compares training-free
+  representation and visible-event reconstruction response at exact step 0
+  and step 2,000. A separately frozen classifier remains the eventual transfer
+  gate.
 
-**Next:** Freeze the admitted S66--S77 label-blind development panel, then run
-the exact step-0 and step-2000 checkpoints on identical repeated/new-host
-samples. Follow that result with the fixed-exposure `256`/`512`/`1,024`/`2,048`
-context diagnostic before deciding whether `TWIRL-FM0.3.1` remains the right
-next candidate. Keep new training, event retention, the formal gate, and the
-sealed test closed.
+**Next:** Run the frozen centered single-event `128/256/512/2,048` diagnostic,
+then use its result to choose whether a shorter-context FM training canary is
+justified. Do not train, fit a classifier, apply the formal gate, or open the
+sealed test in this diagnostic.
 
 ### Candidate validation and follow-up
 
