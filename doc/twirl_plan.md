@@ -6,7 +6,7 @@ Read [the documentation guide](README.md) to find task-specific protocols.
 Detailed results belong in [the progress log](twirl_progress_log.md), and
 unresolved choices belong in [ideas](ideas.md).
 
-Last reconciled: `2026-09-01`.
+Last reconciled: `2026-09-02`.
 
 ## Milestone dashboard
 
@@ -17,7 +17,7 @@ Last reconciled: `2026-09-01`.
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
 | Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
-| TWIRL-FM0 | `128` native cadences at stride one is fixed; the v3 raw/quality mechanics control passed and the cadence objective/trainer replay are implemented, while cadence averaging/downsampling remains forbidden | Verify the composite release's terminal second pass, then run the implemented `36--92` fixed-band transfer screen before any FM0.3 training |
+| TWIRL-FM0 | The S56--S64 + S66--S77 composite is accepted; the matched native-128 FM0.3.1 TCN/FM0.3.2 Conformer code and pre-checkpoint evaluation-freeze contract are locally complete | Freeze the exact 1,440 evaluation crops on ORCD and pass both eight-step H200 smokes before reporting readiness for real training |
 
 The exact current run state and historical metrics are recorded in the
 [progress log](twirl_progress_log.md). Reports are evidence snapshots, not
@@ -196,16 +196,19 @@ project authority.
   `21766861` then exposed a separate evaluation mismatch: taking the maximum
   over all `128` real cadences usually selected an unrelated natural outlier,
   so the raw control remained at chance even for `30%` dips. Neither run is
-  model evidence. A fast v3 mechanics control therefore compares the injected
+  model evidence. A fast v3 mechanics control therefore compared the injected
   event-center cadence with the exact same cadence in its paired clean row;
-  this oracle use of support is mechanics-only and cannot score an FM. After
-  that control passes, the actual transfer screen will emit one score per
-  native cadence and reduce scalar scores only over the predeclared fixed band
-  `36--92`, the union of every allowed jittered event support. The band is the
-  same for every sample and never uses per-event support, duration, depth, or
-  BLS information. The two real candidates
-  must then match data, objective, context, masks, seeds, draws, and optimizer
-  budget so architecture is the only difference.
+  this oracle use of support is mechanics-only and cannot score an FM. V4 then
+  emitted all `128` logits and used one fixed `36--92` maximum, but its raw
+  control remained near chance because the maximum usually selected an
+  unrelated real excursion. This rejects only that broad-band readout; its FM
+  arm values are not architecture or representation evidence. Do not tune a
+  narrower band on the same checkpoint. Instead, pre-register the downstream
+  candidate-classification geometry in the matched FM0.3 canary: a proposer
+  outside the FM centers one event at index `64`, the encoder still emits all
+  `128` native-cadence tokens, and the primary linear readout always uses token
+  `64`. The two real candidates must match data, objective, context, masks,
+  seeds, draws, and optimizer budget so architecture is the only difference.
   The legacy optimized `z_window` VICReg is also disallowed for FM0.3 because
   it is built from a temporal mean. Before real training, freeze one shared
   cadence-level noncollapse objective, expose the post-context cadence stream
@@ -224,12 +227,17 @@ project authority.
   composite-release freezer now joins the accepted S56--S64 release to the
   S66--S77 sector manifests without rewriting shards. It reserves every S77
   `poc_train` component as an internal chronological holdout and removes every
-  overlapping earlier component from training. The first remote freeze pass
-  published `723,461` training rows, `66,232` quarantined-overlap rows, and
-  `23,162` S77 holdout rows, but the terminal second validation pass remains
-  unverified; these counts and hashes are not accepted until that job is
-  terminal and the immutable receipt closes. The current S66--S77 preparation
-  receipt remains intentionally training-ineligible.
+  overlapping earlier component from training. The terminal freeze and
+  repeated validation passed: the composite contains `723,461` training
+  identities, `66,232` quarantined-overlap identities, and `23,162` S77
+  holdout identities. Required ADP-view filtering leaves `676,359` training
+  and `20,617` holdout observations. Its immutable receipt SHA-256 is
+  `cc5cc3bce4c24e74bef1fbf084f407855233de7893183e6bc3486e284a2f44d9`.
+  The matched canary may use the training role only. Its primary architecture
+  evaluation must reuse S66--S71/S72--S74 solely for probe fit/validation and
+  freeze a fresh component-disjoint test from the S77 holdout before opening
+  either trained checkpoint. This is internal development evidence, not a
+  sealed or final FM test.
   Subsequent
   candidates may optimize both independent reconstruction masks and then test
   a separate stable-host cross-visit head,
@@ -411,11 +419,16 @@ negotiation or career-planning notes do not belong in the public plan.
    development-only BLS-free classifier/triage transfer contract whose primary
    feature is the step-2,000 cadence-token sequence at `128` cadences and whose
    controls include step 0, raw cadence features, and quality-only inputs.
-   The raw/quality center-cadence mechanics control has passed. Verify the
-   compact S56--S64 + S66--S77 identity release with S77 held out, then run the
-   implemented `36--92` fixed-band transfer screen. Do not advance FM0.1.3 or
-   FM0.2.2, extend beyond step 2,000, rerun a second seed, start FM0.3 training,
-   apply a formal gate, or open the sealed FM test until those gates pass.
+   The raw/quality center-cadence mechanics control and compact S56--S64 plus
+   S66--S77 identity release have passed. The `36--92` v4 maximum failed its
+   raw control and is retired rather than narrowed post hoc. Finish the matched
+   one-seed FM0.3.1 TCN/FM0.3.2 Conformer canary contract, native-cadence
+   trainer/loader, and two-stage fresh S77 index-64 evaluation freezer are
+   implemented locally. Freeze its exact 1,440 direct-128 crops on ORCD, then
+   pass both eight-step synthetic H200 smokes and report readiness before any
+   real-data submission. Do not extend beyond step 2,000, run a second seed,
+   apply a formal promotion gate, or open the sealed FM test during this
+   canary.
 3. Advance the transparent survey path independently: implement the dip branch
    and multi-sector merging, freeze the archive/index and release boundary
    (including no-TIC and S94+ decisions), then complete the recovery chain

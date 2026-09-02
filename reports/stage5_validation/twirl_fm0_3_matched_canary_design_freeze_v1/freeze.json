@@ -1,0 +1,88 @@
+{
+  "authorization": {
+    "gpu_submission_requires_prestart_smoke": true,
+    "matched_orcd_canary": true,
+    "payload_screened_evaluation_freeze_required": true,
+    "sealed_test_access": false
+  },
+  "binding_method": "direct_file_sha256",
+  "campaign_id": "twirl_fm0_3_s56_s64_s66_s77_matched_canary_v1",
+  "code_binding": {
+    "clean_detached_worktree_required": true,
+    "exact_git_revision_supplied_at_execution": true
+  },
+  "composite_input": {
+    "receipt_sha256": "cc5cc3bce4c24e74bef1fbf084f407855233de7893183e6bc3486e284a2f44d9",
+    "role_index_sha256": "abe9c616523f2486bf1b7be69dfcfda6193d534b40b3f4afc49d8ebf3e40ce5a",
+    "source_bindings_sha256": "8cbcac99409ab89fe2dee0c36687f50122e78376206495073698489ca5424f2b"
+  },
+  "evaluation_input": {
+    "temporal_panel_receipt_sha256": "78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624"
+  },
+  "design_document": {
+    "path": "doc/fm0_3_matched_canary_design.md",
+    "sha256": "6ca42278e83ccd0c28eb37fe6e398e23a08e8f7f19949742c86cfe02bb17cd10"
+  },
+  "freeze_schema_version": "twirl_fm0_3_design_freeze_receipt_v1",
+  "frozen_at_utc": "2026-09-02T00:00:00Z",
+  "frozen_scope": {
+    "authorized_stop_after_steps": [
+      64,
+      2000
+    ],
+    "context_length_cadences": 128,
+    "effective_batch_windows": 64,
+    "evaluation_crop_count": 1440,
+    "evaluation_readout_index_zero_based": 64,
+    "flux_views": [
+      "adp_1x1",
+      "adp_3x3"
+    ],
+    "immutable_milestone_steps": [
+      0,
+      64,
+      2000
+    ],
+    "nominal_cadence_seconds": 200,
+    "patch_stride": 1,
+    "scheduler_horizon_steps": 20000,
+    "seed": 560067,
+    "variants": [
+      "TWIRL-FM0.3.1",
+      "TWIRL-FM0.3.2"
+    ]
+  },
+  "implementation_status": "authorized_matched_canary_not_started",
+  "model_family": "TWIRL-FM0",
+  "not_certified_by_this_receipt": [
+    "prestart_smoke_result",
+    "payload_screened_evaluation_freeze",
+    "training_job",
+    "checkpoint",
+    "architecture_promotion",
+    "sealed_test_result",
+    "production_use",
+    "foundation_model_status"
+  ],
+  "prestart_gates": {
+    "all_required": true,
+    "composite_receipt_and_identity_hashes": true,
+    "exact_clean_git_revision": true,
+    "payload_screened_evaluation_freeze": true,
+    "same_variant_eight_step_fp32_smoke": true,
+    "sealed_and_temporal_holdout_gradient_rows": 0
+  },
+  "resources": {
+    "cpus": 4,
+    "gpus": {
+      "h200": 1
+    },
+    "memory_gib": 32,
+    "multi_gpu_forbidden": true
+  },
+  "scientific_config": {
+    "path": "configs/models/twirl_fm0_3_s56_s64_s66_s77_matched_canary_v1.yaml",
+    "sha256": "3a307fcb2c430a5ec7f56c381e98017d05b957c368863fde560f0938611cd337"
+  },
+  "scientific_contract_status": "frozen"
+}

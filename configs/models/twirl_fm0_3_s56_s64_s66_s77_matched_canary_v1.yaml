@@ -1,0 +1,178 @@
+schema_version: twirl_fm0_3_cadence_objective_config_v1
+campaign_id: twirl_fm0_3_s56_s64_s66_s77_matched_canary_v1
+model_family: TWIRL-FM0
+campaign_name: TWIRL-FM0.3 matched canary
+status: frozen_matched_canary_authorized_not_started
+prepared_on: 2026-09-02
+
+authorization:
+  scientific_contract_frozen: true
+  gpu_training_authorized: true
+  gpu_submission_requires_prestart_smoke: true
+  payload_screened_evaluation_freeze_required: true
+  authorized_variants: [TWIRL-FM0.3.1, TWIRL-FM0.3.2]
+  authorized_max_stop_after_step: 2000
+  sealed_test_access_authorized: false
+  production_model_claim: false
+  foundation_model_claim: false
+
+purpose:
+  primary: matched_short_context_cadence_representation_architecture_canary
+  downstream_role: reusable_backbone_for_later_classification_and_triage
+  architecture_is_only_intended_difference: true
+  bls_or_periodic_search_experiment: false
+
+composite_input:
+  receipt_sha256: cc5cc3bce4c24e74bef1fbf084f407855233de7893183e6bc3486e284a2f44d9
+  source_bindings_sha256: 8cbcac99409ab89fe2dee0c36687f50122e78376206495073698489ca5424f2b
+  role_index_sha256: abe9c616523f2486bf1b7be69dfcfda6193d534b40b3f4afc49d8ebf3e40ce5a
+
+data_contract:
+  included_sectors: [56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+  excluded_sectors: [65]
+  gradient_role: fm03_train
+  temporal_holdout_role: temporal_holdout
+  temporal_holdout_gradient_rows_allowed: 0
+  sealed_rows_allowed: 0
+  physical_source_field: gaia_dr3_source_id
+  grouping_field: leakage_component_id
+  host_first_sampling: true
+  flux_views: [adp_1x1, adp_3x3]
+
+cadence_contract:
+  nominal_cadence_seconds: 200
+  context_length_cadences: 128
+  context_duration_hours: 7.111111111111111
+  one_encoder_token_per_cadence: true
+  patch_stride: 1
+  cadence_averaging: false
+  cadence_merging: false
+  temporal_downsampling: false
+  temporal_pooling: false
+  optimized_representation: h_cadence
+  pooled_window_objective: false
+  mask_target_fraction: 0.15
+  mask_span_range_cadences: [1, 4]
+
+variants:
+  TWIRL-FM0.3.1:
+    architecture: tcn
+    template_variant: TWIRL-FM0.1.1
+    expected_parameter_count: 8825602
+    objective: masked_reconstruction_plus_position_centered_cadence_vicreg_v1
+    reconstruction_input: contextual_h_cadence_without_stem_skip
+  TWIRL-FM0.3.2:
+    architecture: conformer
+    template_variant: TWIRL-FM0.1.2
+    expected_parameter_count: 9345282
+    objective: masked_reconstruction_plus_position_centered_cadence_vicreg_v1
+    reconstruction_input: contextual_h_cadence_without_stem_skip
+
+evaluation_freeze_contract:
+  required_before_real_checkpoint: true
+  shared_between_variants: true
+  temporal_panel_receipt_sha256: 78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624
+  n_identity_crops: 1440
+  crop_length_cadences: 128
+  crop_must_be_unpadded_and_within_one_segment: true
+  minimum_joint_time_and_both_adp_valid_cadences: 103
+  complete_joint_valid_support_indices_inclusive: [60, 68]
+  ineligible_preselected_identity_policy: fail_closed_no_replacement
+  splits:
+    probe_train_sectors: [66, 67, 68, 69, 70, 71]
+    validation_sectors: [72, 73, 74]
+    fresh_test_sector: 77
+    cohorts: [repeated, new]
+    component_pairs_per_split_and_cohort: 240
+  injection:
+    center_index_zero_based: 64
+    durations_cadences: [1, 3, 9]
+    fractional_depths: [0.01, 0.03, 0.10, 0.30]
+    profile: symmetric_trapezoid_sampled_at_cadence_centers
+    ingress_egress_fraction_of_duration: 0.3333333333333333
+    flux_views_only: [adp_1x1, adp_3x3]
+    formula: injected=(1+flux)*(1-profile)-1
+  inference:
+    temporal_and_reconstruction_masks_all_false: true
+    readout: h_cadence_token_64_only
+    token_or_window_pooling: false
+    truth_or_search_features_allowed: false
+  probe:
+    family: full_batch_adam_linear_logit
+    train_only_dimensionwise_standardization: true
+    epochs: 400
+    learning_rate: 0.02
+    l2_weight: 0.001
+    seed: 560306
+    hyperparameter_tuning: false
+  metric:
+    primary: sample_roc_auc
+    bootstrap_method: component_pair_clustered
+    bootstrap_replicates: 1000
+    bootstrap_seed: 560305
+    same_resamples_across_arms_and_paired_deltas: true
+  bls_or_periodic_search: false
+
+objective:
+  name: masked_reconstruction_plus_position_centered_cadence_vicreg_v1
+  first_mask:
+    deterministic: true
+    independent_of_second_mask: true
+  second_mask:
+    deterministic: true
+    independent_of_first_mask: true
+  reconstruction:
+    definition: first_mask_reconstruction_only
+    optimized_mask_views: [first]
+    second_mask_reconstruction_is_diagnostic_only: true
+    loss: huber
+    huber_delta_fractional_flux: 0.01
+    equal_view_weight: true
+  vicreg:
+    acts_on: position_centered_h_cadence
+    valid_unmasked_same_position_pairs_only: true
+    begins_at_optimizer_step: 1
+    total_weight: 0.0002
+    invariance_weight: 25.0
+    variance_weight: 25.0
+    covariance_weight: 1.0
+    pooled_window_input_forbidden: true
+
+optimization:
+  seeds: [560067]
+  optimizer: adamw
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  scheduler: cosine_with_linear_warmup
+  max_optimizer_steps: 20000
+  scheduler_horizon_steps: 20000
+  warmup_steps: 1000
+  effective_batch_windows: 64
+  effective_batch_unique_windows: 64
+  numerical_precision: bf16_after_fp32_smoke
+
+canary:
+  fp32_synthetic_smoke_steps: 8
+  bf16_real_throughput_and_restart_step: 64
+  immutable_milestone_steps: [0, 64, 2000]
+  authorized_stop_after_steps: [64, 2000]
+  one_h200_per_variant: true
+
+prestart_gate_contract:
+  fail_closed: true
+  required_before_each_variant_first_real_submission:
+    - frozen_design_config_and_receipt_hashes_match
+    - exact_clean_git_revision
+    - immutable_composite_receipt_and_identity_hashes_match
+    - shared_payload_screened_evaluation_freeze_valid_and_bound
+    - gradient_role_is_fm03_train
+    - no_temporal_holdout_or_sealed_gradient_rows
+    - same_variant_eight_step_fp32_synthetic_smoke_passes
+  step_2000_requires_exact_step_64_resume: true
+  may_not_be_bypassed_by_environment_override: true
+
+claim_limit: >-
+  This contract authorizes only matched FM0.3.1 TCN and FM0.3.2 Conformer
+  canaries through optimizer step 2000. It authorizes no longer run, second
+  seed, sealed access, production use, architecture promotion, or foundation
+  model claim.

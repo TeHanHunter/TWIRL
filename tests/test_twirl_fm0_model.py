@@ -6,12 +6,12 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from twirl.models.fm0.dataset import (
+from twirl.models.fm0.dataset import (  # noqa: E402
     SyntheticFM0Config,
     SyntheticFM0Dataset,
     collate_fm0_samples,
 )
-from twirl.models.fm0.model import (
+from twirl.models.fm0.model import (  # noqa: E402
     TWIRLFM0,
     FM0ModelConfig,
     architecture_for_variant,
@@ -336,7 +336,7 @@ def test_fm0_3_h_cadence_is_the_post_context_stride_one_sequence(
     torch.testing.assert_close(output["h_cadence"], expected)
 
 
-def test_conformer_decoder_skip_cannot_change_h_cadence(
+def test_fm03_conformer_does_not_use_legacy_decoder_skip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = FM0ModelConfig(
@@ -369,28 +369,26 @@ def test_conformer_decoder_skip_cannot_change_h_cadence(
     with torch.no_grad():
         baseline = model(batch)
 
-    def amplified_decoder_skip(
+    def forbidden_decoder_skip(
         contextual_hidden: torch.Tensor,
         cadence_stem_hidden: torch.Tensor,
         token_valid: torch.Tensor,
     ) -> torch.Tensor:
-        return (
-            contextual_hidden + 17.0 * cadence_stem_hidden
-        ) * token_valid[:, None, :]
+        raise AssertionError("FM0.3 stride-one path used the legacy decoder skip")
 
     monkeypatch.setattr(
         TWIRLFM0,
         "_conformer_decoder_hidden",
-        staticmethod(amplified_decoder_skip),
+        staticmethod(forbidden_decoder_skip),
     )
     with torch.no_grad():
-        changed_skip = model(batch)
+        repeated = model(batch)
 
-    assert not torch.equal(baseline["reconstruction"], changed_skip["reconstruction"])
-    torch.testing.assert_close(baseline["h_cadence"], changed_skip["h_cadence"])
-    torch.testing.assert_close(baseline["h_window"], changed_skip["h_window"])
-    torch.testing.assert_close(baseline["z_window"], changed_skip["z_window"])
-    assert torch.equal(baseline["token_valid"], changed_skip["token_valid"])
+    torch.testing.assert_close(baseline["reconstruction"], repeated["reconstruction"])
+    torch.testing.assert_close(baseline["h_cadence"], repeated["h_cadence"])
+    torch.testing.assert_close(baseline["h_window"], repeated["h_window"])
+    torch.testing.assert_close(baseline["z_window"], repeated["z_window"])
+    assert torch.equal(baseline["token_valid"], repeated["token_valid"])
 
 
 def test_model_config_rejects_nonpositive_patch_stride() -> None:

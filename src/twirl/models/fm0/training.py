@@ -704,6 +704,7 @@ def load_checkpoint(
     expected_optimization: FM0OptimizationConfig,
     expected_objective_state: Mapping[str, Any],
     dataset: Any,
+    expected_global_step: int | None = None,
 ) -> tuple[int, list[dict[str, float]]]:
     """Load and validate a full FM0 checkpoint, including RNG and sampler state."""
 
@@ -756,6 +757,10 @@ def load_checkpoint(
     global_step = int(progress.get("global_step", -1))
     if global_step < 0:
         raise ValueError("FM0 checkpoint has invalid global step")
+    if expected_global_step is not None and global_step != expected_global_step:
+        raise ValueError(
+            "FM0 checkpoint global step differs from the required resume step"
+        )
     progress_epoch = int(progress.get("epoch", 0))
     sampler_epoch = int(payload.get("sampler_state", {}).get("dataset_epoch", -1))
     if sampler_epoch != progress_epoch:
@@ -1003,6 +1008,7 @@ def _run_training(
     checkpoint_interval_seconds: float,
     progress_interval_steps: int,
     resume_checkpoint: str | Path | None = None,
+    expected_resume_step: int | None = None,
 ) -> dict[str, Any]:
     """Run deterministic FM0 training and write full rotating checkpoints."""
 
@@ -1065,6 +1071,8 @@ def _run_training(
     optimizer, scheduler = make_optimizer_and_scheduler(model, optimization)
     global_step = 0
     loss_history: list[dict[str, float]] = []
+    if expected_resume_step is not None and resume_checkpoint is None:
+        raise ValueError("required FM0 resume checkpoint is absent")
     if resume_checkpoint is not None:
         global_step, loss_history = load_checkpoint(
             resume_checkpoint,
@@ -1075,6 +1083,7 @@ def _run_training(
             expected_optimization=optimization,
             expected_objective_state=invocation_objective,
             dataset=dataset,
+            expected_global_step=expected_resume_step,
         )
     if global_step > target_step:
         raise ValueError("resume checkpoint is beyond requested target step")
@@ -1393,6 +1402,7 @@ def run_synthetic_training(
     reconstruct_second_view: bool | None = None,
     objective_identity: str | None = None,
     resume_checkpoint: str | Path | None = None,
+    expected_resume_step: int | None = None,
 ) -> dict[str, Any]:
     """Run an explicitly synthetic numerical smoke."""
 
@@ -1422,6 +1432,7 @@ def run_synthetic_training(
         checkpoint_interval_seconds=0,
         progress_interval_steps=1,
         resume_checkpoint=resume_checkpoint,
+        expected_resume_step=expected_resume_step,
     )
 
 
@@ -1440,6 +1451,7 @@ def run_real_training(
     reconstruct_second_view: bool | None = None,
     objective_identity: str | None = None,
     resume_checkpoint: str | Path | None = None,
+    expected_resume_step: int | None = None,
 ) -> dict[str, Any]:
     """Train one declared FM0 objective on a checksum-bound input release."""
     resolved_reconstruct_second = (
@@ -1468,4 +1480,5 @@ def run_real_training(
         checkpoint_interval_seconds=1800,
         progress_interval_steps=10,
         resume_checkpoint=resume_checkpoint,
+        expected_resume_step=expected_resume_step,
     )

@@ -1,4 +1,5 @@
-"""Fail-closed authority and artifact validation for FM0.1 smokes."""
+"""Fail-closed authority and artifact validation for TWIRL-FM0 runs."""
+
 from __future__ import annotations
 
 import hashlib
@@ -15,6 +16,15 @@ RUN_VALIDATION_SCHEMA_VERSION = "twirl_fm0_1_synthetic_run_validation_v1"
 REAL_RUN_CONTRACT_SCHEMA_VERSION = "twirl_fm0_1_real_run_contract_v1"
 REAL_RUN_SUMMARY_SCHEMA_VERSION = "twirl_fm0_1_real_run_summary_v1"
 REAL_RUN_VALIDATION_SCHEMA_VERSION = "twirl_fm0_1_real_run_validation_v1"
+FM0_3_DESIGN_FREEZE_SCHEMA_VERSION = "twirl_fm0_3_design_freeze_receipt_v1"
+FM0_3_COMPOSITE_DATASET_KIND = "fm0_3_composite_release"
+FM0_3_TRAIN_ROLE = "fm03_train"
+FM0_3_TEMPORAL_PANEL_RECEIPT_SHA256 = (
+    "78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624"
+)
+FM0_3_PRESTART_SMOKE_KIND = "fm0_3_same_variant_prestart_smoke"
+FM0_3_PRESTART_SMOKE_STEP = 8
+FM0_3_TRAINING_HORIZON_STEP = 20_000
 
 
 def sha256_file(path: str | Path) -> str:
@@ -96,7 +106,29 @@ def validate_frozen_authorities(
             is not True
             or authorization.get("sealed_test_access") is not False
         ):
-            raise ValueError("FM0.2 freeze receipt does not authorize only the gated canary")
+            raise ValueError(
+                "FM0.2 freeze receipt does not authorize only the gated canary"
+            )
+    elif receipt_schema == FM0_3_DESIGN_FREEZE_SCHEMA_VERSION:
+        if receipt.get("implementation_status") != (
+            "authorized_matched_canary_not_started"
+        ):
+            raise ValueError("unexpected FM0.3 implementation authorization state")
+        if receipt.get("authorization") != {
+            "matched_orcd_canary": True,
+            "gpu_submission_requires_prestart_smoke": True,
+            "payload_screened_evaluation_freeze_required": True,
+            "sealed_test_access": False,
+        }:
+            raise ValueError(
+                "FM0.3 freeze receipt does not authorize only the matched canary"
+            )
+        if receipt.get("evaluation_input") != {
+            "temporal_panel_receipt_sha256": (
+                FM0_3_TEMPORAL_PANEL_RECEIPT_SHA256
+            )
+        }:
+            raise ValueError("FM0.3 freeze receipt binds a different temporal panel")
     else:
         raise ValueError("unsupported FM0 design-freeze receipt schema")
     design = Path(design_path).resolve(strict=True)
@@ -142,7 +174,9 @@ def validate_frozen_authorities(
 
 
 def require_clean_git_revision(repo: str | Path, expected_sha: str) -> str:
-    if len(expected_sha) != 40 or any(c not in "0123456789abcdef" for c in expected_sha):
+    if len(expected_sha) != 40 or any(
+        c not in "0123456789abcdef" for c in expected_sha
+    ):
         raise ValueError("expected Git SHA must be 40 lowercase hexadecimal characters")
     root = Path(repo).resolve(strict=True)
     observed = subprocess.run(
@@ -160,6 +194,68 @@ def require_clean_git_revision(repo: str | Path, expected_sha: str) -> str:
     if observed != expected_sha or dirty:
         raise ValueError("repository is not the exact clean expected revision")
     return observed
+
+
+def _validate_real_checkpoint_dataset_binding(
+    *,
+    contract: Mapping[str, Any],
+    dataset_contract: Mapping[str, Any],
+    variant: str,
+    cadence_objective: bool,
+) -> None:
+    """Match a real checkpoint dataset to the invocation's immutable input."""
+
+    release = contract.get("input_release")
+    if not isinstance(release, Mapping):
+        raise ValueError("FM0 checkpoint run contract lacks its real input release")
+    if cadence_objective:
+        if (
+            release.get("kind") != FM0_3_COMPOSITE_DATASET_KIND
+            or dataset_contract.get("kind") != FM0_3_COMPOSITE_DATASET_KIND
+            or release.get("role") != FM0_3_TRAIN_ROLE
+            or dataset_contract.get("role") != FM0_3_TRAIN_ROLE
+            or dataset_contract.get("composite_root") != release.get("release_root")
+            or dataset_contract.get("variant") != variant
+            or dataset_contract.get("seed") != contract.get("seed")
+        ):
+            raise ValueError("FM0.3 checkpoint composite dataset identity differs")
+        for name in (
+            "receipt_sha256",
+            "source_bindings_sha256",
+            "role_index_sha256",
+            "n_sources",
+            "n_observations",
+            "n_excluded_missing_required_views",
+        ):
+            if dataset_contract.get(name) != release.get(name):
+                raise ValueError(f"FM0.3 checkpoint composite dataset {name} differs")
+        optimization = contract.get("optimization")
+        if not isinstance(optimization, Mapping):
+            raise ValueError("FM0.3 checkpoint lacks its optimization contract")
+        max_steps = optimization.get("max_optimizer_steps")
+        effective_batch = optimization.get("effective_batch_windows")
+        if (
+            isinstance(max_steps, bool)
+            or not isinstance(max_steps, int)
+            or isinstance(effective_batch, bool)
+            or not isinstance(effective_batch, int)
+        ):
+            raise ValueError("FM0.3 checkpoint optimization shape differs")
+        expected_windows = max_steps * effective_batch
+        if (
+            expected_windows <= 0
+            or dataset_contract.get("windows_per_epoch") != expected_windows
+        ):
+            raise ValueError("FM0.3 checkpoint composite sampling horizon differs")
+        return
+    if (
+        dataset_contract.get("kind") != "fm0_input_release"
+        or dataset_contract.get("manifest_sha256") != release.get("manifest_sha256")
+        or dataset_contract.get("source_partition") != "poc_train"
+        or dataset_contract.get("variant") != variant
+        or dataset_contract.get("seed") != contract.get("seed")
+    ):
+        raise ValueError("FM0 checkpoint real dataset contract mismatch")
 
 
 def _inspect_trusted_checkpoint(
@@ -205,9 +301,7 @@ def _inspect_trusted_checkpoint(
     )
 
     try:
-        checkpoint = torch.load(
-            checkpoint_path, map_location="cpu", weights_only=False
-        )
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     except Exception as exc:
         raise ValueError("FM0 checkpoint is not structurally loadable") from exc
     if not isinstance(checkpoint, Mapping):
@@ -241,9 +335,7 @@ def _inspect_trusted_checkpoint(
     checkpoint_step = progress.get("global_step")
     summary_step = summary.get("global_step")
     target_step = contract.get("target_step")
-    cadence_objective = (
-        contract.get("objective") == CADENCE_VICREG_OBJECTIVE_IDENTITY
-    )
+    cadence_objective = contract.get("objective") == CADENCE_VICREG_OBJECTIVE_IDENTITY
     if cadence_objective:
         expected_objective_state = {
             "schema_version": OBJECTIVE_STATE_SCHEMA_V2,
@@ -255,10 +347,8 @@ def _inspect_trusted_checkpoint(
             checkpoint.get("objective_state") != expected_objective_state
             or contract.get("use_vicreg") is not True
             or contract.get("reconstruct_second_view") is not False
-            or contract.get("mask_target_fraction")
-            != FM0_3_MASK_TARGET_FRACTION
-            or tuple(contract.get("mask_span_range", ()))
-            != FM0_3_MASK_SPAN_RANGE
+            or contract.get("mask_target_fraction") != FM0_3_MASK_TARGET_FRACTION
+            or tuple(contract.get("mask_span_range", ())) != FM0_3_MASK_SPAN_RANGE
         ):
             raise ValueError("FM0.3 cadence objective checkpoint contract differs")
     if cadence_objective and target_step is not None:
@@ -284,15 +374,24 @@ def _inspect_trusted_checkpoint(
                 is not True
             ):
                 raise ValueError("FM0.3 runtime-only stop declaration is missing")
+            if contract.get("synthetic_smoke"):
+                if target_step != contract.get("synthetic_smoke_step"):
+                    raise ValueError("FM0.3 synthetic stop differs from its contract")
+            else:
+                allowed_stops = contract.get("authorized_stop_after_steps")
+                if (
+                    not isinstance(allowed_stops, list)
+                    or target_step not in allowed_stops
+                ):
+                    raise ValueError("FM0.3 real stop was not preauthorized")
         elif contract.get("synthetic_smoke"):
             if target_step != contract.get("synthetic_smoke_step"):
-                raise ValueError("FM0 synthetic invocation stop differs from its contract")
+                raise ValueError(
+                    "FM0 synthetic invocation stop differs from its contract"
+                )
         else:
             allowed_stops = contract.get("authorized_stop_after_steps")
-            if (
-                not isinstance(allowed_stops, list)
-                or target_step not in allowed_stops
-            ):
+            if not isinstance(allowed_stops, list) or target_step not in allowed_stops:
                 raise ValueError("FM0 real invocation stop was not preauthorized")
     if (
         isinstance(checkpoint_step, bool)
@@ -383,9 +482,7 @@ def _inspect_trusted_checkpoint(
         raise ValueError("FM0 checkpoint effective batch is invalid")
     try:
         optimization_config = FM0OptimizationConfig(**dict(optimization))
-        optimizer, scheduler = make_optimizer_and_scheduler(
-            model, optimization_config
-        )
+        optimizer, scheduler = make_optimizer_and_scheduler(model, optimization_config)
         optimizer.load_state_dict(checkpoint["optimizer_state"])
         scheduler.load_state_dict(checkpoint["scheduler_state"])
     except (KeyError, TypeError, ValueError, RuntimeError) as exc:
@@ -412,17 +509,12 @@ def _inspect_trusted_checkpoint(
         ):
             raise ValueError("FM0 checkpoint synthetic dataset contract mismatch")
     else:
-        release_binding = contract.get("input_release")
-        if (
-            dataset_contract.get("kind") != "fm0_input_release"
-            or not isinstance(release_binding, Mapping)
-            or dataset_contract.get("manifest_sha256")
-            != release_binding.get("manifest_sha256")
-            or dataset_contract.get("source_partition") != "poc_train"
-            or dataset_contract.get("variant") != variant
-            or dataset_contract.get("seed") != contract.get("seed")
-        ):
-            raise ValueError("FM0 checkpoint real dataset contract mismatch")
+        _validate_real_checkpoint_dataset_binding(
+            contract=contract,
+            dataset_contract=dataset_contract,
+            variant=variant,
+            cadence_objective=cadence_objective,
+        )
     if cadence_objective:
         dataset_geometry = (
             dataset_contract.get("config")
@@ -604,12 +696,318 @@ def validate_run_release(
     }
 
 
+def validate_fm0_3_prestart_smoke(
+    run_dir: str | Path,
+    *,
+    expected_summary_sha256: str,
+    expected_campaign_id: Any,
+    expected_variant: Any,
+    expected_architecture: Any,
+    expected_git_sha: Any,
+    expected_authorities: Any,
+    inspect_checkpoint: bool = True,
+) -> dict[str, Any]:
+    """Validate and bind the exact same-variant smoke required by FM0.3."""
+
+    from .training import CADENCE_VICREG_OBJECTIVE_IDENTITY
+
+    if (
+        not isinstance(expected_summary_sha256, str)
+        or len(expected_summary_sha256) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in expected_summary_sha256
+        )
+    ):
+        raise ValueError("FM0.3 prestart-smoke summary hash is malformed")
+    if not isinstance(expected_authorities, Mapping):
+        raise ValueError("FM0.3 prestart-smoke authority expectation is malformed")
+
+    root = Path(run_dir).resolve(strict=True)
+    validation = validate_run_release(root, inspect_checkpoint=inspect_checkpoint)
+    contract_path = root / "run_contract.json"
+    checkpoint_path = root / "checkpoint.pt"
+    summary_path = root / "summary.json"
+    observed_summary_sha = sha256_file(summary_path)
+    if observed_summary_sha != expected_summary_sha256:
+        raise ValueError("FM0.3 prestart-smoke summary differs from the requested hash")
+    contract = read_json(contract_path)
+    summary = read_json(summary_path)
+    artifacts = validation.get("artifact_sha256")
+    if not isinstance(artifacts, Mapping):
+        raise ValueError("FM0.3 prestart-smoke validation lacks artifact hashes")
+    if (
+        validation.get("passed") is not True
+        or validation.get("checkpoint_inspected") is not bool(inspect_checkpoint)
+        or validation.get("variant") != expected_variant
+        or validation.get("architecture") != expected_architecture
+        or validation.get("global_step") != FM0_3_PRESTART_SMOKE_STEP
+        or summary.get("passed") is not True
+        or summary.get("synthetic_only") is not True
+        or summary.get("real_data_consumed") is not False
+        or summary.get("scientific_result") is not False
+        or summary.get("variant") != expected_variant
+        or summary.get("architecture") != expected_architecture
+        or summary.get("global_step") != FM0_3_PRESTART_SMOKE_STEP
+        or summary.get("requested_stop_after_step") != FM0_3_PRESTART_SMOKE_STEP
+        or summary.get("precision") != "fp32"
+        or contract.get("campaign_id") != expected_campaign_id
+        or contract.get("variant") != expected_variant
+        or contract.get("architecture") != expected_architecture
+        or contract.get("objective") != CADENCE_VICREG_OBJECTIVE_IDENTITY
+        or contract.get("expected_git_sha") != expected_git_sha
+        or contract.get("authorities") != dict(expected_authorities)
+        or contract.get("synthetic_smoke") is not True
+        or contract.get("real_data_consumed") is not False
+        or contract.get("precision") != "fp32"
+        or contract.get("device_request") not in {"cuda", "cuda:0"}
+        or contract.get("training_horizon_step")
+        != FM0_3_TRAINING_HORIZON_STEP
+        or contract.get("synthetic_smoke_step") != FM0_3_PRESTART_SMOKE_STEP
+        or contract.get("authorized_stop_after_steps") != [64, 2_000]
+        or contract.get("stop_after_step_is_execution_state_not_scientific_contract")
+        is not True
+        or contract.get("evaluation_plan") is not None
+        or contract.get("prestart_smoke") is not None
+        or contract.get("input_release") is not None
+    ):
+        raise ValueError("FM0.3 prestart smoke differs from the matched canary")
+    expected_artifact_names = {
+        "run_contract.json",
+        "checkpoint.pt",
+        "summary.json",
+    }
+    if set(artifacts) != expected_artifact_names:
+        raise ValueError("FM0.3 prestart-smoke artifact set is incomplete")
+    if artifacts.get("summary.json") != expected_summary_sha256:
+        raise ValueError("FM0.3 prestart-smoke validation summary hash differs")
+
+    return {
+        "kind": FM0_3_PRESTART_SMOKE_KIND,
+        "root": str(root),
+        "campaign_id": expected_campaign_id,
+        "variant": expected_variant,
+        "architecture": expected_architecture,
+        "global_step": FM0_3_PRESTART_SMOKE_STEP,
+        "expected_git_sha": expected_git_sha,
+        "run_contract_path": str(contract_path),
+        "run_contract_sha256": artifacts["run_contract.json"],
+        "checkpoint_path": str(checkpoint_path),
+        "checkpoint_sha256": artifacts["checkpoint.pt"],
+        "summary_path": str(summary_path),
+        "summary_sha256": expected_summary_sha256,
+    }
+
+
+def _validate_fm0_3_prestart_smoke_binding(
+    binding: Any,
+    *,
+    contract: Mapping[str, Any],
+    inspect_checkpoint: bool,
+) -> None:
+    """Transitively revalidate the smoke bound into an FM0.3 real run."""
+
+    if not isinstance(binding, Mapping):
+        raise ValueError("FM0.3 real run lacks its same-variant prestart smoke")
+    expected = validate_fm0_3_prestart_smoke(
+        binding.get("root", ""),
+        expected_summary_sha256=binding.get("summary_sha256", ""),
+        expected_campaign_id=contract.get("campaign_id"),
+        expected_variant=contract.get("variant"),
+        expected_architecture=contract.get("architecture"),
+        expected_git_sha=contract.get("expected_git_sha"),
+        expected_authorities=contract.get("authorities"),
+        inspect_checkpoint=inspect_checkpoint,
+    )
+    if dict(binding) != expected:
+        raise ValueError("FM0.3 prestart-smoke run binding differs")
+
+
+def _validate_fm0_3_real_release_binding(
+    release: Mapping[str, Any],
+) -> None:
+    """Recheck the composite authority chain without reopening shard payloads."""
+
+    from .composite_release import (
+        COMPOSITE_RELEASE_SCHEMA_VERSION,
+        COMPOSITE_RELEASE_STATE,
+        validate_composite_release,
+    )
+
+    if (
+        release.get("kind") != FM0_3_COMPOSITE_DATASET_KIND
+        or release.get("role") != FM0_3_TRAIN_ROLE
+    ):
+        raise ValueError("FM0.3 real run must use only the composite training role")
+    root = Path(str(release.get("release_root", ""))).resolve(strict=True)
+    receipt_path = Path(str(release.get("receipt_path", ""))).resolve(strict=True)
+    source_path = Path(str(release.get("source_bindings_path", ""))).resolve(
+        strict=True
+    )
+    role_path = Path(str(release.get("role_index_path", ""))).resolve(strict=True)
+    if (
+        receipt_path != (root / "receipt.json").resolve(strict=True)
+        or source_path != (root / "source_bindings.csv").resolve(strict=True)
+        or role_path != (root / "role_index.csv").resolve(strict=True)
+    ):
+        raise ValueError("FM0.3 real run composite artifact paths differ")
+    receipt_sha = release.get("receipt_sha256")
+    source_sha = release.get("source_bindings_sha256")
+    role_sha = release.get("role_index_sha256")
+    for value, label in (
+        (receipt_sha, "receipt"),
+        (source_sha, "source bindings"),
+        (role_sha, "role index"),
+    ):
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise ValueError(f"FM0.3 composite {label} hash is malformed")
+    try:
+        validate_composite_release(
+            root,
+            expected_receipt_sha256=receipt_sha,
+            expected_source_bindings_sha256=source_sha,
+            expected_role_index_sha256=role_sha,
+            require_read_only=True,
+            require_source_read_only=True,
+        )
+    except ValueError as exc:
+        raise ValueError("FM0.3 composite authority changed after training") from exc
+    if (
+        sha256_file(receipt_path) != receipt_sha
+        or sha256_file(source_path) != source_sha
+        or sha256_file(role_path) != role_sha
+    ):
+        raise ValueError("FM0.3 composite input changed after training")
+    receipt = read_json(receipt_path)
+    limits = receipt.get("limits")
+    sources = receipt.get("sources")
+    selection = receipt.get("selection")
+    if (
+        receipt.get("schema_version") != COMPOSITE_RELEASE_SCHEMA_VERSION
+        or receipt.get("release_state") != COMPOSITE_RELEASE_STATE
+        or receipt.get("passed") is not True
+        or limits
+        != {
+            "identity_only": True,
+            "source_shards_opened": False,
+            "shards_rewritten": False,
+            "development_rows_selected": 0,
+            "sealed_rows_selected": 0,
+            "scientific_training_eligible": True,
+            "model_training_authorized": False,
+            "real_cli_training_enabled": False,
+            "sealed_test_access_authorized": False,
+        }
+        or not isinstance(sources, Mapping)
+        or sources.get("source_bindings_sha256") != source_sha
+        or not isinstance(selection, Mapping)
+        or selection.get("role_index_sha256") != role_sha
+        or (root / "READY").read_text(encoding="utf-8").strip() != receipt_sha
+    ):
+        raise ValueError("FM0.3 composite receipt is not training-eligible")
+
+
+def _validate_fm0_3_evaluation_plan_binding(
+    binding: Any,
+    *,
+    release: Mapping[str, Any],
+    expected_git_sha: Any,
+) -> None:
+    """Recheck the immutable pre-checkpoint evaluation plan without payload I/O."""
+
+    from .matched_canary_payload_plan import validate_matched_canary_payload_plan
+
+    if not isinstance(binding, Mapping):
+        raise ValueError("FM0.3 real run lacks its frozen evaluation plan")
+    receipt_sha = binding.get("receipt_sha256")
+    if (
+        not isinstance(receipt_sha, str)
+        or len(receipt_sha) != 64
+        or any(character not in "0123456789abcdef" for character in receipt_sha)
+    ):
+        raise ValueError("FM0.3 evaluation-plan receipt hash is malformed")
+    try:
+        result = validate_matched_canary_payload_plan(
+            binding.get("root", ""),
+            expected_receipt_sha256=receipt_sha,
+            require_read_only=True,
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        raise ValueError("FM0.3 evaluation plan changed after training") from exc
+    receipt = result.receipt
+    identity = receipt.get("identity_plan")
+    payload = receipt.get("payload_bindings")
+    if (
+        receipt.get("producer_git_sha") != expected_git_sha
+        or not isinstance(identity, Mapping)
+        or not isinstance(payload, Mapping)
+    ):
+        raise ValueError("FM0.3 evaluation-plan code or predecessor differs")
+    authorities = identity.get("input_authorities")
+    temporal = (
+        authorities.get("temporal_panel")
+        if isinstance(authorities, Mapping)
+        else None
+    )
+    composite = (
+        authorities.get("composite_release")
+        if isinstance(authorities, Mapping)
+        else None
+    )
+    if not isinstance(temporal, Mapping) or not isinstance(composite, Mapping):
+        raise ValueError("FM0.3 evaluation plan lacks a frozen input authority")
+    expected_binding = {
+        "kind": "fm0_3_payload_screened_evaluation_plan",
+        "root": str(result.root),
+        "receipt_path": str(result.receipt_path),
+        "receipt_sha256": result.receipt_sha256,
+        "schedule_path": str(result.schedule_path),
+        "schedule_sha256": result.schedule_sha256,
+        "producer_git_sha": expected_git_sha,
+        "identity_plan_receipt_sha256": identity.get("receipt_sha256"),
+        "identity_plan_schedule_sha256": identity.get("schedule_sha256"),
+        "identity_plan_producer_git_sha": identity.get("producer_git_sha"),
+        "temporal_panel_receipt_sha256": temporal.get("receipt_sha256"),
+        "temporal_panel_sha256": temporal.get("panel_sha256"),
+        "temporal_panel_sector_bindings_sha256": temporal.get(
+            "sector_bindings_sha256"
+        ),
+        "source_shard_bindings_sha256": payload.get(
+            "source_shard_bindings_sha256"
+        ),
+        "crop_payload_bindings_sha256": payload.get(
+            "crop_payload_bindings_sha256"
+        ),
+        "n_crops": payload.get("n_crops_frozen"),
+    }
+    if dict(binding) != expected_binding:
+        raise ValueError("FM0.3 evaluation-plan run binding differs")
+    if (
+        temporal.get("receipt_sha256")
+        != FM0_3_TEMPORAL_PANEL_RECEIPT_SHA256
+    ):
+        raise ValueError("FM0.3 evaluation-plan temporal panel differs")
+    for name in (
+        "receipt_sha256",
+        "source_bindings_sha256",
+        "role_index_sha256",
+    ):
+        if composite.get(name) != release.get(name):
+            raise ValueError(
+                f"FM0.3 evaluation-plan composite {name} differs from training"
+            )
+
+
 def validate_real_run_release(
     run_dir: str | Path,
     *,
     inspect_checkpoint: bool = True,
 ) -> dict[str, Any]:
-    """Validate one trusted, checksum-bound real-data FM0.1 run release."""
+    """Validate one trusted, checksum-bound real-data FM0 run release."""
 
     root = Path(run_dir).resolve(strict=True)
     contract_path = root / "run_contract.json"
@@ -635,20 +1033,41 @@ def validate_real_run_release(
     release = contract.get("input_release")
     if not isinstance(release, Mapping):
         raise ValueError("real-data run lacks an input-release binding")
-    receipt_path = Path(str(release.get("receipt_path", ""))).resolve(strict=True)
-    manifest_path = Path(str(release.get("manifest_path", ""))).resolve(strict=True)
-    if sha256_file(receipt_path) != release.get("receipt_sha256"):
-        raise ValueError("real-data input receipt changed after training")
-    if sha256_file(manifest_path) != release.get("manifest_sha256"):
-        raise ValueError("real-data manifest changed after training")
-    receipt = read_json(receipt_path)
-    if (
-        receipt.get("passed") is not True
-        or receipt.get("scientific_training_eligible") is not True
-        or receipt.get("release", {}).get("manifest_sha256")
-        != release.get("manifest_sha256")
-    ):
-        raise ValueError("real-data input receipt does not authorize training")
+    from .training import CADENCE_VICREG_OBJECTIVE_IDENTITY
+
+    cadence_objective = contract.get("objective") == CADENCE_VICREG_OBJECTIVE_IDENTITY
+    fm0_3_composite = release.get("kind") == FM0_3_COMPOSITE_DATASET_KIND
+    if cadence_objective != fm0_3_composite:
+        raise ValueError("FM0.3 real run must bind the composite cadence dataset")
+    if fm0_3_composite:
+        if contract.get("input_release_reuse") is not None:
+            raise ValueError("FM0.3 real run objective or input role differs")
+        _validate_fm0_3_prestart_smoke_binding(
+            contract.get("prestart_smoke"),
+            contract=contract,
+            inspect_checkpoint=inspect_checkpoint,
+        )
+        _validate_fm0_3_real_release_binding(release)
+        _validate_fm0_3_evaluation_plan_binding(
+            contract.get("evaluation_plan"),
+            release=release,
+            expected_git_sha=contract.get("expected_git_sha"),
+        )
+    else:
+        receipt_path = Path(str(release.get("receipt_path", ""))).resolve(strict=True)
+        manifest_path = Path(str(release.get("manifest_path", ""))).resolve(strict=True)
+        if sha256_file(receipt_path) != release.get("receipt_sha256"):
+            raise ValueError("real-data input receipt changed after training")
+        if sha256_file(manifest_path) != release.get("manifest_sha256"):
+            raise ValueError("real-data manifest changed after training")
+        receipt = read_json(receipt_path)
+        if (
+            receipt.get("passed") is not True
+            or receipt.get("scientific_training_eligible") is not True
+            or receipt.get("release", {}).get("manifest_sha256")
+            != release.get("manifest_sha256")
+        ):
+            raise ValueError("real-data input receipt does not authorize training")
     reuse_binding = contract.get("input_release_reuse")
     if str(contract.get("campaign_id", "")).startswith("twirl_fm0_2_"):
         if not isinstance(reuse_binding, Mapping):
@@ -658,8 +1077,7 @@ def validate_real_run_release(
             raise ValueError("FM0.2 input-reuse receipt changed after training")
         reuse_receipt = read_json(reuse_path)
         if (
-            reuse_receipt.get("schema_version")
-            != "twirl_fm0_2_input_reuse_receipt_v1"
+            reuse_receipt.get("schema_version") != "twirl_fm0_2_input_reuse_receipt_v1"
             or reuse_receipt.get("passed") is not True
             or reuse_receipt.get("scientific_training_eligible") is not True
             or reuse_receipt.get("release", {}).get("manifest_sha256")

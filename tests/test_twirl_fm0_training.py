@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 import copy
-from dataclasses import asdict
 import math
+from collections.abc import Mapping
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -11,13 +11,13 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
+import twirl.models.fm0.training as fm0_training  # noqa: E402
 from twirl.models.fm0.dataset import (  # noqa: E402
     SyntheticFM0Config,
     SyntheticFM0Dataset,
     collate_fm0_samples,
 )
 from twirl.models.fm0.model import FM0ModelConfig, build_fm0_model  # noqa: E402
-import twirl.models.fm0.training as fm0_training  # noqa: E402
 from twirl.models.fm0.training import (  # noqa: E402
     FM0OptimizationConfig,
     fm0_objective,
@@ -743,6 +743,58 @@ def test_checkpoint_resume_matches_uninterrupted_training(
             payload = torch.load(milestone, weights_only=False)
             assert payload["progress"]["global_step"] == step
             assert payload["objective_state"] == expected_objective
+
+
+def test_checkpoint_resume_rejects_wrong_required_step(tmp_path: Path) -> None:
+    optimization = FM0OptimizationConfig(
+        learning_rate=1.0e-3,
+        weight_decay=0.0,
+        warmup_steps=0,
+        max_optimizer_steps=2,
+        effective_batch_windows=2,
+    )
+    dataset_config = SyntheticFM0Config(
+        variant="TWIRL-FM0.1.1",
+        seed=560067,
+        windows_per_epoch=4,
+        window_length=32,
+    )
+    contract = {
+        "schema_version": "resume-step-test",
+        "seed": 560067,
+        "use_vicreg": False,
+        "reconstruct_second_view": False,
+        "immutable_milestone_steps": [0, 1, 2],
+    }
+    seed_everything(560067)
+    run_synthetic_training(
+        model=_tiny_model(),
+        dataset=SyntheticFM0Dataset(dataset_config),
+        output_dir=tmp_path,
+        run_contract=contract,
+        optimization=optimization,
+        target_step=1,
+        micro_batch_windows=2,
+        device="cpu",
+        precision="fp32",
+        use_vicreg=False,
+    )
+
+    with pytest.raises(ValueError, match="required resume step"):
+        run_synthetic_training(
+            model=_tiny_model(),
+            dataset=SyntheticFM0Dataset(dataset_config),
+            output_dir=tmp_path,
+            run_contract=contract,
+            optimization=optimization,
+            target_step=2,
+            micro_batch_windows=2,
+            device="cpu",
+            precision="fp32",
+            use_vicreg=False,
+            resume_checkpoint=tmp_path / "checkpoint_step_00000001.pt",
+            expected_resume_step=2,
+        )
 
 
 def test_milestone_checkpoint_is_hash_bound_and_non_overwriting(

@@ -28,7 +28,11 @@ from .dataset import (
     _manifest_view_presence,
     variant_view_indices,
 )
-from .input_release import INPUT_RELEASE_SCHEMA_VERSION, MANIFEST_COLUMNS
+from .input_release import (
+    INPUT_RELEASE_SCHEMA_VERSION,
+    MANIFEST_COLUMNS,
+    ObservationRelease,
+)
 from .later_sector_admission_v2 import (
     POOL_RECEIPT_SCHEMA_VERSION,
     PREPARATION_SECTORS,
@@ -891,6 +895,37 @@ class FM0CompositeReleaseDataset(FM0ReleaseDataset):
         }
         self._n_excluded_missing_required_views = excluded_missing_views
         self._cache: OrderedDict[str, Any] = OrderedDict()
+
+    def _window_start_if_eligible(
+        self,
+        release: ObservationRelease,
+        segment_indices: np.ndarray,
+        *,
+        sample_index: int,
+    ) -> int | None:
+        """Reject short FM0.3 segments instead of allowing padded training."""
+
+        if int(segment_indices.size) < self.config.window_length:
+            return None
+        return super()._window_start_if_eligible(
+            release,
+            segment_indices,
+            sample_index=sample_index,
+        )
+
+    def _selection(
+        self, index: int
+    ) -> tuple[dict[str, str], ObservationRelease, np.ndarray, int]:
+        """Fail closed unless the selected FM0.3 slice is exactly one window."""
+
+        selection = super()._selection(index)
+        _row, _release, segment_indices, start = selection
+        selected = segment_indices[start : start + self.config.window_length]
+        if selected.size != self.config.window_length:
+            raise ValueError(
+                "FM0.3 composite training slice is shorter than window_length"
+            )
+        return selection
 
     @property
     def contract(self) -> dict[str, Any]:

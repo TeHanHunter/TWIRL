@@ -405,3 +405,69 @@ def test_composite_dataset_rejects_non_native_fm03_geometry() -> None:
             variant="TWIRL-FM0.3.2",
             window_length=256,
         )
+
+
+def _uninitialized_composite_dataset() -> composite.FM0CompositeReleaseDataset:
+    dataset = object.__new__(composite.FM0CompositeReleaseDataset)
+    dataset.config = composite.FM0CompositeDatasetConfig(
+        composite_root="/unused",
+        receipt_sha256="a" * 64,
+        source_bindings_sha256="b" * 64,
+        role_index_sha256="c" * 64,
+        variant="TWIRL-FM0.3.1",
+        windows_per_epoch=1,
+        require_read_only=False,
+    )
+    dataset.epoch = 0
+    return dataset
+
+
+def test_composite_sampler_rejects_segments_shorter_than_window() -> None:
+    dataset = _uninitialized_composite_dataset()
+    release = _release()
+    short_segment = np.arange(dataset.config.window_length - 1)
+
+    assert (
+        dataset._window_start_if_eligible(
+            release,
+            short_segment,
+            sample_index=0,
+        )
+        is None
+    )
+    # The inherited FM0.1 sampler deliberately retains its padded-window
+    # behavior; only the FM0.3 composite subclass rejects the short segment.
+    assert (
+        composite.FM0ReleaseDataset._window_start_if_eligible(
+            dataset,
+            release,
+            short_segment,
+            sample_index=0,
+        )
+        == 0
+    )
+    assert (
+        dataset._window_start_if_eligible(
+            release,
+            np.arange(dataset.config.window_length),
+            sample_index=0,
+        )
+        == 0
+    )
+
+
+def test_composite_selection_fails_if_parent_returns_a_short_slice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _uninitialized_composite_dataset()
+    release = _release()
+    short_indices = np.arange(dataset.config.window_length - 1)
+    row = {"observation_key": _identity("observation", "short")}
+    monkeypatch.setattr(
+        composite.FM0ReleaseDataset,
+        "_selection",
+        lambda self, index: (row, release, short_indices, 0),
+    )
+
+    with pytest.raises(ValueError, match="shorter than window_length"):
+        dataset._selection(0)

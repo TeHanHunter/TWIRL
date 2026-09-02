@@ -476,14 +476,21 @@ class TWIRLFM0(_ModuleBase):
             upsampled = token_hidden.transpose(1, 2).repeat_interleave(
                 self.config.patch_stride, dim=-1
             )[:, :, :cadence_length]
-            # The pre-patch cadence stem is a local reconstruction skip.  The
-            # Conformer context therefore cannot force all four cadences in a
-            # patch to share one decoded state and erase sub-patch events.
-            full_hidden = self._conformer_decoder_hidden(
-                upsampled,
-                hidden,
-                token_valid,
-            )
+            if self.config.patch_stride == 1:
+                # FM0.3 compares encoder architectures under the same direct
+                # contextual reconstruction topology.  A Conformer-only stem
+                # skip would change its reconstruction gradients and make the
+                # comparison more than an encoder-architecture ablation.
+                full_hidden = upsampled * token_valid[:, None, :]
+            else:
+                # Preserve the legacy stride-four decoder path, where the
+                # cadence stem prevents all cadences in a patch from sharing
+                # one decoded state.
+                full_hidden = self._conformer_decoder_hidden(
+                    upsampled,
+                    hidden,
+                    token_valid,
+                )
 
         h_window = self._masked_mean(token_hidden, output_valid)
         embedding = self.embedding_projection(h_window)
@@ -497,12 +504,11 @@ class TWIRLFM0(_ModuleBase):
         return {
             "reconstruction": reconstruction,
             # Expose the true post-context token sequence to later
-            # event-localizing heads.  The Conformer cadence-stem skip remains
-            # decoder-only and cannot leak into this representation.  FM0.3
-            # requires patch_stride=1, so each output token is exactly one
-            # unbinned 200-second cadence.  Legacy stride-four Conformer
-            # checkpoints retain their prior decoder-state output shape for
-            # compatibility, but are excluded from the FM0.3 contract.
+            # event-localizing heads. FM0.3 requires patch_stride=1, so each
+            # output token is exactly one unbinned 200-second cadence. Legacy
+            # stride-four Conformer checkpoints retain their prior decoder
+            # state and reconstruction skip for compatibility, but are
+            # excluded from the FM0.3 contract.
             "h_cadence": cadence_hidden,
             # This output-only diagnostic localizes whether low rank originates
             # before or after the projection.  It adds no parameter or model

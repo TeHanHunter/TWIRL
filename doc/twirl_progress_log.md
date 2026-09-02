@@ -1070,11 +1070,60 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   projected-`z` arms are excluded. Focused v1--v4 tests passed `33/33`, and the
   full local suite passed `1,220` tests with `43` optional skips. This synthetic
   candidate-centered screen explicitly cannot choose TCN versus Conformer.
+- `2026-09-02`: Reverified composite freeze job `21772119` as `COMPLETED 0:0`
+  after `15m59s`, with two identical validation passes and an empty error log.
+  The immutable four-file identity release has receipt SHA-256
+  `cc5cc3bce4c24e74bef1fbf084f407855233de7893183e6bc3486e284a2f44d9`,
+  source-bindings SHA-256
+  `8cbcac99409ab89fe2dee0c36687f50122e78376206495073698489ca5424f2b`,
+  and role-index SHA-256
+  `abe9c616523f2486bf1b7be69dfcfda6193d534b40b3f4afc49d8ebf3e40ce5a`.
+  It closes on `723,461` training, `66,232` quarantined-overlap, and `23,162`
+  S77 holdout identities; the two-ADP-view adapter exposes `676,359` training
+  and `20,617` holdout observations. No shard was copied or rewritten.
+- `2026-09-02`: Fixed-band job `21818153` completed `0:0` in `2m40s` with an
+  empty error log. Its immutable result SHA-256 is
+  `c4f770f753c36b35fe42ce4c2a364a1a29d92542c6bedfae998b809e2e8f687d`.
+  Cadence geometry was correct, but the raw positive control failed: AUROC was
+  `0.50392` and paired ranking `0.53125`; even the `30%`-depth duration cells
+  reached only `0.50531`, `0.51594`, and `0.52781`. The step-0 and step-2,000
+  AUROCs were `0.51522` and `0.50136`, respectively, but those FM values are
+  non-interpretable because the broad maximum usually selected an unrelated
+  natural outlier. Quality-only stayed exactly at chance. V4 therefore rejects
+  only the fixed `36--92` maximum, not the short context or either future
+  architecture.
+- `2026-09-02`: Retired a proposed fixed-center v5 on the obsolete FM0.2
+  checkpoint before implementation. It would have repaired the readout but
+  could not test the new cadence-level objective. The next experiment is the
+  matched one-seed FM0.3 canary itself. Its primary downstream task is
+  predeclared candidate-centered classification at fixed index `64`, with all
+  `128` native `200 s` tokens still emitted and no BLS, pooling, cadence merge,
+  or truth-routed scoring. The existing panel supplies only S66--S71 probe
+  fitting and S72--S74 validation; a new identity-only S77 test is being frozen
+  from `20,617` ADP-usable holdout observations (`15,137` repeated and `5,480`
+  new), with zero training-component overlap.
+- `2026-09-02`: Completed the local matched-canary implementation without
+  launching training. FM0.3.1 and FM0.3.2 now share exact native-`128`
+  cadence geometry, stride one, the cadence-level VICReg objective, and a
+  contextual reconstruction input; the legacy stride-four Conformer stem
+  skip is disabled for this matched comparison. The two-stage evaluation
+  freezer first selects identities without payload access, then opens exactly
+  those `1,440` bound shards once and freezes deterministic, unpadded crops
+  with at least `103/128` joint-valid cadences and fully valid indices
+  `60--68`. Its receipt fixes the index-`64` injection/readout, full-batch
+  linear probe, raw/quality controls, and paired bootstrap before any real
+  checkpoint. Real training now requires and revalidates that immutable
+  receipt and the same variant's exact step-`8` FP32 smoke; the composite
+  sampler rejects every segment shorter than `128` rather than padding it, and
+  step `2,000` must exactly resume the same run's step-`64` checkpoint. The
+  controls-only evaluator can run before any checkpoint and freezes its own
+  checksum-bound result. The full local suite passed `1,275` tests with `43`
+  optional skips; documentation, focused lint, shell syntax, and diff checks
+  passed.
 
-**Next:** Reopen the ORCD socket and verify the terminal composite receipt,
-then run the predeclared candidate-band `36--92` transfer screen with raw,
-quality, step-0, and step-2,000 cadence-token controls. Only after those results
-are valid may the matched FM0.3.1 TCN/FM0.3.2 Conformer canary be authorized;
+**Next:** Publish the exact code revision to ORCD, freeze the identity-only and
+payload-screened evaluation bundles, and run the matched eight-step synthetic
+smokes. Report readiness before submitting either real one-H200 canary;
 preserve one native `200 s` cadence per token throughout.
 
 ### Candidate validation and follow-up
