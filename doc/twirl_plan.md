@@ -17,7 +17,7 @@ Last reconciled: `2026-09-01`.
 | Stage 3 completeness | LC-level and pixel-level injection pilots exist | Freeze one extraction-to-candidate recovery chain and a representative pixel calibration subset |
 | Stage 4 inference | Not started | Wait for the Stage 1 index, Stage 2 search contracts, and Stage 3 recovery gates |
 | Stage 5 validation | Human review, aperture checks, LEO/centroid pilots, and WD 1856 diagnostics exist | Turn candidate checks into reproducible, versioned validation products |
-| TWIRL-FM0 | `128` native cadences at stride one is the fixed next context; the cadence objective and trainer replay are implemented, while cadence averaging/downsampling remains forbidden | Validate the raw/quality cadence probe, freeze the S56--S64 + S66--S77 composite index with S77 held out, then run the fixed-band transfer screen before any FM0.3 training |
+| TWIRL-FM0 | `128` native cadences at stride one is fixed; the v3 raw/quality mechanics control passed and the cadence objective/trainer replay are implemented, while cadence averaging/downsampling remains forbidden | Verify the composite release's terminal second pass, then run the implemented `36--92` fixed-band transfer screen before any FM0.3 training |
 
 The exact current run state and historical metrics are recorded in the
 [progress log](twirl_progress_log.md). Reports are evidence snapshots, not
@@ -224,9 +224,12 @@ project authority.
   composite-release freezer now joins the accepted S56--S64 release to the
   S66--S77 sector manifests without rewriting shards. It reserves every S77
   `poc_train` component as an internal chronological holdout and removes every
-  overlapping earlier component from training. The remote composite receipt
-  and final post-quarantine counts are not yet frozen, and the current
-  S66--S77 preparation receipt remains intentionally training-ineligible.
+  overlapping earlier component from training. The first remote freeze pass
+  published `723,461` training rows, `66,232` quarantined-overlap rows, and
+  `23,162` S77 holdout rows, but the terminal second validation pass remains
+  unverified; these counts and hashes are not accepted until that job is
+  terminal and the immutable receipt closes. The current S66--S77 preparation
+  receipt remains intentionally training-ineligible.
   Subsequent
   candidates may optimize both independent reconstruction masks and then test
   a separate stable-host cross-visit head,
@@ -408,9 +411,9 @@ negotiation or career-planning notes do not belong in the public plan.
    development-only BLS-free classifier/triage transfer contract whose primary
    feature is the step-2,000 cadence-token sequence at `128` cadences and whose
    controls include step 0, raw cadence features, and quality-only inputs.
-   First run the raw/quality center-cadence mechanics control, freeze the
+   The raw/quality center-cadence mechanics control has passed. Verify the
    compact S56--S64 + S66--S77 identity release with S77 held out, then run the
-   predeclared `36--92` fixed-band transfer screen. Do not advance FM0.1.3 or
+   implemented `36--92` fixed-band transfer screen. Do not advance FM0.1.3 or
    FM0.2.2, extend beyond step 2,000, rerun a second seed, start FM0.3 training,
    apply a formal gate, or open the sealed FM test until those gates pass.
 3. Advance the transparent survey path independently: implement the dip branch

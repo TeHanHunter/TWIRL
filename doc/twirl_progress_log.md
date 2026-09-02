@@ -1041,15 +1041,41 @@ extraction-to-candidate injection gates are frozen; add thin drivers under
   `23,162` S77 holdout rows containing `178,463,210` cadences; the final counts
   await the immutable remote receipt. A separate raw/quality-only v3 mechanics
   control now uses exact paired event-center cadences and cannot load an FM.
-  The full local suite passed `1,212` tests with `43` optional skips. No shard
+  The full local suite passed `1,213` tests with `43` optional skips. No shard
   was rewritten, no sealed payload was opened, and no FM training was enabled.
+- `2026-09-01`: V3 mechanics job `21772041` completed `0:0` in `43 s`; its
+  immutable result SHA-256 is
+  `10b78bf083595ad8f4ecacb0428d99b939abc9dae5e3f361d02559659d1e2833`.
+  The raw center-cadence paired ranking was `0.98542` with a deterministic
+  `95%` interval of `0.97495--0.99583`, both ADP flux coefficients were
+  negative, and the quality-only control was exactly `0.5`. The evaluator
+  emitted all `128` native cadence logits and used no off-support values,
+  cadence merging, averaging, pooling, or downsampling. This validates the
+  probe mechanics only; it does not score an FM or select an architecture.
+- `2026-09-01`: Composite freeze job `21772119` published its first pass with
+  receipt SHA-256
+  `cc5cc3bce4c24e74bef1fbf084f407855233de7893183e6bc3486e284a2f44d9`,
+  `723,461` provisional training rows, `66,232` quarantined-overlap rows, and
+  `23,162` S77 holdout rows. This corrects the earlier pre-freeze count upward
+  by `105` rows to `789,693` before quarantine. The ORCD control socket expired
+  while the intentional second full validation was still running, so neither
+  these counts nor the receipt are accepted until terminal state and immutable
+  closure are re-verified.
+- `2026-09-01`: Implemented the actual fixed-band v4 transfer screen. It emits
+  one scalar score for each of `128` native cadence tokens, then takes a maximum
+  over the same literal indices `36--92` for every held-out sample. Synthetic
+  support is restricted to the training target and is absent from the held-out
+  scorer/reducer. The four exact arms are raw, quality-only, step-0
+  `h_cadence_128`, and step-2,000 `h_cadence_128`; the old `2,048`-cadence and
+  projected-`z` arms are excluded. Focused v1--v4 tests passed `33/33`, and the
+  full local suite passed `1,220` tests with `43` optional skips. This synthetic
+  candidate-centered screen explicitly cannot choose TCN versus Conformer.
 
-**Next:** Run the fast v3 raw/quality center-cadence mechanics control and
-freeze the composite identity receipt. If mechanics passes, run the
-predeclared candidate-band `36--92` transfer screen with raw, quality, step-0,
-and step-2,000 cadence-token controls. Only after those results are valid may
-the matched FM0.3.1 TCN/FM0.3.2 Conformer canary be authorized; preserve one
-native `200 s` cadence per token throughout.
+**Next:** Reopen the ORCD socket and verify the terminal composite receipt,
+then run the predeclared candidate-band `36--92` transfer screen with raw,
+quality, step-0, and step-2,000 cadence-token controls. Only after those results
+are valid may the matched FM0.3.1 TCN/FM0.3.2 Conformer canary be authorized;
+preserve one native `200 s` cadence per token throughout.
 
 ### Candidate validation and follow-up
 

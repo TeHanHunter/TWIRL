@@ -1,0 +1,166 @@
+schema_version: twirl_fm0_event_transfer_candidate_band_config_v4
+campaign_id: twirl_fm0_2_s66_s77_event_transfer_candidate_band_v4
+model_family: TWIRL-FM0
+status: frozen_bls_free_development_candidate_band_screen
+prepared_on: 2026-09-01
+
+purpose:
+  primary: test_fixed_band_cadence_local_information_for_later_classifiers
+  task_geometry: candidate_centered_single_event_classification
+  probe_only: true
+  formal_model_gate: false
+  production_model_claim: false
+  architecture_selection_claim: false
+
+authorization:
+  development_shard_payload_access: true
+  artificial_single_event_injection: true
+  frozen_checkpoint_inference: true
+  low_capacity_probe_fitting: true
+  fm_encoder_optimizer_or_training: false
+  bls_period_candidate_or_event_features: false
+  sealed_test_access: false
+
+prerequisite:
+  v3_mechanics_pass_required: true
+  v3_mechanics_result_sha256: 10b78bf083595ad8f4ecacb0428d99b939abc9dae5e3f361d02559659d1e2833
+  v1_v2_fm_metrics_interpretable: false
+
+inputs:
+  temporal_panel_receipt_sha256: 78c370e10c556472c5997c20cfe95207a0b334bafe7f024bf7ba4fc7ec4de624
+  expected_schedule_sha256: 6211057e0a6b8acb4377c11c2ccba92f2fc4a56e4a4f9c2e06f5afc0cef4cc37
+  allowed_sectors: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+  excluded_sectors: [65]
+  source_partition: poc_development
+  variant: TWIRL-FM0.2.1
+  checkpoint_steps: [0, 2000]
+  checkpoint_sha256:
+    step0: 92463070381486f0c6053c190d62da8d0c5c0d31be8072e2bdcd677329ac792c
+    step2000: 976b5053c857c38b9fbf7a35c9d0605f0023318b2c9bd37a88995992e5aa7bd2
+
+split:
+  train_sectors: [66, 67, 68, 69, 70, 71]
+  validation_sectors: [72, 73, 74]
+  locked_development_test_sectors: [75, 76, 77]
+  component_spanning_blocks: quarantine
+  one_visit_per_component: true
+  target_components_per_cohort_per_block: 240
+  shortfall_policy: fail_closed
+  minimum_components_per_cohort_per_block: 12
+  component_and_visit_order: deterministic_sha256
+  cohorts: [repeated, new]
+
+temporal_resolution:
+  nominal_cadence_seconds: 200
+  context_cadences: 128
+  direct_centered_crop: true
+  one_encoder_token_per_native_cadence: true
+  one_logit_per_native_cadence: true
+  score_all_128_tokens_before_reduction: true
+  temporal_downsampling: false
+  patching_or_cadence_averaging: false
+  representation_pooling: false
+  fixed_band_start_index_zero_based: 36
+  fixed_band_stop_index_inclusive_zero_based: 92
+  fixed_band_cadences: 57
+  fixed_band_definition: union_of_every_allowed_jittered_event_support
+  fixed_band_same_for_every_sample: true
+  held_out_sample_reduction: maximum_of_scalar_cadence_logits_over_fixed_indices_36_through_92
+
+artificial_event:
+  profile: symmetric_trapezoid_sampled_at_cadence_centers
+  duration_cadences: [1, 3, 9]
+  fractional_depths: [0.01, 0.03, 0.1, 0.3]
+  center_jitter_cadences_inclusive: [-24, 24]
+  apply_to_views: [adp_1x1, adp_3x3]
+  one_clean_and_one_injected_sample_per_component: true
+  one_event_per_injected_sample: true
+  period_defined: false
+  injection_truth_used_as_feature: false
+  held_out_support_used_to_select_score: false
+  support_role: per_cadence_training_target_only_never_feature_or_held_out_router
+
+features:
+  primary: step2000_h_cadence_128
+  arms:
+    - raw_adp_validity_error_cadence_128
+    - quality_only_cadence_128
+    - step0_h_cadence_128
+    - step2000_h_cadence_128
+  forbidden_arms:
+    - step0_h_cadence_2048
+    - step2000_h_cadence_2048
+    - step2000_z_cadence_128_diagnostic
+  forbidden_feature_families:
+    - period
+    - bls
+    - candidate_score
+    - event_duration
+    - event_depth
+    - event_center_numeric_value
+    - injection_support
+
+probe:
+  family: shared_linear_cadence_scorer
+  training_objective: pair_balanced_four_stratum_per_cadence_binary_cross_entropy
+  training_target: synthetic_event_support_boolean_target_not_input_feature
+  standardization: training_fixed_band_valid_tokens_dimensionwise_center_and_scale
+  held_out_sample_score: fixed_band_max_after_all_128_scalar_cadence_logits_exist
+  support_appended_to_features: false
+  held_out_support_used_as_router: false
+  representation_pooling_before_score: false
+  learning_rate: 0.02
+  l2_weight: 0.001
+  epochs: 400
+  initialization_seed: 560203
+  locked_test_not_used_for_fit_or_threshold: true
+
+metrics:
+  primary: paired_component_ranking_accuracy
+  secondary:
+    - roc_auc
+    - average_precision
+    - balanced_accuracy
+    - macro_f1
+    - brier_score
+    - expected_calibration_error
+    - tpr_at_validation_frozen_5_percent_fpr
+    - fpr_at_validation_frozen_5_percent_fpr
+  fpr_operating_point: 0.05
+  calibration_bins: 10
+  bootstrap_replicates: 1000
+  bootstrap_seed: 560204
+  report_by_cohort: true
+  report_by_event_cell: true
+
+probe_mechanics:
+  raw_control_minimum_overall_roc_auc_lower_95: 0.75
+  raw_control_minimum_each_depth_0_30_roc_auc: 0.90
+  raw_control_require_negative_adp_flux_coefficients: true
+  raw_control_paired_ranking_lower_95_strictly_above_chance: true
+  quality_only_maximum_absolute_roc_auc_from_chance: 0.05
+  quality_only_paired_ranking_required_exact: 0.50
+
+readiness:
+  primary_feature: step2000_h_cadence_128
+  minimum_roc_auc_lower_95: 0.75
+  minimum_paired_roc_auc_delta: 0.02
+  paired_delta_controls: [step0_h_cadence_128]
+  paired_delta_lower_95_strictly_positive: true
+  raw_noninferiority_control: raw_adp_validity_error_cadence_128
+  raw_noninferiority_margin: 0.01
+  minimum_each_cohort_roc_auc: 0.70
+  minimum_tpr_at_5_percent_fpr: 0.30
+  minimum_tpr_at_5_percent_fpr_lower_95: 0.20
+  maximum_locked_test_fpr_at_validation_frozen_threshold: 0.10
+  require_paired_ranking_lower_95_above_chance: true
+  raw_noninferiority_supports_readiness_not_superiority: true
+
+claim_limit: >-
+  This development-only screen tests a candidate-centered synthetic event task.
+  It scores every native cadence, then applies one fixed scalar-logit maximum
+  over indices 36--92 for every sample. Synthetic support is a training target
+  only and never a feature or held-out router. The screen does not average,
+  merge, patch, or downsample cadence representations; use BLS or period
+  information; open sealed data; establish natural-event or blind-detection
+  performance; select between TCN and Conformer; or authorize model promotion.
